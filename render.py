@@ -35,6 +35,12 @@ cycles.transparent_max_bounces = 128
 #tell blender to use CUDA / GPU devices
 #bpy.context.user_preferences.system.compute_device_type = 'CUDA'
 
+    # red = makeMaterial('Red', (1,0,0), (1,1,1), 1)
+
+    # for item in bpy.data.objects:
+    #     if item.type == 'MESH':
+    #         for mat in item.data.materials:
+    #             mat = red
 
 bpy.data.scenes['Scene'].render.filepath = 'prova.png'
 

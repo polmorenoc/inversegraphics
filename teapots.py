@@ -5,6 +5,33 @@ import numpy
 from PIL import Image
 import mathutils
 from math import radians
+import h5py
+import scipy.io
+from score_image import getChamferDistance
+import cv2
+import sys
+import io
+
+def loadData():
+    #data
+    fdata = h5py.File('../data/data-all-flipped-cropped-512.mat')
+    data = fdata["data"]
+
+    images = h5py.File('../data/images-all-flipped-cropped-512-color.mat')
+    # images = f["images"]
+    # imgs = numpy.array(images)
+    # N = imgs.shape[0]
+    # imgs = imgs.transpose(0,2,3,1)
+
+    # f = h5py.File('../data/all-flipped-cropped-512-crossval6div2_py-experiment.mat')
+    # experiments = f["experiments_data"]
+
+    # f = h5py.File('../data/all-flipped-cropped-512-crossval6div2_py-experiment.mat')
+    experiments = scipy.io.loadmat('../data/all-flipped-cropped-512-crossval6all2-experiment.mat')
+
+    return data, images, experiments['experiments_data']
+
+
 
 def makeMaterial(name, diffuse, specular, alpha):
     mat = bpy.data.materials.new(name)
@@ -48,6 +75,46 @@ def modelHeight(scene):
 
     return minZ, maxZ
 
+def modelWidth(scene):
+    maxY = -999999;
+    minY = 99999;
+    for model in scene.objects:
+        if model.type == 'MESH':
+            for v in model.data.vertices:
+                if (model.matrix_world * v.co).y > maxY:
+                    maxY = (model.matrix_world * v.co).y
+                if (model.matrix_world * v.co).y < minY:
+                    minY = (model.matrix_world * v.co).y
+
+
+    return minY, maxY
+
+
+def centerOfGeometry(scene):
+    center = mathutils.Vector((0.0,0.0,0.0))
+    numVertices = 0.0
+    for model in scene.objects:
+        if model.type == 'MESH':
+            numVertices = numVertices + len(model.data.vertices)
+            for v in model.data.vertices:
+                center = center + (model.matrix_world * v.co)
+
+
+    return center/numVertices
+
+def setEulerRotation(scene, eulerVectorRotation):
+    for model in scene.objects:
+        if model.type == 'MESH':
+            model.rotation_euler = eulerVectorRotation
+
+    scene.update()
+
+def rotateMatrixWorld(scene, rotationMat):
+    for model in scene.objects:
+        if model.type == 'MESH':
+            model.matrix_world = rotationMat * model.matrix_world
+
+    scene.update()    
 
 
 baseDir = '../databaseFull/models/'
@@ -57,158 +124,274 @@ lines = [line.strip() for line in open('teapots.txt')]
 for object in bpy.data.scenes['Scene'].objects: print(object.name)
 
 lamp = bpy.data.scenes['Scene'].objects[1]
-lamp.location = (0,0.0,2)
+lamp.location = (0,0.0,1.5)
 
 camera = bpy.data.scenes['Scene'].objects[2]
 
 camera.data.angle = 60 * 180 / numpy.pi
-location = (0,-0.5,0.0)
-location = mathutils.Matrix.Rotation(radians(-45.0), 4, 'X') * mathutils.Vector(location)
+
+distance = 0.5
+originalLoc = mathutils.Vector((0,-distance,0.0))
+
+elevation = 0.0
+azimuth = 0.0
+elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+location = azimuthRot * elevationRot * originalLoc
 camera.location = location
 
 look_at(camera, mathutils.Vector((0,0,0)))
 
 
-# red = makeMaterial('Red', (1,0,0), (1,1,1), 1)
-
-# for item in bpy.data.objects:
-#     if item.type == 'MESH':
-#         for mat in item.data.materials:
-#             mat = red
-
 world = bpy.context.scene.world
 
-# World settings
-# world.use_sky_blend = True
 
 # Environment lighting
 world.light_settings.use_environment_light = True
-world.light_settings.environment_energy = 0.10
+world.light_settings.environment_energy = 0.5
 world.horizon_color = mathutils.Color((0.0,0.0,0.0))
-# wset.use_environment_light = True
-# wset.use_ambient_occlusion = False
-# wset.ao_blend_type = 'MULTIPLY'
-# wset.ao_factor = 0.8
-# wset.gather_method = 'APPROXIMATE'
 
-# cycles = bpy.context.scene.cycles
-
-# cycles.max_bounces = 128
-# cycles.min_bounces = 3
-# cycles.caustics_reflective = True
-# cycles.caustics_refractive = True
-# cycles.diffuse_bounces = 128
-# cycles.glossy_bounces = 128
-# cycles.transmission_bounces = 128
-# cycles.volume_bounces = 128
-# cycles.transparent_min_bounces = 8
-# cycles.transparent_max_bounces = 128
+width = 200
+height = 200
 
 
+data, images, experiments = loadData()
 
-for teapot in lines:
-    
+# images["images"][i]
 
-    fullTeapot = baseDir + teapot
+labels = numpy.column_stack((numpy.cos(numpy.array(data["altitudes"])*numpy.pi/180), numpy.sin(numpy.array(data["altitudes"])*numpy.pi/180), numpy.cos(numpy.array(data["azimuths"])*numpy.pi/180.0), numpy.sin(numpy.array(data["azimuths"])*numpy.pi/180.0)))
+groundTruthEls = numpy.array(data["altitudes"])
+groundTruthAzs = numpy.array(data["azimuths"])
 
-    print("Reading " + fullTeapot + '.dae')
+expi = 0
 
-    bpy.ops.scene.new()
-    bpy.context.scene.name = teapot
-    scene = bpy.context.scene
+experiment = experiments['experiments'][0][0][0][expi]
 
-    scene.objects.link(lamp)
-    # scene.objects.link(camera)
+selTrain = experiment['selTrain'][0][0][0]
 
-    scene.camera = camera
+selTest = experiment['selTest'][0][0][0]
 
-    scene.render.use_raytrace = True
-    # scene.render.use_full_sample = True
-    scene.render.antialiasing_samples = '16'
+output = scipy.io.loadmat('../data/crossval6div2-hog8-alldataexperiments.mat')['output_data']
+
+idx = output['idx'][0][0][expi][0]
+
+nnpredazs = output['nnpredradazs'][0][0][expi][0]*180.0/numpy.pi
+nnpredalts = output['nnpredradalts'][0][0][expi][0]*180.0/numpy.pi
+# rtpredazs = output['rtpredradazs'][0][0][expi][0]*180.0/numpy.pi
+# rtpredalts = output['rtpredradalts'][0][0][expi][0]*180.0/numpy.pi
+
+predazs =nnpredazs.squeeze()
+predalts=nnpredalts.squeeze()
+
+numTest = selTest.size
+
+bestModels= [""]*numTest
+bestScores = numpy.ones(numTest)*999999
+bestAzimuths = numpy.zeros(numTest)
+bestElevations = numpy.zeros(numTest)
+
+predi = 0
 
 
-    # scene.render.engine = 'CYCLES'
+for test in selTest[0:2]:
 
-    # cycles = scene.cycles
-    # cycles.samples = 128
-    # cycles.max_bounces = 128
-    # cycles.min_bounces = 3
-    # cycles.caustics_reflective = True
-    # cycles.caustics_refractive = True
-    # cycles.diffuse_bounces = 128
-    # cycles.glossy_bounces = 128
-    # cycles.transmission_bounces = 128
-    # cycles.volume_bounces = 128
-    # cycles.transparent_min_bounces = 8
-    # cycles.transparent_max_bounces = 128
+    testImage = images["images"][test].reshape(100,100,3)
+    score = 9999999
 
-    scene.render.filepath = teapot + '.png'
+    for teapot in lines:
+        
 
-    bpy.utils.collada_import(fullTeapot + '.dae')
-    # bpy.ops.import_scene.autodesk_3ds(filepath=fullTeapot + '.3DS')
+        fullTeapot = baseDir + teapot
 
-    minZ, maxZ = modelHeight(scene)
+        print("Reading " + fullTeapot + '.dae')
 
-    scale = 0.15/(maxZ-minZ)
+        bpy.ops.scene.new()
+        bpy.context.scene.name = teapot
+        scene = bpy.context.scene
 
-    for mesh in scene.objects:
-        if mesh.type == 'MESH':
-            scaleMat = mathutils.Matrix.Scale(scale, 4)
-            mesh.matrix_world =  scaleMat * mesh.matrix_world
-                 
+        scene.objects.link(lamp)
+
+        scene.camera = camera
+
+        # scene.render.use_raytrace = True
+        # scene.render.antialiasing_samples = '16'
+        
+
+        scene.render.resolution_x = width #perhaps set resolution in code
+        scene.render.resolution_y = height
+        scene.world = world
+
+        scene.render.filepath = teapot + '.png'
+
+        bpy.utils.collada_import(fullTeapot + '.dae')
+
+        minZ, maxZ = modelHeight(scene)
+
+        minY, maxY = modelWidth(scene)
+
+
+        scaleZ = 0.254/(maxZ-minZ)
+        scaleY = 0.1778/(maxY-minY)
+
+        scale = min(scaleZ, scaleY)
+
+        for mesh in scene.objects:
+            if mesh.type == 'MESH':
+                scaleMat = mathutils.Matrix.Scale(scale, 4)
+                mesh.matrix_world =  scaleMat * mesh.matrix_world
+                     
+        minZ, maxZ = modelHeight(scene)
+
+        center = centerOfGeometry(scene)
+        for mesh in scene.objects:
+            if mesh.type == 'MESH':
+                mesh.matrix_world = mathutils.Matrix.Translation(-center) * mesh.matrix_world
+
+        #Rotate the object to the azimuth angle we define as 0.
+        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
+        rotateMatrixWorld(scene, rot)
+
+        camera.data.angle = 60 * 180 / numpy.pi
+
+        stopSearchEl  = False
+        stopSearchAz  = False
+        dirEl = 1
+        dirAz = 1
+
+        elevation = predalts[predi]
+        azimuth = predazs[predi]
+        center = centerOfGeometry(scene)
+        elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+        azimuthRot = mathutils.Matrix.Rotation(radians(azimuth), 4, 'Z')
+        location = azimuthRot * elevationRot * (center + originalLoc)
+        camera.location = location
+        look_at(camera, center)
+        scene.update()
+
+        old_stdout = sys.stdout
+        render_output = io.StringIO()
+        sys.stdout = render_output
+        bpy.ops.render.render( write_still=True )
+        sys.stdout = old_stdout
+
+        # blendImage = bpy.data.images['Render Result']
+        # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))
+        # image[numpy.where(image > 1)] = 1
+
+        image = cv2.imread(teapot + '.png', cv2.IMREAD_ANYDEPTH)
+        image = numpy.float16(image)/255.0
+
+        distance = getChamferDistance(testImage, image)
+
+
+        if distance < score:
+            score = distance
+            bestModels[predi] = teapot
+            bestScores[predi] = score
+            bestElevations[predi] = elevation
+            bestAzimuths[predi] = azimuth
+
+
+        # while not stopSearchEl:
+        #     elevation = (elevation + dirEl*2) % 90
+
+        #     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+        #     location = azimuthRot * elevationRot * (center + originalLoc)
+
+        #     camera.location = location
+        #     scene.update()
+
+        #     look_at(camera, center)
+
+        #     bpy.ops.render.render( write_still=True )
+
+        #     # blendImage = bpy.data.images['Render Result']
+
+        #     # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))
+
+        #     # # Truncate intensities larger than 1.
+        #     # image[numpy.where(image > 1)] = 1
+
+        #     image = cv2.imread(teapot + '.png', cv2.IMREAD_ANYDEPTH)
+
+        #     image = numpy.float16(image)/255.0
+
+        #     distance = getChamferDistance(image, testImage)
+
+        #     if distance < score:
+        #         score = distance
+        #         bestModels[predi] = teapot
+        #         bestScores[predi] = score
+        #         bestElevations[predi] = elevation
+                
+        #     elif dirEl > 0:
+        #         elevation = predalts[predi]
+        #         dirEl = -1
+        #     else:
+        #         stopSearchEl = True
+
+        iaz = 0
+        azimuth = 0
+        while not stopSearchAz:
+            azimuth = (azimuth + dirAz*5) 
+
+            azimuthRot = mathutils.Matrix.Rotation(radians(elevation), 4, 'Z')
+            location = azimuthRot * elevationRot * (center + originalLoc)
+            camera.location = location
+
+            look_at(camera, center)
+
             
-    # scene.update()
-    minZ, maxZ = modelHeight(scene)
+            scene.update()
+
+            old_stdout = sys.stdout
+            render_output = io.StringIO()
+            sys.stdout = render_output
+            bpy.ops.render.render( write_still=True )
+            sys.stdout = old_stdout
+
+            blendImage = bpy.data.images['Render Result']
+
+            # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))[:,:,0:3]
+
+            # # Truncate intensities larger than 1.
+            # image[numpy.where(image > 1)] = 1
+
+            image = cv2.imread(teapot + '.png', cv2.IMREAD_ANYDEPTH)
+            image = numpy.float16(image)/255
+
+            distance = getChamferDistance(image, testImage)
+
+            if distance < score:
+                score = distance
+                bestModels[predi] = teapot
+                bestScores[predi] = score
+                bestAzimuths[predi] = azimuth
+            # elif dirAz > 0:
+            #     azimuth = predazs[predi]
+            #     dirAz = -1
+            # else:
+            #     stopSearchAz = True
+
+            if azimuth >= 355:
+                stopSearchAz = True
 
 
-    for mesh in scene.objects:
-        if mesh.type == 'MESH':
-                # mesh.location = mesh.location - mathutils.Vector((0,0,-minZ))
-            mesh.matrix_world = mathutils.Matrix.Translation((0,0,-minZ)) * mesh.matrix_world
-    
-    # scene.update()
-    # scene.world = world
+        # Save best image.
+        # im = Image.fromarray(numpy.uint8(image*255))
 
-    for object in bpy.context.scene.objects: print(object.name)
+        # im.save(teapot + '.png')
 
 
-    width = 300
-    height = 300
+        #Cleanup
 
-    scene.render.resolution_x = width #perhaps set resolution in code
-    scene.render.resolution_y = height
+        for obji in scene.objects:
+            if obji.type == 'MESH':
+                obji.user_clear()
+                bpy.data.objects.remove(obji)
 
+        scene.user_clear()
+        bpy.ops.scene.delete()    
 
-
-    camera.data.angle = 60 * 180 / numpy.pi
-    
-    camera.location = location
-
-    look_at(camera, mathutils.Vector((0,0,0.1)))
-
-
-    # red = makeMaterial('Red', (1,0,0), (1,1,1), 1)
-
-    # for item in bpy.data.objects:
-    #     if item.type == 'MESH':
-    #         for mat in item.data.materials:
-    #             mat = red
-
-    scene.world = world
-
-    # Environment lighting
-    # scene.world.light_settings.use_environment_light = True
-
-    bpy.ops.render.render( write_still=False )
-
-    blendImage = bpy.data.images['Render Result']
-
-    image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))
-
-    # Truncate intensities larger than 1.
-    image[numpy.where(image > 1)] = 1
-
-    im = Image.fromarray(numpy.uint8(image*255))
-
-    im.save(teapot + '_2.png')
+    predi = predi + 1
 
