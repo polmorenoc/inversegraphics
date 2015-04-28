@@ -1,3 +1,4 @@
+13961f08fe5b4c549ef60e9225cbea3a_cleaned
 teapots/8e6a162e707ecdf323c90f8b869f2ce9/Teapot N280912_cleaned
 teapots/c7549b28656181c91bff71a472da9153/Teapot N311012_cleaned
 teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912_cleaned
