@@ -7,12 +7,16 @@ import mathutils
 from math import radians
 import h5py
 import scipy.io
-from score_image import getChamferDistance
+from score_image import *
 import cv2
 import sys
 import io
 import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 import os
+import pickle
+import ipdb
+from tabulate import tabulate
 
 def loadData():
     #data
