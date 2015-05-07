@@ -11,19 +11,22 @@ def scoreImage(img, template, method, methodParams):
         score = numpy.sum(sqDists)
     elif method == 'robustChamferModelToData':
         sqDists = numpy.sum(chamferDistanceModelToData(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
-        score = robustDistance(sqDists, methodParams['robustSigma'])
+        score = robustDistance(sqDists, methodParams['scale'])
     elif method == 'chamferDataToModel':
         sqDists = chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate'])
         score = numpy.sum(sqDists)
     elif method == 'robustChamferDataToModel':
         sqDists = numpy.sum(chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
-        score = robustDistance(sqDists, methodParams['robustScale'])
+        score = robustDistance(sqDists, methodParams['scale'])
     elif method == 'sqDistImages':
         sqDists = sqDistImages(img, template)
-        score = numpy.sum(sqDists)
+        score = numpy.sum(sqDists) / template.size
+    elif method == 'ignoreSqDistImages':
+        sqDists = sqDistImages(img, template)
+        score = numpy.sum(sqDists * (template > 0)) / numpy.sum(template > 0)
     elif method == 'robustSqDistImages':
         sqDists = sqDistImages(img, template)
-        score = robustDistance(sqDists, methodParams['robustScale'])
+        score = robustDistance(sqDists, methodParams['scale'])
 
     return score
 
@@ -76,6 +79,7 @@ def sqDistImages(img, template):
     return sqResiduals
 
 
+
 def robustDistance(sqResiduals, scale):
     return numpy.sum(sqResiduals/(sqResiduals + scale**2))
 
@@ -84,13 +88,19 @@ def robustDistance(sqResiduals, scale):
 
 
 def testImageMatching():
+    minThresTemplate = 10
+    maxThresTemplate = 100
+    methodParams = {'scale': 85000, 'minThresImage': minThresTemplate, 'maxThresImage': maxThresTemplate, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
+            
+            
+
     teapots = ["test/teapot1", "test/teapot2","test/teapot3","test/teapot4","test/teapot5","test/teapot6"]
 
     images = []
     edges = []
     for teapot in teapots:
         im = cv2.imread(teapot + ".png")
-        can = cv2.Canny(im, 50,255)
+        can = cv2.Canny(im, minThresTemplate,maxThresTemplate)
         images.append(im)
         edges.append(can)
         cv2.imwrite(teapot + "_can.png", can)
@@ -98,11 +108,25 @@ def testImageMatching():
     confusion = numpy.zeros([6,6])
     for tp1 in numpy.arange(1,7):
         for tp2 in numpy.arange(tp1,7):
-            dist = getChamferDistance(images[tp1-1], images[tp2-1])
+            dist = distance = scoreImage(images[tp1-1], images[tp2-1], 'robustSqDistImages', methodParams)
             print(dist)
             confusion[tp1-1, tp2-1] = dist
 
-    plt.imshow(confusion, interpolation='nearest')
+    plt.matshow(confusion)
+    plt.colorbar()
     plt.savefig('test/confusion.png')
 
 
+
+
+
+# elif method == 'chamferDataToModel':
+#         sqDists = chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate'])
+#         score = numpy.sum(sqDists)
+#     elif method == 'robustChamferDataToModel':
+#         sqDists = numpy.sum(chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
+#         score = robustDistance(sqDists, methodParams['robustScale'])
+#     elif method == 'sqDistImages':
+#         sqDists = sqDistImages(img, template)
+#         score = numpy.sum(sqDists)
+#     elif method == 'robustSqDistImages':

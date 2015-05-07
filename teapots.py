@@ -33,7 +33,7 @@ world = bpy.context.scene.world
 
 # Environment lighting
 world.light_settings.use_environment_light = True
-world.light_settings.environment_energy = 0.3
+world.light_settings.environment_energy = 0.2
 world.horizon_color = mathutils.Color((0.0,0.0,0.0))
 
 width = 200

@@ -39,6 +39,13 @@ def loadData():
 
     return data, images, experiments['experiments_data']
 
+def modifySpecular(scene, delta):
+    for model in scene.objects:
+        if model.type == 'MESH':
+            for mat in model.data.materials:
+                mat.specular_shader = 'PHONG'
+                mat.specular_intensity = mat.specular_intensity + delta
+                mat.specular_hardness = mat.specular_hardness / 4.0
 
 
 def makeMaterial(name, diffuse, specular, alpha):
