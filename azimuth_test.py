@@ -77,7 +77,7 @@ maxThresImage = 150
 baseDir = '../databaseFull/models/'
 
 experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot', 'teapots/a7fa82f5982edfd033da2d90df7af046/Teapot_fixed', 'teapots/8e6a162e707ecdf323c90f8b869f2ce9/Teapot N280912', 'teapots/12b81ec72a967dc1714fc48a3b0c961a/Teapot N260113_fixed']
-experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot']
+# experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot']
 
 outputExperiments = []
 
@@ -112,7 +112,7 @@ for teapotTest in experimentTeapots:
         bpy.ops.scene.new()
         bpy.context.scene.name = teapot
         scene = bpy.context.scene
-        # bpy.context.scene.render.engine = 'CYCLES'
+        bpy.context.scene.render.engine = 'CYCLES'
         # bpy.context.scene.cycles.samples = 128
 
         scene.camera = camera
@@ -170,7 +170,7 @@ for teapotTest in experimentTeapots:
         bestAzimuths= numpy.array([]) 
 
 
-        expSelTest = numpy.arange(0,numTests,int(numTests/30))
+        expSelTest = numpy.arange(0,numTests,int(numTests/100))
 
 
         for selTestNum in expSelTest:

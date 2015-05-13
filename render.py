@@ -1,73 +1,161 @@
 #!/usr/bin/env python3.4m
  
-import bpy
-import numpy
-from PIL import Image
+import sceneimport
+from utils import * 
 
-# bpy.ops.scene.new(type='EMPTY')
+inchToMeter = 0.0254
 
-# bpy.data.scenes['Scene'].objects.unlink(bpy.context.active_object)
+sceneFile = '../databaseFull/scenes/scene00051.txt' 
+targetIndex = 9
+world = bpy.context.scene.world
 
-# for item in bpy.data.objects:
-#     if item.type == 'MESH':
-#         item.user_clear()
-#         bpy.data.objects.remove(item)
+instances = sceneimport.loadScene(sceneFile)
 
+# targets = sceneimport.loadTargetModels()
+[blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
+
+scene = sceneimport.composeScene(modelInstances, targetIndex)
+
+scene.update()
+bpy.context.screen.scene = scene
 
 #Switch Engine to Cycles
-bpy.context.scene.render.engine = 'CYCLES'
-#bpy.context.scene.render.engine = 'BLENDER_RENDER'
+# bpy.context.scene.render.engine = 'CYCLES'
+# AutoNode()
+# bpy.context.scene.render.engine = 'BLENDER_RENDER'
 
-cycles = bpy.context.scene.cycles
+# cycles = bpy.context.scene.cycles
 
-cycles.max_bounces = 128
-cycles.min_bounces = 3
-cycles.caustics_reflective = True
-cycles.caustics_refractive = True
-cycles.diffuse_bounces = 128
-cycles.glossy_bounces = 128
-cycles.transmission_bounces = 128
-cycles.volume_bounces = 128
-cycles.transparent_min_bounces = 8
-cycles.transparent_max_bounces = 128
+# cycles.samples = 4
+# cycles.max_bounces = 128
+# cycles.min_bounces = 3
+# cycles.caustics_reflective = True
+# cycles.caustics_refractive = True
+# cycles.diffuse_bounces = 128
+# cycles.transmission_bounces = 128
+# cycles.volume_bounces = 128
+# cycles.transparent_min_bounces = 8
+# cycles.transparent_max_bounces = 128
 
- 
-#tell blender to use CUDA / GPU devices
-#bpy.context.user_preferences.system.compute_device_type = 'CUDA'
+width = 600
+height = 600
 
-    # red = makeMaterial('Red', (1,0,0), (1,1,1), 1)
+scene.render.resolution_x = width #perhaps set resolution in code
+scene.render.resolution_y = height
 
-    # for item in bpy.data.objects:
-    #     if item.type == 'MESH':
-    #         for mat in item.data.materials:
-    #             mat = red
+camera = bpy.data.scenes['Scene'].objects[2]
+scene.camera = camera
+camera.up_axis = 'Z'
+camera.data.angle = 60 * 180 / numpy.pi
+distance = 2
 
-bpy.data.scenes['Scene'].render.filepath = 'prova.png'
+center = centerOfGeometry(modelInstances[targetIndex].dupli_group.objects, modelInstances[targetIndex].matrix_world)
+# center = mathutils.Vector((0,0,0))
+# center = instances[targetIndex][1]
 
-# bpy.utils.collada_import("/home/pol/Documents/3DScene/databaseFull/models/teapots/01af6b064c2d71b944715c5630d326dd/Teapot_fixed.dae")
-#bpy.utils.collada_import("/home/pol/Documents/3DScene/databaseFull/models/teapots/e41b46d4249bf5cd81709c7a26423382/Teapot N240608_fixed.dae")
+originalLoc = mathutils.Vector((0,-distance , 0))
+elevation = 45.0
+azimuth = 0
 
-
-for object in bpy.data.scenes['Scene'].objects: print(object.name)
-
-for item in bpy.data.objects:
-    print(item.name, item.type)
-
-width = 360
-height = 240
+scene.render.use_raytrace = True
 
 
-bpy.context.scene.render.resolution_x = width #perhaps set resolution in code
-bpy.context.scene.render.resolution_y = height
+elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+location = center + azimuthRot * elevationRot * originalLoc
+camera.location = location
 
+lamp_data2 = bpy.data.lamps.new(name="LampBotData", type='POINT')
+lamp2 = bpy.data.objects.new(name="LampBot", object_data=lamp_data2)
+lamp2.location = location
+lamp2.data.energy = 1
+# lamp.data.size = 0.25
+lamp2.data.use_diffuse = True
+lamp2.data.use_specular = True
+scene.objects.link(lamp2)
+# world.light_settings.use_environment_light = False
+# world.light_settings.environment_energy = 5
+# world.horizon_color = mathutils.Color((0.0,0.0,0.0))
+# world.light_settings.samples = 20
+# scene.world = world
+
+scene.update()
+
+look_at(camera, center)
+
+bpy.ops.scene.render_layer_add()
+
+# for c in range(2,3):
+#     scene.objects[c].layers[1] = True
+
+# bpy.data.objects['room09'].layers[0] = False
+bpy.data.objects['room09'].layers[1] = True
+# scene.render.use_compositing = False
+
+# for ob in modelInstances[0].dupli_group.objects:
+#     ob.layers[1] = False
+
+camera.layers[1] = True
+lamp2.layers[1] = True
+scene.render.layers[0].use_pass_object_index = True
+scene.render.layers[1].use_pass_object_index = True
+scene.render.layers[1].use_pass_combined = False
+
+
+scene.layers[1] = False
+scene.layers[0] = True
+scene.render.layers[0].use = True
+scene.render.layers[1].use = False
+
+# azimuths = [0,5,10,20,30,40,50]
+# for azimuths in positions:
+#     bpy.context.scene.frame_set(frame_num)
+#     ob.location = position
+#     ob.keyframe_insert(data_path="location", index=-1)
+#     frame_num += 10
+
+
+scene.update()
+
+minZ, maxZ = modelHeight(scene)
+
+
+# scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
+scene.render.image_settings.file_format = 'PNG'
+scene.render.filepath = 'scene.png'
 bpy.ops.render.render( write_still=True )
-#bpy.ops.render.opengl(animation=False, view_context=False)
-#bpy.ops.object.bake(type='COMBINED', filepath="baked.png", width=512, height=512)
 
-blendImage = bpy.data.images['Render Result']
 
-image = numpy.flipud(numpy.array(blendImage.extract_render(scene=bpy.data.scenes['Scene'])).reshape([height/2,width/2,4]))
+# for target in targets:
 
-im = Image.fromarray(numpy.uint8(image*255))
 
-im.save("lele.png")
+# modifySpecular(scene, 0.3)
+
+# # ipdb.set_trace()
+
+# minZ, maxZ = modelHeight(scene)
+
+# minY, maxY = modelWidth(scene)
+
+# scaleZ = 0.254/(maxZ-minZ)
+# scaleY = 0.1778/(maxY-minY)
+
+# scale = min(scaleZ, scaleY)
+
+# for mesh in scene.objects:
+#     if mesh.type == 'MESH':
+#         scaleMat = mathutils.Matrix.Scale(scale, 4)
+#         mesh.matrix_world =  scaleMat * mesh.matrix_world
+             
+# minZ, maxZ = modelHeight(scene)
+# scene.objects.link(lamp2)
+
+# scene.objects.link(lamp)
+
+# # lamp2.location = (0,0, 2)
+
+
+# center = centerOfGeometry(scene)
+# for mesh in scene.objects:
+#     if mesh.type == 'MESH':
+#         mesh.matrix_world = mathutils.Matrix.Translation(-center) * mesh.matrix_world

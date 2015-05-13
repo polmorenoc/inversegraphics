@@ -18,6 +18,8 @@ import pickle
 import ipdb
 from tabulate import tabulate
 
+inchToMeter = 0.0254
+
 def loadData():
     #data
     # fdata = h5py.File('../data/data-all-flipped-cropped-512.mat','r')
@@ -105,14 +107,14 @@ def modelWidth(scene):
     return minY, maxY
 
 
-def centerOfGeometry(scene):
+def centerOfGeometry(objects, transform):
     center = mathutils.Vector((0.0,0.0,0.0))
     numVertices = 0.0
-    for model in scene.objects:
+    for model in objects:
         if model.type == 'MESH':
             numVertices = numVertices + len(model.data.vertices)
             for v in model.data.vertices:
-                center = center + (model.matrix_world * v.co)
+                center = center + (transform * model.matrix_world * v.co)
 
 
     return center/numVertices
@@ -130,3 +132,90 @@ def rotateMatrixWorld(scene, rotationMat):
             model.matrix_world = rotationMat * model.matrix_world
 
     scene.update()  
+
+
+def AutoNodeOff():
+    mats = bpy.data.materials
+    for cmat in mats:
+        cmat.use_nodes=False
+
+def AutoNode():
+    mats = bpy.data.materials
+    for cmat in mats:
+        #print(cmat.name)
+        cmat.use_nodes=True
+        TreeNodes=cmat.node_tree
+        links = TreeNodes.links
+    
+        shader=''
+        for n in TreeNodes.nodes:
+    
+            if n.type == 'ShaderNodeTexImage' or n.type == 'RGBTOBW':
+                TreeNodes.nodes.remove(n)
+
+            if n.type == 'OUTPUT_MATERIAL':
+                shout = n       
+                        
+            if n.type == 'BACKGROUND':
+                shader=n              
+            if n.type == 'BSDF_DIFFUSE':
+                shader=n  
+            if n.type == 'BSDF_GLOSSY':
+                shader=n              
+            if n.type == 'BSDF_GLASS':
+                shader=n  
+            if n.type == 'BSDF_TRANSLUCENT':
+                shader=n     
+            if n.type == 'BSDF_TRANSPARENT':
+                shader=n   
+            if n.type == 'BSDF_VELVET':
+                shader=n     
+            if n.type == 'EMISSION':
+                shader=n 
+            if n.type == 'HOLDOUT':
+                shader=n   
+
+        if cmat.raytrace_mirror.use and cmat.raytrace_mirror.reflect_factor>0.001:
+            print("MIRROR")
+            if shader:
+                if not shader.type == 'BSDF_GLOSSY':
+                    print("MAKE MIRROR SHADER NODE")
+                    TreeNodes.nodes.remove(shader)
+                    shader = TreeNodes.nodes.new('BSDF_GLOSSY')    # RGB node
+                    shader.location = 0,450
+                    #print(shader.glossy)
+                    links.new(shader.outputs[0],shout.inputs[0]) 
+                        
+        if not shader:
+            shader = TreeNodes.nodes.new('BSDF_DIFFUSE')    # RGB node
+            shader.location = 0,450
+             
+            shout = TreeNodes.nodes.new('OUTPUT_MATERIAL')
+            shout.location = 200,400          
+            links.new(shader.outputs[0],shout.inputs[0])                
+                   
+                   
+                   
+        if shader:                         
+            textures = cmat.texture_slots
+            for tex in textures:
+                                
+                if tex:
+                    if tex.texture.type=='IMAGE':
+                         
+                        img = tex.texture.image
+                        #print(img.name)  
+                        shtext = TreeNodes.nodes.new('ShaderNodeTexImage')
+          
+                        shtext.location = -200,400 
+        
+                        shtext.image=img
+        
+                        if tex.use_map_color_diffuse:
+                            links.new(shtext.outputs[0],shader.inputs[0]) 
+    
+                        if tex.use_map_normal:
+                            t = TreeNodes.nodes.new('RGBTOBW')
+                            t.location = -0,300 
+                            links.new(t.outputs[0],shout.inputs[2]) 
+                            links.new(shtext.outputs[0],t.inputs[0]) 
