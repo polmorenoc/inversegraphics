@@ -119,6 +119,7 @@ for teapotTest in experimentTeapots:
 
         scene.render.resolution_x = width #perhaps set resolution in code
         scene.render.resolution_y = height
+        scene.render.resolution_percentage = 100
         scene.world = world
 
         scene.render.filepath = teapot + '.png'
@@ -243,7 +244,7 @@ for teapotTest in experimentTeapots:
 
                 blendImage = bpy.data.images['Render Result']
 
-                image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))[7:107,7:107,0:3]
+                image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/scene.render.resolution_percentage/100,width/scene.render.resolution_percentage/100,4]))[7:107,7:107,0:3]
 
                 # Truncate intensities larger than 1.
                 image[numpy.where(image > 1)] = 1

@@ -3,28 +3,16 @@ reload(saveExrImages)
 from saveExrImages import exportExrImages
 import os
 print "Reading xml "
-for sceneRoot, sceneDirs, files in os.walk("../output/annotation/"):
-    # for sceneName in sceneDirs:
-    #     sceneDir = os.path.join(sceneRoot, sceneName)
-    #     for modelRoot, modelDirs, files2 in os.walk(sceneDir):
-    #         for modelName in modelDirs:
-    #             modelDir = os.path.join(modelRoot, modelName)
-    #             numModels = 1
-    for xmlScene in files:
-        if xmlScene.endswith(".exr"): 
 
-            if not xmlScene.endswith("_single.exr"): 
-                print "Reading xml " + xmlScene
-                try:
-                    outfilename = os.path.splitext(xmlScene)[0]
+lines = [line.strip() for line in open('output/groundtruth.txt')]
 
-                    print "Reading " + outfilename
+for instance in lines:
+    parts = instance.split(' ')
+    teapot = int(parts[3])
+    frame = int(parts[4])
 
-                    #sceneFullPath = os.path.splitext(modelDir + '/' + xmlScene)[0]
+    try:
+        exportExrImages("output/", "output/images/", teapot, frame)
+    except Exception as e:
+        print e
 
-                    exportExrImages("../output/annotation/", "../output/images/", outfilename)
-                except Exception as e:
-                    print e
-                    print "Scene " + outfilename + " failed!"
-    #            numModels = numModels + 1
-                        

@@ -41,6 +41,33 @@ def loadData():
 
     return data, images, experiments['experiments_data']
 
+def loadGroundTruth():
+    lines = [line.strip() for line in open('output/groundtruth.txt')]
+    groundTruthLines = []
+    imageFiles = []
+    groundTruth = numpy.zeros([len(lines), 4])
+    for instance in lines:
+        parts = instance.split(' ')
+        framestr = '{0:04d}'.format(int(parts[4]))
+        outfilename = "scene_obj" + str(int(parts[3])) + "_" + framestr
+        imageFile = "output/images/" + outfilename + ".png"
+        if os.path.isfile(imageFile):
+            imageFiles = imageFiles + [imageFile]
+            groundTruthLines = groundTruthLines + [[float(parts[0]), float(parts[1]), float(parts[2]),int(parts[3]), int(parts[4])]]
+
+    groundTruth = numpy.array(groundTruthLines)
+
+    groundTruth = numpy.hstack((groundTruth,numpy.zeros((groundTruth.shape[0],1))))
+
+    lines = [line.strip() for line in open('output/occlusions.txt')]
+
+    for instance in lines:
+        parts = instance.split(' ')
+        index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])))[0][0]
+        groundTruth[index, 5] = float(parts[2])
+ 
+    return groundTruth, imageFiles
+
 def modifySpecular(scene, delta):
     for model in scene.objects:
         if model.type == 'MESH':
@@ -68,7 +95,7 @@ def setMaterial(ob, mat):
     me.materials.append(mat)
 
 def look_at(obj_camera, point):
-    loc_camera = obj_camera.matrix_world.to_translation()
+    loc_camera = obj_camera.location
 
     direction = point - loc_camera
     # point the cameras '-Z' and use its 'Y' as up
@@ -78,33 +105,48 @@ def look_at(obj_camera, point):
     obj_camera.rotation_euler = rot_quat.to_euler()
 
 
-def modelHeight(scene):
+def modelHeight(objects, transform):
     maxZ = -999999;
     minZ = 99999;
-    for model in scene.objects:
+    for model in objects:
         if model.type == 'MESH':
             for v in model.data.vertices:
-                if (model.matrix_world * v.co).z > maxZ:
-                    maxZ = (model.matrix_world * v.co).z
-                if (model.matrix_world * v.co).z < minZ:
-                    minZ = (model.matrix_world * v.co).z
+                if (transform * model.matrix_world * v.co).z > maxZ:
+                    maxZ = (transform * model.matrix_world * v.co).z
+                if (transform * model.matrix_world * v.co).z < minZ:
+                    minZ = (transform * model.matrix_world * v.co).z
 
 
     return minZ, maxZ
 
-def modelWidth(scene):
+def modelDepth(objects, transform):
     maxY = -999999;
     minY = 99999;
-    for model in scene.objects:
+    for model in objects:
         if model.type == 'MESH':
             for v in model.data.vertices:
-                if (model.matrix_world * v.co).y > maxY:
-                    maxY = (model.matrix_world * v.co).y
-                if (model.matrix_world * v.co).y < minY:
-                    minY = (model.matrix_world * v.co).y
+                if (transform * model.matrix_world * v.co).y > maxY:
+                    maxY = (transform * model.matrix_world * v.co).y
+                if (transform * model.matrix_world * v.co).y < minY:
+                    minY = (transform * model.matrix_world * v.co).y
 
 
     return minY, maxY
+
+
+def modelWidth(objects, transform):
+    maxX = -999999;
+    minX = 99999;
+    for model in objects:
+        if model.type == 'MESH':
+            for v in model.data.vertices:
+                if (transform * model.matrix_world * v.co).x > maxX:
+                    maxX = (transform * model.matrix_world * v.co).x
+                if (transform * model.matrix_world * v.co).x < minX:
+                    minX = (transform * model.matrix_world * v.co).x
+
+
+    return minX, maxX
 
 
 def centerOfGeometry(objects, transform):
@@ -219,3 +261,130 @@ def AutoNode():
                             t.location = -0,300 
                             links.new(t.outputs[0],shout.inputs[2]) 
                             links.new(shtext.outputs[0],t.inputs[0]) 
+
+
+
+def cameraLookingInsideRoom(cameraAzimuth):
+    if cameraAzimuth > 270 and cameraAzimuth < 90:
+        return True
+    return False
+
+
+def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, camera, width, height,useCycles):
+    if useCycles:
+        #Switch Engine to Cycles
+        scene.render.engine = 'CYCLES'
+        AutoNode()
+        # bpy.context.scene.render.engine = 'BLENDER_RENDER'
+
+        cycles = bpy.context.scene.cycles
+
+        cycles.samples = 1024
+        cycles.max_bounces = 128
+        cycles.min_bounces = 3
+        cycles.caustics_reflective = True
+        cycles.caustics_refractive = True
+        cycles.diffuse_bounces = 128
+        cycles.glossy_bounces = 128
+        cycles.transmission_bounces = 128
+        cycles.volume_bounces = 128
+        cycles.transparent_min_bounces = 8
+        cycles.transparent_max_bounces = 128
+
+
+
+    scene.render.resolution_x = width #perhaps set resolution in code
+    scene.render.resolution_y = height
+    scene.render.resolution_percentage = 100
+
+    scene.camera = camera
+    camera.up_axis = 'Y'
+    camera.data.angle = 60 * 180 / numpy.pi
+    camera.data.clip_start = 0.01
+    camera.data.clip_end = 10
+    distance = 0.4
+
+    center = centerOfGeometry(modelInstances[targetIndex].dupli_group.objects, modelInstances[targetIndex].matrix_world)
+    # center = mathutils.Vector((0,0,0))
+    # center = instances[targetIndex][1]
+
+    originalLoc = mathutils.Vector((0,-distance , 0))
+    elevation = 45.0
+    azimuth = 0
+
+    scene.render.use_raytrace = False
+    scene.render.use_shadows = False
+
+    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+    location = center + azimuthRot * elevationRot * originalLoc
+    camera.location = location
+
+    # lamp_data2 = bpy.data.lamps.new(name="LampBotData", type='POINT')
+    # lamp2 = bpy.data.objects.new(name="LampBot", object_data=lamp_data2)
+    # lamp2.location = targetParentPosition + mathutils.Vector((0,0,1.5))
+    # lamp2.data.energy = 0.00010
+    # # lamp.data.size = 0.25
+    # lamp2.data.use_diffuse = True
+    # lamp2.data.use_specular = True
+    # # scene.objects.link(lamp2)
+        
+
+        # # toggle lamps
+        # if obj.type == 'LAMP':
+        #     obj.cycles_visibility.camera = not obj.cycles_visibility.camera
+    roomInstance = scene.objects[roomName]
+
+    ceilMinX, ceilMaxX = modelWidth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
+    ceilWidth = (ceilMaxX - ceilMinX)
+    ceilMinY, ceilMaxY = modelDepth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
+    ceilDepth = (ceilMaxY - ceilMinY) 
+    ceilMinZ, ceilMaxZ = modelHeight(roomInstance.dupli_group.objects, roomInstance.matrix_world)
+    ceilPos =  mathutils.Vector(((ceilMaxX + ceilMinX) / 2.0, (ceilMaxY + ceilMinY) / 2.0 , ceilMaxZ))
+
+    numLights = int(numpy.floor((ceilWidth-0.2)/1.15))
+    lightInterval = ceilWidth/numLights
+
+    for light in range(numLights):
+        lightXPos = light*lightInterval + lightInterval/2.0
+        lamp_data = bpy.data.lamps.new(name="Rect", type='AREA')
+        lamp = bpy.data.objects.new(name="Rect", object_data=lamp_data)
+        lamp.data.size = 0.15
+        lamp.data.size_y = ceilDepth - 0.2
+        lamp.data.shape = 'RECTANGLE'
+        lamp.location = mathutils.Vector((ceilPos.x - ceilWidth/2.0 + lightXPos, ceilPos.y, ceilMaxZ))
+        lamp.data.energy = 0.0005
+
+        if useCycles:
+            lamp.data.cycles.use_multiple_importance_sampling = True
+            lamp.data.use_nodes = True
+            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 20
+        scene.objects.link(lamp)
+        lamp.layers[1] = True
+
+    world.light_settings.use_environment_light = False
+    # world.light_settings.environment_energy = 1
+    world.horizon_color = mathutils.Color((0.0,0.0,0.0))
+    # world.light_settings.samples = 20
+    world.light_settings.use_ambient_occlusion = True
+    world.light_settings.ao_blend_type = 'MULTIPLY'
+    world.light_settings.ao_factor = 1
+    world.light_settings.use_indirect_light = True
+    world.light_settings.gather_method = 'APPROXIMATE'
+    scene.world = world
+
+    scene.update()
+
+    look_at(camera, center)
+
+    bpy.ops.scene.render_layer_add()
+
+    camera.layers[1] = True
+    scene.render.layers[0].use_pass_object_index = True
+    scene.render.layers[1].use_pass_object_index = True
+    scene.render.layers[1].use_pass_combined = False
+
+    scene.layers[1] = False
+    scene.layers[0] = True
+    scene.render.layers[0].use = True
+    scene.render.layers[1].use = False

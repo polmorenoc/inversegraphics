@@ -1,417 +1,270 @@
 #!/usr/bin/env python3.4m
  
-import bpy
-import numpy
-from PIL import Image
-import mathutils
-from math import radians
-import h5py
-import scipy.io
-from score_image import getChamferDistance
-import cv2
-import sys
-import io
+import sceneimport
+from utils import * 
 
-def loadData():
-    #data
-    fdata = h5py.File('../data/data-all-flipped-cropped-512.mat','r')
-    data = fdata["data"]
+numpy.random.seed(1)
 
-    images = h5py.File('../data/images-all-flipped-cropped-512-color.mat','r')
-    # images = f["images"]
-    # imgs = numpy.array(images)
-    # N = imgs.shape[0]
-    # imgs = imgs.transpose(0,2,3,1)
+inchToMeter = 0.0254
 
-    # f = h5py.File('../data/all-flipped-cropped-512-crossval6div2_py-experiment.mat')
-    # experiments = f["experiments_data"]
-
-    # f = h5py.File('../data/all-flipped-cropped-512-crossval6div2_py-experiment.mat')
-    experiments = scipy.io.loadmat('../data/all-flipped-cropped-512-crossval6all2-experiment.mat')
-
-    return data, images, experiments['experiments_data']
-
-
-
-def makeMaterial(name, diffuse, specular, alpha):
-    mat = bpy.data.materials.new(name)
-    mat.diffuse_color = diffuse
-    mat.diffuse_shader = 'LAMBERT' 
-    mat.diffuse_intensity = 1.0 
-    mat.specular_color = specular
-    mat.specular_shader = 'COOKTORR'
-    mat.specular_intensity = 0.5
-    mat.alpha = alpha
-    mat.ambient = 1
-    return mat
- 
-
-def setMaterial(ob, mat):
-    me = ob.data
-    me.materials.append(mat)
-
-def look_at(obj_camera, point):
-    loc_camera = obj_camera.matrix_world.to_translation()
-
-    direction = point - loc_camera
-    # point the cameras '-Z' and use its 'Y' as up
-    rot_quat = direction.to_track_quat('-Z', 'Y')
-
-    # assume we're using euler rotation
-    obj_camera.rotation_euler = rot_quat.to_euler()
-
-
-def modelHeight(scene):
-    maxZ = -999999;
-    minZ = 99999;
-    for model in scene.objects:
-        if model.type == 'MESH':
-            for v in model.data.vertices:
-                if (model.matrix_world * v.co).z > maxZ:
-                    maxZ = (model.matrix_world * v.co).z
-                if (model.matrix_world * v.co).z < minZ:
-                    minZ = (model.matrix_world * v.co).z
-
-
-    return minZ, maxZ
-
-def modelWidth(scene):
-    maxY = -999999;
-    minY = 99999;
-    for model in scene.objects:
-        if model.type == 'MESH':
-            for v in model.data.vertices:
-                if (model.matrix_world * v.co).y > maxY:
-                    maxY = (model.matrix_world * v.co).y
-                if (model.matrix_world * v.co).y < minY:
-                    minY = (model.matrix_world * v.co).y
-
-
-    return minY, maxY
-
-
-def centerOfGeometry(scene):
-    center = mathutils.Vector((0.0,0.0,0.0))
-    numVertices = 0.0
-    for model in scene.objects:
-        if model.type == 'MESH':
-            numVertices = numVertices + len(model.data.vertices)
-            for v in model.data.vertices:
-                center = center + (model.matrix_world * v.co)
-
-
-    return center/numVertices
-
-def setEulerRotation(scene, eulerVectorRotation):
-    for model in scene.objects:
-        if model.type == 'MESH':
-            model.rotation_euler = eulerVectorRotation
-
-    scene.update()
-
-def rotateMatrixWorld(scene, rotationMat):
-    for model in scene.objects:
-        if model.type == 'MESH':
-            model.matrix_world = rotationMat * model.matrix_world
-
-    scene.update()    
-
-
-baseDir = '../databaseFull/models/'
-
-lines = [line.strip() for line in open('teapots.txt')]
-
-for object in bpy.data.scenes['Scene'].objects: print(object.name)
-
-lamp = bpy.data.scenes['Scene'].objects[1]
-lamp.location = (0,0.0,1.5)
-
-camera = bpy.data.scenes['Scene'].objects[2]
-
-camera.data.angle = 60 * 180 / numpy.pi
-
-distance = 0.5
-originalLoc = mathutils.Vector((0,-distance,0.0))
-
-elevation = 0.0
-azimuth = 0.0
-elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
-location = azimuthRot * elevationRot * originalLoc
-camera.location = location
-
-look_at(camera, mathutils.Vector((0,0,0)))
-
+sceneFile = '../databaseFull/scenes/scene00051.txt' 
+targetIndex = 9
+roomName = 'room09'
 
 world = bpy.context.scene.world
 
+instances = sceneimport.loadScene(sceneFile)
 
-# Environment lighting
-world.light_settings.use_environment_light = True
-world.light_settings.environment_energy = 0.3
-world.horizon_color = mathutils.Color((0.0,0.0,0.0))
+targetParentPosition = instances[targetIndex][1]
 
-width = 200
-height = 200
+[targetScenes, targetModels] = sceneimport.loadTargetModels()
+[blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
+width = 100
+height = 100
+camera = bpy.data.scenes['Scene'].objects[2]
+scene = sceneimport.composeScene(modelInstances, targetIndex)
+
+scene.update()
+bpy.context.screen.scene = scene
+
+useCycles = False
+distance = 0.4
+
+setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height,useCycles)
+
+originalLoc = mathutils.Vector((0,-distance , 0))
+groundTruth, imageFiles = loadGroundTruth()
+
+# labels = numpy.column_stack((numpy.cos(groundTruthAzs*numpy.pi/180), numpy.sin(groundTruthAzs*numpy.pi/180), numpy.cos(groundTruthAzs*numpy.pi/180.0), numpy.sin(groundTruthAzs*numpy.pi/180.0)))
+
+numpy.random.seed(1)
+
+minThresTemplate = 10
+maxThresTemplate = 100
+minThresImage = 50
+maxThresImage = 150
+
+baseDir = '../databaseFull/models/'
+
+experimentTeapots = [3]
+# experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot']
+
+outputExperiments = []
+
+# distanceTypes = ['chamferDataToModel', 'robustChamferDataToModel', 'sqDistImages', 'robustSqDistImages']
+distanceTypes = ['chamferDataToModel', 'ignoreSqDistImages', 'sqDistImages', 'chamferModelToData']
 
 
-data, images, experiments = loadData()
+for teapotTest in experimentTeapots:
+    robust = True
+    robustScale = 0
 
-# images["images"][i]
-
-labels = numpy.column_stack((numpy.cos(numpy.array(data["altitudes"])*numpy.pi/180), numpy.sin(numpy.array(data["altitudes"])*numpy.pi/180), numpy.cos(numpy.array(data["azimuths"])*numpy.pi/180.0), numpy.sin(numpy.array(data["azimuths"])*numpy.pi/180.0)))
-groundTruthEls = numpy.array(data["altitudes"])
-groundTruthAzs = numpy.array(data["azimuths"])
-
-expi = 3
-
-experiment = experiments['experiments'][0][0][0][expi]
-
-selTrain = experiment['selTrain'][0][0][0]
-
-selTest = experiment['selTest'][0][0][0]
-
-output = scipy.io.loadmat('../data/crossval6div2-hog8-alldataexperiments.mat')['output_data']
-
-idx = output['idx'][0][0][expi][0]
-
-nnpredazs = output['nnpredradazs'][0][0][expi][0]*180.0/numpy.pi
-nnpredalts = output['nnpredradalts'][0][0][expi][0]*180.0/numpy.pi
-# rtpredazs = output['rtpredradazs'][0][0][expi][0]*180.0/numpy.pi
-# rtpredalts = output['rtpredradalts'][0][0][expi][0]*180.0/numpy.pi
-
-predazs =nnpredazs.squeeze()
-predalts=nnpredalts.squeeze()
-
-numTest = selTest.size
-
-bestModels= [""]*numTest
-bestScores = numpy.ones(numTest)*999999
-bestAzimuths = numpy.zeros(numTest)
-bestElevations = numpy.zeros(numTest)
-
-predi = 0
-
-# selTest[[10384,10397,10408,10440,10442,10446,10458,10469,10478,10492]]:
-# for selTestNum in [10384]:
-
-for selTestNum in [10384, 10492]:
-
-    test = selTest[selTestNum]
-    rgbTestImage = numpy.transpose(images["images"][test])
-    testImage = cv2.cvtColor(numpy.float32(rgbTestImage*255), cv2.COLOR_RGB2BGR)/255.0
-
-    gtAzimuth = groundTruthAzs[test][0]
-    testImageEdges = cv2.Canny(numpy.uint8(testImage*255), 50,150)
-    cv2.imwrite("canny_" + str(test) + "az" + '%.1f' % gtAzimuth + ".png" , testImageEdges)
-    cv2.imwrite("image_" + str(test) + "az" + '%.1f' % gtAzimuth + ".png" , numpy.uint8(testImage*255))
-
-    score = 9999999
-
-    for teapot in lines[0:3]:
+    for distanceType in distanceTypes:
+        robust = ~robust
+        if robust is False:
+            robustScale = 0
         
 
-        fullTeapot = baseDir + teapot
+        experiment = {}
+        # ipdb.set_trace()
+        indices = numpy.where(groundTruth[:, 3] == teapotTest)
 
-        print("Reading " + fullTeapot + '.dae')
+        selTest = indices[0]
+        selTest = numpy.random.permutation(selTest)
+        numTests = len(selTest)
 
-        bpy.ops.scene.new()
-        bpy.context.scene.name = teapot
-        scene = bpy.context.scene
 
-        scene.objects.link(lamp)
-
-        scene.camera = camera
-
-        # scene.render.use_raytrace = True
-        # scene.render.antialiasing_samples = '16'
+        teapot = targetModels[teapotTest]
+        teapot.matrix_world = mathutils.Matrix.Translation(targetParentPosition)
+        center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+        original_matrix_world = teapot.matrix_world.copy()
         
+        azimuthRot = mathutils.Matrix.Rotation(radians(0), 4, 'Z')
+        teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+        scene.objects.link(teapot)
 
-        scene.render.resolution_x = width #perhaps set resolution in code
-        scene.render.resolution_y = height
-        scene.world = world
-
-        scene.render.filepath = teapot + '.png'
-
-        bpy.utils.collada_import(fullTeapot + '.dae')
-
-        minZ, maxZ = modelHeight(scene)
-
-        minY, maxY = modelWidth(scene)
+        performance = numpy.array([])
+        elevations = numpy.array([]) 
+        groundTruthRelAzimuths = numpy.array([])
+        bestRelAzimuths= numpy.array([]) 
 
 
-        scaleZ = 0.254/(maxZ-minZ)
-        scaleY = 0.1778/(maxY-minY)
-
-        scale = min(scaleZ, scaleY)
-
-        for mesh in scene.objects:
-            if mesh.type == 'MESH':
-                scaleMat = mathutils.Matrix.Scale(scale, 4)
-                mesh.matrix_world =  scaleMat * mesh.matrix_world
-                     
-        minZ, maxZ = modelHeight(scene)
-
-        center = centerOfGeometry(scene)
-        for mesh in scene.objects:
-            if mesh.type == 'MESH':
-                mesh.matrix_world = mathutils.Matrix.Translation(-center) * mesh.matrix_world
-
-        #Rotate the object to the azimuth angle we define as 0.
-        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
-        rotateMatrixWorld(scene, rot)
-
-        camera.data.angle = 60 * 180 / numpy.pi
-
-        stopSearchEl  = False
-        stopSearchAz  = False
-        dirEl = 1
-        dirAz = 1
-
-        elevation = predalts[selTestNum]
-        azimuth = predazs[selTestNum]
-  
+        expSelTest = numpy.arange(0,numTests,int(numTests/100))
 
 
-        for i in numpy.arange(0,360,9):
-            azimuth = i
-            center = centerOfGeometry(scene)
-            elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-            azimuthRot = mathutils.Matrix.Rotation(radians(azimuth), 4, 'Z')
-            location = azimuthRot * elevationRot * (center + originalLoc)
-            camera.location = location
-            scene.update()
-            look_at(camera, center)
-            scene.update()
-            scene.render.filepath = 'teapottests/' + str(test) + '/' +  teapot + "_az" + '%.1f' % azimuth + '.png'
-            bpy.ops.render.render( write_still=True )
-            image = cv2.imread('teapottests/' + str(test) + '/' +  teapot + "_az" + '%.1f' % azimuth + '.png', cv2.IMREAD_ANYDEPTH)
-            image = numpy.float16(image)/255.0
-            distance = getChamferDistance(testImage, image)
-            # distances.append(distance)
-            imageEdges = cv2.Canny(numpy.uint8(image*255.0), 25,225)
-            cv2.imwrite('teapottests/' + str(test) + '/' +  teapot + "_az" + '%.1f' % azimuth + '_dist' + '%.1f' % distance + '.png' , imageEdges)            
-            # azs.append(i)
-            # bestAzs.append(groundTruthAzs[selTest[test]])
+        for selTestNum in expSelTest:
 
-        
-        
-        
+            test = selTest[selTestNum]
 
-        # blendImage = bpy.data.images['Render Result']
-        # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))
-        # image[numpy.where(image > 1)] = 1
+            groundTruthAz = groundTruth[test,0]
+            groundTruthObjAz = groundTruth[test,1]
+            groundTruthRelAz = numpy.arctan2(numpy.sin((groundTruthAz-groundTruthObjAz)*numpy.pi/180), numpy.cos((groundTruthAz-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi
+            groundTruthEl = groundTruth[test,2]
+
+            scores = []
+            relAzimuths = []  
+            directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + distanceType
+            if not os.path.exists(directory):
+                os.makedirs(directory)
 
 
+            if not os.path.exists(directory + 'test_samples'):
+                os.makedirs(directory + 'test_samples')
 
 
-        # if distance < score:
-        #     score = distance
-        #     bestModels[predi] = teapot
-        #     bestScores[predi] = score
-        #     bestElevations[predi] = elevation
-        #     bestAzimuths[predi] = azimuth
+            numDir = directory +  'test_samples/num' + str(test) + '_azim' + str(int(groundTruthRelAz)) + '_elev' + str(int(groundTruthEl)) + '/'
+            if not os.path.exists(numDir):
+                os.makedirs(numDir)
 
 
-        # while not stopSearchEl:
-        #     elevation = (elevation + dirEl*2) % 90
+            testImage = cv2.imread(imageFiles[test], cv2.IMREAD_ANYDEPTH)/255.0
+            # testImage = cv2.cvtColor(numpy.float32(rgbTestImage*255), cv2.COLOR_RGB2BGR)/255.0
 
-        #     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-        #     location = azimuthRot * elevationRot * (center + originalLoc)
+            testImageEdges = cv2.Canny(numpy.uint8(testImage*255), minThresImage,maxThresImage)
+            cv2.imwrite(numDir + "image_canny" + ".png" , testImageEdges)
+            cv2.imwrite(numDir + "image" + ".png" , numpy.uint8(testImage*255))
 
-        #     camera.location = location
-        #     scene.update()
-
-        #     look_at(camera, center)
-            # scene.update() 
-        #     bpy.ops.render.render( write_still=True )
-
-        #     # blendImage = bpy.data.images['Render Result']
-
-        #     # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))
-
-        #     # # Truncate intensities larger than 1.
-        #     # image[numpy.where(image > 1)] = 1
-
-        #     image = cv2.imread(teapot + '.png', cv2.IMREAD_ANYDEPTH)
-
-        #     image = numpy.float16(image)/255.0
-
-        #     distance = getChamferDistance(image, testImage)
-
-        #     if distance < score:
-        #         score = distance
-        #         bestModels[predi] = teapot
-        #         bestScores[predi] = score
-        #         bestElevations[predi] = elevation
+            score = numpy.finfo(numpy.float64).max
                 
-        #     elif dirEl > 0:
-        #         elevation = predalts[selTestNum]
-        #         dirEl = -1
-        #     else:
-        #         stopSearchEl = True
+            elevation = groundTruthEl
 
-    #     iaz = 0
-    #     azimuth = 0
-    #     while not stopSearchAz:
-    #         azimuth = (azimuth + dirAz*5) % 360
-
-    #         azimuthRot = mathutils.Matrix.Rotation(radians(azimuth), 4, 'Z')
-    #         location = azimuthRot * elevationRot * (center + originalLoc)
-    #         camera.location = location
-    #         scene.update()
-    #         look_at(camera, center)          
-    #         scene.update()
-
-            
-    #         bpy.ops.render.render( write_still=True )
-            
-
-    #         blendImage = bpy.data.images['Render Result']
-
-    #         # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height/2,width/2,4]))[:,:,0:3]
-
-    #         # # Truncate intensities larger than 1.
-    #         # image[numpy.where(image > 1)] = 1
-
-    #         image = cv2.imread(teapot + '.png', cv2.IMREAD_ANYDEPTH)
-    #         image = numpy.float32(image)/255.0
-
-    #         distance = getChamferDistance(testImage, image)
-
-    #         if distance < score:
-    #             score = distance
-    #             bestModels[predi] = teapot
-    #             bestScores[predi] = score
-    #             bestAzimuths[predi] = azimuth
-    #             imageEdges = cv2.Canny(numpy.uint8(image*255.0), 25,225)
-    #             cv2.imwrite(teapot + "_canny_" + str(test) + ".png" , imageEdges)
-    #         # elif dirAz > 0:
-    #         #     azimuth = predazs[selTestNum]
-    #         #     dirAz = -1
-    #         # else:
-    #         #     stopSearchAz = True
-    #         if azimuth >= 355:
-    #             stopSearchAz = True
+            azimuth = 0
+            elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 
 
-        
-        
-    #     # Save best image.
-    #     # im = Image.fromarray(numpy.uint8(image*255))
+            for azimuth in numpy.arange(0,360,5):
 
-    #     # im.save(teapot + '.png')
+                azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+                elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+                location = center + azimuthRot * elevationRot * originalLoc
+                camera.location = location
+
+                scene.update()
+                look_at(camera, center)
+                scene.update()
+                
+                scene.render.filepath = directory  + "_blender_" +  str(test) +  "_az" + '%.1f' % azimuth + '_dist' + '%.1f' % distance + '.png'
+                
+                bpy.ops.render.render( write_still=True )
+
+                # image = cv2.imread(scene.render.filepath, cv2.IMREAD_ANYDEPTH)
+
+                blendImage = bpy.data.images['Render Result']
+
+                image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height,width,4]))
+                ipdb.set_trace()
+                # Truncate intensities larger than 1.
+                image[numpy.where(image > 1)] = 1
+                # ipdb.set_trace()
+                image[0:20, 75:100, :] = 0
+
+                image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_RGB2BGR)/255.0
+
+                methodParams = {'scale': robustScale, 'minThresImage': minThresImage, 'maxThresImage': maxThresImage, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
+                
+
+                distance = scoreImage(testImage, image, distanceType, methodParams)
+                cv2.imwrite(numDir + 'image' + "_az" + '%.1f' % azimuth + '_dist' + '%.1f' % distance + '.png', numpy.uint8(image*255.0))
+
+                if distance <= score:
+                    imageEdges = cv2.Canny(numpy.uint8(image*255.0), minThresTemplate,maxThresTemplate)
+                    bestImageEdges = imageEdges
+                    bestImage = image
+                    score = distance
 
 
-    #     # Cleanup
+                scores.append(distance)
+                relAzimuth = numpy.arctan2(numpy.sin((azimuth-groundTruthObjAz)*numpy.pi/180), numpy.cos((azimuth-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi
+                relAzimuths.append(relAzimuth)
 
-        for obji in scene.objects:
-            if obji.type == 'MESH':
-                obji.user_clear()
-                bpy.data.objects.remove(obji)
+                                
+            bestRelAzimuth = relAzimuths[numpy.argmin(scores)]
+            if robust is False:
+                robustScale = 1.4826 * numpy.sqrt(numpy.median(scores))
 
-        scene.user_clear()
-        bpy.ops.scene.delete()    
+            error = numpy.arctan2(numpy.sin((groundTruthRelAz-bestRelAzimuth)*numpy.pi/180), numpy.cos((groundTruthRelAz-bestRelAzimuth)*numpy.pi/180))*180/numpy.pi
+            performance = numpy.append(performance, error)
+            elevations = numpy.append(elevations, elevation)
+            bestRelAzimuths = numpy.append(bestRelAzimuths, bestRelAzimuth)
+            groundTruthRelAzimuths = numpy.append(groundTruthRelAzimuths, groundTruthRelAz)
 
-    predi = predi + 1
+            cv2.imwrite(numDir + 'bestImage' + "_canny_az" + '%.1f' % bestRelAzimuth + '_dist' + '%.1f' % score + '.png' , bestImageEdges)
+            cv2.imwrite(numDir + 'bestImage' + "_az" + '%.1f' % bestRelAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(bestImage*255.0))
+
+            imgEdges = cv2.Canny(numpy.uint8(testImage*255), minThresImage,maxThresImage)
+            bwEdges1 = cv2.distanceTransform(~imgEdges, cv2.DIST_L2, 5)
+            disp = cv2.normalize(bwEdges1, bwEdges1, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            cv2.imwrite(numDir + 'dist_transform' +  '.png', disp)
+
+            plt.plot(relAzimuths, numpy.array(scores))
+            plt.xlabel('Azimuth (degrees)')
+            plt.ylabel('Distance')
+            plt.title('Chamfer distance')
+            plt.axvline(x=bestRelAzimuth, linewidth=2, color='b', label='Minimum distance azimuth')
+            plt.axvline(x=groundTruthRelAz, linewidth=2, color='g', label='Ground truth azimuth')
+            plt.axvline(x=(bestRelAzimuth + 180) % 360, linewidth=1, color='b', ls='--', label='Minimum distance azimuth + 180')
+            fontP = FontProperties()
+            fontP.set_size('small')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,360,0,y2))
+            # plt.legend()
+            plt.savefig(numDir + 'performance.png')
+            plt.clf()
+
+
+        experiment = {'methodParams': methodParams, 'distanceType': distanceType, 'teapot':teapotTest, 'bestRelAzimuths':bestRelAzimuths, 'performance': performance, 'elevations':elevations, 'groundTruthRelAzimuths': groundTruthRelAzimuths, 'selTest':selTest, 'expSelTest':expSelTest}
+        outputExperiments.append(experiment)
+        with open(directory + 'experiment.pickle', 'wb') as pfile:
+            pickle.dump(experiment, pfile)
+
+        plt.scatter(elevations, performance)
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-180,180))
+        plt.title('Performance scatter plot')
+        plt.savefig(directory + '_elev-performance-scatter.png')
+        plt.clf()
+
+        plt.scatter(groundTruthRelAzimuths, performance)
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        plt.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.clf()
+
+
+        plt.hist(performance, bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,0, y2))
+        plt.title('Performance histogram')
+        plt.savefig(directory  + '_performance-histogram.png')
+        plt.clf()
+        # experimentFile = 'aztest/teapotsc7549b28656181c91bff71a472da9153Teapot N311012_cleaned.pickle'
+        # with open(experimentFile, 'rb') as pfile:
+        #     experiment = pickle.load( pfile)
+
+        headers=["Best global fit", ""]
+        table = [["Mean angular error", numpy.mean(numpy.abs(performance))],["Median angualar error",numpy.median(numpy.abs(performance))]]
+        performanceTable = tabulate(table, tablefmt="latex", floatfmt=".1f")
+
+        with open(directory + 'performance.tex', 'w') as expfile:
+            expfile.write(performanceTable)
+
+        # Cleanup
+        # for obji in scene.objects:
+        #     if obji.type == 'MESH':
+        #         obji.user_clear()
+        #         bpy.data.objects.remove(obji)
+
+        # scene.user_clear()
+        # bpy.ops.scene.delete()   
+
+print("Finished the experiment")
+
+     
 

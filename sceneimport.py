@@ -33,8 +33,11 @@ def composeScene(modelInstances, targetIndex):
     bpy.context.scene.name = 'Main Scene'
     scene = bpy.context.scene
     scene.unit_settings.system = 'METRIC'
+    modelNum = 0
     for instance in modelInstances:
-        scene.objects.link(instance)
+        if modelNum != targetIndex:
+            scene.objects.link(instance)
+        modelNum = modelNum + 1
 
 
     return scene
@@ -118,10 +121,18 @@ def loadTargetModels():
         bpy.utils.collada_import(modelPath)
         scene.update()
         modifySpecular(scene, 0.3)
-        minZ, maxZ = modelHeight(scene)
-        minY, maxY = modelWidth(scene)
-        scaleZ = 0.254/(maxZ-minZ)
-        scaleY = 0.1778/(maxY-minY)
+
+
+        #Rotate the object to the azimuth angle we define as 0.
+        # rot = mathutils.Matrix.Rotation(radians(-90), 4, 'X')
+        # rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
+        # rotateMatrixWorld(scene,  rot )
+        # rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
+
+        minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
+        minY, maxY = modelDepth(scene.objects, mathutils.Matrix.Identity(4))
+        scaleZ = 0.265/(maxZ-minZ)
+        scaleY = 0.18/(maxY-minY)
         scale = min(scaleZ, scaleY)
 
         for mesh in scene.objects:
@@ -129,22 +140,24 @@ def loadTargetModels():
                 scaleMat = mathutils.Matrix.Scale(scale, 4)
                 mesh.matrix_world =  scaleMat * mesh.matrix_world
 
-        minZ, maxZ = modelHeight(scene)
+        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z') 
+        rotateMatrixWorld(scene,  rot )
+
+        minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
+
         center = centerOfGeometry(scene.objects, mathutils.Matrix.Identity(4))
 
         for mesh in scene.objects:
             if mesh.type == 'MESH':
                 mesh.matrix_world = mathutils.Matrix.Translation(-center) * mesh.matrix_world
 
-        minZ, maxZ = modelHeight(scene)
+        minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
 
         for mesh in scene.objects:
             if mesh.type == 'MESH':
                 mesh.matrix_world = mathutils.Matrix.Translation(mathutils.Vector((0,0,-minZ))) * mesh.matrix_world
 
-        #Rotate the object to the azimuth angle we define as 0.
-        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
-        rotateMatrixWorld(scene, rot)
+
 
         for mesh in scene.objects:
             targetGroup.objects.link(mesh)
