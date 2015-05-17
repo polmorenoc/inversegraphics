@@ -35,7 +35,7 @@ totalObjAzimuths = []
 totalElevations = []
 totalObjectIds = []
 
-for teapotNum in range(3,len(targetModels)):
+for teapotNum in range(8,len(targetModels)):
     
     teapot = targetModels[teapotNum]
     teapot.layers[1] = True
