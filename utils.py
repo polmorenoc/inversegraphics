@@ -276,16 +276,16 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         cycles = bpy.context.scene.cycles
 
         cycles.samples = 1024
-        cycles.max_bounces = 128
-        cycles.min_bounces = 3
+        cycles.max_bounces = 36
+        cycles.min_bounces = 4
         cycles.caustics_reflective = True
         cycles.caustics_refractive = True
-        cycles.diffuse_bounces = 128
-        cycles.glossy_bounces = 128
-        cycles.transmission_bounces = 128
-        cycles.volume_bounces = 128
-        cycles.transparent_min_bounces = 8
-        cycles.transparent_max_bounces = 128
+        cycles.diffuse_bounces = 36
+        cycles.glossy_bounces = 12
+        cycles.transmission_bounces = 12
+        cycles.volume_bounces = 12
+        cycles.transparent_min_bounces = 4
+        cycles.transparent_max_bounces = 12
 
 
 

@@ -117,6 +117,7 @@ for teapotNum in range(len(targetModels)):
 
         cycles.samples = 1
         scene.render.threads = 40
+        screen.render.threads_mode = 'FIXED'
         scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
         # scene.render.image_settings.file_format = 'PNG'
         scene.render.filepath = 'output/scene_obj' + str(teapotNum) + '_single'
