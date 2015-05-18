@@ -7,8 +7,8 @@ numpy.random.seed(1)
 
 inchToMeter = 0.0254
 
-sceneFile = '../databaseFull/scenes/scene00051_2.txt'
-targetIndex = 2
+sceneFile = '../databaseFull/scenes/scene00051.txt'
+targetIndex = 9
 roomName = 'room09'
 prefix = ''
 director = 'output/' + prefix
@@ -17,7 +17,7 @@ width = 110
 height = 110
 camera = bpy.data.scenes['Scene'].objects[2]
 world =  bpy.data.scenes['Scene'].world
-numSamples = 16
+numSamples = 1024
 
 instances = sceneimport.loadScene(sceneFile)
 
@@ -116,6 +116,7 @@ for teapotNum in range(1,len(targetModels)):
         scene.render.layers[1].use = True
 
         cycles.samples = 1
+        scene.render.threads = 40
         scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
         # scene.render.image_settings.file_format = 'PNG'
         scene.render.filepath = 'output/scene_obj' + str(teapotNum) + '_single'

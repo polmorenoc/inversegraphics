@@ -293,6 +293,7 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
 
+
     scene.camera = camera
     camera.up_axis = 'Y'
     camera.data.angle = 60 * 180 / numpy.pi
