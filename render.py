@@ -41,7 +41,7 @@ originalLoc = mathutils.Vector((0,-distance , 0))
 
 setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
 
-numFrames = 20
+numFrames = 200
 batchSize = 10
 
 totalAzimuths = []
@@ -52,7 +52,7 @@ totalObjectIds = []
 frameStart = 0
 frameEnd = frameStart + numFrames
 
-for teapotNum in range(1,len(targetModels)):
+for teapotNum in range(len(targetModels)):
     
     teapot = targetModels[teapotNum]
     teapot.layers[1] = True

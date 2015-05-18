@@ -110,7 +110,7 @@ def loadTargetModels():
     targetInstances = []
     blenderTeapots = []
     modelNum = 0
-    for teapot in teapots[0:2]:
+    for teapot in teapots:
         targetGroup = bpy.data.groups.new(teapot)
         fullTeapot = baseDir + teapot + '.dae'
         modelPath = fullTeapot
