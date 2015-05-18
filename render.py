@@ -37,6 +37,7 @@ useCycles = True
 cycles = bpy.context.scene.cycles
 scene.render.tile_x = 5
 scene.render.tile_y = 5
+
 distance = 0.45
 
 originalLoc = mathutils.Vector((0,-distance , 0))
@@ -45,6 +46,8 @@ setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera,
 
 numFrames = 200
 batchSize = 10
+bpy.context.user_preferences.system.prefetch_frames = batchSize
+bpy.context.user_preferences.system.memory_cache_limit = 8000
 
 totalAzimuths = []
 totalObjAzimuths = []
