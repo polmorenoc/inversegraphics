@@ -1,7 +1,8 @@
 #!/usr/bin/env python3.4m
  
 import sceneimport
-from utils import * 
+from utils import *
+from score_image import *
 from tabulate import tabulate
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties

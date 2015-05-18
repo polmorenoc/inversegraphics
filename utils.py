@@ -6,7 +6,7 @@ import mathutils
 from math import radians
 import h5py
 import scipy.io
-from score_image import *
+
 import sys
 import io
 import os
