@@ -44,7 +44,7 @@ originalLoc = mathutils.Vector((0,-distance , 0))
 
 setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
 
-numFrames = 200
+numFrames = 500
 batchSize = 10
 bpy.context.user_preferences.system.prefetch_frames = batchSize
 bpy.context.user_preferences.system.memory_cache_limit = 8000
@@ -57,7 +57,7 @@ totalObjectIds = []
 frameStart = 0
 frameEnd = frameStart + numFrames
 
-for teapotNum in range(len(targetModels)):
+for teapotNum in range(0,4):
     
     teapot = targetModels[teapotNum]
     teapot.layers[1] = True
