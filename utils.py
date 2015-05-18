@@ -41,16 +41,22 @@ def loadGroundTruth():
     lines = [line.strip() for line in open('output/groundtruth.txt')]
     groundTruthLines = []
     imageFiles = []
-    groundTruth = numpy.zeros([len(lines), 4])
+    prefixes = []
     for instance in lines:
         parts = instance.split(' ')
         framestr = '{0:04d}'.format(int(parts[4]))
-        outfilename = "scene_obj" + str(int(parts[3])) + "_" + framestr
-        imageFile = "output/images/" + outfilename + ".png"
+        prefix = ''
+        if len(parts) == 6:
+            prefix = parts[5]
+        outfilename = prefix + "scene_obj" + str(int(parts[3])) + "_" + framestr
+        imageFile = "output/images/" +  outfilename + ".png"
         if os.path.isfile(imageFile):
             imageFiles = imageFiles + [imageFile]
+            prefixes = prefixes + [prefix]
             groundTruthLines = groundTruthLines + [[float(parts[0]), float(parts[1]), float(parts[2]),int(parts[3]), int(parts[4])]]
 
+
+    groundTruth = numpy.zeros([len(groundTruthLines), 5])
     groundTruth = numpy.array(groundTruthLines)
 
     groundTruth = numpy.hstack((groundTruth,numpy.zeros((groundTruth.shape[0],1))))
@@ -59,10 +65,14 @@ def loadGroundTruth():
 
     for instance in lines:
         parts = instance.split(' ')
-        index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])))[0][0]
+        prefix = ''
+        if len(parts) == 4:
+            prefix = parts[3]
+        eqPrefixes = [ x==y for (x,y) in zip(prefixes, [prefix]*len(prefixes))]
+        index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (eqPrefixes))[0][0]
         groundTruth[index, 5] = float(parts[2])
  
-    return groundTruth, imageFiles
+    return groundTruth, imageFiles, prefixes
 
 def modifySpecular(scene, delta):
     for model in scene.objects:
@@ -288,7 +298,7 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         cycles.transparent_max_bounces = 12
 
 
-
+    scene.render.image_settings.compression = 0
     scene.render.resolution_x = width #perhaps set resolution in code
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
@@ -351,6 +361,8 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         lamp.data.shape = 'RECTANGLE'
         lamp.location = mathutils.Vector((ceilPos.x - ceilWidth/2.0 + lightXPos, ceilPos.y, ceilMaxZ))
         lamp.data.energy = 0.0005
+        if useCycles == False:
+            lamp.data.energy = 0.0015
 
         if useCycles:
             lamp.data.cycles.use_multiple_importance_sampling = True

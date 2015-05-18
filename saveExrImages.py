@@ -6,10 +6,10 @@ from PIL import Image
 import sys
 import numpy as np
 
-def exportExrImages(annotationdir, imgdir, numTeapot, frame):
+def exportExrImages(annotationdir, imgdir, numTeapot, frame, prefix):
 
     framestr = '{0:04d}'.format(frame)
-    outfilename = "scene_obj" + str(numTeapot) + "_" + framestr
+    outfilename = prefix + "scene_obj" + str(numTeapot) + "_" + framestr
     exrfile = OpenEXR.InputFile(annotationdir + outfilename + ".exr")
     pt = Imath.PixelType(Imath.PixelType.FLOAT)
     dw = exrfile.header()['dataWindow']
@@ -84,6 +84,6 @@ def exportExrImages(annotationdir, imgdir, numTeapot, frame):
     print "Sum Complete " + str(sumComplete)
     print "Sum Single " + str(sumSingle)
     with open(annotationdir + 'occlusions' + ".txt", "a") as myfile:
-        myfile.write(str(numTeapot) + ' ' + str(frame) + ' ' + str(sumComplete/sumSingle) + "\n")
+        myfile.write(str(numTeapot) + ' ' + str(frame) + ' ' + str(sumComplete/sumSingle) + ' ' + prefix + "\n")
 
     return

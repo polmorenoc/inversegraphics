@@ -29,6 +29,8 @@ height = 110
 camera = bpy.data.scenes['Scene'].objects[2]
 scene = sceneimport.composeScene(modelInstances, targetIndex)
 
+# scene.view_settings.gamma = 1.5
+
 scene.update()
 bpy.context.screen.scene = scene
 
@@ -39,7 +41,7 @@ numSamples = 1024
 setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
 
 originalLoc = mathutils.Vector((0,-distance , 0))
-groundTruth, imageFiles = loadGroundTruth()
+groundTruth, imageFiles, prefixes = loadGroundTruth()
 
 # labels = numpy.column_stack((numpy.cos(groundTruthAzs*numpy.pi/180), numpy.sin(groundTruthAzs*numpy.pi/180), numpy.cos(groundTruthAzs*numpy.pi/180.0), numpy.sin(groundTruthAzs*numpy.pi/180.0)))
 
@@ -52,14 +54,13 @@ maxThresImage = 150
 
 baseDir = '../databaseFull/models/'
 
-experimentTeapots = [3]
+experimentTeapots = [0]
 # experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot']
 
 outputExperiments = []
 
 # distanceTypes = ['chamferDataToModel', 'robustChamferDataToModel', 'sqDistImages', 'robustSqDistImages']
 distanceTypes = ['chamferDataToModel', 'ignoreSqDistImages', 'sqDistImages', 'chamferModelToData']
-
 
 for teapotTest in experimentTeapots:
     robust = True
@@ -69,8 +70,6 @@ for teapotTest in experimentTeapots:
         robust = ~robust
         if robust is False:
             robustScale = 0
-        
-
         experiment = {}
         # ipdb.set_trace()
         indices = numpy.where(groundTruth[:, 3] == teapotTest)
@@ -95,7 +94,7 @@ for teapotTest in experimentTeapots:
         bestRelAzimuths= numpy.array([]) 
 
 
-        expSelTest = numpy.arange(0,numTests,int(numTests/100))
+        expSelTest = numpy.arange(0,numTests,int(numTests/1))
 
         for selTestNum in expSelTest:
 
@@ -152,22 +151,21 @@ for teapotTest in experimentTeapots:
                 
                 bpy.ops.render.render( write_still=True )
 
-                # image = cv2.imread(scene.render.filepath, cv2.IMREAD_ANYDEPTH)
+                image = cv2.imread(scene.render.filepath)
 
-                blendImage = bpy.data.images['Render Result']
+                # blendImage = bpy.data.images['Render Result']
+                #
+                # image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height,width,4]))[:,:,0:3]
 
-                image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height,width,4]))
-                # ipdb.set_trace()
+                # # ipdb.set_trace()
                 # Truncate intensities larger than 1.
                 # image[numpy.where(image > 1)] = 1
                 # ipdb.set_trace()
                 # image[0:20, 75:100, :] = 0
 
-                image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_RGB2BGR)
+                # image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_RGB2BGR)
 
-                cv2.imshow('ImageWindow',image)
-
-                cv2.waitKey()
+                image = image/255.0
 
                 methodParams = {'scale': robustScale, 'minThresImage': minThresImage, 'maxThresImage': maxThresImage, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
 

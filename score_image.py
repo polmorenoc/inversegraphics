@@ -2,7 +2,7 @@ import cv2
 import numpy
 import matplotlib.pyplot as plt
 import ipdb
-
+import scipy
 def scoreImage(img, template, method, methodParams):
     score = 0
 
@@ -62,6 +62,9 @@ def chamferDistanceModelToData(img, template, minThresImage, maxThresImage, minT
 
     return score
 
+
+
+
 def chamferDistanceDataToModel(img, template, minThresImage, maxThresImage, minThresTemplate, maxThresTemplate):
     imgEdges = cv2.Canny(numpy.uint8(img*255), minThresImage,maxThresImage)
 
@@ -78,6 +81,21 @@ def sqDistImages(img, template):
     sqResiduals = numpy.square(img - template)
     return sqResiduals
 
+def computeVariance(sqResiduals):
+    return numpy.sum(sqResiduals)/len(sqResiduals)
+
+def pixelWiseLayerPriors(masks):
+
+    return numpy.sum(masks) / len(masks)
+
+def modelLogLikelihood(image, template, pixelWiseLayerPriors, variances):
+
+    return numpy.log(numpy.multiply(pixelWiseLayerPriors, scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) )) + (1 - pixelWiseLayerPriors))
+
+def pixelWiseLayerPosteriors(img, template):
+    fgCond = numpy.multiply(pixelWiseLayerPriors, scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ))
+    bgCond = (1 - pixelWiseLayerPriors)
+    return fgCond/numpy.exp(modelLogLikelihood), bgCond/numpy.exp(modelLogLikelihood)
 
 
 def robustDistance(sqResiduals, scale):

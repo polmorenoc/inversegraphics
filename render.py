@@ -11,7 +11,7 @@ sceneFile = '../databaseFull/scenes/scene00051.txt'
 targetIndex = 9
 roomName = 'room09'
 prefix = ''
-director = 'output/' + prefix
+director = 'output/'
 
 width = 110
 height = 110
@@ -27,6 +27,8 @@ targetParentPosition = instances[targetIndex][1]
 [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
 
 scene = sceneimport.composeScene(modelInstances, targetIndex)
+
+
 
 scene.update()
 scene.render.threads = 48
@@ -110,7 +112,7 @@ for teapotNum in range(0,4):
     for batch in range(numBatches):
         with open(director + 'groundtruth.txt', "a") as groundtruth:
             for batch_i in range(batchSize):
-                print(str(azimuths[batch * batchSize + batch_i]) + ' ' + str(objAzimuths[batch * batchSize + batch_i]) + ' ' + str(elevations[batch * batchSize + batch_i]) + ' ' + str(teapotNum) + ' ' + str(batch * batchSize + batch_i + frameStart), file = groundtruth)
+                print(str(azimuths[batch * batchSize + batch_i]) + ' ' + str(objAzimuths[batch * batchSize + batch_i]) + ' ' + str(elevations[batch * batchSize + batch_i]) + ' ' + str(teapotNum) + ' ' + str(batch * batchSize + batch_i + frameStart) + ' ' + prefix, file = groundtruth)
 
         scene.frame_start = frameStart + batch * batchSize
         scene.frame_end = min(frameStart + batch * batchSize + batchSize - 1, frameEnd)
@@ -124,7 +126,7 @@ for teapotNum in range(0,4):
 
         scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
         # scene.render.image_settings.file_format = 'PNG'
-        scene.render.filepath = 'output/scene_obj' + str(teapotNum) + '_single'
+        scene.render.filepath = director + prefix + 'scene_obj' + str(teapotNum) + '_single'
 
         scene.update()
         bpy.ops.render.render( animation=True )
@@ -141,7 +143,7 @@ for teapotNum in range(0,4):
         cycles.samples = numSamples
         scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
         # scene.render.image_settings.file_format = 'PNG'
-        scene.render.filepath = director +  'scene_obj' + str(teapotNum) + '_'
+        scene.render.filepath = director + prefix +  'scene_obj' + str(teapotNum) + '_'
         scene.update()
         bpy.ops.render.render( animation=True )
 

@@ -10,9 +10,12 @@ for instance in lines:
     parts = instance.split(' ')
     teapot = int(parts[3])
     frame = int(parts[4])
+    prefix = ''
+    if len(parts) == 6:
+        prefix = parts[5]
 
     try:
-        exportExrImages("output/", "output/images/", teapot, frame)
+        exportExrImages("output/", "output/images/", teapot, frame, prefix)
     except Exception as e:
         print e
 
