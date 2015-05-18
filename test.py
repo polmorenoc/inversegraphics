@@ -24,8 +24,8 @@ targetParentPosition = instances[targetIndex][1]
 
 [targetScenes, targetModels] = sceneimport.loadTargetModels()
 [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
-width = 100
-height = 100
+width = 110
+height = 110
 camera = bpy.data.scenes['Scene'].objects[2]
 scene = sceneimport.composeScene(modelInstances, targetIndex)
 
@@ -33,7 +33,7 @@ scene.update()
 bpy.context.screen.scene = scene
 
 useCycles = False
-distance = 0.4
+distance = 0.45
 numSamples = 1024
 
 setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
@@ -170,7 +170,6 @@ for teapotTest in experimentTeapots:
                 cv2.waitKey()
 
                 methodParams = {'scale': robustScale, 'minThresImage': minThresImage, 'maxThresImage': maxThresImage, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
-                
 
                 distance = scoreImage(testImage, image, distanceType, methodParams)
                 cv2.imwrite(numDir + 'image' + "_az" + '%.1f' % azimuth + '_dist' + '%.1f' % distance + '.png', numpy.uint8(image*255.0))

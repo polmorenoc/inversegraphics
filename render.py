@@ -29,12 +29,14 @@ targetParentPosition = instances[targetIndex][1]
 scene = sceneimport.composeScene(modelInstances, targetIndex)
 
 scene.update()
-
+scene.render.threads = 48
+scene.render.threads_mode = 'FIXED'
 bpy.context.screen.scene = scene
 
 useCycles = True
 cycles = bpy.context.scene.cycles
-
+scene.render.tile_x = 5
+scene.render.tile_y = 5
 distance = 0.45
 
 originalLoc = mathutils.Vector((0,-distance , 0))
@@ -116,8 +118,7 @@ for teapotNum in range(len(targetModels)):
         scene.render.layers[1].use = True
 
         cycles.samples = 1
-        scene.render.threads = 40
-        scene.render.threads_mode = 'FIXED'
+
         scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
         # scene.render.image_settings.file_format = 'PNG'
         scene.render.filepath = 'output/scene_obj' + str(teapotNum) + '_single'
