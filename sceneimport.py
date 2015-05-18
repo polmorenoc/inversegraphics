@@ -118,6 +118,7 @@ def loadTargetModels():
         bpy.context.scene.name = teapot
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
+        print("Importing " + modelPath)
         bpy.utils.collada_import(modelPath)
         scene.update()
         modifySpecular(scene, 0.3)
