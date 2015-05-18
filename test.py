@@ -2,13 +2,17 @@
  
 import sceneimport
 from utils import * 
+from tabulate import tabulate
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+import cv2
 
 numpy.random.seed(1)
 
 inchToMeter = 0.0254
 
-sceneFile = '../databaseFull/scenes/scene00051.txt' 
-targetIndex = 9
+sceneFile = '../databaseFull/scenes/scene00051_2.txt'
+targetIndex = 2
 roomName = 'room09'
 
 world = bpy.context.scene.world
@@ -29,8 +33,9 @@ bpy.context.screen.scene = scene
 
 useCycles = False
 distance = 0.4
+numSamples = 1024
 
-setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height,useCycles)
+setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
 
 originalLoc = mathutils.Vector((0,-distance , 0))
 groundTruth, imageFiles = loadGroundTruth()
@@ -91,7 +96,6 @@ for teapotTest in experimentTeapots:
 
         expSelTest = numpy.arange(0,numTests,int(numTests/100))
 
-
         for selTestNum in expSelTest:
 
             test = selTest[selTestNum]
@@ -117,7 +121,7 @@ for teapotTest in experimentTeapots:
                 os.makedirs(numDir)
 
 
-            testImage = cv2.imread(imageFiles[test], cv2.IMREAD_ANYDEPTH)/255.0
+            testImage = cv2.imread(imageFiles[test])/255.0
             # testImage = cv2.cvtColor(numpy.float32(rgbTestImage*255), cv2.COLOR_RGB2BGR)/255.0
 
             testImageEdges = cv2.Canny(numpy.uint8(testImage*255), minThresImage,maxThresImage)
@@ -152,13 +156,17 @@ for teapotTest in experimentTeapots:
                 blendImage = bpy.data.images['Render Result']
 
                 image = numpy.flipud(numpy.array(blendImage.extract_render(scene=scene)).reshape([height,width,4]))
-                ipdb.set_trace()
-                # Truncate intensities larger than 1.
-                image[numpy.where(image > 1)] = 1
                 # ipdb.set_trace()
-                image[0:20, 75:100, :] = 0
+                # Truncate intensities larger than 1.
+                # image[numpy.where(image > 1)] = 1
+                # ipdb.set_trace()
+                # image[0:20, 75:100, :] = 0
 
-                image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_RGB2BGR)/255.0
+                image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_RGB2BGR)
+
+                cv2.imshow('ImageWindow',image)
+
+                cv2.waitKey()
 
                 methodParams = {'scale': robustScale, 'minThresImage': minThresImage, 'maxThresImage': maxThresImage, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
                 
@@ -171,7 +179,6 @@ for teapotTest in experimentTeapots:
                     bestImageEdges = imageEdges
                     bestImage = image
                     score = distance
-
 
                 scores.append(distance)
                 relAzimuth = numpy.arctan2(numpy.sin((azimuth-groundTruthObjAz)*numpy.pi/180), numpy.cos((azimuth-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi

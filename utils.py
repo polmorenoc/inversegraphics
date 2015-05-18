@@ -2,21 +2,17 @@
  
 import bpy
 import numpy
-from PIL import Image
 import mathutils
 from math import radians
 import h5py
 import scipy.io
 from score_image import *
-import cv2
 import sys
 import io
-import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
 import os
 import pickle
 import ipdb
-from tabulate import tabulate
+
 
 inchToMeter = 0.0254
 
@@ -270,7 +266,7 @@ def cameraLookingInsideRoom(cameraAzimuth):
     return False
 
 
-def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, camera, width, height,useCycles):
+def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, camera, width, height, numSamples, useCycles):
     if useCycles:
         #Switch Engine to Cycles
         scene.render.engine = 'CYCLES'
