@@ -13,7 +13,9 @@ def loadScene(sceneFile):
             modelId = parts[2]
         if parts[0] == 'parentContactPosition':
             parentContactPosition = mathutils.Vector([float(parts[1])*inchToMeter, float(parts[2])*inchToMeter, float(parts[3])*inchToMeter])            
-        if parts[0] == 'transform': 
+        if parts[0] == 'parentIndex':
+            parentIndex = int(parts[1])
+        if parts[0] == 'transform':
             transform = mathutils.Matrix([[float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])], [float(parts[5]), float(parts[6]), float(parts[7]), float(parts[8])], [ float(parts[9]), float(parts[10]), float(parts[11]), float(parts[12])], [float(parts[13]), float(parts[14]), float(parts[15]), float(parts[16])]]).transposed()
             # ipdb.set_trace()
             transform[0][3] = transform[0][3]*inchToMeter
@@ -21,7 +23,7 @@ def loadScene(sceneFile):
             transform[2][3] = transform[2][3]*inchToMeter
             # ipdb.set_trace()
             
-            instances.append([modelId, parentContactPosition, transform])
+            instances.append([modelId, parentIndex, parentContactPosition, transform])
 
     return instances
 
@@ -51,7 +53,7 @@ def importBlenderScenes(instances, targetIndex):
     modelNum = 0
     for instance in instances:
         modelId = instance[0]
-        transform = instance[2]
+        transform = instance[3]
 
         modelPath = baseDir + modelId + '_cleaned.obj'
         print('Importing ' + modelPath )
@@ -110,7 +112,7 @@ def loadTargetModels():
     targetInstances = []
     blenderTeapots = []
     modelNum = 0
-    for teapot in teapots[0:1]:
+    for teapot in teapots[0:4]:
         targetGroup = bpy.data.groups.new(teapot)
         fullTeapot = baseDir + teapot + '.dae'
         modelPath = fullTeapot

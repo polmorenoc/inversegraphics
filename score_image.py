@@ -27,7 +27,8 @@ def scoreImage(img, template, method, methodParams):
     elif method == 'robustSqDistImages':
         sqDists = sqDistImages(img, template)
         score = robustDistance(sqDists, methodParams['scale'])
-
+    elif method == 'negLogLikelihood':
+        score = -modelLogLikelihood(img, template, methodParams['layerPrior'], methodParams['vars'])
     return score
 
 
@@ -81,28 +82,42 @@ def sqDistImages(img, template):
     sqResiduals = numpy.square(img - template)
     return sqResiduals
 
-def computeVariance(sqResiduals):
-    return numpy.sum(sqResiduals)/len(sqResiduals)
+def computeVariances(sqResiduals):
+    return numpy.sum(sqResiduals, axis=3)/sqResiduals.shape[-1]
 
-def pixelWiseLayerPriors(masks):
+def pixelLayerPriors(masks):
 
-    return numpy.sum(masks) / len(masks)
+    return numpy.sum(masks, axis=2) / masks.shape[-1]
 
-def modelLogLikelihood(image, template, pixelWiseLayerPriors, variances):
+def globalLayerPrior(masks):
 
-    return numpy.log(numpy.multiply(pixelWiseLayerPriors, scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) )) + (1 - pixelWiseLayerPriors))
+    return numpy.sum(masks) / masks.size
 
-def pixelWiseLayerPosteriors(img, template):
-    fgCond = numpy.multiply(pixelWiseLayerPriors, scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ))
-    bgCond = (1 - pixelWiseLayerPriors)
-    return fgCond/numpy.exp(modelLogLikelihood), bgCond/numpy.exp(modelLogLikelihood)
+def modelLogLikelihood(image, template, layerPriors, vars):
+    likelihood = pixelLikelihood(image, template, layerPriors, vars)
+    liksum = numpy.sum(numpy.log(likelihood))
+    return liksum
+
+def pixelLikelihood(image, template, layerPrior, vars):
+    sigma = numpy.sqrt(vars)
+    repPriors = numpy.tile(layerPrior, image.shape)
+    # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
+
+    return layerPrior * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * vars)) + (1 - repPriors)
+
+def layerPosteriors(image, template, layerPrior, vars):
+    sigma = numpy.sqrt(vars)
+    repPriors = numpy.tile(layerPrior, image.shape)
+    fgCond = repPriors * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * vars))
+    bgCond = (1 - repPriors)
+    lik = pixelLikelihood(image, template, layerPrior, vars)
+    prodlik = numpy.prod(lik, axis=2)
+
+    return numpy.prod(fgCond, axis=2)/prodlik, numpy.prod(bgCond, axis=2)/prodlik
 
 
 def robustDistance(sqResiduals, scale):
     return numpy.sum(sqResiduals/(sqResiduals + scale**2))
-
-
-
 
 
 def testImageMatching():

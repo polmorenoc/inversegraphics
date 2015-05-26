@@ -41,38 +41,48 @@ def loadGroundTruth():
     lines = [line.strip() for line in open('output/groundtruth.txt')]
     groundTruthLines = []
     imageFiles = []
+    segmentFiles = []
     prefixes = []
     for instance in lines:
         parts = instance.split(' ')
         framestr = '{0:04d}'.format(int(parts[4]))
         prefix = ''
-        if len(parts) == 6:
-            prefix = parts[5]
-        outfilename = prefix + "scene_obj" + str(int(parts[3])) + "_" + framestr
+        az = float(parts[0])
+        objAz = float(parts[1])
+        el = float(parts[2])
+        objIndex = int(parts[3])
+        frame = int(parts[4])
+        sceneNum = int(parts[5])
+        targetIndex = int(parts[6])
+        if len(parts) == 8:
+            prefix = parts[7]
+        outfilename = "render" + prefix + "_obj" + str(objIndex) + "_scene" + str(sceneNum) + '_target' + str(targetIndex) + '_' + framestr
         imageFile = "output/images/" +  outfilename + ".png"
+        segmentFile =  "output/images/" +  outfilename + "_segment.png"
         if os.path.isfile(imageFile):
             imageFiles = imageFiles + [imageFile]
+            segmentFiles = segmentFiles + [segmentFile]
             prefixes = prefixes + [prefix]
-            groundTruthLines = groundTruthLines + [[float(parts[0]), float(parts[1]), float(parts[2]),int(parts[3]), int(parts[4])]]
+            groundTruthLines = groundTruthLines + [[az, objAz, el, objIndex, frame, 0.0, sceneNum, targetIndex]]
 
 
-    groundTruth = numpy.zeros([len(groundTruthLines), 5])
+    # groundTruth = numpy.zeros([len(groundTruthLines), 5])
     groundTruth = numpy.array(groundTruthLines)
 
-    groundTruth = numpy.hstack((groundTruth,numpy.zeros((groundTruth.shape[0],1))))
+    # groundTruth = numpy.hstack((groundTruth,numpy.zeros((groundTruth.shape[0],1))))
 
     lines = [line.strip() for line in open('output/occlusions.txt')]
 
     for instance in lines:
         parts = instance.split(' ')
         prefix = ''
-        if len(parts) == 4:
-            prefix = parts[3]
+        if len(parts) == 6:
+            prefix = parts[5]
         eqPrefixes = [ x==y for (x,y) in zip(prefixes, [prefix]*len(prefixes))]
-        index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (eqPrefixes))[0][0]
-        groundTruth[index, 5] = float(parts[2])
+        index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (groundTruth[:,6] == int(parts[2])) & (groundTruth[:,7] == int(parts[3])) & (eqPrefixes))[0][0]
+        groundTruth[index, 5] = float(parts[4])
  
-    return groundTruth, imageFiles, prefixes
+    return groundTruth, imageFiles, segmentFiles, prefixes
 
 def modifySpecular(scene, delta):
     for model in scene.objects:
@@ -319,9 +329,6 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
     elevation = 45.0
     azimuth = 0
 
-    scene.render.use_raytrace = False
-    scene.render.use_shadows = False
-
     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
     azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
     location = center + azimuthRot * elevationRot * originalLoc
@@ -360,28 +367,48 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         lamp.data.size_y = ceilDepth - 0.2
         lamp.data.shape = 'RECTANGLE'
         lamp.location = mathutils.Vector((ceilPos.x - ceilWidth/2.0 + lightXPos, ceilPos.y, ceilMaxZ))
-        lamp.data.energy = 0.0005
-        if useCycles == False:
-            lamp.data.energy = 0.0015
+        lamp.data.energy = 0.0025
+        # if not useCycles:
+        #     lamp.data.energy = 0.0015
 
         if useCycles:
             lamp.data.cycles.use_multiple_importance_sampling = True
             lamp.data.use_nodes = True
-            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 20
+            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 5
         scene.objects.link(lamp)
         lamp.layers[1] = True
 
-    world.light_settings.use_environment_light = False
-    # world.light_settings.environment_energy = 1
-    world.horizon_color = mathutils.Color((0.0,0.0,0.0))
-    # world.light_settings.samples = 20
-    world.light_settings.use_ambient_occlusion = True
-    world.light_settings.ao_blend_type = 'MULTIPLY'
-    world.light_settings.ao_factor = 1
-    world.light_settings.use_indirect_light = True
-    world.light_settings.gather_method = 'APPROXIMATE'
     scene.world = world
 
+    if not useCycles:
+        scene.render.use_raytrace = False
+        scene.render.use_shadows = False
+
+        # scene.view_settings.exposure = 5
+        # scene.view_settings.gamma = 0.5
+        scene.world.light_settings.use_ambient_occlusion = True
+        scene.world.light_settings.ao_blend_type = 'ADD'
+        scene.world.light_settings.use_indirect_light = True
+        scene.world.light_settings.indirect_bounces = 1
+        scene.world.light_settings.use_cache = True
+        scene.world.light_settings.distance = 0.1
+        scene.world.light_settings.ao_factor = 1
+        scene.world.light_settings.indirect_factor = 1
+        scene.world.light_settings.gather_method = 'APPROXIMATE'
+
+    world.light_settings.use_environment_light = False
+    world.light_settings.environment_energy = 0.0
+    world.horizon_color = mathutils.Color((0.0,0.0,0.0))
+    # world.light_settings.samples = 20
+
+    # world.light_settings.use_ambient_occlusion = False
+    #
+    # world.light_settings.ao_factor = 1
+    # world.exposure = 1.1
+    # world.light_settings.use_indirect_light = True
+
+
+    # scene.sequencer_colorspace_settings.name = 'Linear'
     scene.update()
 
     look_at(camera, center)
@@ -391,7 +418,7 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
     camera.layers[1] = True
     scene.render.layers[0].use_pass_object_index = True
     scene.render.layers[1].use_pass_object_index = True
-    scene.render.layers[1].use_pass_combined = False
+    scene.render.layers[1].use_pass_combined = True
 
     scene.layers[1] = False
     scene.layers[0] = True
