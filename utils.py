@@ -79,7 +79,11 @@ def loadGroundTruth():
         if len(parts) == 6:
             prefix = parts[5]
         eqPrefixes = [ x==y for (x,y) in zip(prefixes, [prefix]*len(prefixes))]
-        index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (groundTruth[:,6] == int(parts[2])) & (groundTruth[:,7] == int(parts[3])) & (eqPrefixes))[0][0]
+        try:
+            index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (groundTruth[:,6] == int(parts[2])) & (groundTruth[:,7] == int(parts[3])) & (eqPrefixes))[0][0]
+        except:
+            print("Problem!")
+
         groundTruth[index, 5] = float(parts[4])
  
     return groundTruth, imageFiles, segmentFiles, prefixes
@@ -424,3 +428,12 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
     scene.layers[0] = True
     scene.render.layers[0].use = True
     scene.render.layers[1].use = False
+
+def targetSceneCollision(target, scene):
+
+    for sceneInstance in scene.objects:
+        if sceneInstance.type == 'EMPTY' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
+            if instancesIntersect(teapot, sceneInstance):
+                return True
+
+    return False

@@ -27,8 +27,10 @@ def scoreImage(img, template, method, methodParams):
     elif method == 'robustSqDistImages':
         sqDists = sqDistImages(img, template)
         score = robustDistance(sqDists, methodParams['scale'])
+    elif method == 'negLogLikelihoodRobust':
+        score = -modelLogLikelihoodRobust(img, template, methodParams['layerPrior'], methodParams['variances'])
     elif method == 'negLogLikelihood':
-        score = -modelLogLikelihood(img, template, methodParams['layerPrior'], methodParams['vars'])
+        score = -modelLogLikelihood(img, template, methodParams['variances'])
     return score
 
 
@@ -93,24 +95,36 @@ def globalLayerPrior(masks):
 
     return numpy.sum(masks) / masks.size
 
-def modelLogLikelihood(image, template, layerPriors, vars):
-    likelihood = pixelLikelihood(image, template, layerPriors, vars)
+def modelLogLikelihoodRobust(image, template, layerPriors, variances):
+    likelihood = pixelLikelihoodRobust(image, template, layerPriors, variances)
     liksum = numpy.sum(numpy.log(likelihood))
     return liksum
 
-def pixelLikelihood(image, template, layerPrior, vars):
-    sigma = numpy.sqrt(vars)
+def modelLogLikelihood(image, template, variances):
+    likelihood = pixelLikelihood(image, template, variances)
+    liksum = numpy.sum(numpy.log(likelihood))
+    return liksum
+
+def pixelLikelihoodRobust(image, template, layerPrior, variances):
+    sigma = numpy.sqrt(variances)
     repPriors = numpy.tile(layerPrior, image.shape)
     # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
 
-    return layerPrior * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * vars)) + (1 - repPriors)
+    return layerPrior * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) + (1 - repPriors)
 
-def layerPosteriors(image, template, layerPrior, vars):
-    sigma = numpy.sqrt(vars)
+
+def pixelLikelihood(image, template, variances):
+    sigma = numpy.sqrt(variances)
+    # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
+
+    return 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))
+
+def layerPosteriors(image, template, layerPrior, variances):
+    sigma = numpy.sqrt(variances)
     repPriors = numpy.tile(layerPrior, image.shape)
-    fgCond = repPriors * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * vars))
+    fgCond = repPriors * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))
     bgCond = (1 - repPriors)
-    lik = pixelLikelihood(image, template, layerPrior, vars)
+    lik = pixelLikelihood(image, template, layerPrior, variances)
     prodlik = numpy.prod(lik, axis=2)
 
     return numpy.prod(fgCond, axis=2)/prodlik, numpy.prod(bgCond, axis=2)/prodlik

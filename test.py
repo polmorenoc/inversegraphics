@@ -7,14 +7,11 @@ from tabulate import tabulate
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import cv2
+import re
 
 numpy.random.seed(1)
 
 inchToMeter = 0.0254
-
-sceneFile = '../databaseFull/scenes/scene00051.txt'
-targetIndex = 9
-roomName = 'room09'
 
 cam = bpy.data.cameras.new("MainCamera")
 camera = bpy.data.objects.new("MainCamera", cam)
@@ -23,31 +20,18 @@ world = bpy.data.worlds.new("MainWorld")
 
 groundTruth, imageFiles, segmentFiles, prefixes = loadGroundTruth()
 
-instances = sceneimport.loadScene(sceneFile)
-
-targetParentPosition = instances[targetIndex][1]
-
-[targetScenes, targetModels] = sceneimport.loadTargetModels()
-[blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
 width = 110
 height = 110
 
-scene = sceneimport.composeScene(modelInstances, targetIndex)
 
 # scene.view_settings.exposure = 1.5
 # scene.view_settings.gamma = 1.5
-
-scene.update()
-bpy.context.screen.scene = scene
 
 useCycles = False
 distance = 0.45
 numSamples = 16
 
-setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
-
 originalLoc = mathutils.Vector((0,-distance , 0))
-
 
 # labels = numpy.column_stack((numpy.cos(groundTruthAzs*numpy.pi/180), numpy.sin(groundTruthAzs*numpy.pi/180), numpy.cos(groundTruthAzs*numpy.pi/180.0), numpy.sin(groundTruthAzs*numpy.pi/180.0)))
 
@@ -60,13 +44,13 @@ maxThresImage = 150
 
 baseDir = '../databaseFull/models/'
 
-experimentTeapots = [3]
+experimentTeapots = [2]
 # experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot']
 
 outputExperiments = []
 
 # distanceTypes = ['chamferDataToModel', 'robustChamferDataToModel', 'sqDistImages', 'robustSqDistImages']
-distanceTypes = ['sqDistImages', 'negLogLikelihood']
+distanceTypes = ['sqDistImages', 'negLogLikelihoodRobust']
 masks = numpy.array([])
 segmentImages = []
 for segment in segmentFiles:
@@ -80,103 +64,174 @@ masks = numpy.concatenate([aux for aux in segmentImages], axis=-1)
 layerPrior = globalLayerPrior(masks)
 
 backgroundModels = [False, True]
-vars = numpy.array([])
+variances = numpy.array([])
 
-for backgroundModel in backgroundModels:
+sortedGroundTruth = groundTruth[numpy.argsort(groundTruth[:,6]), :]
 
-    scene.layers[1] = True
-    scene.layers[0] = False
-    scene.render.layers[0].use = False
-    scene.render.layers[1].use = True
+indicesOccluded = (sortedGroundTruth[:,5] < 0.99) & (sortedGroundTruth[:,5] > 0.05)
 
-    if backgroundModel:
-        scene.layers[1] = False
-        scene.layers[0] = True
-        scene.render.layers[0].use = True
-        scene.render.layers[1].use = False
+[targetScenes, targetModels] = sceneimport.loadTargetModels()
 
-    scene.update()
+for teapotTest in experimentTeapots:
+    # robust = True
+    # robustScale = 0
+    teapot = targetModels[teapotTest]
+    teapot.layers[0] = True
+    teapot.layers[1] = True
 
-    computingSqDists = False
-    sqDistsSeq = []
+    print("Experiment on teapot " + teapot.name)
 
-    for teapotTest in experimentTeapots:
-        robust = True
-        robustScale = 0
+    indicesTeapot = (sortedGroundTruth[:, 3] == teapotTest)
 
-        teapot = targetModels[teapotTest]
-        teapot.layers[0] = True
-        teapot.layers[1] = True
-        scene.objects.link(teapot)
+    indices = numpy.where(indicesTeapot & indicesOccluded)
 
-        scene.update()
+    selTest = indices[0]
 
+    numTests = len(selTest)
+    print ("Total of " + str(numTests) + " tests")
+    expSelTest = [1,2]
+    # numpy.arange(0,numTests,int(numTests))
+    print ("Runnin only " + str(len(expSelTest)) + " tests")
+    # selTest = numpy.random.permutation(selTest)
+    currentScene = -1
 
-        for distanceType in distanceTypes:
+    performance = {}
+    elevations = {}
+    groundTruthRelAzimuths = {}
+    groundTruthAzimuths = {}
+    bestRelAzimuths= {}
+    bestAzimuths= {}
+    occlusions = {}
 
-            computingSqDists = not computingSqDists
-            if not computingSqDists:
-                sqRes = numpy.concatenate([aux[..., numpy.newaxis] for aux in sqDistsSeq], axis=-1)
-                vars = computeVariances(sqRes)
-                vars[numpy.where(vars <= 1)] = 1/255.0
-            robust = not robust
-            if robust is False:
-                robustScale = 0
-            experiment = {}
-            # ipdb.set_trace()
-            indices = numpy.where(groundTruth[:, 3] == teapotTest)
+    for selTestNum in expSelTest:
 
-            selTest = indices[0]
-            # selTest = numpy.random.permutation(selTest)
-            numTests = len(selTest)
+        test = selTest[selTestNum]
 
-            performance = numpy.array([])
-            elevations = numpy.array([])
-            groundTruthRelAzimuths = numpy.array([])
-            groundTruthAzimuths = numpy.array([])
-            bestRelAzimuths= numpy.array([])
-            bestAzimuths= numpy.array([])
-            occlusions = numpy.array([])
+        groundTruthAz = sortedGroundTruth[test,0]
+        groundTruthObjAz = sortedGroundTruth[test,1]
+        groundTruthRelAz = numpy.arctan2(numpy.sin((groundTruthAz-groundTruthObjAz)*numpy.pi/180), numpy.cos((groundTruthAz-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi
+        groundTruthEl = sortedGroundTruth[test,2]
+        occlusion = sortedGroundTruth[test,5]
+        sceneNum = int(sortedGroundTruth[test,6])
+        targetIndex= int(sortedGroundTruth[test,7])
 
-            expSelTest = numpy.arange(0,numTests,int(numTests/10))
+        if currentScene != sceneNum:
+            if currentScene != -1:
+                # Cleanup
+                for objnum, obji in enumerate(scene.objects):
+                    if obji.name != teapot.name:
+                        obji.user_clear()
+                        bpy.data.objects.remove(obji)
 
-            for selTestNum in expSelTest:
+                scene.user_clear()
+                bpy.data.scenes.remove(scene)
 
-                teapot.matrix_world = mathutils.Matrix.Translation(targetParentPosition)
-                center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-                original_matrix_world = teapot.matrix_world.copy()
-                teapot.matrix_world = original_matrix_world
+            currentScene = sceneNum
 
-                test = selTest[selTestNum]
+            sceneFileName = '{0:05d}'.format(sceneNum)
 
-                groundTruthAz = groundTruth[test,0]
-                groundTruthObjAz = groundTruth[test,1]
-                groundTruthRelAz = numpy.arctan2(numpy.sin((groundTruthAz-groundTruthObjAz)*numpy.pi/180), numpy.cos((groundTruthAz-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi
-                groundTruthEl = groundTruth[test,2]
-                occlusion = groundTruth[test,5]
+            print("Experiment on scene " + sceneFileName)
 
-                azimuthRot = mathutils.Matrix.Rotation(radians(-groundTruthObjAz), 4, 'Z')
-                teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+            instances = sceneimport.loadScene('../databaseFull/scenes/scene' + sceneFileName + '.txt')
+
+            targetParentPosition = instances[targetIndex][2]
+            targetParentIndex = instances[targetIndex][1]
+
+            [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
+            targetParentInstance = modelInstances[targetParentIndex]
+            roomName = ''
+            for model in modelInstances:
+                reg = re.compile('(room[0-9]+)')
+                res = reg.match(model.name)
+                if res:
+                    roomName = res.groups()[0]
+
+            scene = sceneimport.composeScene(modelInstances, targetIndex)
+
+            scene.update()
+            scene.render.threads = 4
+            scene.render.threads_mode = 'FIXED'
+            bpy.context.screen.scene = scene
+
+            cycles = bpy.context.scene.cycles
+            scene.render.tile_x = 55
+            scene.render.tile_y = 55
+
+            setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
+
+            scene.objects.link(teapot)
+            teapot.layers[1] = True
+            scene.update()
+
+            teapot.matrix_world = mathutils.Matrix.Translation(targetParentPosition)
+            center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+            original_matrix_world = teapot.matrix_world.copy()
+            teapot.matrix_world = original_matrix_world
+
+        azimuthRot = mathutils.Matrix.Rotation(radians(-groundTruthObjAz), 4, 'Z')
+        teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+
+        for backgroundModel in backgroundModels:
+            modelStr = 'background/'
+            if not backgroundModel:
+                modelStr = 'no_background/'
+            print("Experiment on background model " + modelStr)
+
+            scene.layers[1] = True
+            scene.layers[0] = False
+            scene.render.layers[0].use = False
+            scene.render.layers[1].use = True
+            teapot.layers[1] = True
+
+            if backgroundModel:
+                scene.layers[1] = False
+                scene.layers[0] = True
+                scene.render.layers[0].use = True
+                scene.render.layers[1].use = False
+                teapot.layers[0] = True
+
+            scene.update()
+
+            sqDistsSeq = []
+            for distanceType in distanceTypes:
+                print("Experiment on model " + distanceType)
+                computingSqDists = False
+                if distanceType == 'sqDistImages':
+                    computingSqDists = True
+
+                if not computingSqDists:
+                    sqRes = numpy.concatenate([aux[..., numpy.newaxis] for aux in sqDistsSeq], axis=-1)
+                    variances = computeVariances(sqRes)
+                    variances[numpy.where(variances <= 1)] = 1/255.0
+
+                # robust = not robust
+                # if robust is False:
+                #     robustScale = 0
+
+                experiment = {}
+
+                performance[(backgroundModel, distanceType)] = numpy.array([])
+                elevations[(backgroundModel, distanceType)] = numpy.array([])
+                groundTruthRelAzimuths[(backgroundModel, distanceType)] = numpy.array([])
+                groundTruthAzimuths[(backgroundModel, distanceType)] = numpy.array([])
+                bestRelAzimuths[(backgroundModel, distanceType)]= numpy.array([])
+                bestAzimuths[(backgroundModel, distanceType)] = numpy.array([])
+                occlusions[(backgroundModel, distanceType)] = numpy.array([])
 
                 scores = []
                 relAzimuths = []
                 azimuths = []
-                modelStr = 'background/'
-                if not backgroundModel:
-                    modelStr = 'no_background/'
-                directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + modelStr + distanceType
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
 
+                directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + modelStr + distanceType
+                if not os.path.exists('aztest/'  + 'teapot' + str(teapotTest)  + '/'):
+                    os.makedirs('aztest/'  + 'teapot' + str(teapotTest)  + '/')
 
                 if not os.path.exists(directory + 'test_samples'):
                     os.makedirs(directory + 'test_samples')
 
-
                 numDir = directory +  'test_samples/num' + str(test) + '_azim' + str(int(groundTruthAz)) + '_elev' + str(int(groundTruthEl)) + '/'
                 if not os.path.exists(numDir):
                     os.makedirs(numDir)
-
 
                 testImage = cv2.imread(imageFiles[test])/255.0
                 # testImage = cv2.cvtColor(numpy.float32(rgbTestImage*255), cv2.COLOR_RGB2BGR)/255.0
@@ -192,8 +247,7 @@ for backgroundModel in backgroundModels:
                 azimuth = 0
                 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 
-
-                for azimuth in numpy.arange(0,360,5):
+                for azimuth in numpy.arange(0,360,90):
 
                     azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
                     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
@@ -225,7 +279,7 @@ for backgroundModel in backgroundModels:
                     image = image/255.0
                     # image2 = image2/255.0
 
-                    methodParams = {'vars':vars, 'layerPrior': layerPrior,  'scale': robustScale, 'minThresImage': minThresImage, 'maxThresImage': maxThresImage, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
+                    methodParams = {'variances':variances, 'layerPrior': layerPrior, 'minThresImage': minThresImage, 'maxThresImage': maxThresImage, 'minThresTemplate': minThresTemplate, 'maxThresTemplate': maxThresTemplate}
 
                     distance = scoreImage(testImage, image, distanceType, methodParams)
                     # cv2.imwrite(numDir + 'image' + "_az" + '%.1f' % azimuth + '_dist' + '%.1f' % distance + '.png', numpy.uint8(image*255.0))
@@ -242,27 +296,36 @@ for backgroundModel in backgroundModels:
                         bestRelAzimuth = relAzimuth
                         bestAzimuth = azimuth
 
-
-                if robust is False:
-                    robustScale = 1.4826 * numpy.sqrt(numpy.median(scores))
+                # if robust is False:
+                #     robustScale = 1.4826 * numpy.sqrt(numpy.median(scores))
 
                 # error = numpy.arctan2(numpy.sin((groundTruthRelAz-bestRelAzimuth)*numpy.pi/180), numpy.cos((groundTruthRelAz-bestRelAzimuth)*numpy.pi/180))*180/numpy.pi
                 error = numpy.arctan2(numpy.sin((groundTruthAz-bestAzimuth)*numpy.pi/180), numpy.cos((groundTruthAz-bestAzimuth)*numpy.pi/180))*180/numpy.pi
-                performance = numpy.append(performance, error)
-                elevations = numpy.append(elevations, elevation)
-                bestAzimuths = numpy.append(bestAzimuths, bestAzimuth)
-                groundTruthAzimuths = numpy.append(groundTruthAzimuths, groundTruthAz)
-                occlusions = numpy.append(occlusions, occlusion)
+                performance[(backgroundModel, distanceType)] = numpy.append(performance[(backgroundModel, distanceType)], error)
+                elevations[(backgroundModel, distanceType)] = numpy.append(elevations[(backgroundModel, distanceType)], elevation)
+                bestAzimuths[(backgroundModel, distanceType)] = numpy.append(bestAzimuths[(backgroundModel, distanceType)], bestAzimuth)
+                groundTruthAzimuths[(backgroundModel, distanceType)] = numpy.append(groundTruthAzimuths[(backgroundModel, distanceType)], groundTruthAz)
+                occlusions[(backgroundModel, distanceType)] = numpy.append(occlusions[(backgroundModel, distanceType)], occlusion)
 
                 sqDist = sqDistImages(bestImage, testImage)
                 disp = cv2.normalize(sqDist, sqDist, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                 cv2.imwrite(numDir + 'sqDists' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(disp))
 
                 if computingSqDists:
-                     sqDistsSeq = sqDistsSeq + [sqDist]
+                    sqDistsSeq = sqDistsSeq + [sqDist]
+
+                if distanceType == 'negLogLikelihoodRobust':
+                    pixLik = pixelLikelihoodRobust(testImage, bestImage, layerPrior, variances)
+                    plt.imshow(pixLik)
+                    plt.colorbar()
+                    plt.savefig(numDir + 'pixelLikelihoodRobustPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
+                    plt.clf()
+
+                    disp = cv2.normalize(pixLik, pixLik, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                    cv2.imwrite(numDir + 'pixelLikelihoodRobust' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(disp))
 
                 if distanceType == 'negLogLikelihood':
-                    pixLik = pixelLikelihood(testImage, bestImage, layerPrior, vars)
+                    pixLik = pixelLikelihood(testImage, bestImage, variances)
                     plt.imshow(pixLik)
                     plt.colorbar()
                     plt.savefig(numDir + 'pixelLikelihoodPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
@@ -271,7 +334,7 @@ for backgroundModel in backgroundModels:
                     disp = cv2.normalize(pixLik, pixLik, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                     cv2.imwrite(numDir + 'pixelLikelihood' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(disp))
 
-                    # fgpost, bgpost = layerPosteriors(testImage, bestImage, layerPrior, vars)
+                    # fgpost, bgpost = layerPosteriors(testImage, bestImage, layerPrior, variances)
                     #
                     # plt.imshow(fgpost)
                     # plt.colorbar()
@@ -316,13 +379,22 @@ for backgroundModel in backgroundModels:
                 plt.savefig(numDir + 'performance.png')
                 plt.clf()
 
+    scene.objects.unlink(teapot)
 
-            experiment = {'methodParams': methodParams, 'distanceType': distanceType, 'teapot':teapotTest, 'bestAzimuths':bestAzimuths, 'performance': performance, 'elevations':elevations, 'groundTruthAzimuths': groundTruthRelAzimuths, 'selTest':selTest, 'expSelTest':expSelTest}
-            outputExperiments.append(experiment)
+    for backgroundModelOut in backgroundModels:
+
+        modelStr = 'background/'
+        if not backgroundModelOut:
+            modelStr = 'no_background/'
+
+        for distanceTypeOut in distanceTypes:
+            directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + modelStr + distanceTypeOut
+
+            experiment = {'teapot':teapotTest, 'bestAzimuths':bestAzimuths[(backgroundModelOut, distanceTypeOut)], 'performance': performance[(backgroundModelOut, distanceTypeOut)], 'elevations':elevations[(backgroundModelOut, distanceTypeOut)], 'groundTruthAzimuths': groundTruthRelAzimuths[(backgroundModelOut, distanceTypeOut)], 'selTest':selTest, 'expSelTest':expSelTest}
             with open(directory + 'experiment.pickle', 'wb') as pfile:
                 pickle.dump(experiment, pfile)
 
-            plt.scatter(elevations, performance)
+            plt.scatter(elevations[(backgroundModelOut, distanceTypeOut)], performance[(backgroundModelOut, distanceTypeOut)])
             plt.xlabel('Elevation (degrees)')
             plt.ylabel('Angular error')
             x1,x2,y1,y2 = plt.axis()
@@ -331,7 +403,16 @@ for backgroundModel in backgroundModels:
             plt.savefig(directory + '_elev-performance-scatter.png')
             plt.clf()
 
-            plt.scatter(groundTruthAzimuths, performance)
+            plt.scatter(occlusions[(backgroundModelOut, distanceTypeOut)]*100.0, performance[(backgroundModelOut, distanceTypeOut)])
+            plt.xlabel('Occlusion (%)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,100,-180,180))
+            plt.title('Performance scatter plot')
+            plt.savefig(directory + '_occlusion-performance-scatter.png')
+            plt.clf()
+
+            plt.scatter(groundTruthAzimuths[(backgroundModelOut, distanceTypeOut)], performance[(backgroundModelOut, distanceTypeOut)])
             plt.xlabel('Azimuth (degrees)')
             plt.ylabel('Angular error')
             x1,x2,y1,y2 = plt.axis()
@@ -340,7 +421,7 @@ for backgroundModel in backgroundModels:
             plt.savefig(directory  + '_azimuth-performance-scatter.png')
             plt.clf()
 
-            plt.hist(performance, bins=36)
+            plt.hist(performance[(backgroundModelOut, distanceTypeOut)], bins=36)
             plt.xlabel('Angular error')
             plt.ylabel('Counts')
             x1,x2,y1,y2 = plt.axis()
@@ -353,23 +434,11 @@ for backgroundModel in backgroundModels:
             #     experiment = pickle.load( pfile)
 
             headers=["Best global fit", ""]
-            table = [["Mean angular error", numpy.mean(numpy.abs(performance))],["Median angualar error",numpy.median(numpy.abs(performance))]]
+            table = [["Mean angular error", numpy.mean(numpy.abs(performance[(backgroundModelOut, distanceTypeOut)]))],["Median angualar error",numpy.median(numpy.abs(performance[(backgroundModelOut, distanceTypeOut)]))]]
             performanceTable = tabulate(table, tablefmt="latex", floatfmt=".1f")
 
             with open(directory + 'performance.tex', 'w') as expfile:
                 expfile.write(performanceTable)
 
-        scene.objects.unlink(teapot)
-            # Cleanup
-            # for obji in scene.objects:
-            #     if obji.type == 'MESH':
-            #         obji.user_clear()
-            #         bpy.data.objects.remove(obji)
-
-            # scene.user_clear()
-            # bpy.ops.scene.delete()
-
 print("Finished the experiment")
-
-     
 

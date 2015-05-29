@@ -16,7 +16,7 @@ height = 110
 numSamples = 1024
 useCycles = False
 distance = 0.45
-numFrames = 10
+numFrames = 1000
 batchSize = 10
 
 cam = bpy.data.cameras.new("MainCamera")
@@ -27,8 +27,10 @@ world = bpy.data.worlds.new("MainWorld")
 renderTeapotsList = [2]
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
-sceneLineNums = [0]
+
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+sceneLineNums = numpy.arange(len(sceneLines))
+
 prefix = ''
 
 for sceneNum in sceneLineNums:
@@ -58,17 +60,12 @@ for sceneNum in sceneLineNums:
         if res:
             roomName = res.groups()[0]
 
-
     scene = sceneimport.composeScene(modelInstances, targetIndex)
-
 
     scene.update()
     scene.render.threads = 4
-    scene.render.threads_mode = 'AUTO'
+    scene.render.threads_mode = 'FIXED'
     bpy.context.screen.scene = scene
-
-    scene.view_settings.exposure = 0
-
 
     cycles = bpy.context.scene.cycles
     scene.render.tile_x = 55
@@ -77,7 +74,6 @@ for sceneNum in sceneLineNums:
     originalLoc = mathutils.Vector((0,-distance , 0))
 
     setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
-
 
     bpy.context.user_preferences.system.prefetch_frames = batchSize
     bpy.context.user_preferences.system.memory_cache_limit = 1000
@@ -98,12 +94,20 @@ for sceneNum in sceneLineNums:
         teapot.layers[1] = True
 
         azimuths = numpy.mod(numpy.random.uniform(270,450, numFrames), 360) # Avoid looking outside the room
+
+        # azimuths = numpy.array([])
+        # while len(azimuths) < numFrames:
+        #     num = numpy.random.uniform(0,360, 1)
+        #     numpy.arccos(mathutils.Vector((-0.6548619270324707, 0.6106656193733215, -0.4452454447746277)) * mathutils.Vector((0.0, -1.0, 0.0)))
+        #     objAzimuths = numpy.append(azimuths, num)
+
+
         # objAzimuths = numpy.arange(0,360, 5) # Map it to non colliding rotations.
         objAzimuths = numpy.array([])
         while len(objAzimuths) < numFrames:
             num = numpy.random.uniform(0,360, 1)
-            if not(num>= 250 and num<290) and not(num>= 80 and num<110):
-                objAzimuths = numpy.append(objAzimuths, num)
+            # if not(num>= 250 and num<290) and not(num>= 80 and num<110):
+            objAzimuths = numpy.append(objAzimuths, num)
 
         elevations = numpy.random.uniform(0,90, numFrames)
 
@@ -119,8 +123,7 @@ for sceneNum in sceneLineNums:
         for frame in range(frameStart, frameEnd):
 
             azimuth = azimuths[frame - frameStart]
-            objAzimuth = 250
-            # objAzimuth = objAzimuths[frame - frameStart]
+            objAzimuth = objAzimuths[frame - frameStart]
             elevation = elevations[frame - frameStart]
 
             bpy.context.scene.frame_set(frame)
@@ -132,13 +135,7 @@ for sceneNum in sceneLineNums:
             azimuthRot = mathutils.Matrix.Rotation(radians(-objAzimuth), 4, 'Z')
             teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
 
-            print("Testing intersections")
-            for sceneInstance in scene.objects:
-                if sceneInstance.type == 'EMPTY' and sceneInstance != teapot and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
-                    if instancesIntersect(teapot, sceneInstance):
-                        print("THERE IS AN INTERSECTION")
-                    else:
-                        print("No so far")
+
 
             scene.update()
             look_at(camera, center)
