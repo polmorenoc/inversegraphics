@@ -12,7 +12,7 @@ import io
 import os
 import pickle
 import ipdb
-
+import re
 
 inchToMeter = 0.0254
 
@@ -37,8 +37,8 @@ def loadData():
 
     return data, images, experiments['experiments_data']
 
-def loadGroundTruth():
-    lines = [line.strip() for line in open('output/groundtruth.txt')]
+def loadGroundTruth(rendersDir):
+    lines = [line.strip() for line in open(rendersDir + 'groundtruth.txt')]
     groundTruthLines = []
     imageFiles = []
     segmentFiles = []
@@ -81,10 +81,11 @@ def loadGroundTruth():
         eqPrefixes = [ x==y for (x,y) in zip(prefixes, [prefix]*len(prefixes))]
         try:
             index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (groundTruth[:,6] == int(parts[2])) & (groundTruth[:,7] == int(parts[3])) & (eqPrefixes))[0][0]
+            groundTruth[index, 5] = float(parts[4])
         except:
             print("Problem!")
 
-        groundTruth[index, 5] = float(parts[4])
+
  
     return groundTruth, imageFiles, segmentFiles, prefixes
 
@@ -290,10 +291,15 @@ def cameraLookingInsideRoom(cameraAzimuth):
     return False
 
 
-def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, camera, width, height, numSamples, useCycles):
+def setupScene(scene, targetIndex, roomName, world, distance, camera, width, height, numSamples, useCycles, useGPU):
     if useCycles:
         #Switch Engine to Cycles
         scene.render.engine = 'CYCLES'
+        if useGPU:
+            bpy.context.scene.cycles.device = 'GPU'
+            bpy.context.user_preferences.system.compute_device_type = 'CUDA'
+            bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_0'
+
         AutoNode()
         # bpy.context.scene.render.engine = 'BLENDER_RENDER'
 
@@ -311,32 +317,29 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         cycles.transparent_min_bounces = 4
         cycles.transparent_max_bounces = 12
 
-
     scene.render.image_settings.compression = 0
     scene.render.resolution_x = width #perhaps set resolution in code
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
-
 
     scene.camera = camera
     camera.up_axis = 'Y'
     camera.data.angle = 60 * 180 / numpy.pi
     camera.data.clip_start = 0.01
     camera.data.clip_end = 10
-    distance = 0.4
 
-    center = centerOfGeometry(modelInstances[targetIndex].dupli_group.objects, modelInstances[targetIndex].matrix_world)
-    # center = mathutils.Vector((0,0,0))
-    # center = instances[targetIndex][1]
-
-    originalLoc = mathutils.Vector((0,-distance , 0))
-    elevation = 45.0
-    azimuth = 0
-
-    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
-    location = center + azimuthRot * elevationRot * originalLoc
-    camera.location = location
+    # center = centerOfGeometry(modelInstances[targetIndex].dupli_group.objects, modelInstances[targetIndex].matrix_world)
+    # # center = mathutils.Vector((0,0,0))
+    # # center = instances[targetIndex][1]
+    #
+    # originalLoc = mathutils.Vector((0,-distance , 0))
+    # elevation = 45.0
+    # azimuth = 0
+    #
+    # elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+    # azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+    # location = center + azimuthRot * elevationRot * originalLoc
+    # camera.location = location
 
     # lamp_data2 = bpy.data.lamps.new(name="LampBotData", type='POINT')
     # lamp2 = bpy.data.objects.new(name="LampBot", object_data=lamp_data2)
@@ -383,6 +386,7 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         lamp.layers[1] = True
 
     scene.world = world
+    scene.world.light_settings.distance = 0.1
 
     if not useCycles:
         scene.render.use_raytrace = False
@@ -395,7 +399,7 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
         scene.world.light_settings.use_indirect_light = True
         scene.world.light_settings.indirect_bounces = 1
         scene.world.light_settings.use_cache = True
-        scene.world.light_settings.distance = 0.1
+
         scene.world.light_settings.ao_factor = 1
         scene.world.light_settings.indirect_factor = 1
         scene.world.light_settings.gather_method = 'APPROXIMATE'
@@ -411,11 +415,8 @@ def setupScene(scene, modelInstances, targetIndex, roomName, world, distance, ca
     # world.exposure = 1.1
     # world.light_settings.use_indirect_light = True
 
-
     # scene.sequencer_colorspace_settings.name = 'Linear'
     scene.update()
-
-    look_at(camera, center)
 
     bpy.ops.scene.render_layer_add()
 

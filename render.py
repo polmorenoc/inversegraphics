@@ -5,19 +5,24 @@ import re
 from utils import *
 from collision import *
 
+import matplotlib.pyplot as plt
+
 numpy.random.seed(1)
 
 inchToMeter = 0.0254
-outputDir = 'output/'
+outputDir = 'output_osiris/'
 
 width = 110
 height = 110
 
 numSamples = 1024
-useCycles = False
+useCycles = True
+useGPU = False
 distance = 0.45
 numFrames = 1000
 batchSize = 10
+
+completeScene = True
 
 cam = bpy.data.cameras.new("MainCamera")
 camera = bpy.data.objects.new("MainCamera", cam)
@@ -50,8 +55,7 @@ for sceneNum in sceneLineNums:
     targetParentPosition = instances[targetIndex][2]
     targetParentIndex = instances[targetIndex][1]
 
-
-    [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
+    [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, completeScene, targetIndex)
     targetParentInstance = modelInstances[targetParentIndex]
     roomName = ''
     for model in modelInstances:
@@ -63,17 +67,17 @@ for sceneNum in sceneLineNums:
     scene = sceneimport.composeScene(modelInstances, targetIndex)
 
     scene.update()
-    scene.render.threads = 4
+    scene.render.threads = 20
     scene.render.threads_mode = 'FIXED'
     bpy.context.screen.scene = scene
 
     cycles = bpy.context.scene.cycles
-    scene.render.tile_x = 55
-    scene.render.tile_y = 55
+    scene.render.tile_x = 25
+    scene.render.tile_y = 25
 
     originalLoc = mathutils.Vector((0,-distance , 0))
 
-    setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
+    setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles, useGPU)
 
     bpy.context.user_preferences.system.prefetch_frames = batchSize
     bpy.context.user_preferences.system.memory_cache_limit = 1000
@@ -100,7 +104,6 @@ for sceneNum in sceneLineNums:
         #     num = numpy.random.uniform(0,360, 1)
         #     numpy.arccos(mathutils.Vector((-0.6548619270324707, 0.6106656193733215, -0.4452454447746277)) * mathutils.Vector((0.0, -1.0, 0.0)))
         #     objAzimuths = numpy.append(azimuths, num)
-
 
         # objAzimuths = numpy.arange(0,360, 5) # Map it to non colliding rotations.
         objAzimuths = numpy.array([])
@@ -134,8 +137,6 @@ for sceneNum in sceneLineNums:
 
             azimuthRot = mathutils.Matrix.Rotation(radians(-objAzimuth), 4, 'Z')
             teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
-
-
 
             scene.update()
             look_at(camera, center)

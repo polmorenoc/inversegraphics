@@ -29,8 +29,7 @@ def loadScene(sceneFile):
 
 
 def composeScene(modelInstances, targetIndex):
-    
-    blenderTeapots = loadTargetModels()
+
     bpy.ops.scene.new()
     bpy.context.scene.name = 'Main Scene'
     scene = bpy.context.scene
@@ -45,7 +44,7 @@ def composeScene(modelInstances, targetIndex):
     return scene
 
 
-def importBlenderScenes(instances, targetIndex):
+def importBlenderScenes(instances, completeScene, targetIndex):
 
     baseDir = '../COLLADA/'
     blenderScenes = []
@@ -53,55 +52,61 @@ def importBlenderScenes(instances, targetIndex):
     modelNum = 0
     for instance in instances:
         modelId = instance[0]
-        transform = instance[3]
 
-        modelPath = baseDir + modelId + '_cleaned.obj'
-        print('Importing ' + modelPath )
-        
-        # if modelNum != targetIndex:
-        bpy.ops.scene.new()
-        bpy.context.scene.name = modelId
-        scene = bpy.context.scene
+        reg = re.compile('(room[0-9]+)')
+        isRoom = reg.match(modelId)
 
-        # scene.unit_settings.system = 'METRIC'
-        # bpy.utils.collada_import(modelPath)
-        bpy.ops.import_scene.obj(filepath=modelPath)
-        # ipdb.set_trace()
-        sceneGroup = bpy.data.groups.new(modelId)
+        if completeScene or isRoom:
 
-        scene.update()
+            transform = instance[3]
 
-        scaleMat = mathutils.Matrix.Scale(inchToMeter, 4)
-        # xrotation = mathutils.Matrix.Rotation(-90,4, 'X')
+            modelPath = baseDir + modelId + '_cleaned.obj'
+            print('Importing ' + modelPath )
 
-        for mesh in scene.objects:
-            if mesh.type == 'MESH':
-                sceneGroup.objects.link(mesh)
-                # ipdb.set_trace()
-                # mesh_transform = mesh.matrix_world
-                # mesh.matrix_world =  transform * mesh.matrix_world
-                mesh.pass_index = 0
-                # mesh.matrix_world[0][3] = mesh.matrix_world[0][3]*inchToMeter
-                # mesh.matrix_world[1][3] = mesh.matrix_world[1][3]*inchToMeter
-                # mesh.matrix_world[2][3] = mesh.matrix_world[2][3]*inchToMeter
-                # mesh.matrix_world = scaleMat * mesh.matrix_world
-                 # ipdb.set_trace()
-                # mesh.data.show_double_sided = True
+            # if modelNum != targetIndex:
+            bpy.ops.scene.new()
+            bpy.context.scene.name = modelId
+            scene = bpy.context.scene
 
-        modelInstance = bpy.data.objects.new(modelId, None)
-        modelInstance.dupli_type = 'GROUP'
-        modelInstance.dupli_group = sceneGroup
-        modelInstance.matrix_world =  transform
-        modelInstance.pass_index = 0
-        modelInstances.append(modelInstance)
-        modelNum = modelNum + 1
-        # ipdb.set_trace()
-        blenderScenes.append(scene)
+            # scene.unit_settings.system = 'METRIC'
+            # bpy.utils.collada_import(modelPath)
+            bpy.ops.import_scene.obj(filepath=modelPath)
+            # ipdb.set_trace()
+            sceneGroup = bpy.data.groups.new(modelId)
+
+            scene.update()
+
+            scaleMat = mathutils.Matrix.Scale(inchToMeter, 4)
+            # xrotation = mathutils.Matrix.Rotation(-90,4, 'X')
+
+            for mesh in scene.objects:
+                if mesh.type == 'MESH':
+                    sceneGroup.objects.link(mesh)
+                    # ipdb.set_trace()
+                    # mesh_transform = mesh.matrix_world
+                    # mesh.matrix_world =  transform * mesh.matrix_world
+                    mesh.pass_index = 0
+                    # mesh.matrix_world[0][3] = mesh.matrix_world[0][3]*inchToMeter
+                    # mesh.matrix_world[1][3] = mesh.matrix_world[1][3]*inchToMeter
+                    # mesh.matrix_world[2][3] = mesh.matrix_world[2][3]*inchToMeter
+                    # mesh.matrix_world = scaleMat * mesh.matrix_world
+                     # ipdb.set_trace()
+                    # mesh.data.show_double_sided = True
+
+            modelInstance = bpy.data.objects.new(modelId, None)
+            modelInstance.dupli_type = 'GROUP'
+            modelInstance.dupli_group = sceneGroup
+            modelInstance.matrix_world =  transform
+            modelInstance.pass_index = 0
+            modelInstances.append(modelInstance)
+            modelNum = modelNum + 1
+            # ipdb.set_trace()
+            blenderScenes.append(scene)
 
 
     return blenderScenes, modelInstances
 
-def loadTargetModels():
+def loadTargetModels(experimentTeapots):
 
     teapots = [line.strip() for line in open('teapots.txt')]
     targetModels = []

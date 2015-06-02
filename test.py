@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.4m
- 
+import matplotlib
+# matplotlib.use('Agg')
 import sceneimport
 from utils import *
 from score_image import *
@@ -7,7 +8,6 @@ from tabulate import tabulate
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import cv2
-import re
 
 numpy.random.seed(1)
 
@@ -18,22 +18,19 @@ camera = bpy.data.objects.new("MainCamera", cam)
 
 world = bpy.data.worlds.new("MainWorld")
 
-groundTruth, imageFiles, segmentFiles, prefixes = loadGroundTruth()
+rendersDir = 'output/'
+
+groundTruth, imageFiles, segmentFiles, prefixes = loadGroundTruth(rendersDir)
 
 width = 110
 height = 110
 
-
-# scene.view_settings.exposure = 1.5
-# scene.view_settings.gamma = 1.5
-
 useCycles = False
+useGPU = False
 distance = 0.45
 numSamples = 16
 
 originalLoc = mathutils.Vector((0,-distance , 0))
-
-# labels = numpy.column_stack((numpy.cos(groundTruthAzs*numpy.pi/180), numpy.sin(groundTruthAzs*numpy.pi/180), numpy.cos(groundTruthAzs*numpy.pi/180.0), numpy.sin(groundTruthAzs*numpy.pi/180.0)))
 
 numpy.random.seed(1)
 
@@ -45,12 +42,11 @@ maxThresImage = 150
 baseDir = '../databaseFull/models/'
 
 experimentTeapots = [2]
-# experimentTeapots = ['teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912','teapots/c7549b28656181c91bff71a472da9153/Teapot N311012', 'teapots/1c43a79bd6d814c84a0fee00d66a5e35/Teapot']
 
 outputExperiments = []
 
 # distanceTypes = ['chamferDataToModel', 'robustChamferDataToModel', 'sqDistImages', 'robustSqDistImages']
-distanceTypes = ['sqDistImages', 'negLogLikelihoodRobust']
+distanceTypes = ['sqDistImages', 'negLogLikelihood','negLogLikelihoodRobust']
 masks = numpy.array([])
 segmentImages = []
 for segment in segmentFiles:
@@ -64,15 +60,19 @@ masks = numpy.concatenate([aux for aux in segmentImages], axis=-1)
 layerPrior = globalLayerPrior(masks)
 
 backgroundModels = [False, True]
-variances = numpy.array([])
+
+completeScene = True
+if True not in backgroundModels:
+    completeScene = False
 
 sortedGroundTruth = groundTruth[numpy.argsort(groundTruth[:,6]), :]
 
 indicesOccluded = (sortedGroundTruth[:,5] < 0.99) & (sortedGroundTruth[:,5] > 0.05)
 
-[targetScenes, targetModels] = sceneimport.loadTargetModels()
+[targetScenes, targetModels] = sceneimport.loadTargetModels(experimentTeapots)
 
 for teapotTest in experimentTeapots:
+
     # robust = True
     # robustScale = 0
     teapot = targetModels[teapotTest]
@@ -89,9 +89,12 @@ for teapotTest in experimentTeapots:
 
     numTests = len(selTest)
     print ("Total of " + str(numTests) + " tests")
-    expSelTest = [1,2]
+
+    # expSelTest = [1,2]
+    expSelTest = numpy.arange(0,numTests,int(numTests)/500)
+
     # numpy.arange(0,numTests,int(numTests))
-    print ("Runnin only " + str(len(expSelTest)) + " tests")
+    print ("Running only " + str(len(expSelTest)) + " tests")
     # selTest = numpy.random.permutation(selTest)
     currentScene = -1
 
@@ -102,6 +105,20 @@ for teapotTest in experimentTeapots:
     bestRelAzimuths= {}
     bestAzimuths= {}
     occlusions = {}
+
+    for backgroundModelOut in backgroundModels:
+        modelStr = 'background/'
+        if not backgroundModelOut:
+            modelStr = 'no_background/'
+        for distanceTypeOut in distanceTypes:
+            performance[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
+            elevations[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
+            groundTruthRelAzimuths[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
+            groundTruthAzimuths[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
+            bestRelAzimuths[(backgroundModelOut, distanceTypeOut)]= numpy.array([])
+            bestAzimuths[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
+            occlusions[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
+
 
     for selTestNum in expSelTest:
 
@@ -137,8 +154,8 @@ for teapotTest in experimentTeapots:
             targetParentPosition = instances[targetIndex][2]
             targetParentIndex = instances[targetIndex][1]
 
-            [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, targetIndex)
-            targetParentInstance = modelInstances[targetParentIndex]
+            [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, completeScene, targetIndex)
+            # targetParentInstance = modelInstances[targetParentIndex]
             roomName = ''
             for model in modelInstances:
                 reg = re.compile('(room[0-9]+)')
@@ -149,15 +166,15 @@ for teapotTest in experimentTeapots:
             scene = sceneimport.composeScene(modelInstances, targetIndex)
 
             scene.update()
-            scene.render.threads = 4
-            scene.render.threads_mode = 'FIXED'
+            scene.render.threads = 8
+            scene.render.threads_mode = 'AUTO'
             bpy.context.screen.scene = scene
 
             cycles = bpy.context.scene.cycles
             scene.render.tile_x = 55
             scene.render.tile_y = 55
 
-            setupScene(scene, modelInstances, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles)
+            setupScene(scene, targetIndex,roomName, world, distance, camera, width, height, numSamples, useCycles, useGPU)
 
             scene.objects.link(teapot)
             teapot.layers[1] = True
@@ -172,6 +189,9 @@ for teapotTest in experimentTeapots:
         teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
 
         for backgroundModel in backgroundModels:
+
+            variances = numpy.array([])
+
             modelStr = 'background/'
             if not backgroundModel:
                 modelStr = 'no_background/'
@@ -196,6 +216,7 @@ for teapotTest in experimentTeapots:
             for distanceType in distanceTypes:
                 print("Experiment on model " + distanceType)
                 computingSqDists = False
+
                 if distanceType == 'sqDistImages':
                     computingSqDists = True
 
@@ -207,16 +228,6 @@ for teapotTest in experimentTeapots:
                 # robust = not robust
                 # if robust is False:
                 #     robustScale = 0
-
-                experiment = {}
-
-                performance[(backgroundModel, distanceType)] = numpy.array([])
-                elevations[(backgroundModel, distanceType)] = numpy.array([])
-                groundTruthRelAzimuths[(backgroundModel, distanceType)] = numpy.array([])
-                groundTruthAzimuths[(backgroundModel, distanceType)] = numpy.array([])
-                bestRelAzimuths[(backgroundModel, distanceType)]= numpy.array([])
-                bestAzimuths[(backgroundModel, distanceType)] = numpy.array([])
-                occlusions[(backgroundModel, distanceType)] = numpy.array([])
 
                 scores = []
                 relAzimuths = []
@@ -247,7 +258,7 @@ for teapotTest in experimentTeapots:
                 azimuth = 0
                 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 
-                for azimuth in numpy.arange(0,360,90):
+                for azimuth in numpy.arange(0,360,5):
 
                     azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
                     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
