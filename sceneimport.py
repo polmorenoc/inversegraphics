@@ -111,13 +111,14 @@ def loadTargetModels(experimentTeapots):
     teapots = [line.strip() for line in open('teapots.txt')]
     targetModels = []
 
-
-
     baseDir = '../databaseFull/models/'
     targetInstances = []
     blenderTeapots = []
+    transformations = []
     modelNum = 0
-    for teapot in teapots[0:4]:
+
+    selection = [ teapots[i] for i in experimentTeapots]
+    for teapot in selection:
         targetGroup = bpy.data.groups.new(teapot)
         fullTeapot = baseDir + teapot + '.dae'
         modelPath = fullTeapot
@@ -130,26 +131,30 @@ def loadTargetModels(experimentTeapots):
         scene.update()
         modifySpecular(scene, 0.3)
 
-
         #Rotate the object to the azimuth angle we define as 0.
         # rot = mathutils.Matrix.Rotation(radians(-90), 4, 'X')
         # rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
         # rotateMatrixWorld(scene,  rot )
         # rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
 
+        matrix_world = mathutils.Matrix.Identity(4)
         minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
         minY, maxY = modelDepth(scene.objects, mathutils.Matrix.Identity(4))
         scaleZ = 0.265/(maxZ-minZ)
         scaleY = 0.18/(maxY-minY)
         scale = min(scaleZ, scaleY)
-
+        scaleMat = mathutils.Matrix.Scale(scale, 4)
         for mesh in scene.objects:
             if mesh.type == 'MESH':
-                scaleMat = mathutils.Matrix.Scale(scale, 4)
+
                 mesh.matrix_world =  scaleMat * mesh.matrix_world
+
+        matrix_world = scaleMat * matrix_world
 
         rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z') 
         rotateMatrixWorld(scene,  rot )
+
+        matrix_world  = rot * matrix_world
 
         minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
 
@@ -159,14 +164,17 @@ def loadTargetModels(experimentTeapots):
             if mesh.type == 'MESH':
                 mesh.matrix_world = mathutils.Matrix.Translation(-center) * mesh.matrix_world
 
+        matrix_world = mathutils.Matrix.Translation(-center) * matrix_world
+
         minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
 
         for mesh in scene.objects:
             if mesh.type == 'MESH':
                 mesh.matrix_world = mathutils.Matrix.Translation(mathutils.Vector((0,0,-minZ))) * mesh.matrix_world
 
+        matrix_world = mathutils.Matrix.Translation(mathutils.Vector((0,0,-minZ))) * matrix_world
 
-
+        transformations = transformations + [matrix_world]
         for mesh in scene.objects:
             targetGroup.objects.link(mesh)
             mesh.pass_index = 1
@@ -177,8 +185,8 @@ def loadTargetModels(experimentTeapots):
         targetInstance.pass_index = 1
         targetInstances.append(targetInstance)
         blenderTeapots.append(scene)
-
-    return blenderTeapots, targetInstances
+    # ipdb.set_trace()
+    return blenderTeapots, targetInstances, transformations
 
 
 

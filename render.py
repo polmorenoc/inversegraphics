@@ -28,7 +28,7 @@ cam = bpy.data.cameras.new("MainCamera")
 camera = bpy.data.objects.new("MainCamera", cam)
 world = bpy.data.worlds.new("MainWorld")
 
-[targetScenes, targetModels] = sceneimport.loadTargetModels()
+[targetScenes, targetModels, transformations] = sceneimport.loadTargetModels()
 renderTeapotsList = [2]
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'

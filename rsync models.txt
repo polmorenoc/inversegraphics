@@ -1,0 +1,1 @@
+rsync -a --ignore-existing ../databaseFull/models/teapots/ s1251804@salmon:/disk/data3/s1251804/databaseFull/models/teapots/

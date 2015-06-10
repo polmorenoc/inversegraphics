@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.4m
  
 import bpy
+import bpy_extras
 import numpy
 import mathutils
 from math import radians
@@ -42,6 +43,7 @@ def loadGroundTruth(rendersDir):
     groundTruthLines = []
     imageFiles = []
     segmentFiles = []
+    segmentSingleFiles = []
     prefixes = []
     for instance in lines:
         parts = instance.split(' ')
@@ -57,11 +59,14 @@ def loadGroundTruth(rendersDir):
         if len(parts) == 8:
             prefix = parts[7]
         outfilename = "render" + prefix + "_obj" + str(objIndex) + "_scene" + str(sceneNum) + '_target' + str(targetIndex) + '_' + framestr
+        outfilenamesingle = "render" + prefix + "_obj" + str(objIndex) + "_scene" + str(sceneNum) + '_target' + str(targetIndex) + '_single_' + framestr
         imageFile = "output/images/" +  outfilename + ".png"
         segmentFile =  "output/images/" +  outfilename + "_segment.png"
+        segmentFileSingle =  "output/images/" +  outfilenamesingle + "_segment.png"
         if os.path.isfile(imageFile):
             imageFiles = imageFiles + [imageFile]
             segmentFiles = segmentFiles + [segmentFile]
+            segmentSingleFiles = segmentSingleFiles + [segmentFileSingle]
             prefixes = prefixes + [prefix]
             groundTruthLines = groundTruthLines + [[az, objAz, el, objIndex, frame, 0.0, sceneNum, targetIndex]]
 
@@ -87,7 +92,7 @@ def loadGroundTruth(rendersDir):
 
 
  
-    return groundTruth, imageFiles, segmentFiles, prefixes
+    return groundTruth, imageFiles, segmentFiles, segmentSingleFiles, prefixes
 
 def modifySpecular(scene, delta):
     for model in scene.objects:
@@ -290,6 +295,16 @@ def cameraLookingInsideRoom(cameraAzimuth):
         return True
     return False
 
+def deleteInstance(instance):
+
+    for mesh in instance.dupli_group.objects:
+        mesh.user_clear()
+        bpy.data.objects.remove(mesh)
+
+    instance.dupli_group.user_clear()
+    bpy.data.groups.remove(instance.dupli_group)
+    instance.user_clear()
+    bpy.data.objects.remove(instance)
 
 def setupScene(scene, targetIndex, roomName, world, distance, camera, width, height, numSamples, useCycles, useGPU):
     if useCycles:
@@ -354,6 +369,7 @@ def setupScene(scene, targetIndex, roomName, world, distance, camera, width, hei
         # # toggle lamps
         # if obj.type == 'LAMP':
         #     obj.cycles_visibility.camera = not obj.cycles_visibility.camera
+
     roomInstance = scene.objects[roomName]
 
     ceilMinX, ceilMaxX = modelWidth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
@@ -438,3 +454,140 @@ def targetSceneCollision(target, scene):
                 return True
 
     return False
+
+
+def view_plane(camd, winx, winy, xasp, yasp):
+    #/* fields rendering */
+    ycor = yasp / xasp
+    use_fields = False
+    if (use_fields):
+      ycor *= 2
+
+    def BKE_camera_sensor_size(p_sensor_fit, sensor_x, sensor_y):
+        #/* sensor size used to fit to. for auto, sensor_x is both x and y. */
+        if (p_sensor_fit == 'VERTICAL'):
+            return sensor_y;
+
+        return sensor_x;
+
+    if (camd.type == 'ORTHO'):
+      #/* orthographic camera */
+      #/* scale == 1.0 means exact 1 to 1 mapping */
+      pixsize = camd.ortho_scale
+    else:
+      #/* perspective camera */
+      sensor_size = BKE_camera_sensor_size(camd.sensor_fit, camd.sensor_width, camd.sensor_height)
+      pixsize = (sensor_size * camd.clip_start) / camd.lens
+
+    #/* determine sensor fit */
+    def BKE_camera_sensor_fit(p_sensor_fit, sizex, sizey):
+        if (p_sensor_fit == 'AUTO'):
+            if (sizex >= sizey):
+                return 'HORIZONTAL'
+            else:
+                return 'VERTICAL'
+
+        return p_sensor_fit
+
+    sensor_fit = BKE_camera_sensor_fit(camd.sensor_fit, xasp * winx, yasp * winy)
+
+    if (sensor_fit == 'HORIZONTAL'):
+      viewfac = winx
+    else:
+      viewfac = ycor * winy
+
+    pixsize /= viewfac
+
+    #/* extra zoom factor */
+    pixsize *= 1 #params->zoom
+
+    #/* compute view plane:
+    # * fully centered, zbuffer fills in jittered between -.5 and +.5 */
+    xmin = -0.5 * winx
+    ymin = -0.5 * ycor * winy
+    xmax =  0.5 * winx
+    ymax =  0.5 * ycor * winy
+
+    #/* lens shift and offset */
+    dx = camd.shift_x * viewfac # + winx * params->offsetx
+    dy = camd.shift_y * viewfac # + winy * params->offsety
+
+    xmin += dx
+    ymin += dy
+    xmax += dx
+    ymax += dy
+
+    #/* fields offset */
+    #if (params->field_second):
+    #    if (params->field_odd):
+    #        ymin -= 0.5 * ycor
+    #        ymax -= 0.5 * ycor
+    #    else:
+    #        ymin += 0.5 * ycor
+    #        ymax += 0.5 * ycor
+
+    #/* the window matrix is used for clipping, and not changed during OSA steps */
+    #/* using an offset of +0.5 here would give clip errors on edges */
+    xmin *= pixsize
+    xmax *= pixsize
+    ymin *= pixsize
+    ymax *= pixsize
+
+    return xmin, xmax, ymin, ymax
+
+
+def projection_matrix(camd, scene):
+    r = scene.render
+    left, right, bottom, top = view_plane(camd, r.resolution_x, r.resolution_y, 1, 1)
+
+    farClip, nearClip = camd.clip_end, camd.clip_start
+
+    Xdelta = right - left
+    Ydelta = top - bottom
+    Zdelta = farClip - nearClip
+
+    mat = [[0]*4 for i in range(4)]
+
+    mat[0][0] = nearClip * 2 / Xdelta
+    mat[1][1] = nearClip * 2 / Ydelta
+    mat[2][0] = (right + left) / Xdelta #/* note: negate Z  */
+    mat[2][1] = (top + bottom) / Ydelta
+    mat[2][2] = -(farClip + nearClip) / Zdelta
+    mat[2][3] = -1
+    mat[3][2] = (-2 * nearClip * farClip) / Zdelta
+    # ipdb.set_trace()
+    # return sum([c for c in mat], [])
+    projMat = mathutils.Matrix(mat)
+    return projMat.transposed()
+
+def image_projection(scene, point):
+    p4d = mathutils.Vector.Fill(4, 1)
+    p4d.x = point.x
+    p4d.y = point.y
+    p4d.z = point.z
+    projectionMat = projection_matrix(scene.camera.data, scene)
+    ipdb.set_trace()
+    proj = projectionMat * scene.camera.matrix_world.inverted() * p4d
+    return [scene.render.resolution_x*(proj.x/proj.w + 1)/2, scene.render.resolution_y*(proj.y/proj.w + 1)/2]
+
+def image_project(scene, camera, point):
+    co_2d = bpy_extras.object_utils.world_to_camera_view(scene, camera, point)
+
+    print("2D Coords:", co_2d)
+
+    # If you want pixel coords
+    render_scale = scene.render.resolution_percentage / 100
+    render_size = ( int(scene.render.resolution_x * render_scale), int(scene.render.resolution_y * render_scale))
+    return (round(co_2d.x * render_size[0]), round(co_2d.y * render_size[1]))
+
+def closestCameraIntersection(scene, point):
+    for instance in scene.objects:
+
+        if obji.type == 'EMPTY' and obji.dupli_type == 'GROUP':
+            instanceLoc = numpy.array(instance.location)
+            camLoc = numpy.array(camera.location)
+            pointLoc = numpy.array(point()
+            if numpy.linalg.norm(instanceLoc - camLoc) < numpy.linalg.norm(pointLoc - camLoc) and (instanceLoc - camLoc).dot(pointLoc - camLoc) > 0:
+                localCam = instance.matrix_world.inverted() * scene.camera.location
+                point = instance.matrix_world.inverted() * point
+                

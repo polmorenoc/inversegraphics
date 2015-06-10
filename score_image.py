@@ -28,9 +28,9 @@ def scoreImage(img, template, method, methodParams):
         sqDists = sqDistImages(img, template)
         score = robustDistance(sqDists, methodParams['scale'])
     elif method == 'negLogLikelihoodRobust':
-        score = -modelLogLikelihoodRobust(img, template, methodParams['layerPrior'], methodParams['variances'])
+        score = -modelLogLikelihoodRobust(img, template,  methodParams['testMask'], methodParams['backgroundModel'], methodParams['layerPrior'], methodParams['variances'])
     elif method == 'negLogLikelihood':
-        score = -modelLogLikelihood(img, template, methodParams['variances'])
+        score = -modelLogLikelihood(img, template,  methodParams['testMask'], methodParams['backgroundModel'], methodParams['variances'])
     return score
 
 
@@ -95,39 +95,80 @@ def globalLayerPrior(masks):
 
     return numpy.sum(masks) / masks.size
 
-def modelLogLikelihoodRobust(image, template, layerPriors, variances):
-    likelihood = pixelLikelihoodRobust(image, template, layerPriors, variances)
+def modelLogLikelihoodRobust(image, template, testMask, backgroundModel, layerPriors, variances):
+    likelihood = pixelLikelihoodRobust(image, template, testMask, backgroundModel,  layerPriors, variances)
     liksum = numpy.sum(numpy.log(likelihood))
+    # try:
+    #     assert(liksum <= 0)
+    # except:
+    #     plt.imshow(image)
+    #     plt.show()
+    #     plt.imshow(template)
+    #     plt.show()
+    #     ipdb.set_trace()
+
     return liksum
 
-def modelLogLikelihood(image, template, variances):
-    likelihood = pixelLikelihood(image, template, variances)
+def modelLogLikelihood(image, template, testMask, backgroundModel, variances):
+    likelihood = pixelLikelihood(image, template, testMask, backgroundModel, variances)
     liksum = numpy.sum(numpy.log(likelihood))
+
+    # try:
+    #     assert(liksum <= 0)
+    # except:
+    #     plt.imshow(testMask)
+    #     plt.show()
+    #     plt.imshow(variances)
+    #     plt.show()
+    #     plt.imshow(image)
+    #     plt.show()
+    #     plt.imshow(template)
+    #     plt.show()
+    #     ipdb.set_trace()
+
     return liksum
 
-def pixelLikelihoodRobust(image, template, layerPrior, variances):
+def pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior, variances):
     sigma = numpy.sqrt(variances)
-    repPriors = numpy.tile(layerPrior, image.shape)
+    mask = testMask
+    if backgroundModel:
+        mask = numpy.ones(image.shape)
+    # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
+    repPriors = numpy.tile(layerPrior, image.shape[0:2])
     # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
+    # uniformProbs = numpy.ones(image.shape)
 
-    return layerPrior * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) + (1 - repPriors)
+    foregroundProbs = numpy.prod(1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2) + (1 - repPriors)
+    return foregroundProbs * mask + (1-mask)
 
 
-def pixelLikelihood(image, template, variances):
+def pixelLikelihood(image, template, testMask, backgroundModel, variances):
     sigma = numpy.sqrt(variances)
     # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
+    mask = testMask
+    if backgroundModel:
+        mask = numpy.ones(image.shape[0:2])
+    # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
+    uniformProbs = numpy.ones(image.shape)
+    normalProbs = numpy.prod((1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))),axis=2)
+    return normalProbs * mask + (1-mask)
 
-    return 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))
+def layerPosteriorsRobust(image, template, testMask, backgroundModel, layerPrior, variances):
 
-def layerPosteriors(image, template, layerPrior, variances):
     sigma = numpy.sqrt(variances)
-    repPriors = numpy.tile(layerPrior, image.shape)
-    fgCond = repPriors * 1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))
-    bgCond = (1 - repPriors)
-    lik = pixelLikelihood(image, template, layerPrior, variances)
-    prodlik = numpy.prod(lik, axis=2)
+    mask = testMask
+    if backgroundModel:
+        mask = numpy.ones(image.shape)
+    # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
+    repPriors = numpy.tile(layerPrior, image.shape[0:2])
+    foregroundProbs = numpy.prod(1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2)
+    backgroundProbs = numpy.ones(image.shape)
+    outlierProbs = (1-repPriors)
+    lik = pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior, variances)
+    # prodlik = numpy.prod(lik, axis=2)
+    # return numpy.prod(foregroundProbs*mask, axis=2)/prodlik, numpy.prod(outlierProbs*mask, axis=2)/prodlik
 
-    return numpy.prod(fgCond, axis=2)/prodlik, numpy.prod(bgCond, axis=2)/prodlik
+    return foregroundProbs*mask/lik, outlierProbs*mask/lik
 
 
 def robustDistance(sqResiduals, scale):
