@@ -3,6 +3,8 @@ import numpy
 import matplotlib.pyplot as plt
 import ipdb
 import scipy
+from numbapro import autojit
+
 def scoreImage(img, template, method, methodParams):
     score = 0
 
@@ -84,6 +86,7 @@ def sqDistImages(img, template):
     sqResiduals = numpy.square(img - template)
     return sqResiduals
 
+
 def computeVariances(sqResiduals):
     return numpy.sum(sqResiduals, axis=3)/sqResiduals.shape[-1]
 
@@ -131,8 +134,8 @@ def modelLogLikelihood(image, template, testMask, backgroundModel, variances):
 def pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior, variances):
     sigma = numpy.sqrt(variances)
     mask = testMask
-    if backgroundModel:
-        mask = numpy.ones(image.shape)
+    if backgroundModel == 'FULL':
+        mask = numpy.ones(image.shape[0:2])
     # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
     repPriors = numpy.tile(layerPrior, image.shape[0:2])
     # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
@@ -141,15 +144,14 @@ def pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior
     foregroundProbs = numpy.prod(1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2) + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 
-
 def pixelLikelihood(image, template, testMask, backgroundModel, variances):
     sigma = numpy.sqrt(variances)
     # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
     mask = testMask
-    if backgroundModel:
+    if backgroundModel == 'FULL':
         mask = numpy.ones(image.shape[0:2])
     # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
-    uniformProbs = numpy.ones(image.shape)
+    uniformProbs = numpy.ones(image.shape[0:2])
     normalProbs = numpy.prod((1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))),axis=2)
     return normalProbs * mask + (1-mask)
 
@@ -157,8 +159,8 @@ def layerPosteriorsRobust(image, template, testMask, backgroundModel, layerPrior
 
     sigma = numpy.sqrt(variances)
     mask = testMask
-    if backgroundModel:
-        mask = numpy.ones(image.shape)
+    if backgroundModel == 'FULL':
+        mask = numpy.ones(image.shape[0:2])
     # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
     repPriors = numpy.tile(layerPrior, image.shape[0:2])
     foregroundProbs = numpy.prod(1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2)

@@ -96,7 +96,7 @@ def importBlenderScenes(instances, completeScene, targetIndex):
             modelInstance = bpy.data.objects.new(modelId, None)
             modelInstance.dupli_type = 'GROUP'
             modelInstance.dupli_group = sceneGroup
-            modelInstance.matrix_world =  transform
+            modelInstance.matrix_world = transform
             modelInstance.pass_index = 0
             modelInstances.append(modelInstance)
             modelNum = modelNum + 1

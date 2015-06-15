@@ -44,6 +44,7 @@ def loadGroundTruth(rendersDir):
     imageFiles = []
     segmentFiles = []
     segmentSingleFiles = []
+    unoccludedFiles = []
     prefixes = []
     for instance in lines:
         parts = instance.split(' ')
@@ -56,34 +57,44 @@ def loadGroundTruth(rendersDir):
         frame = int(parts[4])
         sceneNum = int(parts[5])
         targetIndex = int(parts[6])
-        if len(parts) == 8:
-            prefix = parts[7]
+
+        spoutPosX = int(float(parts[7]))
+        spoutPosY = int(float(parts[8]))
+        handlePosX = int(float(parts[9]))
+        handlePosY = int(float(parts[10]))
+        tipPosX = int(float(parts[11]))
+        tipPosY = int(float(parts[12]))
+        spoutOccluded = int(float(parts[13]))
+        handleOccluded = int(float(parts[14]))
+        tipOccluded = int(float(parts[15]))
+
+        if len(parts) == 17:
+            prefix = parts[16]
         outfilename = "render" + prefix + "_obj" + str(objIndex) + "_scene" + str(sceneNum) + '_target' + str(targetIndex) + '_' + framestr
         outfilenamesingle = "render" + prefix + "_obj" + str(objIndex) + "_scene" + str(sceneNum) + '_target' + str(targetIndex) + '_single_' + framestr
-        imageFile = "output/images/" +  outfilename + ".png"
-        segmentFile =  "output/images/" +  outfilename + "_segment.png"
-        segmentFileSingle =  "output/images/" +  outfilenamesingle + "_segment.png"
+        outfilenameunoccluded = "render" + prefix + "_obj" + str(objIndex) + "_scene" + str(sceneNum) + '_target' + str(targetIndex) + '_unoccluded' + framestr
+        imageFile = rendersDir + "images/" +  outfilename + ".png"
+        segmentFile =  rendersDir + "images/" +  outfilename + "_segment.png"
+        segmentFileSingle =  rendersDir + "images/" +  outfilenamesingle + "_segment.png"
+        unoccludedFile =  rendersDir + "images/" +  outfilenameunoccluded + ".png"
         if os.path.isfile(imageFile):
             imageFiles = imageFiles + [imageFile]
             segmentFiles = segmentFiles + [segmentFile]
             segmentSingleFiles = segmentSingleFiles + [segmentFileSingle]
+            unoccludedFiles = unoccludedFiles + [unoccludedFile]
             prefixes = prefixes + [prefix]
-            groundTruthLines = groundTruthLines + [[az, objAz, el, objIndex, frame, 0.0, sceneNum, targetIndex]]
-
+            groundTruthLines = groundTruthLines + [[az, objAz, el, objIndex, frame, 0.0, sceneNum, targetIndex, spoutPosX, spoutPosY, handlePosX, handlePosY, tipPosX, tipPosY, spoutOccluded, handleOccluded, tipOccluded]]
 
     # groundTruth = numpy.zeros([len(groundTruthLines), 5])
     groundTruth = numpy.array(groundTruthLines)
 
     # groundTruth = numpy.hstack((groundTruth,numpy.zeros((groundTruth.shape[0],1))))
 
-    lines = [line.strip() for line in open('output/occlusions.txt')]
+    lines = [line.strip() for line in open(rendersDir + 'occlusions.txt')]
 
     for instance in lines:
         parts = instance.split(' ')
         prefix = ''
-        if len(parts) == 6:
-            prefix = parts[5]
-        eqPrefixes = [ x==y for (x,y) in zip(prefixes, [prefix]*len(prefixes))]
         try:
             index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (groundTruth[:,6] == int(parts[2])) & (groundTruth[:,7] == int(parts[3])) & (eqPrefixes))[0][0]
             groundTruth[index, 5] = float(parts[4])
@@ -92,7 +103,7 @@ def loadGroundTruth(rendersDir):
 
 
  
-    return groundTruth, imageFiles, segmentFiles, segmentSingleFiles, prefixes
+    return groundTruth, imageFiles, segmentFiles, segmentSingleFiles, unoccludedFiles, prefixes
 
 def modifySpecular(scene, delta):
     for model in scene.objects:
@@ -400,6 +411,7 @@ def setupScene(scene, targetIndex, roomName, world, distance, camera, width, hei
             lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 5
         scene.objects.link(lamp)
         lamp.layers[1] = True
+        lamp.layers[2] = True
 
     scene.world = world
     scene.world.light_settings.distance = 0.1
@@ -435,16 +447,21 @@ def setupScene(scene, targetIndex, roomName, world, distance, camera, width, hei
     scene.update()
 
     bpy.ops.scene.render_layer_add()
+    bpy.ops.scene.render_layer_add()
 
     camera.layers[1] = True
     scene.render.layers[0].use_pass_object_index = True
     scene.render.layers[1].use_pass_object_index = True
     scene.render.layers[1].use_pass_combined = True
 
+    camera.layers[2] = True
+
     scene.layers[1] = False
+    scene.layers[2] = False
     scene.layers[0] = True
     scene.render.layers[0].use = True
     scene.render.layers[1].use = False
+    scene.render.layers[2].use = False
 
 def targetSceneCollision(target, scene):
 
@@ -573,21 +590,38 @@ def image_projection(scene, point):
 def image_project(scene, camera, point):
     co_2d = bpy_extras.object_utils.world_to_camera_view(scene, camera, point)
 
-    print("2D Coords:", co_2d)
+    # print("2D Coords:", co_2d)
 
     # If you want pixel coords
     render_scale = scene.render.resolution_percentage / 100
     render_size = ( int(scene.render.resolution_x * render_scale), int(scene.render.resolution_y * render_scale))
     return (round(co_2d.x * render_size[0]), round(co_2d.y * render_size[1]))
 
+#Need to verify!
 def closestCameraIntersection(scene, point):
     for instance in scene.objects:
 
-        if obji.type == 'EMPTY' and obji.dupli_type == 'GROUP':
+        if instance.type == 'EMPTY' and instance.dupli_type == 'GROUP':
             instanceLoc = numpy.array(instance.location)
-            camLoc = numpy.array(camera.location)
-            pointLoc = numpy.array(point()
+            camLoc = numpy.array(scene.camera.location)
+            pointLoc = numpy.array(point)
+            invInstanceTransf = instance.matrix_world.inverted()
+            localCamTmp = invInstanceTransf * scene.camera.location
             if numpy.linalg.norm(instanceLoc - camLoc) < numpy.linalg.norm(pointLoc - camLoc) and (instanceLoc - camLoc).dot(pointLoc - camLoc) > 0:
-                localCam = instance.matrix_world.inverted() * scene.camera.location
-                point = instance.matrix_world.inverted() * point
-                
+                for mesh in instance.dupli_group.objects:
+                    if mesh.type == 'MESH':
+                        invMeshTransf = mesh.matrix_world.inverted()
+                        localCam = invMeshTransf * localCamTmp
+                        localPoint = invMeshTransf * invInstanceTransf * point
+
+                        location, normal, index = mesh.ray_cast(localCam, localPoint)
+                        if index != -1:
+                            #Success.
+                            return True
+
+    return False
+
+def sceneIntersection(scene, point):
+    result, object, matrix, location, normal = scene.ray_cast(scene.camera.location, point)
+
+    return result

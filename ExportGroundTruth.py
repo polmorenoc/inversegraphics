@@ -5,7 +5,7 @@ import os
 print "Reading xml "
 
 
-outputDir = 'output/'
+outputDir = '../data/output/'
 imgDir = outputDir  + "images/"
 
 lines = [line.strip() for line in open(outputDir  + 'groundtruth.txt')]
@@ -24,9 +24,8 @@ for instance in lines:
     targetIndex = int(parts[6])
 
     prefix = ''
-    if len(parts) == 8:
-        prefix = parts[7]
-
+    if len(parts) == 17:
+        prefix = parts[16]
     try:
         exportExrImages(outputDir, imgDir, teapot, frame, sceneNum, targetIndex, prefix)
     except Exception as e:

@@ -9,16 +9,14 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import cv2
 
-
 numpy.random.seed(1)
 
 inchToMeter = 0.0254
 
+rendersDir = '../data/output/'
+baseTestDir = '../data/aztest/'
 
-
-rendersDir = 'output/'
-
-groundTruth, imageFiles, segmentFiles,segmentSingleFiles, prefixes = loadGroundTruth(rendersDir)
+groundTruth, imageFiles, segmentFiles,segmentSingleFiles, unoccludedFiles, prefixes = loadGroundTruth(rendersDir)
 
 width = 110
 height = 110
@@ -57,10 +55,10 @@ masks = numpy.concatenate([aux for aux in segmentImages], axis=-1)
 
 layerPrior = globalLayerPrior(masks)
 
-backgroundModels = [False]
+backgroundModels = ['SINGLE', 'UNOCCLUDED']
 
 completeScene = True
-if True not in backgroundModels:
+if 'FULL' not in backgroundModels:
     completeScene = False
 
 # sortedScenesIndices = numpy.argsort(groundTruth[:,6])
@@ -74,14 +72,17 @@ indicesOccluded = (groundTruth[:,5] < 0.90) & (groundTruth[:,5] > 0.05)
 
 indicesScenes = (groundTruth[:,6] != 19)
 
+partsOccluded = (groundTruth[:,14] == 1) | (groundTruth[:,13] == 1)
+
+indicesPrefix = [ x==y for (x,y) in zip(prefixes, ['_occluded']*len(prefixes))]
+
 [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(experimentTeapots)
 
-numExperiments = 50
+numExperiments = 10
 
 spout = mathutils.Vector((-6.2, -0.16, 6.25))
 handle = mathutils.Vector((6.2, 0.2, 5.7))
 tip = mathutils.Vector((0, 0, 8))
-
 
 for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
@@ -98,7 +99,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
     indicesTeapot = (groundTruth[:, 3] == teapotTest)
 
-    indices = numpy.where(indicesTeapot & indicesOccluded & indicesScenes)
+    indices = numpy.where(indicesTeapot & indicesOccluded & indicesScenes & partsOccluded & indicesPrefix)
 
     selTest = indices[0]
 
@@ -121,10 +122,8 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
     bestAzimuths= {}
     occlusions = {}
 
+
     for backgroundModelOut in backgroundModels:
-        modelStr = 'background/'
-        if not backgroundModelOut:
-            modelStr = 'no_background/'
         for distanceTypeOut in distanceTypes:
             performance[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
             elevations[(backgroundModelOut, distanceTypeOut)] = numpy.array([])
@@ -138,6 +137,9 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
         test = selTest[selTestNum]
 
+        testResults = {}
+        testAzimuths = {}
+
         groundTruthAz = groundTruth[test,0]
         groundTruthObjAz = groundTruth[test,1]
         groundTruthRelAz = numpy.arctan2(numpy.sin((groundTruthAz-groundTruthObjAz)*numpy.pi/180), numpy.cos((groundTruthAz-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi
@@ -145,6 +147,10 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
         occlusion = groundTruth[test,5]
         sceneNum = int(groundTruth[test,6])
         targetIndex= int(groundTruth[test,7])
+
+        sampleDir = baseTestDir + 'teapot' + str(teapotTest)  + '/' 'test_samples/num' + str(test) + '_azim' + str(int(groundTruthAz)) + '_elev' + str(int(groundTruthEl)) + '_occlusion' + str(occlusion) + '/'
+        if not os.path.exists(sampleDir):
+            os.makedirs(sampleDir)
 
         if currentScene != sceneNum:
             if currentScene != -1:
@@ -228,34 +234,29 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
             original_matrix_world = teapot.matrix_world.copy()
             teapot.matrix_world = original_matrix_world
 
-            bpy.ops.mesh.primitive_uv_sphere_add(size=0.05, location=spout)
-            sphereSpout = scene.objects[0]
-            bpy.ops.mesh.primitive_uv_sphere_add(size=0.05, location=handle)
-            sphereHandle = scene.objects[0]
-            bpy.ops.mesh.primitive_uv_sphere_add(size=0.05, location=tip)
-            sphereTip = scene.objects[0]
-            sphereTip.layers[1] = True
-            sphereSpout.layers[1] = True
-            sphereHandle.layers[1] = True
+            # bpy.ops.mesh.primitive_uv_sphere_add(size=0.005, location=spout)
+            # sphereSpout = scene.objects[0]
+            # bpy.ops.mesh.primitive_uv_sphere_add(size=0.005, location=handle)
+            # sphereHandle = scene.objects[0]
+            # bpy.ops.mesh.primitive_uv_sphere_add(size=0.005, location=tip)
+            # sphereTip = scene.objects[0]
+            # sphereTip.layers[1] = True
+            # sphereSpout.layers[1] = True
+            # sphereHandle.layers[1] = True
 
         azimuthRot = mathutils.Matrix.Rotation(radians(-groundTruthObjAz), 4, 'Z')
         groundTruthTransf = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation()))
         teapot.matrix_world = groundTruthTransf * original_matrix_world
 
-        sphereSpout.matrix_world = teapot.matrix_world * mathutils.Matrix.Translation(spout)
-        sphereHandle.matrix_world = teapot.matrix_world * mathutils.Matrix.Translation(handle)
-        sphereTip.matrix_world = teapot.matrix_world * mathutils.Matrix.Translation(tip)
-
-
+        sphereSpout_matrix_world = teapot.matrix_world * mathutils.Matrix.Translation(spout)
+        sphereHandle_matrix_world = teapot.matrix_world * mathutils.Matrix.Translation(handle)
+        sphereTip_matrix_world = teapot.matrix_world * mathutils.Matrix.Translation(tip)
 
         for backgroundModel in backgroundModels:
 
             variances = numpy.ones([height, width, 3])*2/255.0
 
-            modelStr = 'background/'
-            if not backgroundModel:
-                modelStr = 'no_background/'
-            print("Experiment on background model " + modelStr)
+            print("Experiment on background model " + backgroundModel)
 
             scene.layers[1] = True
             scene.layers[0] = False
@@ -263,7 +264,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
             scene.render.layers[1].use = True
             teapot.layers[1] = True
 
-            if backgroundModel:
+            if backgroundModel == 'FULL':
                 scene.layers[1] = False
                 scene.layers[0] = True
                 scene.render.layers[0].use = True
@@ -282,7 +283,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 if distIdx == 0:
                     computingSqDists = True
 
-                if not computingSqDists and not backgroundModel:
+                if not computingSqDists and not backgroundModel == 'FULL':
                     sqRes = numpy.concatenate([aux[..., numpy.newaxis] for aux in sqDistsSeq], axis=-1)
                     variances = computeVariances(sqRes)
                     variances[numpy.where(variances <= 1)] = 2.0/255.0
@@ -295,9 +296,9 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 relAzimuths = []
                 azimuths = []
 
-                directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + modelStr + distanceType
-                if not os.path.exists('aztest/'  + 'teapot' + str(teapotTest)  + '/'):
-                    os.makedirs('aztest/'  + 'teapot' + str(teapotTest)  + '/')
+                directory =  baseTestDir + 'teapot' + str(teapotTest)  + '/' + backgroundModel + '_' + distanceType
+                if not os.path.exists('../data/aztest/'  + 'teapot' + str(teapotTest)  + '/'):
+                    os.makedirs('../data/aztest/'  + 'teapot' + str(teapotTest)  + '/')
 
                 if not os.path.exists(directory + 'test_samples'):
                     os.makedirs(directory + 'test_samples')
@@ -307,13 +308,18 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                     os.makedirs(numDir)
 
                 testImage = cv2.imread(imageFiles[test])/255.0
+                if backgroundModel == 'UNOCCLUDED':
+                    testImage = cv2.imread(unoccludedFiles[test])/255.0
                 # testImage = cv2.cvtColor(numpy.float32(rgbTestImage*255), cv2.COLOR_RGB2BGR)/255.0
 
                 testMask = masks[:,:,test]
 
                 testImageEdges = cv2.Canny(numpy.uint8(testImage*255), minThresImage,maxThresImage)
-                cv2.imwrite(numDir + "image_canny" + ".png" , testImageEdges)
-                cv2.imwrite(numDir + "image" + ".png" , numpy.uint8(testImage*255))
+                cv2.imwrite(numDir + "image_canny_" + backgroundModel +  ".png" , testImageEdges)
+                cv2.imwrite(numDir + "image_" + backgroundModel + ".png" , numpy.uint8(testImage*255))
+
+                cv2.imwrite(sampleDir + "image_canny_" + backgroundModel +  ".png" , testImageEdges)
+                cv2.imwrite(sampleDir + "image_" + backgroundModel + ".png" , numpy.uint8(testImage*255))
 
                 score = numpy.finfo(numpy.float64).max
 
@@ -322,7 +328,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 azimuth = 0
                 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 
-                for azimuth in numpy.arange(0,360,5):
+                for azimuth in numpy.arange(0,360,10):
 
                     azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
                     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
@@ -336,11 +342,17 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                     # projMat = projection_matrix(scene.camera.data, scene)
                     # ipdb.set_trace()
 
-                    spoutlocation = image_project(scene, camera, sphereSpout.matrix_world.to_translation())
-                    handlelocation = image_project(scene, camera,sphereHandle.matrix_world.to_translation())
-                    spherelocation = image_project(scene, camera, sphereTip.matrix_world.to_translation())
+                    spoutlocation = image_project(scene, camera, sphereSpout_matrix_world.to_translation())
+                    handlelocation = image_project(scene, camera,sphereHandle_matrix_world.to_translation())
+                    spherelocation = image_project(scene, camera, sphereTip_matrix_world.to_translation())
 
-                    ipdb.set_trace()
+                    # touched = closestCameraIntersection(scene, sphereSpout.matrix_world.to_translation())
+
+                    # scene.objects.unlink(sphereSpout)
+                    # scene.objects.unlink(sphereHandle)
+                    # scene.objects.unlink(sphereTip)
+                    result, object, matrix, location, normal = scene.ray_cast(scene.camera.location, sphereSpout_matrix_world.to_translation())
+
                     scene.render.filepath = numDir  + '_blender.png'
 
                     bpy.ops.render.render( write_still=True )
@@ -369,7 +381,6 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                     distance = scoreImage(testImage, image, distanceType, methodParams)
                     # cv2.imwrite(numDir + 'image' + "_az" + '%.1f' % azimuth + '_dist' + '%.1f' % distance + '.png', numpy.uint8(image*255.0))
 
-
                     scores.append(distance)
                     relAzimuth = numpy.mod(numpy.arctan2(numpy.sin((azimuth-groundTruthObjAz)*numpy.pi/180), numpy.cos((azimuth-groundTruthObjAz)*numpy.pi/180))*180/numpy.pi , 360)
                     azimuths.append(azimuth)
@@ -392,6 +403,9 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 bestAzimuths[(backgroundModel, distanceType)] = numpy.append(bestAzimuths[(backgroundModel, distanceType)], bestAzimuth)
                 groundTruthAzimuths[(backgroundModel, distanceType)] = numpy.append(groundTruthAzimuths[(backgroundModel, distanceType)], groundTruthAz)
                 occlusions[(backgroundModel, distanceType)] = numpy.append(occlusions[(backgroundModel, distanceType)], occlusion)
+
+                testResults[(backgroundModel, distanceType)] = scores
+                testAzimuths[(backgroundModel, distanceType)] = azimuths
 
                 sqDist = sqDistImages(bestImage, testImage)
                 disp = cv2.normalize(sqDist, sqDist, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
@@ -425,8 +439,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                     # plt.imshow(bgpost)
                     # plt.show()
                     # ipdb.set_trace
-                    assert(numpy.abs(numpy.sum(fgpost + bgpost - testMask)) < 0.001)
-
+                    assert(numpy.abs(numpy.sum(fgpost + bgpost - testMask)) < 0.01)
 
                     plt.imshow(fgpost)
                     plt.colorbar()
@@ -479,16 +492,46 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 plt.savefig(numDir + 'performance.png')
                 plt.clf()
 
+        backgroundModelOut = 'UNOCCLUDED'
+        distanceTypeOut = 'negLogLikelihood'
+        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]), color='b', label='Clean - Normal model')
+
+
+        backgroundModelOut = 'SINGLE'
+        distanceTypeOut = 'negLogLikelihood'
+        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]), color='r', label='Occlusions - Normal model')
+        x1,x2,y1,y2 = plt.axis()
+        scale = abs(y1-y2)
+
+        backgroundModelOut = 'SINGLE'
+        distanceTypeOut = 'negLogLikelihoodRobust'
+        maxRob = numpy.max(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        minRob = numpy.min(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        testResultsRobust = numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]) * scale / (maxRob-minRob)
+
+        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], testResultsRobust, color='g', label='Occlusions - Robust model')
+
+
+
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Score')
+        fontP = FontProperties()
+        fontP.set_size('small')
+        # plt.axvline(x=bestAzimuth, linewidth=2, color='r', label='Minimum score azimuth')
+        plt.axvline(x=groundTruthAz, linewidth=2, color='b', label='Ground truth azimuth')
+        # plt.axvline(x=(bestAzimuth + 180) % 360, linewidth=1, color='r', ls='--', label='Minimum distance azimuth + 180')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,y1,y2))
+        plt.legend()
+        plt.savefig(sampleDir + 'performance.png')
+        plt.clf()
+
     scene.objects.unlink(teapot)
 
     for backgroundModelOut in backgroundModels:
 
-        modelStr = 'background/'
-        if not backgroundModelOut:
-            modelStr = 'no_background/'
-
         for distanceTypeOut in distanceTypes:
-            directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + modelStr + distanceTypeOut
+            directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + backgroundModel + distanceTypeOut
 
             experiment = {'teapot':teapotTest, 'bestAzimuths':bestAzimuths[(backgroundModelOut, distanceTypeOut)], 'performance': performance[(backgroundModelOut, distanceTypeOut)], 'elevations':elevations[(backgroundModelOut, distanceTypeOut)], 'groundTruthAzimuths': groundTruthRelAzimuths[(backgroundModelOut, distanceTypeOut)], 'selTest':selTest, 'test':test}
             with open(directory + 'experiment.pickle', 'wb') as pfile:
