@@ -120,14 +120,15 @@ def loadTargetModels(experimentTeapots):
     selection = [ teapots[i] for i in experimentTeapots]
     for teapot in selection:
         targetGroup = bpy.data.groups.new(teapot)
-        fullTeapot = baseDir + teapot + '.dae'
+        fullTeapot = baseDir + teapot + '.obj'
         modelPath = fullTeapot
         bpy.ops.scene.new()
         bpy.context.scene.name = teapot
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         print("Importing " + modelPath)
-        bpy.utils.collada_import(modelPath)
+        # bpy.utils.collada_import(modelPath)
+        bpy.ops.import_scene.obj(filepath=modelPath)
         scene.update()
         modifySpecular(scene, 0.3)
 

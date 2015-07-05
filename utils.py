@@ -3,6 +3,7 @@
 import bpy
 import bpy_extras
 import numpy
+import numpy as np
 import mathutils
 from math import radians
 import h5py
@@ -95,6 +96,9 @@ def loadGroundTruth(rendersDir):
     for instance in lines:
         parts = instance.split(' ')
         prefix = ''
+        if len(parts) == 6:
+            prefix = parts[5]
+        eqPrefixes = [ x==y for (x,y) in zip(prefixes, [prefix]*len(prefixes))]
         try:
             index = numpy.where((groundTruth[:, 3] == int(parts[0])) & (groundTruth[:, 4] == int(parts[1])) & (groundTruth[:,6] == int(parts[2])) & (groundTruth[:,7] == int(parts[3])) & (eqPrefixes))[0][0]
             groundTruth[index, 5] = float(parts[4])
@@ -583,7 +587,7 @@ def image_projection(scene, point):
     p4d.y = point.y
     p4d.z = point.z
     projectionMat = projection_matrix(scene.camera.data, scene)
-    ipdb.set_trace()
+
     proj = projectionMat * scene.camera.matrix_world.inverted() * p4d
     return [scene.render.resolution_x*(proj.x/proj.w + 1)/2, scene.render.resolution_y*(proj.y/proj.w + 1)/2]
 
@@ -625,3 +629,185 @@ def sceneIntersection(scene, point):
     result, object, matrix, location, normal = scene.ray_cast(scene.camera.location, point)
 
     return result
+
+# def flattenMesh(mesh, transform):
+#     return
+# def flattenInstance(instance, transform):
+
+
+def setupBlender(teapot, width, height, angle, clip_start, clip_end, camDistance):
+    cam = bpy.data.cameras.new("MainCamera")
+    camera = bpy.data.objects.new("MainCamera", cam)
+    world = bpy.data.worlds.new("MainWorld")
+    bpy.ops.scene.new()
+    bpy.context.scene.name = 'Main Scene'
+    scene = bpy.context.scene
+    scene.objects.link(teapot)
+    scene.camera = camera
+    camera.up_axis = 'Y'
+    camera.data.angle = angle
+    camera.data.clip_start = clip_start
+    camera.data.clip_end = clip_end
+    scene.world = world
+    world.light_settings.use_environment_light = False
+    world.light_settings.environment_energy = 0.0
+    world.horizon_color = mathutils.Color((0.0,0.0,0.0))
+    scene.render.resolution_x = width #perhaps set resolution in code
+    scene.render.resolution_y = height
+    scene.render.resolution_percentage = 100
+    scene.update()
+    lamp_data2 = bpy.data.lamps.new(name="LampBotData", type='POINT')
+    lamp2 = bpy.data.objects.new(name="LampBot", object_data=lamp_data2)
+    lamp2.location = mathutils.Vector((0,0,1.5))
+    lamp2.data.energy = 1
+    scene.objects.link(lamp2)
+    lamp_data2 = bpy.data.lamps.new(name="LampBotData2", type='POINT')
+    lamp2 = bpy.data.objects.new(name="LampBot2", object_data=lamp_data2)
+    lamp2.location = mathutils.Vector((0,0,-1.5))
+    lamp2.data.energy = 0.5
+    scene.objects.link(lamp2)
+    bpy.context.screen.scene = scene
+    # teapot.matrix_world = mathutils.Matrix.Translation(mathutils.Vector((0,0,0)))
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    azimuth = 90
+    elevation = 25
+    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+    originalLoc = mathutils.Vector((0,-camDistance, 0))
+    location = center + azimuthRot * elevationRot * originalLoc
+    camera.location = location
+    scene.update()
+    look_at(camera, center)
+    scene.update()
+
+    return scene
+
+
+###########################################################
+#
+#   Round values of the 3D vector
+#
+###########################################################
+
+def r3d(v):
+    return round(v[0],6), round(v[1],6), round(v[2],6)
+
+###########################################################
+#
+#   Round values of the 2D vector
+#
+###########################################################
+
+def r2d(v):
+    return round(v[0],6), round(v[1],6)
+
+
+###########################################################
+#
+#   Convert object name to be suitable for C definition
+#
+###########################################################
+
+def clearName(name):
+    tmp=name.upper()
+    ret=""
+    for i in tmp:
+        if (i in " ./\-+#$%^!@"):
+            ret=ret+"_"
+        else:
+            ret=ret+i
+    return ret
+
+
+###########################################################
+#
+#   Build data for each object (MESH)
+#
+###########################################################
+
+def buildData (msh):
+
+    lvdic = {} # local dictionary
+    lfl = [] # lcoal faces index list
+    lvl = [] # local vertex list
+    lvcl = []
+    lnl = [] # local normal list
+    luvl = [] # local uv list
+    lvcnt = 0 # local vertices count
+    isSmooth = False
+    hasUV = True    # true by default, it will be verified below
+
+    # if len(msh.tessfaces) == 0 or msh.tessfaces is None:
+    #     msh.calc_tessface()
+
+    if (len(msh.tessface_uv_textures)>0):
+        if (msh.tessface_uv_textures.active is None):
+            hasUV=False
+    else:
+        hasUV = False
+
+    if (hasUV):
+        activeUV = msh.tessface_uv_textures.active.data
+
+
+    for i,f in enumerate(msh.polygons):
+        isSmooth = f.use_smooth
+        tmpfaces = []
+        for j,v in enumerate(f.vertices):
+
+            vec = msh.vertices[v].co
+
+            vec = r3d(vec)
+
+            if (isSmooth):  # use vertex normal
+                nor = msh.vertices[v].normal
+            else:           # use face normal
+                nor = f.normal
+
+            vcolor = msh.materials[f.material_index].diffuse_color[:]
+            if vcolor == (0.0,0.0,0.0) and msh.materials[f.material_index].specular_color[:] != (0.0,0.0,0.0):
+                vcolor = msh.materials[f.material_index].specular_color[:]
+                # print("Using specular!")
+
+            nor = r3d(nor)
+
+            if (hasUV):
+                co = activeUV[i].uv[j]
+                co = r2d(co)
+            else:
+                co = (0.0, 0.0)
+
+            key = vec, nor, co
+            vinx = lvdic.get(key)
+
+            if (vinx is None): # vertex not found
+
+                lvdic[key] = lvcnt
+                lvl.append(vec)
+                lnl.append(nor)
+
+                lvcl.append(vcolor)
+
+                luvl.append(co)
+                tmpfaces.append(lvcnt)
+                lvcnt+=1
+            else:
+                inx = lvdic[key]
+                tmpfaces.append(inx)
+
+        if (len(tmpfaces)==3):
+            lfl.append(tmpfaces)
+        else:
+            lfl.append([tmpfaces[0], tmpfaces[1], tmpfaces[2]])
+            lfl.append([tmpfaces[0], tmpfaces[2], tmpfaces[3]])
+
+
+    #update global lists and dictionaries
+    # vtx.append(lvdic)
+    f = np.vstack(lfl)
+    v = np.vstack(lvl)
+    vc = np.vstack(lvcl)
+    n = np.vstack(lnl)
+    uv = np.vstack(luvl)
+
+    return f, v, vc, n, uv

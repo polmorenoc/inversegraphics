@@ -1,6 +1,6 @@
 #!/usr/bin/env python3.4m
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import sceneimport
 from utils import *
 from score_image import *
@@ -8,6 +8,8 @@ from tabulate import tabulate
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import cv2
+
+plt.ioff()
 
 numpy.random.seed(1)
 
@@ -78,7 +80,7 @@ indicesPrefix = [ x==y for (x,y) in zip(prefixes, ['_occluded']*len(prefixes))]
 
 [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(experimentTeapots)
 
-numExperiments = 10
+numExperiments = 100
 
 spout = mathutils.Vector((-6.2, -0.16, 6.25))
 handle = mathutils.Vector((6.2, 0.2, 5.7))
@@ -99,7 +101,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
     indicesTeapot = (groundTruth[:, 3] == teapotTest)
 
-    indices = numpy.where(indicesTeapot & indicesOccluded & indicesScenes & partsOccluded & indicesPrefix)
+    indices = numpy.where(indicesTeapot & indicesOccluded & indicesScenes & partsOccluded )
 
     selTest = indices[0]
 
@@ -107,6 +109,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
     print ("Total of " + str(numTests) + " tests")
 
     # expSelTest = [0,1]
+    numExperiments = min(numTests, numExperiments)
     expSelTest = numpy.array(numpy.arange(0,numTests-1,int(numTests-1)/numExperiments), dtype=numpy.int)
 
     # numpy.arange(0,numTests,int(numTests))
@@ -328,7 +331,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 azimuth = 0
                 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 
-                for azimuth in numpy.arange(0,360,10):
+                for azimuth in numpy.arange(0,360,5):
 
                     azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
                     elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
@@ -416,10 +419,11 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
                 if distanceType == 'negLogLikelihoodRobust':
                     pixLik = pixelLikelihoodRobust(testImage, bestImage, testMask, backgroundModel, layerPrior, variances)
+                    fig = plt.figure()
                     plt.imshow(pixLik)
                     plt.colorbar()
-                    plt.savefig(numDir + 'pixelLikelihoodRobustPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
-                    plt.clf()
+                    fig.savefig(numDir + 'pixelLikelihoodRobustPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
+                    plt.close(fig)
 
                     disp = cv2.normalize(pixLik, pixLik, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                     cv2.imwrite(numDir + 'pixelLikelihoodRobust' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(disp))
@@ -440,16 +444,17 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                     # plt.show()
                     # ipdb.set_trace
                     assert(numpy.abs(numpy.sum(fgpost + bgpost - testMask)) < 0.01)
-
+                    fig = plt.figure()
                     plt.imshow(fgpost)
                     plt.colorbar()
-                    plt.savefig(numDir + 'fgPosteriorPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
-                    plt.clf()
+                    fig.savefig(numDir + 'fgPosteriorPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
+                    plt.close(fig)
 
+                    fig = plt.figure()
                     plt.imshow(bgpost)
                     plt.colorbar()
-                    plt.savefig(numDir + 'bgPosteriorPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
-                    plt.clf()
+                    fig.savefig(numDir + 'bgPosteriorPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
+                    plt.close(fig)
 
                     disp = cv2.normalize(fgpost, fgpost, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                     cv2.imwrite(numDir + 'fgPosterior' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(disp))
@@ -458,10 +463,11 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
                 if distanceType == 'negLogLikelihood':
                     pixLik = pixelLikelihood(testImage, bestImage, testMask, backgroundModel, variances)
+                    fig = plt.figure()
                     plt.imshow(pixLik)
                     plt.colorbar()
-                    plt.savefig(numDir + 'pixelLikelihoodPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
-                    plt.clf()
+                    fig.savefig(numDir + 'pixelLikelihoodPlot' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png')
+                    plt.close(fig)
 
                     disp = cv2.normalize(pixLik, pixLik, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                     cv2.imwrite(numDir + 'pixelLikelihood' + "_az" + '%.1f' % bestAzimuth + '_dist' + '%.1f' % score + '.png', numpy.uint8(disp))
@@ -476,10 +482,10 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 cv2.imwrite(numDir + 'dist_transform' +  '.png', disp)
 
                 # ipdb.set_trace()
-
+                fig = plt.figure()
                 plt.plot(azimuths, numpy.array(scores))
                 plt.xlabel('Azimuth (degrees)')
-                plt.ylabel('Score')
+                plt.ylabel('Negative Log Likelihood')
                 plt.title(distanceType)
                 plt.axvline(x=bestAzimuth, linewidth=2, color='b', label='Minimum score azimuth')
                 plt.axvline(x=groundTruthAz, linewidth=2, color='g', label='Ground truth azimuth')
@@ -488,90 +494,96 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 fontP.set_size('small')
                 x1,x2,y1,y2 = plt.axis()
                 plt.axis((0,360,y1,y2))
-                # plt.legend()
-                plt.savefig(numDir + 'performance.png')
-                plt.clf()
 
+                # plt.legend()
+                fig.savefig(numDir + 'performance.png')
+                plt.close(fig)
+        fig = plt.figure()
         backgroundModelOut = 'UNOCCLUDED'
         distanceTypeOut = 'negLogLikelihood'
-        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]), color='b', label='Clean - Normal model')
+        maxY = numpy.max(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        minY = numpy.min(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], (numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]) - minY)/ (maxY-minY), color='g', label='Clean model')
+        plt.axvline(x=testAzimuths[(backgroundModelOut, distanceTypeOut)][numpy.argmin(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))], linewidth=1, color='g', ls='--')
 
 
         backgroundModelOut = 'SINGLE'
         distanceTypeOut = 'negLogLikelihood'
-        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]), color='r', label='Occlusions - Normal model')
-        x1,x2,y1,y2 = plt.axis()
-        scale = abs(y1-y2)
+        maxY = numpy.max(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        minY = numpy.min(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], (numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]) - minY)/ (maxY-minY), color='r', label='Normal model')
+        plt.axvline(x=testAzimuths[(backgroundModelOut, distanceTypeOut)][numpy.argmin(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))], linewidth=1, color='r', ls='--')
 
         backgroundModelOut = 'SINGLE'
         distanceTypeOut = 'negLogLikelihoodRobust'
-        maxRob = numpy.max(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
-        minRob = numpy.min(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
-        testResultsRobust = numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]) * scale / (maxRob-minRob)
-
-        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], testResultsRobust, color='g', label='Occlusions - Robust model')
-
-
+        maxY = numpy.max(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        minY = numpy.min(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))
+        plt.plot(testAzimuths[(backgroundModelOut, distanceTypeOut)], (numpy.array(testResults[(backgroundModelOut, distanceTypeOut)])- minY) / (maxY-minY), color='c', label='Robust model')
+        plt.axvline(x=testAzimuths[(backgroundModelOut, distanceTypeOut)][numpy.argmin(numpy.array(testResults[(backgroundModelOut, distanceTypeOut)]))], linewidth=1, color='c', ls='--')
 
         plt.xlabel('Azimuth (degrees)')
-        plt.ylabel('Score')
+        plt.ylabel('Negative Log Likelihood')
         fontP = FontProperties()
         fontP.set_size('small')
         # plt.axvline(x=bestAzimuth, linewidth=2, color='r', label='Minimum score azimuth')
-        plt.axvline(x=groundTruthAz, linewidth=2, color='b', label='Ground truth azimuth')
+        plt.axvline(x=groundTruthAz, linewidth=1, color='b', label='GT azimuth')
         # plt.axvline(x=(bestAzimuth + 180) % 360, linewidth=1, color='r', ls='--', label='Minimum distance azimuth + 180')
         x1,x2,y1,y2 = plt.axis()
         plt.axis((0,360,y1,y2))
-        plt.legend()
-        plt.savefig(sampleDir + 'performance.png')
-        plt.clf()
+        lgd = plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, mode="expand", borderaxespad=0.)
+
+        fig.savefig(sampleDir + 'performance.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
+        plt.close(fig)
 
     scene.objects.unlink(teapot)
 
     for backgroundModelOut in backgroundModels:
 
         for distanceTypeOut in distanceTypes:
-            directory = 'aztest/'  + 'teapot' + str(teapotTest)  + '/' + backgroundModel + distanceTypeOut
+            directory = baseTestDir  + 'teapot' + str(teapotTest)  + '/' + backgroundModelOut + distanceTypeOut
 
-            experiment = {'teapot':teapotTest, 'bestAzimuths':bestAzimuths[(backgroundModelOut, distanceTypeOut)], 'performance': performance[(backgroundModelOut, distanceTypeOut)], 'elevations':elevations[(backgroundModelOut, distanceTypeOut)], 'groundTruthAzimuths': groundTruthRelAzimuths[(backgroundModelOut, distanceTypeOut)], 'selTest':selTest, 'test':test}
+            experiment = {'distanceType':distanceTypeOut, 'backgroundModel':backgroundModelOut, 'rendersDir':rendersDir, 'scores':scores, 'azimuths':azimuths,'teapot':teapotTest, 'bestAzimuths':bestAzimuths[(backgroundModelOut, distanceTypeOut)], 'performance': performance[(backgroundModelOut, distanceTypeOut)], 'elevations':elevations[(backgroundModelOut, distanceTypeOut)], 'groundTruthAzimuths': groundTruthRelAzimuths[(backgroundModelOut, distanceTypeOut)], 'occlusions': occlusions[(backgroundModelOut, distanceTypeOut)],'selTest':selTest, 'test':test}
             with open(directory + 'experiment.pickle', 'wb') as pfile:
                 pickle.dump(experiment, pfile)
-
+            fig = plt.figure()
             plt.scatter(elevations[(backgroundModelOut, distanceTypeOut)], performance[(backgroundModelOut, distanceTypeOut)])
             plt.xlabel('Elevation (degrees)')
             plt.ylabel('Angular error')
             x1,x2,y1,y2 = plt.axis()
             plt.axis((0,90,-180,180))
             plt.title('Performance scatter plot')
-            plt.savefig(directory + '_elev-performance-scatter.png')
-            plt.clf()
+            fig.savefig(directory + '_elev-performance-scatter.png')
+            plt.close(fig)
 
+            fig = plt.figure()
             plt.scatter(occlusions[(backgroundModelOut, distanceTypeOut)]*100.0, performance[(backgroundModelOut, distanceTypeOut)])
             plt.xlabel('Occlusion (%)')
             plt.ylabel('Angular error')
             x1,x2,y1,y2 = plt.axis()
             plt.axis((0,100,-180,180))
             plt.title('Performance scatter plot')
-            plt.savefig(directory + '_occlusion-performance-scatter.png')
-            plt.clf()
+            fig.savefig(directory + '_occlusion-performance-scatter.png')
+            plt.close(fig)
 
+            fig = plt.figure()
             plt.scatter(groundTruthAzimuths[(backgroundModelOut, distanceTypeOut)], performance[(backgroundModelOut, distanceTypeOut)])
             plt.xlabel('Azimuth (degrees)')
             plt.ylabel('Angular error')
             x1,x2,y1,y2 = plt.axis()
             plt.axis((0,360,-180,180))
             plt.title('Performance scatter plot')
-            plt.savefig(directory  + '_azimuth-performance-scatter.png')
-            plt.clf()
+            fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            plt.close(fig)
 
+            fig = plt.figure()
             plt.hist(performance[(backgroundModelOut, distanceTypeOut)], bins=36)
             plt.xlabel('Angular error')
             plt.ylabel('Counts')
             x1,x2,y1,y2 = plt.axis()
             plt.axis((-180,180,y1, y2))
             plt.title('Performance histogram')
-            plt.savefig(directory  + '_performance-histogram.png')
-            plt.clf()
+            fig.savefig(directory  + '_performance-histogram.png')
+            plt.close(fig)
             # experimentFile = 'aztest/teapotsc7549b28656181c91bff71a472da9153Teapot N311012_cleaned.pickle'
             # with open(experimentFile, 'rb') as pfile:
             #     experiment = pickle.load( pfile)
@@ -582,6 +594,10 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
             with open(directory + 'performance.tex', 'w') as expfile:
                 expfile.write(performanceTable)
+
+    experiment = {'distanceTypes':distanceTypes, 'backgroundModels':backgroundModels, 'rendersDir':rendersDir,'teapot':teapotTest,'testResults':testResults,'testAzimuths':testAzimuths, 'bestAzimuths':bestAzimuths, 'performance': performance, 'elevations':elevations, 'groundTruthAzimuths': groundTruthRelAzimuths, 'occlusions': occlusions}
+    with open(baseTestDir  + 'teapot' + str(teapotTest)  + '/' + 'experiment.pickle', 'wb') as pfile:
+        pickle.dump(experiment, pfile)
 
 print("Finished the experiment")
 
