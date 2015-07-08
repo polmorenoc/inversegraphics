@@ -6,7 +6,7 @@ import mathutils
 from math import radians
 import timeit
 import time
-import opendr
+import opendr as opendr
 import chumpy as ch
 from opendr.renderer import ColoredRenderer
 from opendr.lighting import LambertianPointLight
@@ -26,12 +26,6 @@ matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
 plt.ion()
 
-
-# mesh = get_earthmesh(trans=ch.array([0,0,4]), rotation=ch.zeros(3))
-
-# fname = '../databaseFull/models/teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912_cleaned.obj'
-# m = load_mesh(fname)
-# Create renderer
 rn = ColoredRenderer()
 
 renderTeapotsList = [2]
@@ -50,8 +44,8 @@ scene.render.filepath = 'opendr_blender.png'
 # bpy.ops.render.render( write_still=True )
 
 center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-azimuth = 261
-elevation = 75
+azimuth = 55
+elevation = 80
 azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 originalLoc = mathutils.Vector((0,-camDistance, 0))
@@ -62,6 +56,19 @@ scene.update()
 look_at(camera, center)
 scene.update()
 bpy.ops.render.render( write_still=True )
+
+center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+azimuth = 25
+elevation = 80
+azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+originalLoc = mathutils.Vector((0,-camDistance, 0))
+location = center + azimuthRot * elevationRot * originalLoc
+camera = scene.camera
+camera.location = location
+scene.update()
+look_at(camera, center)
+scene.update()
 
 
 image = cv2.imread(scene.render.filepath)
@@ -93,22 +100,29 @@ for mesh in teapot.dupli_group.objects:
         vertexMeshIndex = vertexMeshIndex + len(vmesh)
 
 f = np.vstack(f).astype(dtype=np.uint32)
-# ftmp = f.copy()
-# f[:,0] = f[:,2]
-# f[:,2] = ftmp[:,0]
+
 v = np.vstack(v).astype(np.float32)
 vc = np.vstack(vc).astype(np.float32)
+#Desaturate a bit.
+gray = np.dot(np.array([0.3, 0.59, 0.11]), vc.T).T
+sat = 0.5
+
+vc[:,0] = vc[:,0] * sat + (1-sat) * gray
+vc[:,1] = vc[:,1] * sat + (1-sat) * gray
+vc[:,2] = vc[:,2] * sat + (1-sat) * gray
+
 vn = np.vstack(vn).astype(np.float32)
 uv = np.vstack(uv).astype(np.float32)
 
 
-# * mathutils.Matrix.Rotation(radians(180), 4, 'Y'))
-gtCamRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
-camRot = cv2.Rodrigues(np.array((camera.matrix_world * mathutils.Matrix.Rotation(radians(10), 4, 'Z') ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
-# camRot = camera.matrix_world.inverted().to_euler()
+# gtCamRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
+# camRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
+camRot = cv2.Rodrigues(np.array((camera.matrix_world *  mathutils.Matrix.Rotation(radians(180), 4, 'X')).inverted().to_3x3()))[0].squeeze() #[0,0,0]
 
-camLoc = (camera.matrix_world ).inverted().to_translation()
-gtrotation = ch.array(camRot)
+
+camLoc = (camera.matrix_world * mathutils.Matrix.Rotation(radians(180), 4, 'X')).inverted().to_translation()
+
+# gtrotation = ch.array(camRot)
 
 translation, rotation = ch.array(camLoc), ch.array(camRot)
 vch = ch.array(v)
@@ -127,9 +141,9 @@ l1 = LambertianPointLight(
     v=vch,
     vn=vnch,
     num_verts=len(vch),
-    light_pos=ch.array([-0,-0,-0.5]),
+    light_pos=ch.array([0,0,0.5]),
     vc=vcch,
-    light_color=ch.array([1., 1., 1.]))
+    light_color=ch.array([1., 1., 1.])*1.5)
 
 
 # Construct point light source
@@ -138,19 +152,11 @@ l2 = LambertianPointLight(
     v=vch,
     vn=vnch,
     num_verts=len(vch),
-    light_pos=ch.array([-0,-0,0.5]),
+    light_pos=ch.array([-0,-0,-0.5]),
     vc=vcch,
     light_color=ch.array([1., 1., 1.]))
 
-# vcl1 = l1.r + l2.r
-
-
-rn.vc = l1 + l2
-
-# A = SphericalHarmonics(vn=vnch, vc=vcch,
-#                    components=[3.,2.,0.,0.,0.,0.,0.,0.,0.],
-#                    light_color=ch.ones(3))
-# rn.vc = A
+rn.vc = l1 + l2 + vcch*0.1
 
 # Show it
 print("Beginning render.")
@@ -158,31 +164,42 @@ t = time.process_time()
 rn.r
 elapsed_time = time.process_time() - t
 print("Ended render in  " + str(elapsed_time))
-# plt.imshow(iplm)
-# plt.show()
-# imr = cv2.resize(im, (0,0), fx=2.0/upscale, fy=2.0/upscale)
-# imc = imr[imr.shape[0]/2 - width/2: imr.shape[0]/2 + width/2, imr.shape[1]/2 - height/2: imr.shape[1]/2 + height/2]
-# plt.imshow(imc)
-# plt.show()
 
 plt.imsave('opendr_opengl_final.png', rn.r)
 
 chImage = ch.array(image)
-E_raw = (rn - chImage)*(rn - chImage)
+E_raw = rn - chImage
+SqE_raw = ch.SumOfSquares(rn - chImage)
 iterat = 0
-# plt.imsave('groundtruth' + '.png',image)
-# plt.imsave('initialmodel' + '.png',im)
+
 def cb(_):
     global E_raw
     global iterat
     iterat = iterat + 1
-    res = np.copy(np.array(E_raw.r))
-    resimg = np.copy(np.array(rn.r))
+    res = np.copy(np.array(SqE_raw.r))
     print("Callback! " + str(iterat))
-    plt.imsave('iter_' + str(iterat) + '.png',res)
+    print("Current error: ", str(res))
+    # print("Current dr wrt rotation: ", str(SqE_raw.dr_wrt(rotation)))
+    resimg = np.copy(np.array(rn.r))
+    draz, angles = getDrWrtAzimuth(SqE_raw, rotation)
+
+    print("Current rotation gradient: ", SqE_raw.dr_wrt(rotation)/(2*400*400))
+    # print("Current rotation gradient sum: ", np.sum(SqE_raw.dr_wrt(rotation)/(2*400*400)))
+    # print("Current azimuth gradient: ", str(draz))
+    # print("Current azimuth (alpha): ", str(angles[0]))
+    # print("Current elevation (gamma): ", str(angles[1]))
+    # print("Current roll (beta): ", str(angles[2]))
+
+    imres = np.copy(np.sqrt(np.array(E_raw.r * E_raw.r)))
+    plt.imsave('iter_Err' + str(iterat) + '.png',imres)
     plt.imsave('iter_dr' + str(iterat) + '.png',resimg)
-    # plt.imshow('Sq error', res)
-    # cv2.waitKey(1)
+
+# ipdb.set_trace()
 #
-free_variables = [rotation]
-ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb)
+# free_variables = [l1.vc]
+# ch.minimize({'raw': E_raw}, method='dogleg', x0=free_variables, callback=cb, options={'maxiter':1})
+
+# ipdb.set_trace()
+
+free_variables = [rotation, l1.light_pos, l2.light_pos]
+ch.minimize({'raw': E_raw}, method='dogleg', x0=free_variables, callback=cb)

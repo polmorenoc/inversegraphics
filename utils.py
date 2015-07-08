@@ -8,7 +8,7 @@ import mathutils
 from math import radians
 import h5py
 import scipy.io
-
+import cv2
 import sys
 import io
 import os
@@ -811,3 +811,28 @@ def buildData (msh):
     uv = np.vstack(luvl)
 
     return f, v, vc, n, uv
+
+def getDrWrtAzimuth(SqE_raw, rotation):
+    rot, rot_dr = cv2.Rodrigues(np.array(rotation))
+    a = mathutils.Matrix(rot).to_euler()[2]
+    a2 = np.arctan(rot[1,0]/rot[0,0])
+    b = mathutils.Matrix(rot).to_euler()[1]
+    b2 = np.arctan(-rot[2,0]/np.sqrt(rot[2,1]**2 + rot[2,2]**2))
+    g = mathutils.Matrix(rot).to_euler()[0]
+    g2 = np.arctan(rot[2,1]/rot[2,2])
+
+    dra11 = -np.sin(a)*np.cos(b)
+    dra12 = -np.sin(a)*np.sin(b)*np.sin(g) - np.sin(a)*np.cos(g)
+    dra13 = -np.sin(a)*np.sin(b)*np.cos(g) + np.cos(a)*np.sin(g)
+    dra21 = np.cos(a)*np.cos(b)
+    dra22 = np.cos(a)*np.sin(b)*np.sin(g) - np.sin(a)*np.cos(g)
+    dra23 = np.cos(a)*np.sin(b)*np.cos(g) + np.sin(a)*np.cos(g)
+    dra31 = 0
+    dra32 = 0
+    dra33 = 0
+
+    rotwrtaz = np.array([[dra11,dra12,dra13], [dra21,dra22,dra23], [dra31,dra32,dra33]])
+    # ipdb.set_trace()
+    drazimuth = np.dot(SqE_raw.dr_wrt(rotation), np.dot(rot_dr , rotwrtaz.ravel()))/(2*400*400)
+
+    return drazimuth, np.array([a,g,b])

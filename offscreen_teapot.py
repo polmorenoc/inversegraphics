@@ -183,13 +183,12 @@ GL.glViewport(0, 0, width, height)
 
 GL.glEnable(GL.GL_DEPTH_TEST)
 GL.glDepthMask(GL.GL_TRUE)
-GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
 # GL.glCullFace(GL.GL_FRONT)
 # GL.Disable(GL_LIGHTING); # causes error
 GL.glEnable(GL.GL_CULL_FACE)
 # GL.glFrontFace( GL.GL_CW )
-GL.glPixelStorei(GL.GL_PACK_ALIGNMENT,1)
-GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT,1)
+
 
 print ('Vendor: %s' % (GL.glGetString(GL.GL_VENDOR)))
 print ('Opengl version: %s' % (GL.glGetString(GL.GL_VERSION)))
@@ -253,7 +252,7 @@ t = time.process_time()
 shaders.glUseProgram(shader)
 
 GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, fbo)
-GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+# GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
 
 position_location = GL.glGetAttribLocation(shader, 'position')
 color_location = GL.glGetAttribLocation(shader, 'color')
@@ -268,7 +267,7 @@ vertexArrayObject = GL.GLuint(0)
 GL.glGenVertexArrays(1, vertexArrayObject)
 GL.glBindVertexArray(vertexArrayObject)
 
-GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+# GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
 
 # ipdb.set_trace()
 
@@ -298,11 +297,11 @@ GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
 
 frange= np.arange(len(f)*3, dtype=np.uint32).reshape(f.shape)
 
-vfravel = v[f]
+vfravel = v[f.ravel()]
 
-vbo_verts = vbo.VBO(v)
+vbo_verts = vbo.VBO(vfravel)
 
-vbo_indices = vbo.VBO(f, target=GL.GL_ELEMENT_ARRAY_BUFFER)
+vbo_indices = vbo.VBO(frange, target=GL.GL_ELEMENT_ARRAY_BUFFER)
 
 # vc = np.array([[1, 0, 0], [1, 0,0], [1, 0, 0]], dtype=np.float32)
 #
@@ -342,8 +341,8 @@ l2 = LambertianPointLight(
     light_color=ch.array([1., 1., 1.]))
 
 vcl1 = l1 + l2
-
-vbo_colors =  vbo.VBO(vcl1.r)
+vcl1fravel = vcl1[f.ravel()]
+vbo_colors =   vbo.VBO(np.array(vcl1fravel, dtype=np.float32))
 # ipdb.set_trace()
 
 vbo_indices.bind()
@@ -362,8 +361,6 @@ GL.glVertexAttribPointer(position_location, 3, GL.GL_FLOAT, GL.GL_FALSE, 0, None
 #
 # vc_buffer = GL.glGenBuffers(1)
 # GL.glBindBuffer(GL.GL_ARRAY_BUFFER, vc_buffer)
-GL.glPixelStorei(GL.GL_PACK_ALIGNMENT,1)
-GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT,1)
 
 vbo_colors.bind()
 GL.glEnableVertexAttribArray(color_location) # from 'location = 0' in shader
@@ -430,34 +427,32 @@ GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 # ipdb.set_trace()
 # GL.glDrawArrays(GL.GL_TRIANGLES, 0, len(vbo_verts))
 GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+
 GL.glDrawElements(GL.GL_TRIANGLES, len(vbo_indices)*3, GL.GL_UNSIGNED_INT, None)
 
 GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
 
-GL.glPixelStorei(GL.GL_PACK_ALIGNMENT,1)
-GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT,1)
-
-GL.glPixelStorei(GL.GL_UNPACK_LSB_FIRST, GL.GL_FALSE)
 
 GL.glReadBuffer(GL.GL_COLOR_ATTACHMENT0)
 
-GL.glPixelStorei(GL.GL_PACK_ALIGNMENT,1)
-GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT,1)
-
-GL.glPixelStorei(GL.GL_UNPACK_LSB_FIRST, GL.GL_FALSE)
 # pixels = GL.glReadPixels(0,0,width, height, GL.GL_RGBA, GL.GL_FLOAT)
 
-screenshot = GL.glReadPixels( 0,0, width, height, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
-im = Image.frombuffer("RGB", (width,height), screenshot, "raw", "RGB", 0, 0)
+pixels = GL.glReadPixels( 0,0, width, height, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
+im = Image.frombuffer("RGB", (width,height), pixels, "raw", "RGB", 0, 0)
 pixels =  np.array(im.transpose(Image.FLIP_TOP_BOTTOM))
+
+plt.imsave('offscreen-opengl.png', pixels)
+
+
 # pixels =  np.array(im)[:,:,0:3]
 print(pixels.shape)
 elapsed_time = time.process_time() - t
 print("Ended render in  " + str(elapsed_time))
 
 plt.imshow(pixels)
-plt.imsave('offscreen-opengl.png', pixels)
-# ipdb.set_trace()
+
+
+ipdb.set_trace()
 
 glfw.swap_buffers(win)
 

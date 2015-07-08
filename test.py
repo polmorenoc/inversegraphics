@@ -44,7 +44,8 @@ experimentTeapots = [2]
 outputExperiments = []
 
 # distanceTypes = ['chamferDataToModel', 'robustChamferDataToModel', 'sqDistImages', 'robustSqDistImages']
-distanceTypes = ['negLogLikelihood','negLogLikelihoodRobust']
+distanceTypes = ['negLogLikelihood']
+# distanceTypes = ['negLogLikelihood','negLogLikelihoodRobust']
 masks = numpy.array([])
 segmentImages = []
 for segment in segmentSingleFiles:
@@ -57,7 +58,8 @@ masks = numpy.concatenate([aux for aux in segmentImages], axis=-1)
 
 layerPrior = globalLayerPrior(masks)
 
-backgroundModels = ['SINGLE', 'UNOCCLUDED']
+backgroundModels = ['UNOCCLUDED']
+# backgroundModels = ['SINGLE', 'UNOCCLUDED']
 
 completeScene = True
 if 'FULL' not in backgroundModels:
