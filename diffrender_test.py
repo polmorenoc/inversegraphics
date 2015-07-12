@@ -20,7 +20,7 @@ import cv2
 # from opendr.util_tests import get_earthmesh
 from sklearn.preprocessing import normalize
 from utils import *
-
+import geometry
 import matplotlib
 matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
@@ -114,17 +114,41 @@ vc[:,2] = vc[:,2] * sat + (1-sat) * gray
 vn = np.vstack(vn).astype(np.float32)
 uv = np.vstack(uv).astype(np.float32)
 
+chAz = ch.Ch([radians(azimuth)])
+chEl = ch.Ch([radians(elevation)])
+chDist = ch.Ch(camDistance)
 
-# gtCamRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
+
+initRot = np.array(mathutils.Matrix.Rotation(-radians(90), 4, 'X'))
+# distMat = np.eye(4)
+# chDistMat = ch.Ch(distMat)
+# chDistMat[2,3] = chDist
+
+chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
+
+# chRotAzMat = ch.Ch([[ch.cos(chAz), -ch.sin(chAz), 0, 0], [ch.sin(chAz), ch.cos(chAz), 0, 0], [0, 0, 1, 0], [0,0,0,1]])
+chRotAzMat = geometry.RotateZ(a=chAz)
+chRotElMat = geometry.RotateX(a=chEl)
+chCamModelWorld = ch.dot(chRotAzMat, ch.dot(chRotElMat,ch.dot(chDistMat, initRot)))
+
+chInvCam = ch.inv(ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))))
+
+ipdb.set_trace()
+
+chRod = opendr.geometry.Rodrigues(rt=chInvCam[0:3,0:3]).reshape(3)
+chTranslation = chInvCam[3,0:2]
+
+
 # camRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
-camRot = cv2.Rodrigues(np.array((camera.matrix_world *  mathutils.Matrix.Rotation(radians(180), 4, 'X')).inverted().to_3x3()))[0].squeeze() #[0,0,0]
+# camRot = cv2.Rodrigues(np.array((camera.matrix_world *  mathutils.Matrix.Rotation(radians(180), 4, 'X')).inverted().to_3x3()))[0].squeeze() #[0,0,0]
+# camRot = cv2.Rodrigues(np.array(chInvCam))[0].squeeze() #[0,0,0]
 
 
 camLoc = (camera.matrix_world * mathutils.Matrix.Rotation(radians(180), 4, 'X')).inverted().to_translation()
 
 # gtrotation = ch.array(camRot)
 
-translation, rotation = ch.array(camLoc), ch.array(camRot)
+translation, rotation = ch.array(chTranslation), ch.array(chRod)
 vch = ch.array(v)
 vnch = ch.array(vn)
 vcch = ch.array(vc)

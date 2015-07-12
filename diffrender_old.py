@@ -44,8 +44,8 @@ scene.render.filepath = 'opendr_blender.png'
 # bpy.ops.render.render( write_still=True )
 
 center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-azimuth = 45
-elevation = 15
+azimuth = 48
+elevation = 80
 azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
 originalLoc = mathutils.Vector((0,-camDistance, 0))
@@ -56,6 +56,19 @@ scene.update()
 look_at(camera, center)
 scene.update()
 bpy.ops.render.render( write_still=True )
+
+center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+azimuth = 40
+elevation = 80
+azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+originalLoc = mathutils.Vector((0,-camDistance, 0))
+location = center + azimuthRot * elevationRot * originalLoc
+camera = scene.camera
+camera.location = location
+scene.update()
+look_at(camera, center)
+scene.update()
 
 
 image = cv2.imread(scene.render.filepath)
@@ -155,21 +168,30 @@ print("Ended render in  " + str(elapsed_time))
 plt.imsave('opendr_opengl_final.png', rn.r)
 
 chImage = ch.array(image)
-E_raw = ch.SumOfSquares(rn - chImage)
+E_raw = rn - chImage
+SqE_raw = ch.SumOfSquares(rn - chImage)
 iterat = 0
-
+global t
+t = time.process_time()
 def cb(_):
+    global t
+    elapsed_time = time.process_time() - t
+    print("Ended interation in  " + str(elapsed_time))
+
     global E_raw
     global iterat
     iterat = iterat + 1
-    res = np.copy(np.array(E_raw.r))
-    print("Current error: ", str(res))
+    # res = np.copy(np.array(SqE_raw.r))
     resimg = np.copy(np.array(rn.r))
     print("Callback! " + str(iterat))
-    # plt.imsave('iter_' + str(iterat) + '.png',res)
+    imres = np.copy(np.sqrt(np.array(E_raw.r * E_raw.r)))
+    plt.imsave('iter_Err' + str(iterat) + '.png',imres)
     plt.imsave('iter_dr' + str(iterat) + '.png',resimg)
-
+    # plt.imshow('Sq error', res)
+    # cv2.waitKey(1)
+    t = time.process_time()
 # ipdb.set_trace()
 #
 free_variables = [rotation]
+
 ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb)
