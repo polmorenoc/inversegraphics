@@ -189,7 +189,7 @@ rn.r
 elapsed_time = time.process_time() - t
 print("Ended render in  " + str(elapsed_time))
 
-plt.imsave('opendr_opengl_final.png', rn.r)
+plt.imsave('opendr_opengl_first.png', rn.r)
 
 chImage = ch.array(image)
 E_raw = rn - chImage
@@ -226,4 +226,9 @@ def cb(_):
 # ipdb.set_trace()
 
 free_variables = [rotation, l1.light_pos, l2.light_pos]
-ch.minimize({'raw': E_raw}, method='dogleg', x0=free_variables, callback=cb)
+
+# ipdb.set_trace()
+
+ch.minimize({'raw': E_raw}, method='dogleg', x0=free_variables, callback=cb2)
+
+plt.imsave('opendr_opengl_final.png', rn.r)

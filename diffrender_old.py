@@ -20,7 +20,7 @@ import cv2
 # from opendr.util_tests import get_earthmesh
 from sklearn.preprocessing import normalize
 from utils import *
-
+import timeit
 import matplotlib
 matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
@@ -194,4 +194,4 @@ def cb(_):
 #
 free_variables = [rotation]
 
-ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb)
+# ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb)

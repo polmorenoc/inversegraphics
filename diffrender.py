@@ -11,7 +11,7 @@ import chumpy as ch
 from opendr.renderer import ColoredRenderer
 from opendr.lighting import LambertianPointLight
 from opendr.lighting import SphericalHarmonics
-
+import geometry
 from opendr.camera import ProjectPoints
 import numpy as np
 import cv2
@@ -20,6 +20,7 @@ import cv2
 # from opendr.util_tests import get_earthmesh
 from sklearn.preprocessing import normalize
 from utils import *
+import timeit
 
 import matplotlib
 matplotlib.use('Qt4Agg')
@@ -64,7 +65,7 @@ scene.update()
 bpy.ops.render.render( write_still=True )
 
 center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-azimuth = 40
+azimuth = 42
 elevation = 80
 azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
@@ -121,23 +122,36 @@ vc[:,2] = vc[:,2] * sat + (1-sat) * gray
 vn = np.vstack(vn).astype(np.float32)
 uv = np.vstack(uv).astype(np.float32)
 
-
-# * mathutils.Matrix.Rotation(radians(180), 4, 'Y'))
-gtCamRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
 camRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
 # camRot = camera.matrix_world.inverted().to_euler()
 
-camLoc = (camera.matrix_world ).inverted().to_translation()
-gtrotation = ch.array(camRot)
+chAz = ch.Ch([radians(-azimuth)])
+chEl = ch.Ch([radians(-elevation)])
+chDist = ch.Ch(camDistance)
 
-translation, rotation = ch.array(camLoc), ch.array(camRot)
+chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
+chToObjectTranslate = geometry.Translate(x=center.x, y=center.y, z=center.z)
+
+# chRotAzMat = ch.Ch([[ch.cos(chAz), -ch.sin(chAz), 0, 0], [ch.sin(chAz), ch.cos(chAz), 0, 0], [0, 0, 1, 0], [0,0,0,1]])
+chRotAzMat = geometry.RotateZ(a=chAz)
+chRotElMat = geometry.RotateX(a=chEl)
+chCamModelWorld = ch.dot(chToObjectTranslate, ch.dot(chRotAzMat, ch.dot(chRotElMat,chDistMat)))
+
+chInvCam = ch.inv(ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(90), 4, 'X'))))
+
+chRod = opendr.geometry.Rodrigues(rt=chInvCam[0:3,0:3]).reshape(3)
+chTranslation = chInvCam[0:3,3]
+
+camLoc = (camera.matrix_world ).inverted().to_translation()
+
+translation, rotation = (chTranslation, chRod)
 vch = ch.array(v)
 vnch = ch.array(vn)
 vcch = ch.array(vc)
 fch = f.astype('uint32')
 
 from opendr.camera import ProjectPoints
-rn.camera = ProjectPoints(v=vch, rt=rotation, t=translation, f= 1.06 * ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
+rn.camera = ProjectPoints(v=vch, rt=rotation, t=translation, f= 1.12*ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
 rn.frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 rn.set(v=vch, f=fch, bgcolor=ch.zeros(3))
 
@@ -185,7 +199,7 @@ print("Ended render in  " + str(elapsed_time))
 # plt.imshow(imc)
 # plt.show()
 
-plt.imsave('opendr_opengl_final.png', rn.r)
+plt.imsave('opendr_opengl_first.png', rn.r)
 
 chImage = ch.array(image)
 E_raw = rn - chImage
@@ -212,7 +226,28 @@ def cb(_):
     # plt.imshow('Sq error', res)
     # cv2.waitKey(1)
     t = time.process_time()
-#
-free_variables = [rotation]
+def cb2(_):
+    global t
+    elapsed_time = time.process_time() - t
+    print("Ended interation in  " + str(elapsed_time))
 
-ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb)
+    global E_raw
+    global iterat
+    iterat = iterat + 1
+    # res = np.copy(np.array(SqE_raw.r))
+    # resimg = np.copy(np.array(rn.r))
+    print("Callback! " + str(iterat))
+    # imres = np.copy(np.sqrt(np.array(E_raw.r * E_raw.r)))
+    # plt.imsave('iter_Err' + str(iterat) + '.png',imres)
+    # plt.imsave('iter_dr' + str(iterat) + '.png',resimg)
+    # plt.imshow('Sq error', res)
+    # cv2.waitKey(1)
+    t = time.process_time()
+
+free_variables = [chAz]
+
+ipdb.set_trace()
+
+ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb2)
+
+plt.imsave('opendr_opengl_final.png', rn.r)
