@@ -27,12 +27,6 @@ matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
 plt.ion()
 
-
-# mesh = get_earthmesh(trans=ch.array([0,0,4]), rotation=ch.zeros(3))
-
-# fname = '../databaseFull/models/teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912_cleaned.obj'
-# m = load_mesh(fname)
-# Create renderer
 rn = ColoredRenderer()
 
 renderTeapotsList = [2]
@@ -65,7 +59,7 @@ scene.update()
 bpy.ops.render.render( write_still=True )
 
 center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-azimuth = 42
+azimuth = 15
 elevation = 80
 azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
 elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
@@ -79,8 +73,8 @@ scene.update()
 
 
 image = cv2.imread(scene.render.filepath)
-image = image/255.0
-image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_BGR2RGB)/255.0
+image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+image = np.array(image, dtype=np.float64)/255.0
 
 f = []
 v = []
@@ -110,8 +104,8 @@ f = np.vstack(f).astype(dtype=np.uint32)
 # ftmp = f.copy()
 # f[:,0] = f[:,2]
 # f[:,2] = ftmp[:,0]
-v = np.vstack(v).astype(np.float32)
-vc = np.vstack(vc).astype(np.float32)
+v = np.vstack(v).astype(np.float64)
+vc = np.vstack(vc).astype(np.float64)
 #Desaturate a bit.
 gray = np.dot(np.array([0.3, 0.59, 0.11]), vc.T).T
 sat = 0.5
@@ -119,8 +113,8 @@ sat = 0.5
 vc[:,0] = vc[:,0] * sat + (1-sat) * gray
 vc[:,1] = vc[:,1] * sat + (1-sat) * gray
 vc[:,2] = vc[:,2] * sat + (1-sat) * gray
-vn = np.vstack(vn).astype(np.float32)
-uv = np.vstack(uv).astype(np.float32)
+vn = np.vstack(vn).astype(np.float64)
+uv = np.vstack(uv).astype(np.float64)
 
 camRot = cv2.Rodrigues(np.array((camera.matrix_world ).inverted().to_3x3()))[0].squeeze() #[0,0,0]
 # camRot = camera.matrix_world.inverted().to_euler()
@@ -137,7 +131,7 @@ chRotAzMat = geometry.RotateZ(a=chAz)
 chRotElMat = geometry.RotateX(a=chEl)
 chCamModelWorld = ch.dot(chToObjectTranslate, ch.dot(chRotAzMat, ch.dot(chRotElMat,chDistMat)))
 
-chInvCam = ch.inv(ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(90), 4, 'X'))))
+chInvCam = ch.inv(ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(270), 4, 'X'))))
 
 chRod = opendr.geometry.Rodrigues(rt=chInvCam[0:3,0:3]).reshape(3)
 chTranslation = chInvCam[0:3,3]
@@ -152,8 +146,9 @@ fch = f.astype('uint32')
 
 from opendr.camera import ProjectPoints
 rn.camera = ProjectPoints(v=vch, rt=rotation, t=translation, f= 1.12*ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
+rn.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
 rn.frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-rn.set(v=vch, f=fch, bgcolor=ch.zeros(3))
+rn.set(v=vch, f=fch, bgcolor=ch.ones(3), overdraw=True)
 
 # Construct point light source
 l1 = LambertianPointLight(
@@ -178,26 +173,29 @@ l2 = LambertianPointLight(
 
 rn.vc = l1 + l2 + vcch*0.25
 
-
-# rn.vc = l1 + l2
-
-# A = SphericalHarmonics(vn=vnch, vc=vcch,
-#                    components=[3.,2.,0.,0.,0.,0.,0.,0.,0.],
-#                    light_color=ch.ones(3))
-# rn.vc = A
+chDist[0] = 0.45
+chEl[0] = 0.01
 
 # Show it
 print("Beginning render.")
-t = time.process_time()
+t = time.time()
 rn.r
-elapsed_time = time.process_time() - t
+elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
-# plt.imshow(iplm)
-# plt.show()
-# imr = cv2.resize(im, (0,0), fx=2.0/upscale, fy=2.0/upscale)
-# imc = imr[imr.shape[0]/2 - width/2: imr.shape[0]/2 + width/2, imr.shape[1]/2 - height/2: imr.shape[1]/2 + height/2]
-# plt.imshow(imc)
-# plt.show()
+
+plt.imsave('opendr_opengl_gt.png', rn.r)
+image = np.copy(np.array(rn.r)).astype(np.float64)
+
+# chAz[0] = chAz.r + radians(5)
+# chEl[0] = chEl.r + radians(10)
+chDist[0] = chDist.r - 0.1
+
+# Show it
+print("Beginning render.")
+t = time.time()
+rn.r
+elapsed_time = time.time() - t
+print("Ended render in  " + str(elapsed_time))
 
 plt.imsave('opendr_opengl_first.png', rn.r)
 
@@ -205,49 +203,38 @@ chImage = ch.array(image)
 E_raw = rn - chImage
 SqE_raw = ch.SumOfSquares(rn - chImage)
 iterat = 0
-# plt.imsave('groundtruth' + '.png',image)
-# plt.imsave('initialmodel' + '.png',im)
+
 global t
-t = time.process_time()
+t = time.time()
 def cb(_):
     global t
-    elapsed_time = time.process_time() - t
+    elapsed_time = time.time() - t
     print("Ended interation in  " + str(elapsed_time))
-
     global E_raw
     global iterat
     iterat = iterat + 1
-    # res = np.copy(np.array(SqE_raw.r))
     resimg = np.copy(np.array(rn.r))
     print("Callback! " + str(iterat))
     imres = np.copy(np.sqrt(np.array(E_raw.r * E_raw.r)))
     plt.imsave('iter_Err' + str(iterat) + '.png',imres)
     plt.imsave('iter_dr' + str(iterat) + '.png',resimg)
-    # plt.imshow('Sq error', res)
-    # cv2.waitKey(1)
-    t = time.process_time()
+    t = time.time()
 def cb2(_):
     global t
-    elapsed_time = time.process_time() - t
+    elapsed_time = time.time() - t
     print("Ended interation in  " + str(elapsed_time))
 
     global E_raw
     global iterat
     iterat = iterat + 1
-    # res = np.copy(np.array(SqE_raw.r))
-    # resimg = np.copy(np.array(rn.r))
     print("Callback! " + str(iterat))
-    # imres = np.copy(np.sqrt(np.array(E_raw.r * E_raw.r)))
-    # plt.imsave('iter_Err' + str(iterat) + '.png',imres)
-    # plt.imsave('iter_dr' + str(iterat) + '.png',resimg)
-    # plt.imshow('Sq error', res)
-    # cv2.waitKey(1)
-    t = time.process_time()
 
-free_variables = [chAz]
+    t = time.time()
+
+free_variables = [chDist]
 
 ipdb.set_trace()
 
-ch.minimize({'raw': E_raw}, x0=free_variables, callback=cb2)
+ch.minimize({'raw': E_raw},  x0=free_variables, callback=cb2, options={'disp':True})
 
 plt.imsave('opendr_opengl_final.png', rn.r)

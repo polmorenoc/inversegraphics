@@ -9,7 +9,7 @@ from opendr.geometry import Rodrigues
 
 class RotateZ(Ch):
     dterms = 'a'
-    
+
     def compute_r(self):
         return np.array([[np.cos(self.a.r), -np.sin(self.a.r), 0, 0], [np.sin(self.a.r), np.cos(self.a.r), 0, 0], [0, 0, 1, 0], [0,0,0,1]])
         

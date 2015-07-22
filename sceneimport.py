@@ -70,7 +70,9 @@ def importBlenderScenes(instances, completeScene, targetIndex):
 
             # scene.unit_settings.system = 'METRIC'
             # bpy.utils.collada_import(modelPath)
-            bpy.ops.import_scene.obj(filepath=modelPath)
+
+
+            bpy.ops.import_scene.obj(filepath=modelPath, split_mode='OFF', use_split_objects=True, use_split_groups=False)
             # ipdb.set_trace()
             sceneGroup = bpy.data.groups.new(modelId)
 
@@ -128,7 +130,8 @@ def loadTargetModels(experimentTeapots):
         scene.unit_settings.system = 'METRIC'
         print("Importing " + modelPath)
         # bpy.utils.collada_import(modelPath)
-        bpy.ops.import_scene.obj(filepath=modelPath)
+
+        bpy.ops.import_scene.obj(filepath=modelPath, split_mode='OFF', use_split_objects=True, use_split_groups=False)
         scene.update()
         modifySpecular(scene, 0.3)
 
