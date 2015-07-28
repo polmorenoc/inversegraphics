@@ -173,7 +173,7 @@ l2 = LambertianPointLight(
 rn.vc = l1 + l2 + vcch*0.25
 
 chDist[0] = 0.45
-chEl[0] = 0.01
+chEl[0] = -radians(45)
 
 # Show it
 print("Beginning render.")
@@ -188,8 +188,8 @@ image = image/255.0
 image = cv2.cvtColor(numpy.float32(image*255), cv2.COLOR_BGR2RGB)/255.0
 
 # chAz[0] = chAz.r + radians(5)
-# chEl[0] = chEl.r + radians(10)
-chDist[0] = chDist.r + 0.05
+chEl[0] = chEl.r + radians(5)
+chDist[0] = chDist.r 
 
 # Show it
 print("Beginning render.")
@@ -231,7 +231,7 @@ def cb2(_):
     print("Callback! " + str(iterat))
     t = time.time()
 
-free_variables = [chDist]
+free_variables = [chEl]
 
 ipdb.set_trace()
 

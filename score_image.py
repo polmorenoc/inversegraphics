@@ -1,5 +1,5 @@
 import cv2
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 import ipdb
 import scipy
@@ -10,22 +10,22 @@ def scoreImage(img, template, method, methodParams):
 
     if method == 'chamferModelToData':
         sqDists = chamferDistanceModelToData(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate'])
-        score = numpy.sum(sqDists)
+        score = np.sum(sqDists)
     elif method == 'robustChamferModelToData':
-        sqDists = numpy.sum(chamferDistanceModelToData(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
+        sqDists = np.sum(chamferDistanceModelToData(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
         score = robustDistance(sqDists, methodParams['scale'])
     elif method == 'chamferDataToModel':
         sqDists = chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate'])
-        score = numpy.sum(sqDists)
+        score = np.sum(sqDists)
     elif method == 'robustChamferDataToModel':
-        sqDists = numpy.sum(chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
+        sqDists = np.sum(chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
         score = robustDistance(sqDists, methodParams['scale'])
     elif method == 'sqDistImages':
         sqDists = sqDistImages(img, template)
-        score = numpy.sum(sqDists) / template.size
+        score = np.sum(sqDists) / template.size
     elif method == 'ignoreSqDistImages':
         sqDists = sqDistImages(img, template)
-        score = numpy.sum(sqDists * (template > 0)) / numpy.sum(template > 0)
+        score = np.sum(sqDists * (template > 0)) / np.sum(template > 0)
     elif method == 'robustSqDistImages':
         sqDists = sqDistImages(img, template)
         score = robustDistance(sqDists, methodParams['scale'])
@@ -37,17 +37,17 @@ def scoreImage(img, template, method, methodParams):
 
 
 def chamferDistanceModelToData(img, template, minThresImage, maxThresImage, minThresTemplate, maxThresTemplate):
-    imgEdges = cv2.Canny(numpy.uint8(img*255), minThresImage,maxThresImage)
+    imgEdges = cv2.Canny(np.uint8(img*255), minThresImage,maxThresImage)
 
-    tempEdges = cv2.Canny(numpy.uint8(template*255), minThresTemplate, maxThresTemplate)
+    tempEdges = cv2.Canny(np.uint8(template*255), minThresTemplate, maxThresTemplate)
 
     bwEdges1 = cv2.distanceTransform(~imgEdges, cv2.DIST_L2, 5)
 
-    # cv2.imshow('ImageWindow',numpy.uint8(img*255))
+    # cv2.imshow('ImageWindow',np.uint8(img*255))
 
     # cv2.waitKey()
 
-    # cv2.imshow('ImageWindow',numpy.uint8(template*255))
+    # cv2.imshow('ImageWindow',np.uint8(template*255))
 
     # cv2.waitKey()
 
@@ -63,7 +63,7 @@ def chamferDistanceModelToData(img, template, minThresImage, maxThresImage, minT
 
     # cv2.waitKey()
 
-    score = numpy.sum(numpy.multiply(tempEdges/255, bwEdges1))/numpy.sum(tempEdges/255.0)
+    score = np.sum(np.multiply(tempEdges/255, bwEdges1))/np.sum(tempEdges/255.0)
 
     return score
 
@@ -71,36 +71,36 @@ def chamferDistanceModelToData(img, template, minThresImage, maxThresImage, minT
 
 
 def chamferDistanceDataToModel(img, template, minThresImage, maxThresImage, minThresTemplate, maxThresTemplate):
-    imgEdges = cv2.Canny(numpy.uint8(img*255), minThresImage,maxThresImage)
+    imgEdges = cv2.Canny(np.uint8(img*255), minThresImage,maxThresImage)
 
-    tempEdges = cv2.Canny(numpy.uint8(template*255), minThresTemplate, maxThresTemplate)
+    tempEdges = cv2.Canny(np.uint8(template*255), minThresTemplate, maxThresTemplate)
 
     bwEdges1 = cv2.distanceTransform(~tempEdges, cv2.DIST_L2, 5)
 
-    score = numpy.multiply(imgEdges/255.0, bwEdges1)/numpy.sum(imgEdges/255.0)
+    score = np.multiply(imgEdges/255.0, bwEdges1)/np.sum(imgEdges/255.0)
 
     return score
 
 
 def sqDistImages(img, template):
-    sqResiduals = numpy.square(img - template)
+    sqResiduals = np.square(img - template)
     return sqResiduals
 
 
 def computeVariances(sqResiduals):
-    return numpy.sum(sqResiduals, axis=3)/sqResiduals.shape[-1]
+    return np.sum(sqResiduals, axis=3)/sqResiduals.shape[-1]
 
 def pixelLayerPriors(masks):
 
-    return numpy.sum(masks, axis=2) / masks.shape[-1]
+    return np.sum(masks, axis=2) / masks.shape[-1]
 
 def globalLayerPrior(masks):
 
-    return numpy.sum(masks) / masks.size
+    return np.sum(masks) / masks.size
 
 def modelLogLikelihoodRobust(image, template, testMask, backgroundModel, layerPriors, variances):
     likelihood = pixelLikelihoodRobust(image, template, testMask, backgroundModel,  layerPriors, variances)
-    liksum = numpy.sum(numpy.log(likelihood))
+    liksum = np.sum(np.log(likelihood))
     # try:
     #     assert(liksum <= 0)
     # except:
@@ -114,7 +114,7 @@ def modelLogLikelihoodRobust(image, template, testMask, backgroundModel, layerPr
 
 def modelLogLikelihood(image, template, testMask, backgroundModel, variances):
     likelihood = pixelLikelihood(image, template, testMask, backgroundModel, variances)
-    liksum = numpy.sum(numpy.log(likelihood))
+    liksum = np.sum(np.log(likelihood))
 
     # try:
     #     assert(liksum <= 0)
@@ -132,49 +132,49 @@ def modelLogLikelihood(image, template, testMask, backgroundModel, variances):
     return liksum
 
 def pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior, variances):
-    sigma = numpy.sqrt(variances)
+    sigma = np.sqrt(variances)
     mask = testMask
     if backgroundModel == 'FULL':
-        mask = numpy.ones(image.shape[0:2])
-    # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
-    repPriors = numpy.tile(layerPrior, image.shape[0:2])
-    # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
-    # uniformProbs = numpy.ones(image.shape)
+        mask = np.ones(image.shape[0:2])
+    # mask = np.repeat(mask[..., np.newaxis], 3, 2)
+    repPriors = np.tile(layerPrior, image.shape[0:2])
+    # sum = np.sum(np.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=np.sqrt(variances) ) + (1 - repPriors)))
+    # uniformProbs = np.ones(image.shape)
 
-    foregroundProbs = numpy.prod(1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2) + (1 - repPriors)
+    foregroundProbs = np.prod(1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2) + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 
 def pixelLikelihood(image, template, testMask, backgroundModel, variances):
-    sigma = numpy.sqrt(variances)
-    # sum = numpy.sum(numpy.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=numpy.sqrt(variances) ) + (1 - repPriors)))
+    sigma = np.sqrt(variances)
+    # sum = np.sum(np.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=np.sqrt(variances) ) + (1 - repPriors)))
     mask = testMask
     if backgroundModel == 'FULL':
-        mask = numpy.ones(image.shape[0:2])
-    # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
-    uniformProbs = numpy.ones(image.shape[0:2])
-    normalProbs = numpy.prod((1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances))),axis=2)
+        mask = np.ones(image.shape[0:2])
+    # mask = np.repeat(mask[..., np.newaxis], 3, 2)
+    uniformProbs = np.ones(image.shape[0:2])
+    normalProbs = np.prod((1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (image - template)**2 / (2 * variances))),axis=2)
     return normalProbs * mask + (1-mask)
 
 def layerPosteriorsRobust(image, template, testMask, backgroundModel, layerPrior, variances):
 
-    sigma = numpy.sqrt(variances)
+    sigma = np.sqrt(variances)
     mask = testMask
     if backgroundModel == 'FULL':
-        mask = numpy.ones(image.shape[0:2])
-    # mask = numpy.repeat(mask[..., numpy.newaxis], 3, 2)
-    repPriors = numpy.tile(layerPrior, image.shape[0:2])
-    foregroundProbs = numpy.prod(1/(sigma * numpy.sqrt(2 * numpy.pi)) * numpy.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2)
-    backgroundProbs = numpy.ones(image.shape)
+        mask = np.ones(image.shape[0:2])
+    # mask = np.repeat(mask[..., np.newaxis], 3, 2)
+    repPriors = np.tile(layerPrior, image.shape[0:2])
+    foregroundProbs = np.prod(1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2)
+    backgroundProbs = np.ones(image.shape)
     outlierProbs = (1-repPriors)
     lik = pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior, variances)
-    # prodlik = numpy.prod(lik, axis=2)
-    # return numpy.prod(foregroundProbs*mask, axis=2)/prodlik, numpy.prod(outlierProbs*mask, axis=2)/prodlik
+    # prodlik = np.prod(lik, axis=2)
+    # return np.prod(foregroundProbs*mask, axis=2)/prodlik, np.prod(outlierProbs*mask, axis=2)/prodlik
 
     return foregroundProbs*mask/lik, outlierProbs*mask/lik
 
 
 def robustDistance(sqResiduals, scale):
-    return numpy.sum(sqResiduals/(sqResiduals + scale**2))
+    return np.sum(sqResiduals/(sqResiduals + scale**2))
 
 
 def testImageMatching():
@@ -195,9 +195,9 @@ def testImageMatching():
         edges.append(can)
         cv2.imwrite(teapot + "_can.png", can)
 
-    confusion = numpy.zeros([6,6])
-    for tp1 in numpy.arange(1,7):
-        for tp2 in numpy.arange(tp1,7):
+    confusion = np.zeros([6,6])
+    for tp1 in np.arange(1,7):
+        for tp2 in np.arange(tp1,7):
             dist = distance = scoreImage(images[tp1-1], images[tp2-1], 'robustSqDistImages', methodParams)
             print(dist)
             confusion[tp1-1, tp2-1] = dist
@@ -212,11 +212,11 @@ def testImageMatching():
 
 # elif method == 'chamferDataToModel':
 #         sqDists = chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate'])
-#         score = numpy.sum(sqDists)
+#         score = np.sum(sqDists)
 #     elif method == 'robustChamferDataToModel':
-#         sqDists = numpy.sum(chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
+#         sqDists = np.sum(chamferDistanceDataToModel(img, template, methodParams['minThresImage'], methodParams['maxThresImage'], methodParams['minThresTemplate'],methodParams['maxThresTemplate']))
 #         score = robustDistance(sqDists, methodParams['robustScale'])
 #     elif method == 'sqDistImages':
 #         sqDists = sqDistImages(img, template)
-#         score = numpy.sum(sqDists)
+#         score = np.sum(sqDists)
 #     elif method == 'robustSqDistImages':

@@ -85,6 +85,8 @@ for sceneNum in sceneLineNums[0:1]:
 
     scene = sceneimport.composeScene(modelInstances, targetIndex)
     roomInstance = scene.objects[roomName]
+
+    ipdb.set_trace()
     roomInstance.layers[2] = True
     targetParentInstance.layers[2] = True
 

@@ -1,6 +1,6 @@
 from utils import *
-
-
+from sklearn.preprocessing import normalize
+from collections import OrderedDict
 
 def loadScene(sceneFile):
     sceneLines = [line.strip() for line in open(sceneFile)]
@@ -133,7 +133,7 @@ def loadTargetModels(experimentTeapots):
 
         bpy.ops.import_scene.obj(filepath=modelPath, split_mode='OFF', use_split_objects=True, use_split_groups=False)
         scene.update()
-        modifySpecular(scene, 0.3)
+        # modifySpecular(scene, 0.3)
 
         #Rotate the object to the azimuth angle we define as 0.
         # rot = mathutils.Matrix.Rotation(radians(-90), 4, 'X')
@@ -192,23 +192,159 @@ def loadTargetModels(experimentTeapots):
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
 
+def unpackObjects(target):
+    f_list = []
+    v = []
+    vc = []
+    vn = []
+    uv = []
+    haveTextures = []
+    textures_list = []
+    vertexMeshIndex = 0
+    for mesh in target.dupli_group.objects:
+        if mesh.type == 'MESH':
+            # mesh.data.validate(verbose=True, clean_customdata=True)
+            fmesh, vmesh, vcmesh,  nmesh, uvmesh, haveTexture, textures  = buildData(mesh.data)
+            f_list = f_list + [fmesh]
+            vc = vc + [vcmesh]
+            transf = np.array(np.dot(target.matrix_world, mesh.matrix_world))
+            vmesh = np.hstack([vmesh, np.ones([vmesh.shape[0],1])])
+            vmesh = ( np.dot(transf , vmesh.T)).T[:,0:3]
+            v = v + [vmesh]
+            transInvMat = np.linalg.inv(transf).T
+            nmesh = np.hstack([nmesh, np.ones([nmesh.shape[0],1])])
+            nmesh = (np.dot(transInvMat , nmesh.T)).T[:,0:3]
+            vn = vn + [normalize(nmesh, axis=1)]
+            uv = uv + [uvmesh]
+            haveTextures_list = haveTextures + [haveTexture]
+            textures_list = textures_list + [textures]
 
-
-
-
-        # ipdb.set_trace()
-
+            vertexMeshIndex = vertexMeshIndex + len(vmesh)
+    # f = np.vstack(f).astype(dtype=np.uint32)
+    # v = np.vstack(v).astype(np.float64)
+    # vc = np.vstack(vc).astype(np.float64)
+    # vn = np.vstack(vn).astype(np.float64)
+    # uv = np.vstack(uv).astype(np.float64)
+    return v,f_list,vc,vn, uv, haveTextures_list, textures_list
         
+def buildData (msh):
 
-        
+    lvdic = {} # local dictionary
+    lfl = [] # lcoal faces index list
+    lvl = [] # local vertex list
+    lvcl = []
+    lnl = [] # local normal list
+    luvl = [] # local uv list
+    lvcnt = 0 # local vertices count
+    isSmooth = False
+
+    texdic = {} # local dictionary
+
+    msh.calc_tessface()
+    # if len(msh.tessfaces) == 0 or msh.tessfaces is None:
+    #     msh.calc_tessface()
+
+    textureNames = []
+    haveUVs = []
+
+    for i,f in enumerate(msh.polygons):
+        isSmooth = f.use_smooth
+        tmpfaces = []
+        hasUV = False    # true by default, it will be verified below
+        texture = None
+        texname = None
+        if (len(msh.tessface_uv_textures)>0):
+            activeUV = msh.tessface_uv_textures.active.data
+
+            if msh.tessface_uv_textures.active.data[i].image is not None:
+                # ipdb.set_trace()
+                texname = msh.tessface_uv_textures.active.data[i].image.name
+                hasUV = True
+                texture = texdic.get(texname)
+                if (texture is None): # vertex not found
+                    # print("Image: " + texname)
+                    # print("Clamp x: " + str(msh.tessface_uv_textures.active.data[i].image.use_clamp_x))
+                    # print("Clamp y: " + str(msh.tessface_uv_textures.active.data[i].image.use_clamp_y))
+                    # print("Tile x: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_x))
+                    # print("Tile y: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_y))
+                    texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
+                    texdic[texname] = texture
+        textureNames = textureNames + [texname]
+        haveUVs = haveUVs + [hasUV]
 
 
+        for j,v in enumerate(f.vertices):
 
-        
+            vec = msh.vertices[v].co
 
+            vec = r3d(vec)
 
-                     
-        
+            if (isSmooth):  # use vertex normal
+                nor = msh.vertices[v].normal
+            else:           # use face normal
+                nor = f.normal
 
+            vcolor = msh.materials[f.material_index].diffuse_color[:]
+            if vcolor == (0.0,0.0,0.0) and msh.materials[f.material_index].specular_color[:] != (0.0,0.0,0.0):
+                vcolor = msh.materials[f.material_index].specular_color[:]
+                # print("Using specular!")
 
-        
+            nor = r3d(nor)
+            co = (0.0, 0.0)
+
+            if hasUV:
+                co = activeUV[i].uv[j]
+                co = r2d(co)
+                vcolor = (1.0,1.0,1.0)
+
+            key = vec, nor, co
+            vinx = lvdic.get(key)
+
+            if (vinx is None): # vertex not found
+
+                lvdic[key] = lvcnt
+                lvl.append(vec)
+                lnl.append(nor)
+
+                lvcl.append(vcolor)
+                luvl.append(co)
+                tmpfaces.append(lvcnt)
+                lvcnt+=1
+            else:
+                inx = lvdic[key]
+                tmpfaces.append(inx)
+
+        if (len(tmpfaces)==3):
+            lfl.append(tmpfaces)
+        else:
+            lfl.append([tmpfaces[0], tmpfaces[1], tmpfaces[2]])
+            lfl.append([tmpfaces[0], tmpfaces[2], tmpfaces[3]])
+
+    # vtx.append(lvdic)
+    textures = []
+    haveTextures = []
+    f_list = []
+
+    orderedtexs = OrderedDict(sorted(texdic.items(), key=lambda t: t[0]))
+    for texname, texture in orderedtexs.items():
+        fidxs = [lfl[idx] for idx in range(len(lfl)) if textureNames[idx] == texname]
+        f_list = f_list + [np.vstack(fidxs)]
+        textures = textures + [texture]
+        haveTextures = haveTextures + [True]
+    try:
+        fidxs = [lfl[idx] for idx in range(len(lfl)) if haveUVs[idx] == False]
+    except:
+        ipdb.set_trace()
+
+    if fidxs != None and fidxs != []:
+        f_list = f_list + [np.vstack(fidxs)]
+        textures = textures + [None]
+        haveTextures = haveTextures + [False]
+
+    #update global lists and dictionaries
+    v = np.vstack(lvl)
+    vc = np.vstack(lvcl)
+    n = np.vstack(lnl)
+    uv = np.vstack(luvl)
+
+    return f_list, v, vc, n, uv, haveTextures, textures

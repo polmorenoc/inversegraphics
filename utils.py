@@ -725,92 +725,6 @@ def clearName(name):
 #
 ###########################################################
 
-def buildData (msh):
-
-    lvdic = {} # local dictionary
-    lfl = [] # lcoal faces index list
-    lvl = [] # local vertex list
-    lvcl = []
-    lnl = [] # local normal list
-    luvl = [] # local uv list
-    lvcnt = 0 # local vertices count
-    isSmooth = False
-    hasUV = True    # true by default, it will be verified below
-
-    # if len(msh.tessfaces) == 0 or msh.tessfaces is None:
-    #     msh.calc_tessface()
-
-    if (len(msh.tessface_uv_textures)>0):
-        if (msh.tessface_uv_textures.active is None):
-            hasUV=False
-    else:
-        hasUV = False
-
-    if (hasUV):
-        activeUV = msh.tessface_uv_textures.active.data
-
-
-    for i,f in enumerate(msh.polygons):
-        isSmooth = f.use_smooth
-        tmpfaces = []
-        for j,v in enumerate(f.vertices):
-
-            vec = msh.vertices[v].co
-
-            vec = r3d(vec)
-
-            if (isSmooth):  # use vertex normal
-                nor = msh.vertices[v].normal
-            else:           # use face normal
-                nor = f.normal
-
-            vcolor = msh.materials[f.material_index].diffuse_color[:]
-            if vcolor == (0.0,0.0,0.0) and msh.materials[f.material_index].specular_color[:] != (0.0,0.0,0.0):
-                vcolor = msh.materials[f.material_index].specular_color[:]
-                # print("Using specular!")
-
-            nor = r3d(nor)
-
-            if (hasUV):
-                co = activeUV[i].uv[j]
-                co = r2d(co)
-            else:
-                co = (0.0, 0.0)
-
-            key = vec, nor, co
-            vinx = lvdic.get(key)
-
-            if (vinx is None): # vertex not found
-
-                lvdic[key] = lvcnt
-                lvl.append(vec)
-                lnl.append(nor)
-
-                lvcl.append(vcolor)
-
-                luvl.append(co)
-                tmpfaces.append(lvcnt)
-                lvcnt+=1
-            else:
-                inx = lvdic[key]
-                tmpfaces.append(inx)
-
-        if (len(tmpfaces)==3):
-            lfl.append(tmpfaces)
-        else:
-            lfl.append([tmpfaces[0], tmpfaces[1], tmpfaces[2]])
-            lfl.append([tmpfaces[0], tmpfaces[2], tmpfaces[3]])
-
-
-    #update global lists and dictionaries
-    # vtx.append(lvdic)
-    f = np.vstack(lfl)
-    v = np.vstack(lvl)
-    vc = np.vstack(lvcl)
-    n = np.vstack(lnl)
-    uv = np.vstack(luvl)
-
-    return f, v, vc, n, uv
 
 def getDrWrtAzimuth(SqE_raw, rotation):
     rot, rot_dr = cv2.Rodrigues(np.array(rotation))
@@ -836,3 +750,4 @@ def getDrWrtAzimuth(SqE_raw, rotation):
     drazimuth = np.dot(SqE_raw.dr_wrt(rotation), np.dot(rot_dr , rotwrtaz.ravel()))/(2*400*400)
 
     return drazimuth, np.array([a,g,b])
+
