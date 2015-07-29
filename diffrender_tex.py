@@ -1,7 +1,7 @@
 __author__ = 'pol'
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt4Agg')
 
 import bpy
 import sceneimport
@@ -27,6 +27,19 @@ import matplotlib.pyplot as plt
 
 plt.ion()
 
+
+def gradCheck(fun, var, delta):
+    grad = fun.dr_wrt(var)
+    f0 = fun.r
+    oldvar = var.r[0]
+    var[0] = var.r[0] + delta
+    f1 = fun.r
+    diff = (f1 - f0)/np.abs(delta)
+    check = grad.toarray()/diff
+    var[0] = oldvar
+    return grad.toarray(), diff, check
+
+
 # pylab.pause(0.0001)
 #
 # pylab.plot([1,2,3])
@@ -50,8 +63,8 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 camDistance = 0.4
-azimuth = 95
-elevation = 65
+azimuth = 275
+elevation = 45
 
 cam = bpy.data.cameras.new("MainCamera")
 camera = bpy.data.objects.new("MainCamera", cam)
@@ -181,11 +194,16 @@ chElScaled = ch.Ch([radians(elevation/elScale)])
 chDistScaled = ch.Ch([camDistance/distScale])
 chComponentScaled = ch.Ch([1, 0.25, 0.25, 0.,0.,0.,0.,0.,0.])
 
-
 chAz = chAzScaled*azScale
 chEl = chElScaled*elScale
+
+chAz = ch.Ch([radians(azimuth)])
+chEl = ch.Ch([radians(elevation)])
+
 chDist = chDistScaled*distScale
+chDist = ch.Ch([camDistance])
 chComponent = chComponentScaled*componentScale
+chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
 chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
 chToObjectTranslate = geometry.Translate(x=center.x, y=center.y, z=center.z)
@@ -199,25 +217,20 @@ chInvCam = ch.inv(ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(rad
 chRod = opendr.geometry.Rodrigues(rt=chInvCam[0:3,0:3]).reshape(3)
 chTranslation = chInvCam[0:3,3]
 
-
 translation, rotation = (chTranslation, chRod)
 
-
 light_color=ch.ones(3)
-
 
 A_list = [SphericalHarmonics(vn=vnch[mesh],
                        components=chComponent,
                        light_color=light_color) for mesh in rangeMeshes]
 vc_list = [A_list[mesh]*vcch[mesh] for mesh in rangeMeshes]
 
-
 mesh =0
 A_mod = [SphericalHarmonics(vn=vnchmod[mesh],
                        components=chComponent,
                        light_color=light_color)]
 vcmod_list = [A_mod[mesh]*vcchmod[mesh]]
-
 
 v = ch.vstack(vch)
 f = []
@@ -258,8 +271,6 @@ if textureschmod != []:
 else:
     texturemod_stack = ch.Ch([])
 
-
-
 from opendr.camera import ProjectPoints
 rn.camera = ProjectPoints(v=v, rt=rotation, t=translation, f= 1.12*ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
 rn.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
@@ -273,8 +284,6 @@ rnmod.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'
 rnmod.frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 rnmod.set(v=vmod, f=fstackmod, vn=vnmod, vc=vcmod, ft=ftmod, texture_stack=texturemod_stack, v_list=vchmod, f_list=fmod_list, vc_list=vcmod_list, ft_list=uvmod, textures_list=texturesmod_list, haveUVs_list=haveTexturesmod_list, bgcolor=ch.ones(3), overdraw=True)
 
-chAzOld = chAz[0].r
-chElOld = chEl[0].r
 
 # Show it
 print("Beginning render.")
@@ -283,15 +292,24 @@ rn.r
 elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
 
-figuregt = plt.figure(1)
-plt.imshow(rn.r)
-ipdb.set_trace()
+f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, sharex='col', sharey='row')
 
+# figuregt = plt.figure(1)
+ax1.set_title("Ground Truth")
+ax1.imshow(rn.r)
+# ipdb.set_trace()
 plt.imsave('opendr_opengl_gt.png', rn.r)
-image = np.copy(np.array(rn.r)).astype(np.float64)
+plt.draw()
+imagegt = np.copy(np.array(rn.r)).astype(np.float64)
 
-chAzScaled[0] = chAzScaled.r - radians(5)/azScale
-chElScaled[0] = chElScaled.r - radians(5)/elScale
+vis_im = np.array(rnmod.visibility_image != 4294967295).copy()
+
+# ipdb.set_trace()
+
+chAz[0] = chAz[0].r + radians(15)
+chEl[0] = chEl[0].r + radians(15)
+# chComponent[0] = chComponent[0].r - 1
+
 # chComponentScaled[0] = chComponentScaled[0].r - 1/componentScale
 # A.components[0] = A.components[0].r - 0.3
 # A.components[1] = A.components[1].r + 0.2
@@ -299,26 +317,59 @@ chElScaled[0] = chElScaled.r - radians(5)/elScale
 # chEl[0] = chEl.r + radians(10)
 # chDist[0] = chDist.r - 0.1
 # Show it
+shapeIm = vis_im.shape
+
 print("Beginning render.")
 t = time.time()
 rn.r
 elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
 plt.imsave('opendr_opengl_first.png', rn.r)
-chImage = ch.array(image)
-E_raw = chImage - rnmod
-SqE_raw = 2*ch.SumOfSquares(rnmod - chImage)/chImage.size
+chImage = ch.array(imagegt)
+E_raw_simple = rnmod - chImage
+E_raw = rnmod*vis_im.reshape([shapeIm[0],shapeIm[1],1]) - chImage*vis_im.reshape([shapeIm[0],shapeIm[1],1])
+SqE_raw = ch.SumOfSquares(E_raw)/np.sum(vis_im)
+SqE_raw_simple = ch.SumOfSquares(E_raw_simple)/np.sum(vis_im)
+
 iterat = 0
 
-figurerender = plt.figure(2)
-render = plt.imshow(rnmod.r)
+# figurerender = plt.figure(2)
+ax2.set_title("Backprojection")
+render = ax2.imshow(rnmod.r)
 # global render
 # plt.show()
 # render.draw()
+plt.draw()
+# ax1.figure(1)
+edges = rnmod.boundarybool_image
+gtoverlay = imagegt.copy()
+gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+ax1.imshow(gtoverlay)
+plt.draw()
+# figureerror = plt.figure(3)
 
-figureerror = plt.figure(3)
-plt.imshow(E_raw.r)
+ax3.set_title("Error (Abs of residuals)")
+ax3.imshow(np.abs(E_raw.r))
+plt.draw()
 
+
+
+ax3.set_title("Error (Abs of residuals)")
+ax3.imshow(np.abs(E_raw.r))
+plt.draw()
+
+
+
+ax5.set_title("Dr wrt. Azimuth")
+ax5.imshow(np.sum(E_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2))
+plt.draw()
+#
+# ax6.set_title("Dr wrt. Azimuth")
+# ax6.imshow(np.sum(E_raw.dr_wrt(chEl),axis=2).reshape(shapeIm))
+# plt.draw()
+
+
+ipdb.set_trace()
 
 elapsed_time = time.time() - t
 def cb2(_):
@@ -330,29 +381,39 @@ def cb2(_):
     global iterat
     iterat = iterat + 1
     print("Callback! " + str(iterat))
+    print("Sq Error: " + str(SqE_raw.r))
+    global imagegt
+    global rnmod
 
-    # global render
-    plt.figure(2)
-    # render.set_data(rn.r)
-    plt.imshow(rnmod.r)
+    if iterat % 5 == 0:
+        ax1.figure(1)
+        edges = rnmod.boundarybool_image
+        gtoverlay = imagegt.copy()
+        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+        ax1.imshow(gtoverlay)
+        plt.draw()
 
-    plt.figure(3)
-    # render.set_data(rn.r)
-    plt.imshow(E_raw.r)
+        # plt.figure(2)
+        # render.set_data(rn.r)
+        ax2.imshow(rnmod.r)
+
+        # plt.figure(3)
+        # render.set_data(rn.r)
+        ax3.imshow(np.abs(E_raw.r))
+        plt.draw()
+
+        plt.show()
+    # ipdb.set_trace()
 
     t = time.time()
-
-chAzScaled
-chElScaled
-chDistScaled
-chComponentScaled
-free_variables = [chAzScaled, chElScaled]
+# , chComponent[0]
+free_variables = [chAz, chEl]
 
 mintime = time.time()
 boundEl = (0, radians(90))
 boundAz = (0, radians(360))
 boundscomponents = (0,None)
-bounds = [boundEl, boundAz ]
+bounds = [boundEl, boundAz]
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 
 
@@ -360,6 +421,28 @@ ch.minimize({'raw': SqE_raw}, bounds=bounds, method=methods[0], x0=free_variable
 elapsed_time = time.time() - mintime
 print("Minimization time:  " + str(elapsed_time))
 
-#
-ipdb.set_trace()
+# plt.figure(1)
+edges = rnmod.boundarybool_image
+gtoverlay = imagegt.copy()
+gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+ax1.imshow(gtoverlay)
+plt.draw()
+
+# global render
+# plt.figure(2)
+# render.set_data(rn.r)
+ax2.imshow(rnmod.r)
+plt.draw()
+# plt.figure(3)
+# render.set_data(rn.r)
+ax3.imshow(np.abs(E_raw.r))
+# ipdb.set_trace()
+plt.draw()
+
+# plt.figure(4)
+ax4.set_title("Full backprojection")
+ax4.imshow(rn.r)
+plt.draw()
+plt.show()
+
 plt.imsave('opendr_opengl_final.png', rn.r)

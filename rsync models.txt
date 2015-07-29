@@ -1,1 +1,23 @@
 rsync -a --ignore-existing ../databaseFull/models/teapots/ s1251804@salmon:/disk/data3/s1251804/databaseFull/models/teapots/
+
+rsync -a --ignore-existing ../COLLADA/1308f3ff2e55eae4f1783a44a88d6274* /home/pol/MEGA/scene\ update/COLLADA
+
+newModel 0 room09
+newModel 1 26ebcfb2ebd8345f14b86d5282eb8301
+newModel 2 d5030e978cceae91f11c3739edd52fa3
+newModel 3 2997f21fa426e18a6ab1a25d0e8f3590
+newModel 4 6372c4d2e046d0fd7d3aa3bae1f7b494
+newModel 5 6970d21f2c2146656ab04bd3af593c95
+newModel 6 38c843d1075bd351e652fa812161367
+newModel 7 63a1164c4dcf8874b6c61406205e1df7
+newModel 8 a28f3699bdb6176614513156cf2b8d0d
+newModel 9 56ac77092883c683eeff745b3f73bf77
+newModel 10 c9fe86bef85fd1d0caeedf6b101df8f6
+newModel 11 8824ac5d1d34309794247f03639516c
+newModel 12 4a1cc007d6e0754d18b14db3b83de9ff
+newModel 13 cd82398f7e6b64b08c9441777325d0fd
+newModel 14 fca9fcb710592311d291861d5bc3e7c8
+newModel 15 1308f3ff2e55eae4f1783a44a88d6274
+newModel 16 1308f3ff2e55eae4f1783a44a88d6274
+newModel 17 1308f3ff2e55eae4f1783a44a88d6274
+newModel 18 1308f3ff2e55eae4f1783a44a88d6274
