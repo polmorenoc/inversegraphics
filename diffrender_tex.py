@@ -45,8 +45,8 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 camDistance = 0.4
-azimuth = 275
-elevation = 45
+azimuth = 315
+elevation = 25
 
 cam = bpy.data.cameras.new("MainCamera")
 camera = bpy.data.objects.new("MainCamera", cam)
@@ -74,7 +74,6 @@ original_matrix_world = teapot.matrix_world.copy()
 sceneDicFile = 'sceneDic.pickle'
 sceneDic = {}
 if False:
-
     [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, True, targetIndex)
 
     targetParentInstance = modelInstances[targetParentIndex]
@@ -274,7 +273,14 @@ rn.r
 elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
 
-f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, sharex='col', sharey='row')
+
+f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'})
+pos1 = ax1.get_position()
+pos5 = ax5.get_position()
+pos5.x0 = pos1.x0
+ax5.set_position(pos5)
+
+
 f.tight_layout()
 
 # figuregt = plt.figure(1)
@@ -290,9 +296,9 @@ vis_im = np.array(rnmod.visibility_image != 4294967295).copy()
 oldChAz = chAz[0].r
 oldChEl = chEl[0].r
 
-chAz[0] = chAz[0].r + radians(0)
-chEl[0] = chEl[0].r - radians(2)
-# chComponent[0] = chComponent[0].r - 1
+chAz[0] = chAz[0].r + radians(40)
+chEl[0] = chEl[0].r - radians(20)
+chComponent[0] = chComponent[0].r
 
 # Show it
 shapeIm = vis_im.shape
@@ -325,7 +331,7 @@ iterat = 0
 
 # figurerender = plt.figure(2)
 ax2.set_title("Backprojection")
-render = ax2.imshow(rnmod.r)
+pim2 = ax2.imshow(rnmod.r)
 # global render
 # plt.show()
 # render.draw()
@@ -334,14 +340,11 @@ plt.draw()
 edges = rnmod.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-ax1.imshow(gtoverlay)
-plt.draw()
+pim1 = ax1.imshow(gtoverlay)
 # figureerror = plt.figure(3)
 
 ax3.set_title("Error (Abs of residuals)")
-ax3.imshow(np.abs(E_raw.r))
-plt.draw()
-
+pim3 = ax3.imshow(np.abs(E_raw.r))
 
 ax5.set_title("Dr wrt. Azimuth")
 drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
@@ -350,8 +353,8 @@ drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).r
 # drazsumpos = drazsum.copy()
 # drazsumpos[drazsumpos >= 0] = 0
 # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm)
-plt.colorbar(img, ax=ax5)
+img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+plt.colorbar(img, ax=ax5,use_gridspec=True)
 
 ax6.set_title("Dr wrt. Elevation")
 drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
@@ -360,12 +363,22 @@ drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).r
 # drazsumpos = drazsum.copy()
 # drazsumpos[drazsumpos >= 0] = 0
 # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm)
-plt.colorbar(img, ax=ax6)
+img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+plt.colorbar(img6, ax=ax6,use_gridspec=True)
 # plt.draw()
+pos1 = ax1.get_position()
+pos5 = ax5.get_position()
+pos5.x0 = pos1.x0
+ax5.set_position(pos5)
+
 plt.show()
+pos1 = ax1.get_position()
+pos5 = ax5.get_position()
+pos5.x0 = pos1.x0
+ax5.set_position(pos5)
 
 ipdb.set_trace()
+plt.pause(0.1)
 
 elapsed_time = time.time() - t
 def cb2(_):
@@ -381,44 +394,45 @@ def cb2(_):
     global imagegt
     global rnmod
 
-    if iterat % 5 == 0:
-        edges = rnmod.boundarybool_image
-        gtoverlay = imagegt.copy()
-        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-        ax1.imshow(gtoverlay)
+    # if iterat % 5 == 0:
+    edges = rnmod.boundarybool_image
+    gtoverlay = imagegt.copy()
+    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+    pim1.set_data(gtoverlay)
 
-        # plt.figure(2)
-        # render.set_data(rn.r)
-        ax2.imshow(rnmod.r)
+    # plt.figure(2)
+    # render.set_data(rn.r)
+    pim2.set_data(rnmod.r)
 
-        # plt.figure(3)
-        # render.set_data(rn.r)
-        ax3.imshow(np.abs(E_raw.r))
+    # plt.figure(3)
+    # render.set_data(rn.r)
+    pim3.set_data(np.abs(E_raw.r))
 
-        ax5.set_title("Dr wrt. Azimuth")
-        drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-        # drazsumneg = drazsum.copy()
-        # drazsumneg[drazsumneg < 0] = 0
-        # drazsumpos = drazsum.copy()
-        # drazsumpos[drazsumpos >= 0] = 0
-        # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-        img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm)
 
-        ax6.set_title("Dr wrt. Elevation")
-        drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-        # drazsumneg = drazsum.copy()
-        # drazsumneg[drazsumneg < 0] = 0
-        # drazsumpos = drazsum.copy()
-        # drazsumpos[drazsumpos >= 0] = 0
-        # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-        img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm)
-        # plt.draw()
-        plt.show()
-        f.show()
+    drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
+    # drazsumneg = drazsum.copy()
+    # drazsumneg[drazsumneg < 0] = 0
+    # drazsumpos = drazsum.copy()
+    # drazsumpos[drazsumpos >= 0] = 0
+    # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+    img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
-    # ipdb.set_trace()
+
+    drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
+    # drazsumneg = drazsum.copy()
+    # drazsumneg[drazsumneg < 0] = 0
+    # drazsumpos = drazsum.copy()
+    # drazsumpos[drazsumpos >= 0] = 0
+    # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+    # img6.set_data(drazsum.squeeze())
+    img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    # plt.draw()
+
+    f.canvas.draw()
+    plt.pause(0.1)
 
     t = time.time()
+
 # , chComponent[0]
 free_variables = [chAz, chEl]
 
@@ -426,7 +440,7 @@ mintime = time.time()
 boundEl = (0, np.pi/2.0)
 boundAz = (0, None)
 boundscomponents = (0,None)
-bounds = [boundEl, boundAz]
+bounds = [boundAz,boundEl]
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 
 ipdb.set_trace()
@@ -439,8 +453,7 @@ ipdb.set_trace()
 # # Grad
 # ch.optimization.scipyGradCheck({'raw': SSqE_raw}, [chAz])
 
-
-ch.minimize({'raw': E_pyr}, bounds=bounds, method=methods[0], x0=free_variables, callback=cb2, options={'disp':True})
+ch.minimize({'raw': SSqE_pyr}, bounds=bounds, method=methods[1], x0=free_variables, callback=cb2, options={'disp':True})
 
 # ch.minimize({'raw': SSqE_pyr}, bounds=bounds, method=methods[3], x0=free_variables, callback=cb2, options={'disp':True})
 
@@ -451,25 +464,19 @@ print("Minimization time:  " + str(elapsed_time))
 edges = rnmod.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-ax1.imshow(gtoverlay)
-plt.draw()
+pim1.set_data(gtoverlay)
 
 # global render
 # plt.figure(2)
 # render.set_data(rn.r)
-ax2.imshow(rnmod.r)
-plt.draw()
+pim2.set_data(rnmod.r)
 # plt.figure(3)
 # render.set_data(rn.r)
-ax3.imshow(np.abs(E_raw.r))
-# ipdb.set_trace()
-plt.draw()
+pim3.set_data(np.abs(E_raw.r))
 
 # plt.figure(4)
 ax4.set_title("Full backprojection")
 ax4.imshow(rn.r)
-plt.draw()
-plt.show()
 
 ax5.set_title("Dr wrt. Azimuth")
 drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
@@ -478,7 +485,7 @@ drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).r
 # drazsumpos = drazsum.copy()
 # drazsumpos[drazsumpos >= 0] = 0
 # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm)
+img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
 ax6.set_title("Dr wrt. Elevation")
 drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
@@ -487,9 +494,9 @@ drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).r
 # drazsumpos = drazsum.copy()
 # drazsumpos[drazsumpos >= 0] = 0
 # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm)
+img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
+f.canvas.draw()
+plt.pause(0.1)
 
-# plt.draw()
-plt.show()
 plt.imsave('opendr_opengl_final.png', rn.r)

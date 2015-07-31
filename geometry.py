@@ -34,7 +34,7 @@ class RotateX(Ch):
         #     return
 
         if wrt is self.a:
-            return np.array([[0, 0, 0, 0],[0, -np.sin(self.a.r)[0], -np.cos(self.a.r)[0], 0], [0, np.cos(self.a.r)[0], -np.cos(self.a.r)[0],0],[0,0,0,0]]).reshape(16,1)
+            return np.array([[0, 0, 0, 0],[0, -np.sin(self.a.r)[0], -np.cos(self.a.r)[0], 0], [0, np.cos(self.a.r)[0], -np.sin(self.a.r)[0],0],[0,0,0,0]]).reshape(16,1)
 
 class Translate(Ch):
     dterms = 'x', 'y', 'z'
