@@ -23,7 +23,8 @@ import cv2
 from sklearn.preprocessing import normalize
 from utils import *
 import timeit
-
+import glfw
+import score_image
 import matplotlib.pyplot as plt
 
 plt.ion()
@@ -45,8 +46,8 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 camDistance = 0.4
-azimuth = 315
-elevation = 25
+azimuth = 275
+elevation = 33
 
 cam = bpy.data.cameras.new("MainCamera")
 camera = bpy.data.objects.new("MainCamera", cam)
@@ -266,42 +267,33 @@ rnmod.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'
 rnmod.frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 rnmod.set(v=vmod, f=fstackmod, vn=vnmod, vc=vcmod, ft=ftmod, texture_stack=texturemod_stack, v_list=vchmod, f_list=fmod_list, vc_list=vcmod_list, ft_list=uvmod, textures_list=texturesmod_list, haveUVs_list=haveTexturesmod_list, bgcolor=ch.ones(3), overdraw=True)
 
-# Show it
-print("Beginning render.")
-t = time.time()
-rn.r
-elapsed_time = time.time() - t
-print("Ended render in  " + str(elapsed_time))
-
-
 f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'})
 pos1 = ax1.get_position()
 pos5 = ax5.get_position()
 pos5.x0 = pos1.x0
 ax5.set_position(pos5)
 
-
 f.tight_layout()
 
-# figuregt = plt.figure(1)
 ax1.set_title("Ground Truth")
 ax1.imshow(rn.r)
-# ipdb.set_trace()
+
 plt.imsave('opendr_opengl_gt.png', rn.r)
 plt.draw()
-imagegt = np.copy(np.array(rn.r)).astype(np.float64)
 
-vis_im = np.array(rnmod.visibility_image != 4294967295).copy()
+vis_im = np.array(rn.image_mesh_bool(0)).copy().astype(np.bool)
+vis_mask = np.array(rn.indices_image==1).copy().astype(np.bool)
 
 oldChAz = chAz[0].r
 oldChEl = chEl[0].r
 
-chAz[0] = chAz[0].r + radians(40)
-chEl[0] = chEl[0].r - radians(20)
+chAz[0] = chAz[0].r
+chEl[0] = chEl[0].r
 chComponent[0] = chComponent[0].r
 
 # Show it
 shapeIm = vis_im.shape
+shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
 print("Beginning render.")
 t = time.time()
@@ -309,15 +301,17 @@ rn.r
 elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
 plt.imsave('opendr_opengl_first.png', rn.r)
+
+imagegt = np.copy(np.array(rn.r)).astype(np.float64)
 chImage = ch.array(imagegt)
-
 E_raw_simple = rnmod - chImage
-
 negVisIm = ~vis_im
-chImageWhite = imagegt.copy()
-chImageWhite[np.tile(negVisIm.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+imageWhite = imagegt.copy()
+imageWhite[np.tile(negVisIm.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+
+chImageWhite = ch.Ch(imageWhite)
 E_raw = rnmod - chImageWhite
-SE_raw = E_raw*E_raw
+SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 E_pyr = gaussian_pyramid(E_raw, n_levels=4, normalization='SSE')
 E_pyr_simple = gaussian_pyramid(E_raw_simple, n_levels=4, normalization='SSE')
@@ -327,45 +321,52 @@ SSqE_raw_simple = ch.SumOfSquares(E_raw_simple)/np.sum(vis_im)
 SSqE_pyr = ch.SumOfSquares(E_pyr)/np.sum(vis_im)
 SSqE_pyr_simple = ch.SumOfSquares(E_pyr_simple)/np.sum(vis_im)
 
+variances = numpy.ones(shapeIm3D)*2/255.0
+globalPrior = 0.8
+
+negLikModel = -score_image.modelLogLikelihoodCh(chImageWhite, rnmod, vis_im, 'SINGLE', variances)
+
+negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE', globalPrior, variances)
+
+pixelLikelihoodCh = score_image.pixelLikelihoodCh(chImageWhite, rnmod, vis_im, 'SINGLE', variances)
+pixelLikelihoodRobustCh = score_image.pixelLikelihoodRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE', globalPrior, variances)
+
+post = score_image.layerPosteriorsRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE', globalPrior, variances)[0]
+
+# pixelErrorFun = S
+# errorFun = negLikModel
+
+pixelErrorFun = SE_raw
+errorFun = SSqE_raw
+
 iterat = 0
 
-# figurerender = plt.figure(2)
 ax2.set_title("Backprojection")
 pim2 = ax2.imshow(rnmod.r)
-# global render
-# plt.show()
-# render.draw()
+
 plt.draw()
-# ax1.figure(1)
+
 edges = rnmod.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 pim1 = ax1.imshow(gtoverlay)
-# figureerror = plt.figure(3)
 
 ax3.set_title("Error (Abs of residuals)")
-pim3 = ax3.imshow(np.abs(E_raw.r))
+pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+
+ax4.set_title("Posterior probabilities")
+ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
 ax5.set_title("Dr wrt. Azimuth")
-drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-# drazsumneg = drazsum.copy()
-# drazsumneg[drazsumneg < 0] = 0
-# drazsumpos = drazsum.copy()
-# drazsumpos[drazsumpos >= 0] = 0
-# drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
 img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 plt.colorbar(img, ax=ax5,use_gridspec=True)
 
 ax6.set_title("Dr wrt. Elevation")
-drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-# drazsumneg = drazsum.copy()
-# drazsumneg[drazsumneg < 0] = 0
-# drazsumpos = drazsum.copy()
-# drazsumpos[drazsumpos >= 0] = 0
-# drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
 img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 plt.colorbar(img6, ax=ax6,use_gridspec=True)
-# plt.draw()
+
 pos1 = ax1.get_position()
 pos5 = ax5.get_position()
 pos5.x0 = pos1.x0
@@ -377,56 +378,43 @@ pos5 = ax5.get_position()
 pos5.x0 = pos1.x0
 ax5.set_position(pos5)
 
-ipdb.set_trace()
 plt.pause(0.1)
 
 elapsed_time = time.time() - t
+changedGT = False
+refresh = True
+
 def cb2(_):
     global t
     elapsed_time = time.time() - t
     print("Ended interation in  " + str(elapsed_time))
 
-    global E_raw
+    global pixelErrorFun
+    global errorFun
     global iterat
     iterat = iterat + 1
     print("Callback! " + str(iterat))
-    print("Sq Error: " + str(SSqE_raw.r))
+    print("Sq Error: " + str(errorFun.r))
     global imagegt
     global rnmod
 
-    # if iterat % 5 == 0:
     edges = rnmod.boundarybool_image
     gtoverlay = imagegt.copy()
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1.set_data(gtoverlay)
 
-    # plt.figure(2)
-    # render.set_data(rn.r)
     pim2.set_data(rnmod.r)
 
-    # plt.figure(3)
-    # render.set_data(rn.r)
-    pim3.set_data(np.abs(E_raw.r))
+    pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
+    ax4.set_title("Posterior probabilities")
+    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-    drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-    # drazsumneg = drazsum.copy()
-    # drazsumneg[drazsumneg < 0] = 0
-    # drazsumpos = drazsum.copy()
-    # drazsumpos[drazsumpos >= 0] = 0
-    # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+    drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
-
-    drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-    # drazsumneg = drazsum.copy()
-    # drazsumneg[drazsumneg < 0] = 0
-    # drazsumpos = drazsum.copy()
-    # drazsumpos[drazsumpos >= 0] = 0
-    # drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
-    # img6.set_data(drazsum.squeeze())
+    drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    # plt.draw()
 
     f.canvas.draw()
     plt.pause(0.1)
@@ -442,58 +430,163 @@ boundAz = (0, None)
 boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
+method = 0
+exit = False
+minimize = False
+robustModel = False
+def readKeys(window, key, scancode, action, mods):
+    print("Reading keys...")
+    global exit
+    global refresh
+    refresh = False
+    if key == glfw.KEY_ESCAPE and action == glfw.RELEASE:
+        glfw.set_window_should_close(window, True)
+        exit = True
+    if key == glfw.KEY_LEFT:
+        refresh = True
+        chAz[0] = chAz[0].r - radians(5)
+    if key == glfw.KEY_RIGHT:
+        refresh = True
+        chAz[0] = chAz[0].r + radians(5)
+    if key == glfw.KEY_DOWN:
+        refresh = True
+        chEl[0] = chEl[0].r - radians(5)
+        refresh = True
+    if key == glfw.KEY_UP:
+        refresh = True
+        chEl[0] = chEl[0].r + radians(5)
+    if key == glfw.KEY_C and action == glfw.RELEASE:
+        print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01]))
+        print("Scipy grad check: " + ch.optimization.scipyGradCheck({'raw': errorFun}, [chAz]))
+    if key == glfw.KEY_B:
+        refresh = True
+        chComponent[0] = chComponent[0].r + 0.1
+    if key == glfw.KEY_D:
+        refresh = True
+        chComponent[0] = chComponent[0].r - 0.1
+    global changedGT
+    if key == glfw.KEY_G and action == glfw.RELEASE:
+        refresh = True
+        changedGT = True
 
-ipdb.set_trace()
+    if key == glfw.KEY_P and action == glfw.RELEASE:
+        ipdb.set_trace()
+        refresh = True
 
-# Sq err,delta,grad simple, grad check, grad pyramid
+    global robustModel
+    global errorFun
+    global pixelErrorFun
+    if key == glfw.KEY_O and action == glfw.RELEASE:
 
-# Grad
-# ch.optimization.gradCheck(SSqE_raw, [chAz], [0.01])
-#
-# # Grad
-# ch.optimization.scipyGradCheck({'raw': SSqE_raw}, [chAz])
+        if robustModel:
+            print("Using Gaussian model")
+            errorFun = negLikModel
+            pixelErrorFun = pixelLikelihoodCh
+            robustModel = False
+        else:
+            print("Using robust model")
+            errorFun = negLikModelRobust
+            pixelErrorFun = pixelLikelihoodRobustCh
+            robustModel = True
 
-ch.minimize({'raw': SSqE_pyr}, bounds=bounds, method=methods[1], x0=free_variables, callback=cb2, options={'disp':True})
+        refresh = True
 
+    global method
+    if key == glfw.KEY_1 and action == glfw.RELEASE:
+        method = 0
+    if key == glfw.KEY_2 and action == glfw.RELEASE:
+        method = 1
+    if key == glfw.KEY_2 and action == glfw.RELEASE:
+        method = 2
+    if key == glfw.KEY_3 and action == glfw.RELEASE:
+        method = 3
+    if key == glfw.KEY_3 and action == glfw.RELEASE:
+        method = 4
+    global minimize
+    if key == glfw.KEY_M and action == glfw.RELEASE:
+        minimize = True
+
+glfw.make_context_current(rnmod.win)
+
+glfw.set_key_callback(rnmod.win, readKeys)
+
+while not exit:
+    # Poll for and process events
+    glfw.make_context_current(rnmod.win)
+    glfw.poll_events()
+    global refresh
+    global changedGT
+
+    if changedGT:
+        imagegt = np.copy(np.array(rn.r)).astype(np.float64)
+        chImage[:,:,:] = imagegt[:,:,:]
+
+        vis_im = np.array(rn.image_mesh_bool(0)).copy().astype(np.bool)
+        vis_mask = np.array(rn.indices_image==1).copy().astype(np.bool)
+
+        negVisIm = ~vis_im
+        imageWhite = imagegt.copy()
+        imageWhite[np.tile(negVisIm.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+        chImageWhite[:,:,:] = imageWhite[:,:,:]
+        changedGT = False
+
+    if refresh:
+        iterat = iterat + 1
+
+        print("Sq Error: " + str(errorFun.r))
+
+        edges = rnmod.boundarybool_image
+        gtoverlay = imagegt.copy()
+        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+        pim1.set_data(gtoverlay)
+
+        pim2.set_data(rnmod.r)
+
+        pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+
+        ax4.set_title("Posterior probabilities")
+        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+
+        drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+
+        drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+
+        f.canvas.draw()
+        plt.pause(0.1)
+        refresh = False
+
+    if minimize:
+        iterat = 1
+        print("Minimizing with method " + methods[method])
+        ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
+        minimize = False
 # ch.minimize({'raw': SSqE_pyr}, bounds=bounds, method=methods[3], x0=free_variables, callback=cb2, options={'disp':True})
 
 elapsed_time = time.time() - mintime
 print("Minimization time:  " + str(elapsed_time))
 
-# plt.figure(1)
 edges = rnmod.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 pim1.set_data(gtoverlay)
 
-# global render
-# plt.figure(2)
-# render.set_data(rn.r)
 pim2.set_data(rnmod.r)
-# plt.figure(3)
-# render.set_data(rn.r)
-pim3.set_data(np.abs(E_raw.r))
 
-# plt.figure(4)
-ax4.set_title("Full backprojection")
-ax4.imshow(rn.r)
+pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+
+ax4.set_title("Posterior probabilities")
+ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
 ax5.set_title("Dr wrt. Azimuth")
-drazsum = np.sum(SE_raw.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-# drazsumneg = drazsum.copy()
-# drazsumneg[drazsumneg < 0] = 0
-# drazsumpos = drazsum.copy()
-# drazsumpos[drazsumpos >= 0] = 0
-# drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+
 img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
 ax6.set_title("Dr wrt. Elevation")
-drazsum = np.sum(SE_raw.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],3), axis=2).reshape(shapeIm[0],shapeIm[1],1)
-# drazsumneg = drazsum.copy()
-# drazsumneg[drazsumneg < 0] = 0
-# drazsumpos = drazsum.copy()
-# drazsumpos[drazsumpos >= 0] = 0
-# drazsumfinal = np.concatenate([drazsumpos, drazsumneg, np.zeros([shapeIm[0],shapeIm[1],1])],axis=2)
+drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+
 img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
 f.canvas.draw()
