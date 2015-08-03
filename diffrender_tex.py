@@ -336,8 +336,8 @@ post = score_image.layerPosteriorsRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE'
 # pixelErrorFun = S
 # errorFun = negLikModel
 
-pixelErrorFun = SE_raw
-errorFun = SSqE_raw
+pixelErrorFun = pixelLikelihoodRobustCh
+errorFun = negLikModelRobust
 
 iterat = 0
 
