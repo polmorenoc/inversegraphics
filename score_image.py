@@ -146,7 +146,7 @@ def pixelLikelihoodRobustCh(image, template, testMask, backgroundModel, layerPri
     repPriors = np.tile(layerPrior, image.shape[0:2])
     # sum = np.sum(np.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=np.sqrt(variances) ) + (1 - repPriors)))
     # uniformProbs = np.ones(image.shape)
-    probs = ch.exp( - (image - template)**2 / (2 * variances)) * (1/(sigma * np.sqrt(2 * np.pi)))
+    probs = ch.exp( - (image - template)**2 / (2 * variances)) * (1./(sigma * np.sqrt(2 * np.pi)))
     foregroundProbs = (probs[:,:,0] * probs[:,:,1] * probs[:,:,2]) * layerPrior + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 

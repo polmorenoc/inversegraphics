@@ -395,29 +395,29 @@ def cb2(_):
     iterat = iterat + 1
     print("Callback! " + str(iterat))
     print("Sq Error: " + str(errorFun.r))
-    global imagegt
-    global rnmod
+    # global imagegt
+    # global rnmod
 
-    edges = rnmod.boundarybool_image
-    gtoverlay = imagegt.copy()
-    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-    pim1.set_data(gtoverlay)
+    # edges = rnmod.boundarybool_image
+    # gtoverlay = imagegt.copy()
+    # gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+    # pim1.set_data(gtoverlay)
 
-    pim2.set_data(rnmod.r)
+    # pim2.set_data(rnmod.r)
 
-    pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    # pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-    ax4.set_title("Posterior probabilities")
-    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    # ax4.set_title("Posterior probabilities")
+    # ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-    drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    # drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    # img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
-    drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    # drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    # img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
-    f.canvas.draw()
-    plt.pause(0.1)
+    # f.canvas.draw()
+    # plt.pause(0.1)
 
     t = time.time()
 
@@ -473,6 +473,10 @@ def readKeys(window, key, scancode, action, mods):
         ipdb.set_trace()
         refresh = True
 
+
+    if key == glfw.KEY_R and action == glfw.RELEASE:
+        refresh = True
+
     global robustModel
     global errorFun
     global pixelErrorFun
@@ -492,16 +496,23 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
 
     global method
+    global methods
     if key == glfw.KEY_1 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
         method = 0
     if key == glfw.KEY_2 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
         method = 1
     if key == glfw.KEY_2 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
         method = 2
     if key == glfw.KEY_3 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
         method = 3
-    if key == glfw.KEY_3 and action == glfw.RELEASE:
+    if key == glfw.KEY_4 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
         method = 4
+
     global minimize
     if key == glfw.KEY_M and action == glfw.RELEASE:
         minimize = True
