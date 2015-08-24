@@ -40,7 +40,7 @@ teapot = targetModels[0]
 teapot.layers[1] = True
 teapot.layers[2] = True
 
-width, height = (200, 200)
+width, height = (300, 300)
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -336,8 +336,8 @@ post = score_image.layerPosteriorsRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE'
 # pixelErrorFun = S
 # errorFun = negLikModel
 
-pixelErrorFun = pixelLikelihoodRobustCh
-errorFun = negLikModelRobust
+pixelErrorFun = SE_raw
+errorFun = SSqE_raw
 
 iterat = 0
 
@@ -384,6 +384,20 @@ elapsed_time = time.time() - t
 changedGT = False
 refresh = True
 
+import matplotlib.animation as animation
+Writer = animation.writers['ffmpeg']
+writer = Writer(fps=1, metadata=dict(title='', artist=''), bitrate=1800)
+figvid, (vax1, vax2) = plt.subplots(1, 2, sharey=True, subplot_kw={'aspect':'equal'}, figsize=(12, 6))
+vax1.axes.get_xaxis().set_visible(False)
+vax1.axes.get_yaxis().set_visible(False)
+vax1.set_title("Ground truth")
+vax2.axes.get_xaxis().set_visible(False)
+vax2.axes.get_yaxis().set_visible(False)
+vax2.set_title("Backprojection")
+
+plt.tight_layout()
+
+ims = []
 def cb2(_):
     global t
     elapsed_time = time.time() - t
@@ -395,12 +409,27 @@ def cb2(_):
     iterat = iterat + 1
     print("Callback! " + str(iterat))
     print("Sq Error: " + str(errorFun.r))
-    # global imagegt
-    # global rnmod
+    global imagegt
+    global rnmod
 
-    # edges = rnmod.boundarybool_image
-    # gtoverlay = imagegt.copy()
-    # gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+    edges = rnmod.boundarybool_image
+    gtoverlay = imagegt.copy()
+    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+
+    plt.figure(figvid.number)
+    im1 = vax1.imshow(gtoverlay)
+
+    bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.8)
+
+    t = vax1.annotate("Minimization iteration: " + str(iterat), xy=(1, 0), xycoords='axes fraction', fontsize=16,
+                xytext=(-20, 5), textcoords='offset points', ha='right', va='bottom', bbox=bbox_props)
+
+    # figvid.suptitle()
+
+    im2 = vax2.imshow(rnmod.r)
+
+    ims.append([im1, im2, t])
+
     # pim1.set_data(gtoverlay)
 
     # pim2.set_data(rnmod.r)
@@ -430,7 +459,7 @@ boundAz = (0, None)
 boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-method = 0
+method = 1
 exit = False
 minimize = False
 robustModel = False
@@ -473,6 +502,9 @@ def readKeys(window, key, scancode, action, mods):
         ipdb.set_trace()
         refresh = True
 
+    if key == glfw.KEY_V and action == glfw.RELEASE:
+        im_ani = animation.ArtistAnimation(figvid, ims, interval=2000, repeat_delay=3000, repeat=False, blit=True)
+        im_ani.save('minimization_demo.avi', fps=None, writer=writer, codec='avi')
 
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True
@@ -542,7 +574,6 @@ while not exit:
         changedGT = False
 
     if refresh:
-        iterat = iterat + 1
 
         print("Sq Error: " + str(errorFun.r))
 
@@ -569,14 +600,15 @@ while not exit:
         refresh = False
 
     if minimize:
-        iterat = 1
+        iterat = 0
         print("Minimizing with method " + methods[method])
         ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
         minimize = False
 # ch.minimize({'raw': SSqE_pyr}, bounds=bounds, method=methods[3], x0=free_variables, callback=cb2, options={'disp':True})
 
-elapsed_time = time.time() - mintime
-print("Minimization time:  " + str(elapsed_time))
+# elapsed_time = time.time() - mintime
+# print("Minimization time:  " + str(elapsed_time))
+
 
 edges = rnmod.boundarybool_image
 gtoverlay = imagegt.copy()
