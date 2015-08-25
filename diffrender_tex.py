@@ -504,7 +504,7 @@ def readKeys(window, key, scancode, action, mods):
 
     if key == glfw.KEY_V and action == glfw.RELEASE:
         im_ani = animation.ArtistAnimation(figvid, ims, interval=2000, repeat_delay=3000, repeat=False, blit=True)
-        im_ani.save('minimization_demo.avi', fps=None, writer=writer, codec='avi')
+        im_ani.save('minimization_demo.mp4', fps=None, writer=writer, codec='mp4')
 
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True
