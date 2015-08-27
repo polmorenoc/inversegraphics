@@ -725,7 +725,6 @@ def clearName(name):
 #
 ###########################################################
 
-
 def getDrWrtAzimuth(SqE_raw, rotation):
     rot, rot_dr = cv2.Rodrigues(np.array(rotation))
     a = mathutils.Matrix(rot).to_euler()[2]

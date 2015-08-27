@@ -11,27 +11,20 @@ import timeit
 import time
 import opendr
 import chumpy as ch
-from opendr.renderer import ColoredRenderer
-from opendr.renderer import TexturedRenderer
 from opendr.lighting import LambertianPointLight
 from opendr.lighting import SphericalHarmonics
 from opendr.filters import gaussian_pyramid
 import geometry
-from opendr.camera import ProjectPoints
+
 import numpy as np
 import cv2
-from sklearn.preprocessing import normalize
 from utils import *
-import timeit
 import glfw
 import score_image
 import matplotlib.pyplot as plt
+from opendr_utils import *
 
 plt.ion()
-
-rn = TexturedRenderer()
-
-rnmod = TexturedRenderer()
 
 renderTeapotsList = [2]
 
@@ -40,7 +33,7 @@ teapot = targetModels[0]
 teapot.layers[1] = True
 teapot.layers[2] = True
 
-width, height = (300, 300)
+width, height = (100, 100)
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -158,116 +151,71 @@ vmod,fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sc
 
 rangeMeshes = range(len(v))
 vch = [ch.array(v[mesh]) for mesh in rangeMeshes]
-vnch = [ch.array(vn[mesh]) for mesh in rangeMeshes]
-vcch = [ch.array(vc[mesh]) for mesh in rangeMeshes]
+if len(vch)==1:
+    vstack = vch[0]
+else:
+    vstack = ch.vstack(vch)
 
-mesh = 0
-vchmod = [ch.array(vmod[mesh])]
-vnchmod = [ch.array(vnmod[mesh])]
-vcchmod = [ch.array(vcmod[mesh])]
-
-azScale = radians(30)
-elScale = radians(15)
-componentScale = 4
-distScale = 0.2
-
-chAzScaled = ch.Ch([radians(azimuth/azScale)])
-chElScaled = ch.Ch([radians(elevation/elScale)])
-chDistScaled = ch.Ch([camDistance/distScale])
-chComponentScaled = ch.Ch([1, 0.25, 0.25, 0.,0.,0.,0.,0.,0.])
-
-chAz = chAzScaled*azScale
-chEl = chElScaled*elScale
+rangeMeshes = range(len(vmod))
+vchmod = [ch.array(vmod[mesh]) for mesh in rangeMeshes]
+if len(vchmod)==1:
+    vstackmod = vchmod[0]
+else:
+    vstackmod = ch.vstack(vchmod)
 
 chAz = ch.Ch([radians(azimuth)])
 chEl = ch.Ch([radians(elevation)])
-
-chDist = chDistScaled*distScale
 chDist = ch.Ch([camDistance])
-chComponent = chComponentScaled*componentScale
-chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
-chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
-chToObjectTranslate = geometry.Translate(x=center.x, y=center.y, z=center.z)
+chAzGT = ch.Ch([radians(azimuth)])
+chElGT = ch.Ch([radians(elevation)])
+chDistGT = ch.Ch([camDistance])
 
-chRotAzMat = geometry.RotateZ(a=-chAz)
-chRotElMat = geometry.RotateX(a=-chEl)
-chCamModelWorld = ch.dot(chToObjectTranslate, ch.dot(chRotAzMat, ch.dot(chRotElMat,chDistMat)))
+cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center, width, height)
 
-chInvCam = ch.inv(ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(270), 4, 'X'))))
+camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, center, width, height)
 
-chRod = opendr.geometry.Rodrigues(rt=chInvCam[0:3,0:3]).reshape(3)
-chTranslation = chInvCam[0:3,3]
+rangeMeshes = range(len(v))
 
-translation, rotation = (chTranslation, chRod)
+vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vn[mesh])))) for mesh in rangeMeshes]
+vcch = [ch.array(vc[mesh]) for mesh in rangeMeshes]
 
 light_color=ch.ones(3)
+chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
+chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
 A_list = [SphericalHarmonics(vn=vnch[mesh],
-                       components=chComponent,
+                       components=chComponentGT,
                        light_color=light_color) for mesh in rangeMeshes]
+
 vc_list = [A_list[mesh]*vcch[mesh] for mesh in rangeMeshes]
 
-mesh =0
-A_mod = [SphericalHarmonics(vn=vnchmod[mesh],
+rangeMeshes = range(len(vmod))
+
+vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmod[mesh])))) for mesh in rangeMeshes]
+vcchmod = [ch.array(vcmod[mesh]) for mesh in rangeMeshes]
+
+light_color=ch.ones(3)
+chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
+
+Amod_list = [SphericalHarmonics(vn=vnchmod[mesh],
                        components=chComponent,
-                       light_color=light_color)]
-vcmod_list = [A_mod[mesh]*vcchmod[mesh]]
+                       light_color=light_color) for mesh in rangeMeshes]
 
-v = ch.vstack(vch)
-f = []
-for mesh in f_list:
-    lenMeshes = len(f)
-    for polygons in mesh:
-        f = f + [polygons + lenMeshes]
-fstack = np.vstack(f)
-vn = ch.vstack(vnch)
-vc = ch.vstack(vc_list)
-ft = np.vstack(uv)
+vcmod_list = [Amod_list[mesh]*vcch[mesh] for mesh in rangeMeshes]
 
-texturesch = []
-for texture_list in textures_list:
-    for texture in texture_list:
-        if texture != None:
-            texturesch = texturesch + [ch.array(texture)]
-texture_stack = ch.concatenate([tex.ravel() for tex in texturesch])
 
-vmod = ch.vstack(vchmod)
-fmod = []
-for mesh in fmod_list:
-    lenMeshes = len(fmod)
-    for polygons in mesh:
-        fmod = fmod + [polygons + lenMeshes]
-fstackmod = np.vstack(fmod)
-vnmod = ch.vstack(vnchmod)
-vcmod = ch.vstack(vcmod_list)
-ftmod = np.vstack(uvmod)
 
-textureschmod = []
-for texturemod_list in texturesmod_list:
-    for texture in texturemod_list:
-        if texture != None:
-            textureschmod = textureschmod + [ch.array(texture)]
-if textureschmod != []:
-    texturemod_stack = ch.concatenate([tex.ravel() for tex in textureschmod])
-else:
-    texturemod_stack = ch.Ch([])
+# ipdb.set_trace()
 
-from opendr.camera import ProjectPoints
-rn.camera = ProjectPoints(v=v, rt=rotation, t=translation, f= 1.12*ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
-# rn.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
-rn.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
-rn.frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
+frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 
-#Ugly initializations, think of a better way that still works well with Chumpy!
-rn.set(v=v, f=fstack, vn=vn, vc=vc, ft=ft, texture_stack=texture_stack, v_list=vch, f_list=f_list, vc_list=vc_list, ft_list=uv, textures_list=textures_list, haveUVs_list=haveTextures_list, bgcolor=ch.ones(3), overdraw=True)
 
-rnmod.camera = ProjectPoints(v=vmod, rt=rotation, t=translation, f= 1.12*ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
-rnmod.camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
-rnmod.frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-rnmod.set(v=vmod, f=fstackmod, vn=vnmod, vc=vcmod, ft=ftmod, texture_stack=texturemod_stack, v_list=vchmod, f_list=fmod_list, vc_list=vcmod_list, ft_list=uvmod, textures_list=texturesmod_list, haveUVs_list=haveTexturesmod_list, bgcolor=ch.ones(3), overdraw=True)
+rendererGT = setupTexturedRenderer(vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum)
 
-f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'})
+renderer = setupTexturedRenderer(vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum)
+
+f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
 pos1 = ax1.get_position()
 pos5 = ax5.get_position()
 pos5.x0 = pos1.x0
@@ -276,83 +224,88 @@ ax5.set_position(pos5)
 f.tight_layout()
 
 ax1.set_title("Ground Truth")
-ax1.imshow(rn.r)
+ax1.imshow(rendererGT.r)
 
-plt.imsave('opendr_opengl_gt.png', rn.r)
+plt.imsave('opendr_opengl_gt.png', rendererGT.r)
 plt.draw()
 
-vis_im = np.array(rn.image_mesh_bool(0)).copy().astype(np.bool)
-vis_mask = np.array(rn.indices_image==1).copy().astype(np.bool)
+vis_gt = np.array(rendererGT.image_mesh_bool(0)).copy().astype(np.bool)
+vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
+
+vis_im = np.array(renderer.image_mesh_bool(0)).copy().astype(np.bool)
 
 oldChAz = chAz[0].r
 oldChEl = chEl[0].r
 
-chAz[0] = chAz[0].r
-chEl[0] = chEl[0].r
-chComponent[0] = chComponent[0].r
-
 # Show it
-shapeIm = vis_im.shape
+shapeIm = vis_gt.shape
+numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
 print("Beginning render.")
 t = time.time()
-rn.r
+rendererGT.r
 elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
-plt.imsave('opendr_opengl_first.png', rn.r)
+plt.imsave('opendr_opengl_first.png', rendererGT.r)
 
-imagegt = np.copy(np.array(rn.r)).astype(np.float64)
+imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
 chImage = ch.array(imagegt)
-E_raw_simple = rnmod - chImage
-negVisIm = ~vis_im
-imageWhite = imagegt.copy()
-imageWhite[np.tile(negVisIm.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+# E_raw_simple = renderer - rendererGT
+negVisGT = ~vis_gt
+imageWhiteMask = imagegt.copy()
+imageWhiteMask[np.tile(negVisGT.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 
-chImageWhite = ch.Ch(imageWhite)
-E_raw = rnmod - chImageWhite
+chImageWhite = ch.Ch(imageWhiteMask)
+E_raw = renderer - rendererGT
 SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
-E_pyr = gaussian_pyramid(E_raw, n_levels=4, normalization='SSE')
-E_pyr_simple = gaussian_pyramid(E_raw_simple, n_levels=4, normalization='SSE')
+# E_pyr = gaussian_pyramid(E_raw, n_levels=4, normalization='SSE')
+# E_pyr_simple = gaussian_pyramid(E_raw_simple, n_levels=4, normalization='SSE')
 
-SSqE_raw = ch.SumOfSquares(E_raw)/np.sum(vis_im)
-SSqE_raw_simple = ch.SumOfSquares(E_raw_simple)/np.sum(vis_im)
-SSqE_pyr = ch.SumOfSquares(E_pyr)/np.sum(vis_im)
-SSqE_pyr_simple = ch.SumOfSquares(E_pyr_simple)/np.sum(vis_im)
+SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
+# ch.SumOfSquares(E_raw)/np.sum(vis_im)
+# SSqE_raw_simple = ch.SumOfSquares(E_raw_simple)/vis_im.size
+# SSqE_pyr = ch.SumOfSquares(E_pyr_simple)/vis_im.size
+# ch.SumOfSquares(E_pyr)/np.sum(vis_im)
+# SSqE_pyr_simple = ch.SumOfSquares(E_pyr_simple)/vis_im.size
 
-variances = numpy.ones(shapeIm3D)*2/255.0
-globalPrior = 0.8
+variances = (numpy.ones(shapeIm3D)*25.0/255.0) ** 2
+globalPrior = 0.9
 
-negLikModel = -score_image.modelLogLikelihoodCh(chImageWhite, rnmod, vis_im, 'SINGLE', variances)
+negLikModel = -score_image.modelLogLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)/numPixels
 
-negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE', globalPrior, variances)
+negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
 
-pixelLikelihoodCh = score_image.pixelLikelihoodCh(chImageWhite, rnmod, vis_im, 'SINGLE', variances)
-pixelLikelihoodRobustCh = score_image.pixelLikelihoodRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE', globalPrior, variances)
+pixelLikelihoodCh = -score_image.logPixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)
+negLikModelPyr = gaussian_pyramid(pixelLikelihoodCh, n_levels=4, normalization='SSE')
 
-post = score_image.layerPosteriorsRobustCh(chImageWhite, rnmod, vis_im, 'SINGLE', globalPrior, variances)[0]
+pixelLikelihoodRobustCh = -ch.log(score_image.pixelLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
+# pixelLikelihoodRobustCh2 = -ch.log(score_image.pixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
+
+post = score_image.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
 # pixelErrorFun = S
 # errorFun = negLikModel
-
+global model
+model = 2
 pixelErrorFun = SE_raw
 errorFun = SSqE_raw
 
 iterat = 0
 
 ax2.set_title("Backprojection")
-pim2 = ax2.imshow(rnmod.r)
+pim2 = ax2.imshow(renderer.r)
 
 plt.draw()
 
-edges = rnmod.boundarybool_image
+edges = renderer.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 pim1 = ax1.imshow(gtoverlay)
 
 ax3.set_title("Error (Abs of residuals)")
-pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+pim3 = ax3.imshow(pixelErrorFun.r)
 
 ax4.set_title("Posterior probabilities")
 ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
@@ -384,18 +337,46 @@ elapsed_time = time.time() - t
 changedGT = False
 refresh = True
 
-import matplotlib.animation as animation
-Writer = animation.writers['ffmpeg']
-writer = Writer(fps=1, metadata=dict(title='', artist=''), bitrate=1800)
-figvid, (vax1, vax2) = plt.subplots(1, 2, sharey=True, subplot_kw={'aspect':'equal'}, figsize=(12, 6))
-vax1.axes.get_xaxis().set_visible(False)
-vax1.axes.get_yaxis().set_visible(False)
-vax1.set_title("Ground truth")
-vax2.axes.get_xaxis().set_visible(False)
-vax2.axes.get_yaxis().set_visible(False)
-vax2.set_title("Backprojection")
+makeVideo = False
 
-plt.tight_layout()
+if makeVideo:
+    import matplotlib.animation as animation
+    Writer = animation.writers['ffmpeg']
+    writer = Writer(fps=1, metadata=dict(title='', artist=''), bitrate=1800)
+    figvid, (vax1, vax2) = plt.subplots(1, 2, sharey=True, subplot_kw={'aspect':'equal'}, figsize=(12, 6))
+    vax1.axes.get_xaxis().set_visible(False)
+    vax1.axes.get_yaxis().set_visible(False)
+    vax1.set_title("Ground truth")
+    vax2.axes.get_xaxis().set_visible(False)
+    vax2.axes.get_yaxis().set_visible(False)
+    vax2.set_title("Backprojection")
+
+    plt.tight_layout()
+
+computePerformance = True
+performance = {}
+elevations = {}
+azimuths = {}
+performanceSurf = {}
+elevationsSurf = {}
+azimuthsSurf = {}
+
+if computePerformance:
+    from mpl_toolkits.mplot3d import Axes3D
+    figperf = plt.figure()
+    axperf = figperf.add_subplot(111, projection='3d')
+    from matplotlib.font_manager import FontProperties
+    fontP = FontProperties()
+    fontP.set_size('small')
+    # x1,x2,y1,y2 = plt.axis()
+    # plt.axis((0,360,0,90))
+    performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+    performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
 ims = []
 def cb2(_):
@@ -410,43 +391,83 @@ def cb2(_):
     print("Callback! " + str(iterat))
     print("Sq Error: " + str(errorFun.r))
     global imagegt
-    global rnmod
+    global renderer
 
-    edges = rnmod.boundarybool_image
+    edges = renderer.boundarybool_image
     gtoverlay = imagegt.copy()
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 
-    plt.figure(figvid.number)
-    im1 = vax1.imshow(gtoverlay)
+    if makeVideo:
+        plt.figure(figvid.number)
+        im1 = vax1.imshow(gtoverlay)
 
-    bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.8)
+        bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.8)
 
-    t = vax1.annotate("Minimization iteration: " + str(iterat), xy=(1, 0), xycoords='axes fraction', fontsize=16,
-                xytext=(-20, 5), textcoords='offset points', ha='right', va='bottom', bbox=bbox_props)
+        t = vax1.annotate("Minimization iteration: " + str(iterat), xy=(1, 0), xycoords='axes fraction', fontsize=16,
+                    xytext=(-20, 5), textcoords='offset points', ha='right', va='bottom', bbox=bbox_props)
 
-    # figvid.suptitle()
+        # figvid.suptitle()
 
-    im2 = vax2.imshow(rnmod.r)
+        im2 = vax2.imshow(renderer.r)
+        ims.append([im1, im2, t])
 
-    ims.append([im1, im2, t])
+    if computePerformance:
+        performance[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(performance[(model, chAzGT.r[0], chElGT.r[0])], errorFun.r)
+        azimuths[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuths[(model, chAzGT.r[0], chElGT.r[0])], chAz.r)
+        elevations[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevations[(model, chAzGT.r[0], chElGT.r[0])], chEl.r)
+        global figperf
+        global axperf
+        global surf
+        global line
+        plt.figure(figperf.number)
+        axperf.clear()
+        from matplotlib.font_manager import FontProperties
+        fontP = FontProperties()
+        fontP.set_size('small')
 
-    # pim1.set_data(gtoverlay)
+        performanceSurf[(model, chAzGT.r[0], chElGT.r[0])]
 
-    # pim2.set_data(rnmod.r)
+            # try:
+        # line.remove()
+            # except:    #     print("no line")
 
-    # pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+        from scipy.interpolate import griddata
+        x1 = np.linspace((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
+        y1 = np.linspace((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
+        x2, y2 = np.meshgrid(x1, y1)
+        z2 = griddata(((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)), performanceSurf[(model, chAzGT.r[0], chElGT.r[0])], (x2, y2), method='cubic')
+        from matplotlib import cm, colors
+        surf = axperf.plot_surface(x2, y2, z2, rstride=3, cstride=3, cmap=cm.coolwarm, linewidth=0.1, alpha=0.85)
 
-    # ax4.set_title("Posterior probabilities")
-    # ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-    # drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    # img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        # plt.axvline(x=bestAzimuth, linewidth=2, color='b', label='Minimum score azimuth')
+        # plt.axvline(x=chAzGT, linewidth=2, color='g', label='Ground truth azimuth')
+        # plt.axvline(x=(bestAzimuth + 180) % 360, linewidth=1, color='b', ls='--', label='Minimum distance azimuth + 180')
 
-    # drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    # img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        # fig.savefig(numDir + 'performance.png')
 
-    # f.canvas.draw()
-    # plt.pause(0.1)
+        line = axperf.plot(azimuths[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, elevations[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, performance[(model, chAzGT.r[0], chElGT.r[0])], color='g', linewidth=1.5)
+        line = axperf.plot(azimuths[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, elevations[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, performance[(model, chAzGT.r[0], chElGT.r[0])], 'rD')
+
+        axperf.set_xlabel('Azimuth (degrees)')
+        axperf.set_ylabel('Elevation (degrees)')
+        axperf.set_zlabel('Negative Log Likelihood')
+        plt.title('Model type: ' + str(model))
+
+
+
+
+    pim1.set_data(gtoverlay)
+    pim2.set_data(renderer.r)
+    pim3 = ax3.imshow(pixelErrorFun.r)
+    ax4.set_title("Posterior probabilities")
+    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    f.canvas.draw()
+    plt.pause(0.1)
 
     t = time.time()
 
@@ -462,7 +483,8 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 method = 1
 exit = False
 minimize = False
-robustModel = False
+
+
 def readKeys(window, key, scancode, action, mods):
     print("Reading keys...")
     global exit
@@ -498,32 +520,74 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
         changedGT = True
 
+    if key == glfw.KEY_E and action == glfw.RELEASE:
+        chAzOld = chAz.r[0]
+        chElOld = chEl.r[0]
+        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
+            for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
+                chAz[:] = chAzi
+                chEl[:] = chEli
+                performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])], errorFun.r)
+                azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])], chAzi)
+                elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])], chEli)
+        chAz[:] = chAzOld
+        chEl[:] = chElOld
+
     if key == glfw.KEY_P and action == glfw.RELEASE:
         ipdb.set_trace()
         refresh = True
 
+    if key == glfw.KEY_S and action == glfw.RELEASE:
+        print("GT Azimuth: " + str(chAzGT))
+        print("Azimuth: " + str(chAz))
+        print("GT Elevation: " + str(chElGT))
+        print("Elevation: " + str(chEl))
+
+        print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
+        print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
+        # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
+
+
     if key == glfw.KEY_V and action == glfw.RELEASE:
-        im_ani = animation.ArtistAnimation(figvid, ims, interval=2000, repeat_delay=3000, repeat=False, blit=True)
-        im_ani.save('minimization_demo.mp4', fps=None, writer=writer, codec='mp4')
+        global ims
+        if makeVideo:
+            im_ani = animation.ArtistAnimation(figvid, ims, interval=2000, repeat_delay=3000, repeat=False, blit=True)
+            im_ani.save('minimization_demo.mp4', fps=None, writer=writer, codec='mp4')
+            ims = []
 
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True
 
-    global robustModel
     global errorFun
     global pixelErrorFun
+    global model
     if key == glfw.KEY_O and action == glfw.RELEASE:
+        model = (model + 1) % 4
+        if computePerformance:
+            performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
-        if robustModel:
+            performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+        if model == 0:
             print("Using Gaussian model")
             errorFun = negLikModel
             pixelErrorFun = pixelLikelihoodCh
-            robustModel = False
-        else:
+        elif model == 1:
             print("Using robust model")
             errorFun = negLikModelRobust
             pixelErrorFun = pixelLikelihoodRobustCh
-            robustModel = True
+        elif model == 2:
+            print("Using sum of squared error model")
+            errorFun = SSqE_raw
+            pixelErrorFun = SE_raw
+        elif model == 3:
+            print("Using Gaussian Pyramid model")
+            errorFun = negLikModelPyr
+            pixelErrorFun = pixelLikelihoodCh
 
         refresh = True
 
@@ -535,13 +599,13 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_2 and action == glfw.RELEASE:
         print("Changed to minimizer: " + methods[method])
         method = 1
-    if key == glfw.KEY_2 and action == glfw.RELEASE:
-        print("Changed to minimizer: " + methods[method])
-        method = 2
     if key == glfw.KEY_3 and action == glfw.RELEASE:
         print("Changed to minimizer: " + methods[method])
-        method = 3
+        method = 2
     if key == glfw.KEY_4 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
+        method = 3
+    if key == glfw.KEY_5 and action == glfw.RELEASE:
         print("Changed to minimizer: " + methods[method])
         method = 4
 
@@ -549,42 +613,48 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_M and action == glfw.RELEASE:
         minimize = True
 
-glfw.make_context_current(rnmod.win)
+glfw.make_context_current(renderer.win)
 
-glfw.set_key_callback(rnmod.win, readKeys)
+glfw.set_key_callback(renderer.win, readKeys)
 
 while not exit:
     # Poll for and process events
-    glfw.make_context_current(rnmod.win)
+    glfw.make_context_current(renderer.win)
     glfw.poll_events()
-    global refresh
-    global changedGT
 
     if changedGT:
-        imagegt = np.copy(np.array(rn.r)).astype(np.float64)
+        imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
         chImage[:,:,:] = imagegt[:,:,:]
 
-        vis_im = np.array(rn.image_mesh_bool(0)).copy().astype(np.bool)
-        vis_mask = np.array(rn.indices_image==1).copy().astype(np.bool)
+        chAzGT[:] = chAz.r[:]
+        chElGT[:] = chEl.r[:]
+        chDistGT[:] = chDist.r[:]
+        chComponentGT[:] = chComponent.r[:]
 
-        negVisIm = ~vis_im
-        imageWhite = imagegt.copy()
-        imageWhite[np.tile(negVisIm.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-        chImageWhite[:,:,:] = imageWhite[:,:,:]
         changedGT = False
 
-    if refresh:
+        if makeVideo:
+            ims = []
 
+        if computePerformance:
+            figperf.clear()
+
+        performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+    if refresh:
         print("Sq Error: " + str(errorFun.r))
 
-        edges = rnmod.boundarybool_image
+        edges = renderer.boundarybool_image
+        imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
         gtoverlay = imagegt.copy()
         gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
         pim1.set_data(gtoverlay)
 
-        pim2.set_data(rnmod.r)
+        pim2.set_data(renderer.r)
 
-        pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+        pim3 = ax3.imshow(pixelErrorFun.r)
 
         ax4.set_title("Posterior probabilities")
         ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
@@ -609,15 +679,14 @@ while not exit:
 # elapsed_time = time.time() - mintime
 # print("Minimization time:  " + str(elapsed_time))
 
-
-edges = rnmod.boundarybool_image
+edges = renderer.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 pim1.set_data(gtoverlay)
 
-pim2.set_data(rnmod.r)
+pim2.set_data(renderer.r)
 
-pim3 = ax3.imshow(np.tile(np.abs(pixelErrorFun.r).reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+pim3 = ax3.imshow(pixelErrorFun.r)
 
 ax4.set_title("Posterior probabilities")
 ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
@@ -635,4 +704,4 @@ img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 f.canvas.draw()
 plt.pause(0.1)
 
-plt.imsave('opendr_opengl_final.png', rn.r)
+plt.imsave('opendr_opengl_final.png', rendererGT.r)
