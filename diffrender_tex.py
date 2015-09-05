@@ -33,7 +33,7 @@ teapot = targetModels[0]
 teapot.layers[1] = True
 teapot.layers[2] = True
 
-width, height = (100, 100)
+width, height = (200, 200)
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -163,12 +163,23 @@ if len(vchmod)==1:
 else:
     vstackmod = ch.vstack(vchmod)
 
-chAz = ch.Ch([radians(azimuth)])
-chEl = ch.Ch([radians(elevation)])
+# GT Azimuth: [ 1.30899694]
+# Azimuth: [ 0.78539816]
+# GT Elevation: [ 0.52359878]
+# Elevation: [ 0.87266463]
+
+# chAz = ch.Ch([radians(azimuth)])
+# chEl = ch.Ch([radians(elevation)])
+chAz = ch.Ch([5.742895587179587])
+chEl = ch.Ch([0.82173048])
 chDist = ch.Ch([camDistance])
 
-chAzGT = ch.Ch([radians(azimuth)])
-chElGT = ch.Ch([radians(elevation)])
+# chAzGT = ch.Ch([radians(azimuth)])
+# chElGT = ch.Ch([radians(elevation)])
+
+# chAzGT = ch.Ch([1.30899694])
+chAzGT = ch.Ch([5.742895587179587])
+chElGT = ch.Ch([0.82120681])
 chDistGT = ch.Ch([camDistance])
 
 cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center, width, height)
@@ -215,23 +226,8 @@ rendererGT = setupTexturedRenderer(vstack, vch, f_list, vc_list, vnch,  uv, have
 
 renderer = setupTexturedRenderer(vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum)
 
-f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
-pos1 = ax1.get_position()
-pos5 = ax5.get_position()
-pos5.x0 = pos1.x0
-ax5.set_position(pos5)
-
-f.tight_layout()
-
-ax1.set_title("Ground Truth")
-ax1.imshow(rendererGT.r)
-
-plt.imsave('opendr_opengl_gt.png', rendererGT.r)
-plt.draw()
-
 vis_gt = np.array(rendererGT.image_mesh_bool(0)).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
-
 vis_im = np.array(renderer.image_mesh_bool(0)).copy().astype(np.bool)
 
 oldChAz = chAz[0].r
@@ -260,65 +256,78 @@ chImageWhite = ch.Ch(imageWhiteMask)
 E_raw = renderer - rendererGT
 SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
-# E_pyr = gaussian_pyramid(E_raw, n_levels=4, normalization='SSE')
-# E_pyr_simple = gaussian_pyramid(E_raw_simple, n_levels=4, normalization='SSE')
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
-# ch.SumOfSquares(E_raw)/np.sum(vis_im)
-# SSqE_raw_simple = ch.SumOfSquares(E_raw_simple)/vis_im.size
-# SSqE_pyr = ch.SumOfSquares(E_pyr_simple)/vis_im.size
-# ch.SumOfSquares(E_pyr)/np.sum(vis_im)
-# SSqE_pyr_simple = ch.SumOfSquares(E_pyr_simple)/vis_im.size
 
-variances = (numpy.ones(shapeIm3D)*25.0/255.0) ** 2
-globalPrior = 0.9
+stds = ch.Ch([0.1])
+variances = stds ** 2
+globalPrior = ch.Ch([0.8])
 
 negLikModel = -score_image.modelLogLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)/numPixels
 
 negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
 
-pixelLikelihoodCh = -score_image.logPixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)
-negLikModelPyr = gaussian_pyramid(pixelLikelihoodCh, n_levels=4, normalization='SSE')
+pixelLikelihoodCh = score_image.logPixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)
 
-pixelLikelihoodRobustCh = -ch.log(score_image.pixelLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
-# pixelLikelihoodRobustCh2 = -ch.log(score_image.pixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
+pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
 
 post = score_image.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-# pixelErrorFun = S
-# errorFun = negLikModel
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+modelsDescr = ["Gaussian Model", "Outlier model"]
+# , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
+
 global model
-model = 2
-pixelErrorFun = SE_raw
-errorFun = SSqE_raw
+model = 0
+
+pixelErrorFun = pixelLikelihoodCh
+errorFun = negLikModel
 
 iterat = 0
 
+f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
+pos1 = ax1.get_position()
+pos5 = ax5.get_position()
+pos5.x0 = pos1.x0
+ax5.set_position(pos5)
+
+f.tight_layout()
+
+ax1.set_title("Ground Truth")
+
 ax2.set_title("Backprojection")
 pim2 = ax2.imshow(renderer.r)
-
-plt.draw()
 
 edges = renderer.boundarybool_image
 gtoverlay = imagegt.copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 pim1 = ax1.imshow(gtoverlay)
 
-ax3.set_title("Error (Abs of residuals)")
-pim3 = ax3.imshow(pixelErrorFun.r)
+ax3.set_title("Pixel negative log probabilities")
+pim3 = ax3.imshow(-pixelErrorFun.r)
+cb3 = plt.colorbar(pim3, ax=ax3,use_gridspec=True)
+cb3.mappable = pim3
 
 ax4.set_title("Posterior probabilities")
 ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
 ax5.set_title("Dr wrt. Azimuth")
-drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-plt.colorbar(img, ax=ax5,use_gridspec=True)
+drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
+cb5.mappable = img5
 
 ax6.set_title("Dr wrt. Elevation")
-drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
 img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-plt.colorbar(img6, ax=ax6,use_gridspec=True)
+cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
+cb6.mappable = img6
+
+pos1 = ax1.get_position()
+pos5 = ax5.get_position()
+pos5.x0 = pos1.x0
+ax5.set_position(pos5)
 
 pos1 = ax1.get_position()
 pos5 = ax5.get_position()
@@ -326,17 +335,16 @@ pos5.x0 = pos1.x0
 ax5.set_position(pos5)
 
 plt.show()
-pos1 = ax1.get_position()
-pos5 = ax5.get_position()
-pos5.x0 = pos1.x0
-ax5.set_position(pos5)
-
 plt.pause(0.1)
 
 elapsed_time = time.time() - t
+global changedGT
 changedGT = False
+global refresh
 refresh = True
-
+global drawSurf
+drawSurf = False
+global makeVideo
 makeVideo = False
 
 if makeVideo:
@@ -357,13 +365,21 @@ computePerformance = True
 performance = {}
 elevations = {}
 azimuths = {}
+gradEl = {}
+gradAz = {}
 performanceSurf = {}
 elevationsSurf = {}
 azimuthsSurf = {}
+gradElSurf = {}
+gradAzSurf = {}
+gradFinElSurf = {}
+gradFinAzSurf = {}
 
 if computePerformance:
     from mpl_toolkits.mplot3d import Axes3D
+    global figperf
     figperf = plt.figure()
+    global axperf
     axperf = figperf.add_subplot(111, projection='3d')
     from matplotlib.font_manager import FontProperties
     fontP = FontProperties()
@@ -373,12 +389,136 @@ if computePerformance:
     performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
     azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
     elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    gradAz[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    gradEl[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
     performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
     azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
     elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
+    gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+    gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+    gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
 ims = []
+
+def refreshSubplots():
+        #Other subplots visualizing renders and its pixel derivatives
+        edges = renderer.boundarybool_image
+        imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
+        gtoverlay = imagegt.copy()
+        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+        pim1.set_data(gtoverlay)
+        pim2.set_data(renderer.r)
+        pim3 = ax3.imshow(-pixelErrorFun.r)
+        cb3.mappable = pim3
+        cb3.update_normal(pim3)
+        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+        drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb5.mappable = img5
+        cb5.update_normal(img5)
+        drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb6.mappable = img6
+        cb6.update_normal(img6)
+        f.canvas.draw()
+        plt.pause(0.1)
+
+
+def plotSurface():
+    global figperf
+    global axperf
+    global surf
+    global line
+    global drawSurf
+    global computePerformance
+    global plotMinimization
+    global chAz
+    global chEl
+    global model
+    if not plotMinimization and not drawSurf:
+        figperf.clear()
+        global axperf
+        axperf = figperf.add_subplot(111, projection='3d')
+
+    plt.figure(figperf.number)
+    axperf.clear()
+    from matplotlib.font_manager import FontProperties
+    fontP = FontProperties()
+    fontP.set_size('small')
+    scaleSurfGrads = 0
+    if drawSurf:
+        from scipy.interpolate import griddata
+        x1 = np.linspace((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
+        y1 = np.linspace((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
+        x2, y2 = np.meshgrid(x1, y1)
+        z2 = griddata(((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)), performanceSurf[(model, chAzGT.r[0], chElGT.r[0])], (x2, y2), method='cubic')
+        from matplotlib import cm, colors
+        surf = axperf.plot_surface(x2, y2, z2, rstride=3, cstride=3, cmap=cm.coolwarm, linewidth=0.1, alpha=0.85)
+        avgSurfGradMagnitudes = np.mean(np.sqrt(gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])]**2+gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]**2))
+        scaleSurfGrads = 5./avgSurfGradMagnitudes
+        for point in range(len(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])):
+            perfi = performanceSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            azi = azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            eli = elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            gradAzi = -gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            gradEli = -gradElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi*scaleSurfGrads], [eli*180./np.pi, eli*180./np.pi + gradEli*scaleSurfGrads], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+            axperf.add_artist(arrowGrad)
+
+            diffAzi = -gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            diffEli = -gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            colorArrow = 'g'
+            if diffAzi * gradAzi + diffEli * gradEli < 0:
+                colorArrow = 'r'
+            arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi*scaleSurfGrads], [eli*180./np.pi, eli*180./np.pi + diffEli*scaleSurfGrads], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+            axperf.add_artist(arrowGradDiff)
+
+        axperf.plot([chAzGT.r[0]*180./np.pi, chAzGT.r[0]*180./np.pi], [chElGT.r[0]*180./np.pi,chElGT.r[0]*180./np.pi], [z2.min(), z2.max()], 'b--', linewidth=1)
+
+        axperf.plot(chAz.r*180./np.pi, chEl.r*180./np.pi, errorFun.r[0], 'yD')
+
+        import scipy.sparse as sp
+        if sp.issparse(errorFun.dr_wrt(chAz)):
+            drAz = -errorFun.dr_wrt(chAz).toarray()[0][0]
+        else:
+            drAz = -errorFun.dr_wrt(chAz)[0][0]
+        if sp.issparse(errorFun.dr_wrt(chEl)):
+            drEl = -errorFun.dr_wrt(chEl).toarray()[0][0]
+        else:
+            drEl = -errorFun.dr_wrt(chEl)[0][0]
+
+        chAzOldi = chAz.r[0]
+        chElOldi = chEl.r[0]
+        diffAz = -ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+        diffEl = -ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+        chAz[0] = chAzOldi
+        chEl[0] = chElOldi
+
+        arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz*scaleSurfGrads], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl*scaleSurfGrads], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+        axperf.add_artist(arrowGrad)
+        colorArrow = 'g'
+        if diffAz * drAz + diffEl * drEl < 0:
+            colorArrow = 'r'
+        arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz*scaleSurfGrads], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl*scaleSurfGrads], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+        axperf.add_artist(arrowGradDiff)
+
+    if plotMinimization:
+        if azimuths.get((model, chAzGT.r[0], chElGT.r[0])) != None:
+            axperf.plot(azimuths[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, elevations[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, performance[(model, chAzGT.r[0], chElGT.r[0])], color='g', linewidth=1.5)
+            axperf.plot(azimuths[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, elevations[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, performance[(model, chAzGT.r[0], chElGT.r[0])], 'rD')
+
+    axperf.set_xlabel('Azimuth (degrees)')
+    axperf.set_ylabel('Elevation (degrees)')
+    axperf.set_zlabel('Negative Log Likelihood')
+    plt.title('Model type: ' + str(model))
+
+    plt.pause(0.1)
+    plt.draw()
+
 def cb2(_):
     global t
     elapsed_time = time.time() - t
@@ -392,10 +532,13 @@ def cb2(_):
     print("Sq Error: " + str(errorFun.r))
     global imagegt
     global renderer
+    global gradAz
+    global gradEl
+    global performance
+    global azimuths
+    global elevations
 
-    edges = renderer.boundarybool_image
-    gtoverlay = imagegt.copy()
-    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+    refreshSubplots()
 
     if makeVideo:
         plt.figure(figvid.number)
@@ -405,70 +548,40 @@ def cb2(_):
 
         t = vax1.annotate("Minimization iteration: " + str(iterat), xy=(1, 0), xycoords='axes fraction', fontsize=16,
                     xytext=(-20, 5), textcoords='offset points', ha='right', va='bottom', bbox=bbox_props)
-
-        # figvid.suptitle()
-
         im2 = vax2.imshow(renderer.r)
         ims.append([im1, im2, t])
 
     if computePerformance:
+        if performance.get((model, chAzGT.r[0], chElGT.r[0])) == None:
+            performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradAz[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradEl[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
         performance[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(performance[(model, chAzGT.r[0], chElGT.r[0])], errorFun.r)
         azimuths[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuths[(model, chAzGT.r[0], chElGT.r[0])], chAz.r)
         elevations[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevations[(model, chAzGT.r[0], chElGT.r[0])], chEl.r)
-        global figperf
-        global axperf
-        global surf
-        global line
-        plt.figure(figperf.number)
-        axperf.clear()
-        from matplotlib.font_manager import FontProperties
-        fontP = FontProperties()
-        fontP.set_size('small')
 
-        performanceSurf[(model, chAzGT.r[0], chElGT.r[0])]
+        import scipy.sparse as sp
+        if sp.issparse(errorFun.dr_wrt(chAz)):
+            drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
+        else:
+            drAz = errorFun.dr_wrt(chAz)[0][0]
+        if sp.issparse(errorFun.dr_wrt(chEl)):
+            drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
+        else:
+            drEl = errorFun.dr_wrt(chEl)[0][0]
 
-            # try:
-        # line.remove()
-            # except:    #     print("no line")
+        gradAz[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAz[(model, chAzGT.r[0], chElGT.r[0])], drAz)
+        gradEl[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradEl[(model, chAzGT.r[0], chElGT.r[0])], drEl)
 
-        from scipy.interpolate import griddata
-        x1 = np.linspace((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
-        y1 = np.linspace((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
-        x2, y2 = np.meshgrid(x1, y1)
-        z2 = griddata(((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)), performanceSurf[(model, chAzGT.r[0], chElGT.r[0])], (x2, y2), method='cubic')
-        from matplotlib import cm, colors
-        surf = axperf.plot_surface(x2, y2, z2, rstride=3, cstride=3, cmap=cm.coolwarm, linewidth=0.1, alpha=0.85)
+        plotSurface()
 
 
-        # plt.axvline(x=bestAzimuth, linewidth=2, color='b', label='Minimum score azimuth')
-        # plt.axvline(x=chAzGT, linewidth=2, color='g', label='Ground truth azimuth')
-        # plt.axvline(x=(bestAzimuth + 180) % 360, linewidth=1, color='b', ls='--', label='Minimum distance azimuth + 180')
-
-        # fig.savefig(numDir + 'performance.png')
-
-        line = axperf.plot(azimuths[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, elevations[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, performance[(model, chAzGT.r[0], chElGT.r[0])], color='g', linewidth=1.5)
-        line = axperf.plot(azimuths[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, elevations[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi, performance[(model, chAzGT.r[0], chElGT.r[0])], 'rD')
-
-        axperf.set_xlabel('Azimuth (degrees)')
-        axperf.set_ylabel('Elevation (degrees)')
-        axperf.set_zlabel('Negative Log Likelihood')
-        plt.title('Model type: ' + str(model))
-
-
-
-
-    pim1.set_data(gtoverlay)
-    pim2.set_data(renderer.r)
-    pim3 = ax3.imshow(pixelErrorFun.r)
-    ax4.set_title("Posterior probabilities")
-    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-    drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    f.canvas.draw()
     plt.pause(0.1)
-
+    plt.show()
+    plt.draw()
+    plt.pause(0.1)
     t = time.time()
 
 # , chComponent[0]
@@ -483,31 +596,54 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 method = 1
 exit = False
 minimize = False
-
+plotMinimization = False
+global chAzSaved
+global chElSaved
+global chComponentSaved
+chAzSaved = chAz.r[0]
+chElSaved = chEl.r[0]
+chComponentSaved = chComponent.r[0]
 
 def readKeys(window, key, scancode, action, mods):
     print("Reading keys...")
     global exit
     global refresh
+    global chAz
+    global chEl
+    global chComponent
     refresh = False
-    if key == glfw.KEY_ESCAPE and action == glfw.RELEASE:
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_ESCAPE and action == glfw.RELEASE:
         glfw.set_window_should_close(window, True)
         exit = True
-    if key == glfw.KEY_LEFT:
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
         refresh = True
         chAz[0] = chAz[0].r - radians(5)
-    if key == glfw.KEY_RIGHT:
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
         refresh = True
         chAz[0] = chAz[0].r + radians(5)
-    if key == glfw.KEY_DOWN:
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r - radians(5)
         refresh = True
-    if key == glfw.KEY_UP:
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r + radians(5)
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
+        print("Left modifier!")
+        refresh = True
+        chAz[0] = chAz[0].r - radians(1)
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
+        refresh = True
+        chAz[0] = chAz[0].r + radians(1)
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
+        refresh = True
+        chEl[0] = chEl[0].r - radians(1)
+        refresh = True
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
+        refresh = True
+        chEl[0] = chEl[0].r + radians(1)
     if key == glfw.KEY_C and action == glfw.RELEASE:
-        print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01]))
+        print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01745]))
         print("Scipy grad check: " + ch.optimization.scipyGradCheck({'raw': errorFun}, [chAz]))
     if key == glfw.KEY_B:
         refresh = True
@@ -516,28 +652,98 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
         chComponent[0] = chComponent[0].r - 0.1
     global changedGT
+    global drawSurf
+    global model
+    global models
     if key == glfw.KEY_G and action == glfw.RELEASE:
         refresh = True
         changedGT = True
 
     if key == glfw.KEY_E and action == glfw.RELEASE:
-        chAzOld = chAz.r[0]
-        chElOld = chEl.r[0]
-        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
-            for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
-                chAz[:] = chAzi
-                chEl[:] = chEli
-                performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])], errorFun.r)
-                azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])], chAzi)
-                elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])], chEli)
-        chAz[:] = chAzOld
-        chEl[:] = chElOld
+        if computePerformance:
+            print("Estimating cost function surface and gradients...")
+            drawSurf = True
+            chAzOld = chAz.r[0]
+            chElOld = chEl.r[0]
+
+            for model_num, errorFun in enumerate(models):
+                performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
+                for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
+                    for model_num, errorFun in enumerate(models):
+                        chAz[:] = chAzi
+                        chEl[:] = chEli
+
+                        performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
+                        azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
+                        elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
+                        import scipy.sparse as sp
+                        if sp.issparse(errorFun.dr_wrt(chAz)):
+                            drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
+                        else:
+                            drAz = errorFun.dr_wrt(chAz)[0][0]
+                        if sp.issparse(errorFun.dr_wrt(chEl)):
+                            drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
+                        else:
+                            drEl = errorFun.dr_wrt(chEl)[0][0]
+
+                        gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
+                        gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
+                        chAzOldi = chAz.r[0]
+                        chElOldi = chEl.r[0]
+                        diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+                        diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+                        chAz[:] = chAzOldi
+                        chEl[:] = chElOldi
+                        gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
+                        gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
+            errorFun = models[model]
+
+            chAz[:] = chAzOld
+            chEl[:] = chElOld
+
+            refresh = True
+            print("Finshed estimating.")
 
     if key == glfw.KEY_P and action == glfw.RELEASE:
         ipdb.set_trace()
         refresh = True
 
+    if key == glfw.KEY_N and action == glfw.RELEASE:
+        print("Back to GT!")
+        chAz[:] = chAzGT.r[:]
+        chEl[:] = chElGT.r[:]
+        chComponent[:] = chComponentGT.r[:]
+        refresh = True
+
+    global chAzSaved
+    global chElSaved
+    global chComponentSaved
+
+    if key == glfw.KEY_Z and action == glfw.RELEASE:
+        print("Saved!")
+        chAzSaved = chAz.r[0]
+        chElSaved = chEl.r[0]
+        chComponentSaved = chComponent.r[0]
+
+    if key == glfw.KEY_X and action == glfw.RELEASE:
+        print("Back to Saved!")
+        chAz[0] = chAzSaved
+        chEl[0] = chElSaved
+        chComponent[0] = chComponentSaved
+        refresh = True
+
     if key == glfw.KEY_S and action == glfw.RELEASE:
+        print("**** Statistics ****" )
         print("GT Azimuth: " + str(chAzGT))
         print("Azimuth: " + str(chAz))
         print("GT Elevation: " + str(chElGT))
@@ -547,6 +753,29 @@ def readKeys(window, key, scancode, action, mods):
         print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
         # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
 
+        print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
+
+        if drawSurf:
+            avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
+            print("** Approx gradients - finite differenes." )
+            print("Avg Eucl. distance :: " + str(avgError))
+            norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+            norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+            avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
+            print("Avg Angle.: " + str(np.mean(avgAngle)))
+            print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
+            idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
+            # distGTMin = np.sqrt((chAzGT*180/np.pi - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]*180/np.pi)**2 + (chAzGT*180/np.pi-elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]*180/np.pi)**2)
+            # print("Dist of minimum to groundtruth: " + str(distGTMin))
+            azDiff = np.arctan(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+            elDiff = np.arctan(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+            print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
+            print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
+
+        azDiff = np.arctan(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
+        elDiff = np.arctan(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
+        print("Current Azimuth difference of " + str(azDiff*180/np.pi))
+        print("Current Elevation difference of " + str(elDiff*180/np.pi))
 
     if key == glfw.KEY_V and action == glfw.RELEASE:
         global ims
@@ -555,59 +784,71 @@ def readKeys(window, key, scancode, action, mods):
             im_ani.save('minimization_demo.mp4', fps=None, writer=writer, codec='mp4')
             ims = []
 
+    global stds
+    global globalPrior
+    global plotMinimization
+    if key == glfw.KEY_KP_1 and action == glfw.RELEASE:
+        stds[:] = stds.r[0]/1.5
+        print("New standard devs of " + str(stds.r))
+        refresh = True
+        drawSurf = False
+        plotMinimization = False
+    if key == glfw.KEY_KP_2 and action == glfw.RELEASE:
+        stds[:] = stds.r[0]*1.5
+        print("New standard devs of " + str(stds.r))
+        refresh = True
+        drawSurf = False
+        plotMinimization = False
+
+    if key == glfw.KEY_KP_4 and action == glfw.RELEASE:
+        globalPrior[0] = globalPrior.r[0] - 0.05
+        print("New foreground prior of" + str(globalPrior.r))
+        refresh = True
+        drawSurf = False
+        plotMinimization = False
+    if key == glfw.KEY_KP_5 and action == glfw.RELEASE:
+        globalPrior[0] = globalPrior.r[0] + 0.05
+        print("New foreground prior of " + str(globalPrior.r))
+        refresh = True
+        drawSurf = False
+        plotMinimization = False
+
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True
 
     global errorFun
     global pixelErrorFun
     global model
+    global models
+    global modelsDescr
+    global pixelModels
+
     if key == glfw.KEY_O and action == glfw.RELEASE:
-        model = (model + 1) % 4
-        if computePerformance:
-            performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-            elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-            azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-            performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-            azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-            elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-        if model == 0:
-            print("Using Gaussian model")
-            errorFun = negLikModel
-            pixelErrorFun = pixelLikelihoodCh
-        elif model == 1:
-            print("Using robust model")
-            errorFun = negLikModelRobust
-            pixelErrorFun = pixelLikelihoodRobustCh
-        elif model == 2:
-            print("Using sum of squared error model")
-            errorFun = SSqE_raw
-            pixelErrorFun = SE_raw
-        elif model == 3:
-            print("Using Gaussian Pyramid model")
-            errorFun = negLikModelPyr
-            pixelErrorFun = pixelLikelihoodCh
+        # drawSurf = False
+        model = (model + 1) % len(models)
+        print("Using " + modelsDescr[model])
+        errorFun = models[model]
+        pixelErrorFun = pixelModels[model]
 
         refresh = True
 
     global method
     global methods
     if key == glfw.KEY_1 and action == glfw.RELEASE:
-        print("Changed to minimizer: " + methods[method])
         method = 0
+        print("Changed to minimizer: " + methods[method])
     if key == glfw.KEY_2 and action == glfw.RELEASE:
-        print("Changed to minimizer: " + methods[method])
         method = 1
-    if key == glfw.KEY_3 and action == glfw.RELEASE:
         print("Changed to minimizer: " + methods[method])
+    if key == glfw.KEY_3 and action == glfw.RELEASE:
         method = 2
+        print("Changed to minimizer: " + methods[method])
     if key == glfw.KEY_4 and action == glfw.RELEASE:
         print("Changed to minimizer: " + methods[method])
         method = 3
     if key == glfw.KEY_5 and action == glfw.RELEASE:
-        print("Changed to minimizer: " + methods[method])
         method = 4
+        print("Changed to minimizer: " + methods[method])
 
     global minimize
     if key == glfw.KEY_M and action == glfw.RELEASE:
@@ -623,6 +864,8 @@ while not exit:
     glfw.poll_events()
 
     if changedGT:
+        drawSurf = False
+        plotMinimization = False
         imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
         chImage[:,:,:] = imagegt[:,:,:]
 
@@ -636,72 +879,44 @@ while not exit:
         if makeVideo:
             ims = []
 
-        if computePerformance:
-            figperf.clear()
-
         performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
         azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
         elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        gradAz[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        gradEl[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+        performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+        gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+        gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+        gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
     if refresh:
         print("Sq Error: " + str(errorFun.r))
 
-        edges = renderer.boundarybool_image
-        imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
-        gtoverlay = imagegt.copy()
-        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-        pim1.set_data(gtoverlay)
+        refreshSubplots()
 
-        pim2.set_data(renderer.r)
 
-        pim3 = ax3.imshow(pixelErrorFun.r)
+        if computePerformance and drawSurf:
+            plotSurface()
 
-        ax4.set_title("Posterior probabilities")
-        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-
-        drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-        img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-
-        drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-        img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-
-        f.canvas.draw()
         plt.pause(0.1)
+        plt.draw()
         refresh = False
 
     if minimize:
         iterat = 0
         print("Minimizing with method " + methods[method])
         ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
+        plotMinimization = True
         minimize = False
-# ch.minimize({'raw': SSqE_pyr}, bounds=bounds, method=methods[3], x0=free_variables, callback=cb2, options={'disp':True})
 
-# elapsed_time = time.time() - mintime
-# print("Minimization time:  " + str(elapsed_time))
 
-edges = renderer.boundarybool_image
-gtoverlay = imagegt.copy()
-gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-pim1.set_data(gtoverlay)
 
-pim2.set_data(renderer.r)
-
-pim3 = ax3.imshow(pixelErrorFun.r)
-
-ax4.set_title("Posterior probabilities")
-ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-
-ax5.set_title("Dr wrt. Azimuth")
-drazsum = pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-
-img = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-
-ax6.set_title("Dr wrt. Elevation")
-drazsum = pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-
-img = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-
-f.canvas.draw()
-plt.pause(0.1)
+refreshSubplots()
 
 plt.imsave('opendr_opengl_final.png', rendererGT.r)

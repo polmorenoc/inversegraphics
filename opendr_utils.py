@@ -10,12 +10,19 @@ from opendr.camera import ProjectPoints
 from opendr.renderer import TexturedRenderer
 import ipdb
 
+def getOcclusionFraction(renderer):
+
+    vis_occluded = np.array(renderer.indices_image==1).copy().astype(np.bool)
+    vis_im = np.array(renderer.image_mesh_bool(0)).copy().astype(np.bool)
+
+    return 1. - np.sum(vis_occluded)/np.sum(vis_im)
+
 def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
 
     chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
     chToObjectTranslate = geometry.Translate(x=objCenter.x, y=objCenter.y, z=objCenter.z)
 
-    chRotAzMat = geometry.RotateZ(a=-chAz)
+    chRotAzMat = geometry.RotateZ(a=chAz)
     chRotElMat = geometry.RotateX(a=-chEl)
     chCamModelWorld = ch.dot(chToObjectTranslate, ch.dot(chRotAzMat, ch.dot(chRotElMat,chDistMat)))
 
@@ -70,6 +77,6 @@ def setupTexturedRenderer(vstack, vch,f_list, vc_list, vnch, uv, haveTextures_li
     renderer.camera = camera
 
     renderer.frustum = frustum
-    renderer.set(v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_list, vc_list=vc_list, ft_list=uv, textures_list=textures_list, haveUVs_list=haveTextures_list, bgcolor=ch.ones(3), overdraw=True)
+    renderer.set(v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_list, vc_list=vc_list, ft_list=uv, textures_list=textures_list, haveUVs_list=haveTextures_list, bgcolor=ch.zeros(3), overdraw=True)
 
     return renderer
