@@ -33,7 +33,7 @@ teapot = targetModels[0]
 teapot.layers[1] = True
 teapot.layers[2] = True
 
-width, height = (200, 200)
+width, height = (110, 110)
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -170,16 +170,16 @@ else:
 
 # chAz = ch.Ch([radians(azimuth)])
 # chEl = ch.Ch([radians(elevation)])
-chAz = ch.Ch([5.742895587179587])
-chEl = ch.Ch([0.82173048])
+chAz = ch.Ch([4.742895587179587])
+chEl = ch.Ch([0.22173048])
 chDist = ch.Ch([camDistance])
 
 # chAzGT = ch.Ch([radians(azimuth)])
 # chElGT = ch.Ch([radians(elevation)])
 
 # chAzGT = ch.Ch([1.30899694])
-chAzGT = ch.Ch([5.742895587179587])
-chElGT = ch.Ch([0.82120681])
+chAzGT = ch.Ch([4.742895587179587])
+chElGT = ch.Ch([0.22120681])
 chDistGT = ch.Ch([camDistance])
 
 cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center, width, height)
@@ -767,13 +767,13 @@ def readKeys(window, key, scancode, action, mods):
             idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
             # distGTMin = np.sqrt((chAzGT*180/np.pi - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]*180/np.pi)**2 + (chAzGT*180/np.pi-elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]*180/np.pi)**2)
             # print("Dist of minimum to groundtruth: " + str(distGTMin))
-            azDiff = np.arctan(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-            elDiff = np.arctan(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+            azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+            elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
             print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
             print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
 
-        azDiff = np.arctan(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
-        elDiff = np.arctan(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
+        azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
+        elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
         print("Current Azimuth difference of " + str(azDiff*180/np.pi))
         print("Current Elevation difference of " + str(elDiff*180/np.pi))
 
@@ -813,10 +813,69 @@ def readKeys(window, key, scancode, action, mods):
         drawSurf = False
         plotMinimization = False
 
-    if key == glfw.KEY_R and action == glfw.RELEASE:
-        refresh = True
+    import regression_methods
+    global azsGT
+    global elevsGT
+    global split
+    global randForestModel
+    global linRegModel
+    global numDataset
+    import imageproc
 
-    global errorFun
+    if key == glfw.KEY_T and action == glfw.RELEASE:
+
+        ipdb.set_trace()
+        numDataset = 10
+        chAzOld = chAz.r[0]
+        chElOld = chEl.r[0]
+        chAzGTOld = chAzGT.r[0]
+        chElGTOld = chElGT.r[0]
+
+        azsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, numDataset)
+        elevsGT = numpy.random.uniform(1,np.pi/2, numDataset)
+        images = []
+        occlusions = []
+        hogs = []
+
+        split = 0.8
+        setTrain = np.arange(np.floor(len(azsGT)*split)).astype(np.uint8)
+        for train_i in setTrain:
+            azi = azsGT[train_i]
+            eli = elevsGT[train_i]
+            chAzGT[:] = azi
+            chElGT[:] = eli
+            image = rendererGT.r.copy()
+            images = images + [image]
+            occlusions = occlusions + [getOcclusionFraction(rendererGT)]
+            hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
+
+        hogfeats = np.vstack(hogs)
+
+        #Train
+        randForestModelCosAzs = regression_methods.trainRandomForest(hogfeats, np.cos(azsGT[setTrain]))
+        randForestModelSinAzs = regression_methods.trainRandomForest(hogfeats, np.sin(elevsGT[setTrain]))
+        linRegModelCosAzs = regression_methods.trainLinearRegression(hogfeats, np.cos(azsGT[setTrain]))
+        linRegModelSinAzs = regression_methods.trainLinearRegression(hogfeats, np.sin(elevsGT[setTrain]))
+
+        chAz[:] = chAzOld
+        chEl[:] = chElOld
+        chAzGT[:] = chAzGTOld
+        chElGT[:] = chElGTOld
+
+    if key == glfw.KEY_I and action == glfw.RELEASE:
+
+        elevsPred = np.arctan2(np.sin(elevsPred), np.cos(elevsPred))
+        azsPred = np.arctan2(np.sin(azsPred), np.cos(azsPred))
+
+        randForestModelCosAzs
+        randForestModelSinAzs
+        linRegModelCosAzs
+        linRegModelSinAzs
+
+        evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred)
+
+    if key == glfw.KEY_R and action == glfw.RELEASE:
+        global errorFun
     global pixelErrorFun
     global model
     global models
@@ -914,8 +973,6 @@ while not exit:
         ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
         plotMinimization = True
         minimize = False
-
-
 
 refreshSubplots()
 
