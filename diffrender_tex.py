@@ -1000,7 +1000,6 @@ def readKeys(window, key, scancode, action, mods):
             chAz[:] = azsPredRF[test_i]
             chEl[:] = elevsPredRF[test_i]
             ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
             cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
             fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
