@@ -8,26 +8,26 @@ from sklearn.ensemble import RandomForestRegressor
 
 def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
 
-    errazs = np.arctan2(np.sin(azsGT - azsPred), np.cos(azsGT - azsPred))*180/pi
-    errelevs = np.arctan2(np.sin(elevsGT-elevsPred), np.cos(elevsGT-elevsPred))*180/pi
+    errazs = np.arctan2(np.sin(azsGT - azsPred), np.cos(azsGT - azsPred))*180/np.pi
+    errelevs = np.arctan2(np.sin(elevsGT-elevsPred), np.cos(elevsGT-elevsPred))*180/np.pi
     return errazs, errelevs
 
 def trainRandomForest(xtrain, ytrain):
 
-    rf = RandomForestRegressor()
-    r = rf.fit(xtrain, ytrain)
+    randForest = RandomForestRegressor(n_estimators=200, n_jobs=-1)
+    rf = randForest.fit(xtrain, ytrain)
 
-    return rf, r
+    return rf
 
-def testRandomForest(xtest, ytest):
+def testRandomForest(randForest, xtest):
 
-    return rf.predict(X_t)
+    return randForest.predict(xtest)
 
 
 def trainLinearRegression(xtrain, ytrain):
 
     # Create linear regression object
-    regr = linear_model.LinearRegression()
+    regr = linear_model.LinearRegression(n_jobs=-1)
 
     # Train the model using the training sets
     regr.fit(xtrain, ytrain)
@@ -44,6 +44,6 @@ def trainLinearRegression(xtrain, ytrain):
 
 
 
-def testLinearRegression(xtest, ytest):
+def testLinearRegression(lrmodel, xtest):
 
-    return regr.predict(xtest)
+    return lrmodel.predict(xtest)

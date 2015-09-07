@@ -1,0 +1,7 @@
+meanAbsErrAzsRF 143.080433746
+meanAbsErrElevsRF 26.1116626541
+meanAbsErrAzsFittedRFGaussian 129.244575796
+meanAbsErrElevsFittedRFGaussian 9.16860144333
+meanAbsErrAzsFittedRFRobust 140.769427588
+meanAbsErrElevsFittedRFRobust 46.6406829961
+Occlusions [ 0.         0.1668956]

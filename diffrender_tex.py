@@ -259,7 +259,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-stds = ch.Ch([0.1])
+stds = ch.Ch([0.025])
 variances = stds ** 2
 globalPrior = ch.Ch([0.8])
 
@@ -279,10 +279,10 @@ modelsDescr = ["Gaussian Model", "Outlier model"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
 global model
-model = 0
+model = 1
 
-pixelErrorFun = pixelLikelihoodCh
-errorFun = negLikModel
+pixelErrorFun = pixelLikelihoodRobustCh
+errorFun = negLikModelRobust
 
 iterat = 0
 
@@ -518,6 +518,30 @@ def plotSurface():
 
     plt.pause(0.1)
     plt.draw()
+
+def cb(_):
+    global t
+    elapsed_time = time.time() - t
+    print("Ended interation in  " + str(elapsed_time))
+
+    global pixelErrorFun
+    global errorFun
+    global iterat
+    iterat = iterat + 1
+    print("Callback! " + str(iterat))
+    print("Sq Error: " + str(errorFun.r))
+    global imagegt
+    global renderer
+    global gradAz
+    global gradEl
+    global performance
+    global azimuths
+    global elevations
+
+
+    t = time.time()
+
+
 
 def cb2(_):
     global t
@@ -814,65 +838,450 @@ def readKeys(window, key, scancode, action, mods):
         plotMinimization = False
 
     import regression_methods
-    global azsGT
-    global elevsGT
+    global trainAzsGT
+    global trainElevsGT
+    global testAzsGT
+    global testElevsGT
     global split
+    global trainSize
     global randForestModel
     global linRegModel
-    global numDataset
+    global testSize
     import imageproc
-
+    global occlusions
+    global hogfeats
+    global randForestModelCosAzs
+    global randForestModelSinAzs
+    global linRegModelCosAzs
+    global linRegModelSinAzs
+    global randForestModelCosElevs
+    global randForestModelSinElevs
+    global linRegModelCosElevs
+    global linRegModelSinElevs
     if key == glfw.KEY_T and action == glfw.RELEASE:
 
-        ipdb.set_trace()
-        numDataset = 10
+        print("Training recognition models.")
+        trainSize = 10
+        testSize = 2
         chAzOld = chAz.r[0]
         chElOld = chEl.r[0]
         chAzGTOld = chAzGT.r[0]
         chElGTOld = chElGT.r[0]
 
-        azsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, numDataset)
-        elevsGT = numpy.random.uniform(1,np.pi/2, numDataset)
+        trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+        trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
+
+        testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
+        testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
         images = []
-        occlusions = []
+        occlusions = np.array([])
         hogs = []
 
-        split = 0.8
-        setTrain = np.arange(np.floor(len(azsGT)*split)).astype(np.uint8)
-        for train_i in setTrain:
-            azi = azsGT[train_i]
-            eli = elevsGT[train_i]
+        # split = 0.8
+        # setTrain = np.arange(np.floor(trainSize*split)).astype(np.uint8)
+        print("Generating renders")
+        for train_i in range(len(trainAzsGT)):
+            azi = trainAzsGT[train_i]
+            eli = trainElevsGT[train_i]
             chAzGT[:] = azi
             chElGT[:] = eli
             image = rendererGT.r.copy()
             images = images + [image]
-            occlusions = occlusions + [getOcclusionFraction(rendererGT)]
+            occlusions = np.append(occlusions, getOcclusionFraction(rendererGT))
             hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
 
         hogfeats = np.vstack(hogs)
-
-        #Train
-        randForestModelCosAzs = regression_methods.trainRandomForest(hogfeats, np.cos(azsGT[setTrain]))
-        randForestModelSinAzs = regression_methods.trainRandomForest(hogfeats, np.sin(elevsGT[setTrain]))
-        linRegModelCosAzs = regression_methods.trainLinearRegression(hogfeats, np.cos(azsGT[setTrain]))
-        linRegModelSinAzs = regression_methods.trainLinearRegression(hogfeats, np.sin(elevsGT[setTrain]))
+        print("Training RFs")
+        randForestModelCosAzs = regression_methods.trainRandomForest(hogfeats, np.cos(trainAzsGT))
+        randForestModelSinAzs = regression_methods.trainRandomForest(hogfeats, np.sin(trainAzsGT))
+        randForestModelCosElevs = regression_methods.trainRandomForest(hogfeats, np.cos(trainElevsGT))
+        randForestModelSinElevs = regression_methods.trainRandomForest(hogfeats, np.sin(trainElevsGT))
+        print("Training LR")
+        linRegModelCosAzs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
+        linRegModelSinAzs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
+        linRegModelCosElevs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
+        linRegModelSinElevs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
 
         chAz[:] = chAzOld
         chEl[:] = chElOld
         chAzGT[:] = chAzGTOld
         chElGT[:] = chElGTOld
 
+        print("Finished training recognition models.")
+
     if key == glfw.KEY_I and action == glfw.RELEASE:
+        chAzOld = chAz.r[0]
+        chElOld = chEl.r[0]
+        print("Backprojecting and fitting estimates.")
+        testImages = []
+        testHogs = []
 
-        elevsPred = np.arctan2(np.sin(elevsPred), np.cos(elevsPred))
-        azsPred = np.arctan2(np.sin(azsPred), np.cos(azsPred))
+        print("Generating renders")
+        for test_i in range(len(testAzsGT)):
+            azi = testAzsGT[test_i]
+            eli = testElevsGT[test_i]
+            chAzGT[:] = azi
+            chElGT[:] = eli
+            testImage = rendererGT.r.copy()
+            testImages = testImages + [testImage]
+            testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
 
-        randForestModelCosAzs
-        randForestModelSinAzs
-        linRegModelCosAzs
-        linRegModelSinAzs
+        print("Predicting with RFs")
+        testHogfeats = np.vstack(testHogs)
 
-        evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred)
+        cosAzsPredRF = regression_methods.testRandomForest(randForestModelCosAzs, testHogfeats)
+        sinAzsPredRF = regression_methods.testRandomForest(randForestModelSinAzs, testHogfeats)
+        cosElevsPredRF = regression_methods.testRandomForest(randForestModelCosElevs, testHogfeats)
+        sinElevsPredRF = regression_methods.testRandomForest(randForestModelSinElevs, testHogfeats)
+
+        print("Predicting with LR")
+        cosAzsPredLR = regression_methods.testLinearRegression(linRegModelCosAzs, testHogfeats)
+        sinAzsPredLR = regression_methods.testLinearRegression(linRegModelSinAzs, testHogfeats)
+        cosElevsPredLR = regression_methods.testLinearRegression(linRegModelCosElevs, testHogfeats)
+        sinElevsPredLR = regression_methods.testLinearRegression(linRegModelSinElevs, testHogfeats)
+
+        elevsPredRF = np.arctan2(sinElevsPredRF, cosElevsPredRF)
+        azsPredRF = np.arctan2(sinAzsPredRF, cosAzsPredRF)
+
+        elevsPredLR = np.arctan2(sinElevsPredLR, cosElevsPredLR)
+        azsPredLR = np.arctan2(sinAzsPredLR, cosAzsPredLR)
+
+        errorsRF = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredRF, elevsPredRF)
+        errorsLR = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
+
+        meanAbsErrAzsRF = np.mean(np.abs(errorsRF[0]))
+        meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
+        meanAbsErrAzsLR = np.mean(np.abs(errorsLR[0]))
+        meanAbsErrElevsLR = np.mean(np.abs(errorsLR[1]))
+
+        ipdb.set_trace()
+
+        #Fit:
+        print("Fitting predictions")
+
+        model = 0
+        print("Using " + modelsDescr[model])
+        errorFun = models[model]
+        pixelErrorFun = pixelModels[model]
+        fittedAzsGaussian = np.array([])
+        fittedElevsGaussian = np.array([])
+        testOcclusions = np.array([])
+        for test_i in range(len(testAzsGT)):
+            print("Minimizing loss of prediction " + str(test_i) + "of " + str(testSize))
+            chAzGT[:] = testAzsGT[test_i]
+            chElGT[:] = testElevsGT[test_i]
+            chAz[:] = azsPredRF[test_i]
+            chEl[:] = elevsPredRF[test_i]
+            testOcclusions = np.append(testOcclusions, getOcclusionFraction(rendererGT))
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            fittedAzsGaussian = np.append(fittedAzsGaussian, chAz.r[0])
+            fittedElevsGaussian = np.append(fittedElevsGaussian, chEl.r[0])
+
+        errorsFittedRFGaussian = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
+        meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
+        meanAbsErrElevsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[1]))
+
+        model = 1
+        print("Using " + modelsDescr[model])
+        errorFun = models[model]
+        pixelErrorFun = pixelModels[model]
+        fittedAzsRobust = np.array([])
+        fittedElevsRobust = np.array([])
+        for test_i in range(len(testAzsGT)):
+            print("Minimizing loss of prediction " + str(test_i) + "of " + str(testSize))
+            chAzGT[:] = testAzsGT[test_i]
+            chElGT[:] = testElevsGT[test_i]
+            chAz[:] = azsPredRF[test_i]
+            chEl[:] = elevsPredRF[test_i]
+            image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/groundtruth-' + str(test_i) + '.png', image)
+            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/predicted-' + str(test_i) + '.png',image)
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/fitted-' + str(test_i) + '.png', image)
+            fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
+            fittedElevsRobust = np.append(fittedElevsRobust, chEl.r[0])
+
+        errorsFittedRFRobust = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
+        meanAbsErrAzsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[0]))
+        meanAbsErrElevsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[1]))
+
+        plt.ioff()
+
+        directory = 'results/predicted-azimuth-error'
+
+        fig = plt.figure()
+        plt.scatter(testElevsGT*180/np.pi, errorsRF[0])
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-90,90))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_elev-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testOcclusions*100.0,errorsRF[0])
+        plt.xlabel('Occlusion (%)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,100,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_occlusion-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testAzsGT*180/np.pi, errorsRF[0])
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.hist(np.abs(errorsRF[0]), bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,y1, y2))
+        plt.title('Performance histogram')
+        fig.savefig(directory  + '_performance-histogram.png')
+        plt.close(fig)
+
+        directory = 'results/predicted-elevation-error'
+
+        fig = plt.figure()
+        plt.scatter(testElevsGT*180/np.pi, errorsRF[1])
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-90,90))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_elev-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testOcclusions*100.0,errorsRF[1])
+        plt.xlabel('Occlusion (%)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,100,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_occlusion-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testAzsGT*180/np.pi, errorsRF[1])
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.hist(np.abs(errorsRF[1]), bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,y1, y2))
+        plt.title('Performance histogram')
+        fig.savefig(directory  + '_performance-histogram.png')
+        plt.close(fig)
+
+        #Fitted predictions plots:
+
+        directory = 'results/fitted-azimuth-error'
+
+        fig = plt.figure()
+        plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[0])
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-90,90))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_elev-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[0])
+        plt.xlabel('Occlusion (%)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,100,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_occlusion-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testAzsGT*180/np.pi, errorsFittedRFGaussian[0])
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.hist(np.abs(errorsFittedRFGaussian[0]), bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,y1, y2))
+        plt.title('Performance histogram')
+        fig.savefig(directory  + '_performance-histogram.png')
+        plt.close(fig)
+
+        directory = 'results/fitted-elevation-error'
+
+        fig = plt.figure()
+        plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[1])
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-90,90))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_elev-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[1])
+        plt.xlabel('Occlusion (%)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,100,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_occlusion-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testAzsGT*180/np.pi, errorsFittedRFGaussian[1])
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.hist(np.abs(errorsFittedRFGaussian[1]), bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,y1, y2))
+        plt.title('Performance histogram')
+        fig.savefig(directory  + '_performance-histogram.png')
+        plt.close(fig)
+
+        directory = 'results/fitted-robust-azimuth-error'
+
+        fig = plt.figure()
+        plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[0])
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-90,90))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_elev-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[0])
+        plt.xlabel('Occlusion (%)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,100,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_occlusion-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testAzsGT*180/np.pi, errorsFittedRFRobust[0])
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.hist(np.abs(errorsFittedRFRobust[0]), bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,y1, y2))
+        plt.title('Performance histogram')
+        fig.savefig(directory  + '_performance-histogram.png')
+        plt.close(fig)
+
+        directory = 'results/fitted-robust-elevation-error'
+
+        fig = plt.figure()
+        plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[1])
+        plt.xlabel('Elevation (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,90,-90,90))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_elev-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[1])
+        plt.xlabel('Occlusion (%)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,100,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory + '_occlusion-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.scatter(testAzsGT*180/np.pi, errorsFittedRFRobust[1])
+        plt.xlabel('Azimuth (degrees)')
+        plt.ylabel('Angular error')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((0,360,-180,180))
+        plt.title('Performance scatter plot')
+        fig.savefig(directory  + '_azimuth-performance-scatter.png')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.hist(np.abs(errorsFittedRFRobust[1]), bins=36)
+        plt.xlabel('Angular error')
+        plt.ylabel('Counts')
+        x1,x2,y1,y2 = plt.axis()
+        plt.axis((-180,180,y1, y2))
+        plt.title('Performance histogram')
+        fig.savefig(directory  + '_performance-histogram.png')
+        plt.close(fig)
+
+        plt.ion()
+
+        directory = 'results/'
+
+
+        #Write statistics to file.
+        with open(directory + 'performance.txt', 'w') as expfile:
+            # expfile.write(str(z))
+            expfile.write("meanAbsErrAzsRF " +  str(meanAbsErrAzsRF) + '\n')
+            expfile.write("meanAbsErrElevsRF " +  str(meanAbsErrElevsRF)+ '\n')
+            expfile.write("meanAbsErrAzsFittedRFGaussian " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
+            expfile.write("meanAbsErrElevsFittedRFGaussian " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
+            expfile.write("meanAbsErrAzsFittedRFRobust " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
+            expfile.write("meanAbsErrElevsFittedRFRobust " +  str(meanAbsErrElevsFittedRFRobust)+ '\n')
+            expfile.write("Occlusions " +  str(testOcclusions)+ '\n')
+
+        chAz[:] = chAzOld
+        chEl[:] = chElOld
+        print("Finished backprojecting and fitting estimates.")
 
     if key == glfw.KEY_R and action == glfw.RELEASE:
         global errorFun
@@ -958,7 +1367,6 @@ while not exit:
         print("Sq Error: " + str(errorFun.r))
 
         refreshSubplots()
-
 
         if computePerformance and drawSurf:
             plotSurface()

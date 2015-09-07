@@ -77,6 +77,6 @@ def setupTexturedRenderer(vstack, vch,f_list, vc_list, vnch, uv, haveTextures_li
     renderer.camera = camera
 
     renderer.frustum = frustum
-    renderer.set(v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_list, vc_list=vc_list, ft_list=uv, textures_list=textures_list, haveUVs_list=haveTextures_list, bgcolor=ch.zeros(3), overdraw=True)
+    renderer.set(v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_list, vc_list=vc_list, ft_list=uv, textures_list=textures_list, haveUVs_list=haveTextures_list, bgcolor=ch.ones(3), overdraw=True)
 
     return renderer
