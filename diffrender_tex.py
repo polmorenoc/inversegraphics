@@ -861,8 +861,8 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_T and action == glfw.RELEASE:
 
         print("Training recognition models.")
-        trainSize = 10
-        testSize = 2
+        trainSize = 500
+        testSize = 20
         chAzOld = chAz.r[0]
         chElOld = chEl.r[0]
         chAzGTOld = chAzGT.r[0]
@@ -896,11 +896,11 @@ def readKeys(window, key, scancode, action, mods):
         randForestModelSinAzs = regression_methods.trainRandomForest(hogfeats, np.sin(trainAzsGT))
         randForestModelCosElevs = regression_methods.trainRandomForest(hogfeats, np.cos(trainElevsGT))
         randForestModelSinElevs = regression_methods.trainRandomForest(hogfeats, np.sin(trainElevsGT))
-        print("Training LR")
-        linRegModelCosAzs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
-        linRegModelSinAzs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
-        linRegModelCosElevs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
-        linRegModelSinElevs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
+        # print("Training LR")
+        # linRegModelCosAzs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
+        # linRegModelSinAzs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
+        # linRegModelCosElevs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
+        # linRegModelSinElevs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
 
         chAz[:] = chAzOld
         chEl[:] = chElOld
@@ -934,25 +934,25 @@ def readKeys(window, key, scancode, action, mods):
         cosElevsPredRF = regression_methods.testRandomForest(randForestModelCosElevs, testHogfeats)
         sinElevsPredRF = regression_methods.testRandomForest(randForestModelSinElevs, testHogfeats)
 
-        print("Predicting with LR")
-        cosAzsPredLR = regression_methods.testLinearRegression(linRegModelCosAzs, testHogfeats)
-        sinAzsPredLR = regression_methods.testLinearRegression(linRegModelSinAzs, testHogfeats)
-        cosElevsPredLR = regression_methods.testLinearRegression(linRegModelCosElevs, testHogfeats)
-        sinElevsPredLR = regression_methods.testLinearRegression(linRegModelSinElevs, testHogfeats)
+        # print("Predicting with LR")
+        # cosAzsPredLR = regression_methods.testLinearRegression(linRegModelCosAzs, testHogfeats)
+        # sinAzsPredLR = regression_methods.testLinearRegression(linRegModelSinAzs, testHogfeats)
+        # cosElevsPredLR = regression_methods.testLinearRegression(linRegModelCosElevs, testHogfeats)
+        # sinElevsPredLR = regression_methods.testLinearRegression(linRegModelSinElevs, testHogfeats)
 
         elevsPredRF = np.arctan2(sinElevsPredRF, cosElevsPredRF)
         azsPredRF = np.arctan2(sinAzsPredRF, cosAzsPredRF)
 
-        elevsPredLR = np.arctan2(sinElevsPredLR, cosElevsPredLR)
-        azsPredLR = np.arctan2(sinAzsPredLR, cosAzsPredLR)
+        # elevsPredLR = np.arctan2(sinElevsPredLR, cosElevsPredLR)
+        # azsPredLR = np.arctan2(sinAzsPredLR, cosAzsPredLR)
 
         errorsRF = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredRF, elevsPredRF)
-        errorsLR = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
+        # errorsLR = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
 
         meanAbsErrAzsRF = np.mean(np.abs(errorsRF[0]))
         meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
-        meanAbsErrAzsLR = np.mean(np.abs(errorsLR[0]))
-        meanAbsErrElevsLR = np.mean(np.abs(errorsLR[1]))
+        # meanAbsErrAzsLR = np.mean(np.abs(errorsLR[0]))
+        # meanAbsErrElevsLR = np.mean(np.abs(errorsLR[1]))
 
         ipdb.set_trace()
 
@@ -972,8 +972,14 @@ def readKeys(window, key, scancode, action, mods):
             chElGT[:] = testElevsGT[test_i]
             chAz[:] = azsPredRF[test_i]
             chEl[:] = elevsPredRF[test_i]
+            image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/groundtruth-' + str(test_i) + '.png', image)
+            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/predicted-' + str(test_i) + '.png',image)
             testOcclusions = np.append(testOcclusions, getOcclusionFraction(rendererGT))
             ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/fitted-gaussian-' + str(test_i) + '.png', image)
             fittedAzsGaussian = np.append(fittedAzsGaussian, chAz.r[0])
             fittedElevsGaussian = np.append(fittedElevsGaussian, chEl.r[0])
 
@@ -993,19 +999,45 @@ def readKeys(window, key, scancode, action, mods):
             chElGT[:] = testElevsGT[test_i]
             chAz[:] = azsPredRF[test_i]
             chEl[:] = elevsPredRF[test_i]
-            image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/groundtruth-' + str(test_i) + '.png', image)
-            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/predicted-' + str(test_i) + '.png',image)
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/fitted-' + str(test_i) + '.png', image)
+            cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
             fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
             fittedElevsRobust = np.append(fittedElevsRobust, chEl.r[0])
 
         errorsFittedRFRobust = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
         meanAbsErrAzsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[0]))
         meanAbsErrElevsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[1]))
+
+        model = 1
+        print("Using Both")
+        errorFun = models[model]
+        pixelErrorFun = pixelModels[model]
+        fittedAzsBoth = np.array([])
+        fittedElevsBoth = np.array([])
+        for test_i in range(len(testAzsGT)):
+            print("Minimizing loss of prediction " + str(test_i) + "of " + str(testSize))
+            chAzGT[:] = testAzsGT[test_i]
+            chElGT[:] = testElevsGT[test_i]
+            chAz[:] = azsPredRF[test_i]
+            chEl[:] = elevsPredRF[test_i]
+            model = 0
+            errorFun = models[model]
+            pixelErrorFun = pixelModels[model]
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            model = 1
+            errorFun = models[model]
+            pixelErrorFun = pixelModels[model]
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
+            fittedAzsBoth = np.append(fittedAzsBoth, chAz.r[0])
+            fittedElevsBoth = np.append(fittedElevsBoth, chEl.r[0])
+
+        errorsFittedRFBoth = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
+        meanAbsErrAzsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[0]))
+        meanAbsErrElevsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[1]))
 
         plt.ioff()
 
@@ -1042,7 +1074,7 @@ def readKeys(window, key, scancode, action, mods):
         plt.close(fig)
 
         fig = plt.figure()
-        plt.hist(np.abs(errorsRF[0]), bins=36)
+        plt.hist(np.abs(errorsRF[0]), bins=18)
         plt.xlabel('Angular error')
         plt.ylabel('Counts')
         x1,x2,y1,y2 = plt.axis()
@@ -1084,7 +1116,7 @@ def readKeys(window, key, scancode, action, mods):
         plt.close(fig)
 
         fig = plt.figure()
-        plt.hist(np.abs(errorsRF[1]), bins=36)
+        plt.hist(np.abs(errorsRF[1]), bins=18)
         plt.xlabel('Angular error')
         plt.ylabel('Counts')
         x1,x2,y1,y2 = plt.axis()
@@ -1128,7 +1160,7 @@ def readKeys(window, key, scancode, action, mods):
         plt.close(fig)
 
         fig = plt.figure()
-        plt.hist(np.abs(errorsFittedRFGaussian[0]), bins=36)
+        plt.hist(np.abs(errorsFittedRFGaussian[0]), bins=18)
         plt.xlabel('Angular error')
         plt.ylabel('Counts')
         x1,x2,y1,y2 = plt.axis()
@@ -1170,7 +1202,7 @@ def readKeys(window, key, scancode, action, mods):
         plt.close(fig)
 
         fig = plt.figure()
-        plt.hist(np.abs(errorsFittedRFGaussian[1]), bins=36)
+        plt.hist(np.abs(errorsFittedRFGaussian[1]), bins=18)
         plt.xlabel('Angular error')
         plt.ylabel('Counts')
         x1,x2,y1,y2 = plt.axis()
@@ -1212,7 +1244,7 @@ def readKeys(window, key, scancode, action, mods):
         plt.close(fig)
 
         fig = plt.figure()
-        plt.hist(np.abs(errorsFittedRFRobust[0]), bins=36)
+        plt.hist(np.abs(errorsFittedRFRobust[0]), bins=18)
         plt.xlabel('Angular error')
         plt.ylabel('Counts')
         x1,x2,y1,y2 = plt.axis()
@@ -1254,7 +1286,7 @@ def readKeys(window, key, scancode, action, mods):
         plt.close(fig)
 
         fig = plt.figure()
-        plt.hist(np.abs(errorsFittedRFRobust[1]), bins=36)
+        plt.hist(np.abs(errorsFittedRFRobust[1]), bins=18)
         plt.xlabel('Angular error')
         plt.ylabel('Counts')
         x1,x2,y1,y2 = plt.axis()
