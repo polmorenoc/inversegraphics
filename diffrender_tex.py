@@ -1309,6 +1309,9 @@ def readKeys(window, key, scancode, action, mods):
             expfile.write("meanAbsErrElevsFittedRFGaussian " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
             expfile.write("meanAbsErrAzsFittedRFRobust " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
             expfile.write("meanAbsErrElevsFittedRFRobust " +  str(meanAbsErrElevsFittedRFRobust)+ '\n')
+            expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
+            expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
+
             expfile.write("Occlusions " +  str(testOcclusions)+ '\n')
 
         chAz[:] = chAzOld
