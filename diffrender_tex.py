@@ -405,27 +405,27 @@ if computePerformance:
 ims = []
 
 def refreshSubplots():
-        #Other subplots visualizing renders and its pixel derivatives
-        edges = renderer.boundarybool_image
-        imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
-        gtoverlay = imagegt.copy()
-        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-        pim1.set_data(gtoverlay)
-        pim2.set_data(renderer.r)
-        pim3 = ax3.imshow(-pixelErrorFun.r)
-        cb3.mappable = pim3
-        cb3.update_normal(pim3)
-        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-        drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-        img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-        cb5.mappable = img5
-        cb5.update_normal(img5)
-        drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-        img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-        cb6.mappable = img6
-        cb6.update_normal(img6)
-        f.canvas.draw()
-        plt.pause(0.1)
+    #Other subplots visualizing renders and its pixel derivatives
+    edges = renderer.boundarybool_image
+    imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
+    gtoverlay = imagegt.copy()
+    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+    pim1.set_data(gtoverlay)
+    pim2.set_data(renderer.r)
+    pim3 = ax3.imshow(-pixelErrorFun.r)
+    cb3.mappable = pim3
+    cb3.update_normal(pim3)
+    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    cb5.mappable = img5
+    cb5.update_normal(img5)
+    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    cb6.mappable = img6
+    cb6.update_normal(img6)
+    f.canvas.draw()
+    plt.pause(0.1)
 
 
 def plotSurface():
@@ -458,23 +458,26 @@ def plotSurface():
         z2 = griddata(((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)), performanceSurf[(model, chAzGT.r[0], chElGT.r[0])], (x2, y2), method='cubic')
         from matplotlib import cm, colors
         surf = axperf.plot_surface(x2, y2, z2, rstride=3, cstride=3, cmap=cm.coolwarm, linewidth=0.1, alpha=0.85)
-        avgSurfGradMagnitudes = np.mean(np.sqrt(gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])]**2+gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]**2))
-        scaleSurfGrads = 5./avgSurfGradMagnitudes
+
+        # scaleSurfGrads = 5./avgSurfGradMagnitudes
         for point in range(len(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])):
             perfi = performanceSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
             azi = azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
             eli = elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
             gradAzi = -gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
             gradEli = -gradElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi*scaleSurfGrads], [eli*180./np.pi, eli*180./np.pi + gradEli*scaleSurfGrads], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+            scaleGrad = np.sqrt(gradAzi**2+gradEli**2) / 5
+
+            arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi/scaleGrad], [eli*180./np.pi, eli*180./np.pi + gradEli/scaleGrad], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
             axperf.add_artist(arrowGrad)
 
             diffAzi = -gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
             diffEli = -gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            scaleDiff = np.sqrt(diffAzi**2+diffEli**2) / 5
             colorArrow = 'g'
             if diffAzi * gradAzi + diffEli * gradEli < 0:
                 colorArrow = 'r'
-            arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi*scaleSurfGrads], [eli*180./np.pi, eli*180./np.pi + diffEli*scaleSurfGrads], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+            arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi/scaleDiff], [eli*180./np.pi, eli*180./np.pi + diffEli/scaleDiff], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
             axperf.add_artist(arrowGradDiff)
 
         axperf.plot([chAzGT.r[0]*180./np.pi, chAzGT.r[0]*180./np.pi], [chElGT.r[0]*180./np.pi,chElGT.r[0]*180./np.pi], [z2.min(), z2.max()], 'b--', linewidth=1)
@@ -490,20 +493,22 @@ def plotSurface():
             drEl = -errorFun.dr_wrt(chEl).toarray()[0][0]
         else:
             drEl = -errorFun.dr_wrt(chEl)[0][0]
-
+        scaleDr = np.sqrt(drAz**2+drEl**2) / 5
         chAzOldi = chAz.r[0]
         chElOldi = chEl.r[0]
         diffAz = -ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
         diffEl = -ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+        scaleDiff = np.sqrt(diffAz**2+diffEl**2) / 5
         chAz[0] = chAzOldi
         chEl[0] = chElOldi
 
-        arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz*scaleSurfGrads], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl*scaleSurfGrads], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+        arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz/scaleDr], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl/scaleDr], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
         axperf.add_artist(arrowGrad)
         colorArrow = 'g'
         if diffAz * drAz + diffEl * drEl < 0:
             colorArrow = 'r'
-        arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz*scaleSurfGrads], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl*scaleSurfGrads], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+
+        arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz/scaleDiff], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl/scaleDiff], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
         axperf.add_artist(arrowGradDiff)
 
     if plotMinimization:
