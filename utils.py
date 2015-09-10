@@ -321,7 +321,29 @@ def deleteInstance(instance):
     instance.user_clear()
     bpy.data.objects.remove(instance)
 
-def setupScene(scene, targetIndex, roomName, world, distance, camera, width, height, numSamples, useCycles, useGPU):
+
+def placeNewTarget(scene, target, targetPosition):
+    target.layers[1] = True
+    target.layers[2] = True
+    scene.objects.link(target)
+    target.matrix_world = mathutils.Matrix.Translation(targetPosition)
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    original_matrix_world = teapot.matrix_world.copy()
+    camera = scene.camera
+    scene.update()
+    look_at(camera, center)
+    scene.update()
+
+def placeCamera(camera, azimuth, elevation, camDistance, center):
+    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+    originalLoc = mathutils.Vector((0,-camDistance, 0))
+    location = center + azimuthRot * elevationRot * originalLoc
+    camera.location = location
+    look_at(camera, center)
+
+
+def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSamples, useCycles, useGPU):
     if useCycles:
         #Switch Engine to Cycles
         scene.render.engine = 'CYCLES'
@@ -357,33 +379,6 @@ def setupScene(scene, targetIndex, roomName, world, distance, camera, width, hei
     camera.data.angle = 60 * 180 / numpy.pi
     camera.data.clip_start = 0.01
     camera.data.clip_end = 10
-
-    # center = centerOfGeometry(modelInstances[targetIndex].dupli_group.objects, modelInstances[targetIndex].matrix_world)
-    # # center = mathutils.Vector((0,0,0))
-    # # center = instances[targetIndex][1]
-    #
-    # originalLoc = mathutils.Vector((0,-distance , 0))
-    # elevation = 45.0
-    # azimuth = 0
-    #
-    # elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-    # azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
-    # location = center + azimuthRot * elevationRot * originalLoc
-    # camera.location = location
-
-    # lamp_data2 = bpy.data.lamps.new(name="LampBotData", type='POINT')
-    # lamp2 = bpy.data.objects.new(name="LampBot", object_data=lamp_data2)
-    # lamp2.location = targetParentPosition + mathutils.Vector((0,0,1.5))
-    # lamp2.data.energy = 0.00010
-    # # lamp.data.size = 0.25
-    # lamp2.data.use_diffuse = True
-    # lamp2.data.use_specular = True
-    # # scene.objects.link(lamp2)
-        
-
-        # # toggle lamps
-        # if obj.type == 'LAMP':
-        #     obj.cycles_visibility.camera = not obj.cycles_visibility.camera
 
     roomInstance = scene.objects[roomName]
 

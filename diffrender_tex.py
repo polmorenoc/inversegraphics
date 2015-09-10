@@ -26,7 +26,8 @@ from opendr_utils import *
 
 plt.ion()
 
-renderTeapotsList = [2]
+teapotIdx = 2
+renderTeapotsList = [teapotIdx]
 
 [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
 teapot = targetModels[0]
@@ -38,116 +39,32 @@ width, height = (110, 110)
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
+
 camDistance = 0.4
 azimuth = 275
 elevation = 33
 
-cam = bpy.data.cameras.new("MainCamera")
-camera = bpy.data.objects.new("MainCamera", cam)
-world = bpy.data.worlds.new("MainWorld")
+sceneIdx = 0
 
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
-sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-sceneLineNums = numpy.arange(len(sceneLines))
-sceneNum =  sceneLineNums[0]
-sceneLine = sceneLines[sceneNum]
-sceneParts = sceneLine.split(' ')
-sceneFile = sceneParts[0]
-sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
-sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
-targetIndex = int(sceneParts[1])
-instances = sceneimport.loadScene('../databaseFull/scenes/' + sceneFileName)
-targetParentPosition = instances[targetIndex][2]
-targetParentIndex = instances[targetIndex][1]
-teapot.layers[1] = True
-teapot.layers[2] = True
-teapot.matrix_world = mathutils.Matrix.Translation(targetParentPosition)
+v, f_list, vc, vn, uv, haveTextures_list, textures_list, scene, targetPosition = sceneimport.loadSceneBlenderToOpenDR(0, True, width, height)
+
+blenderCamera = scene.camera
+
+placeNewTarget(scene, teapot, targetPosition)
+
 center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-original_matrix_world = teapot.matrix_world.copy()
 
-sceneDicFile = 'sceneDic.pickle'
-sceneDic = {}
-if False:
-    [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, True, targetIndex)
+placeCamera(blenderCamera, azimuth, elevation, camDistance, center)
 
-    targetParentInstance = modelInstances[targetParentIndex]
-    targetParentInstance.layers[2] = True
+scene.update()
 
-    roomName = ''
-    for model in modelInstances:
-        reg = re.compile('(room[0-9]+)')
-        res = reg.match(model.name)
-        if res:
-            roomName = res.groups()[0]
+vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapot, teapotIdx, True)
 
-    scene = sceneimport.composeScene(modelInstances, targetIndex)
+addObjectData(vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
-    roomInstance = scene.objects[roomName]
-    roomInstance.layers[2] = True
-    targetParentInstance.layers[2] = True
+updateRendererData()
 
-    setupScene(scene, targetIndex,roomName, world, camDistance, camera, width, height, 16, False, False)
-    scene.objects.link(teapot)
-
-    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
-    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-    originalLoc = mathutils.Vector((0,-camDistance, 0))
-    location = center + azimuthRot * elevationRot * originalLoc
-    camera = scene.camera
-    camera.location = location
-    scene.update()
-    look_at(camera, center)
-    scene.update()
-    scene.render.filepath = 'opendr_blender.png'
-    bpy.ops.render.render( write_still=True )
-
-    # ipdb.set_trace()
-    # v,f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackObjects(teapot)
-    v = []
-    f_list = []
-    vc  = []
-    vn  = []
-    uv  = []
-    haveTextures_list  = []
-    textures_list  = []
-    print("Unpacking blender data for OpenDR.")
-    for modelInstance in scene.objects:
-        if modelInstance.dupli_group != None:
-            vmod,f_listmod, vcmod, vnmod, uvmod, haveTextures_listmod, textures_listmod = sceneimport.unpackObjects(modelInstance)
-            # gray = np.dot(np.array([0.3, 0.59, 0.11]), vcmod[0].T).T
-            # sat = 0.5
-            #
-            # vcmod[0][:,0] = vcmod[0][:,0] * sat + (1-sat) * gray
-            # vcmod[0][:,1] = vcmod[0][:,1] * sat + (1-sat) * gray
-            # vcmod[0][:,2] = vcmod[0][:,2] * sat + (1-sat) * gray
-            v = v + vmod
-            f_list = f_list + f_listmod
-            vc = vc + vcmod
-            vn = vn + vnmod
-            uv = uv + uvmod
-            haveTextures_list  = haveTextures_list + haveTextures_listmod
-            textures_list  = textures_list + textures_listmod
-
-    #Serialize
-    sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
-    with open(sceneDicFile, 'wb') as pfile:
-        pickle.dump(sceneDic, pfile)
-
-    print("Serialized scene!")
-else:
-    with open(sceneDicFile, 'rb') as pfile:
-        sceneDic = pickle.load(pfile)
-        v = sceneDic['v']
-        f_list = sceneDic['f_list']
-        vc = sceneDic['vc']
-        uv = sceneDic['uv']
-        haveTextures_list = sceneDic['haveTextures_list']
-        vn = sceneDic['vn']
-        textures_list = sceneDic['textures_list']
-
-    print("Loaded serialized scene!")
-
-vmod,fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapot)
+removeObjectData(objIdx)
 
 rangeMeshes = range(len(v))
 vch = [ch.array(v[mesh]) for mesh in rangeMeshes]
@@ -163,21 +80,10 @@ if len(vchmod)==1:
 else:
     vstackmod = ch.vstack(vchmod)
 
-# GT Azimuth: [ 1.30899694]
-# Azimuth: [ 0.78539816]
-# GT Elevation: [ 0.52359878]
-# Elevation: [ 0.87266463]
-
-# chAz = ch.Ch([radians(azimuth)])
-# chEl = ch.Ch([radians(elevation)])
 chAz = ch.Ch([4.742895587179587])
 chEl = ch.Ch([0.22173048])
 chDist = ch.Ch([camDistance])
 
-# chAzGT = ch.Ch([radians(azimuth)])
-# chElGT = ch.Ch([radians(elevation)])
-
-# chAzGT = ch.Ch([1.30899694])
 chAzGT = ch.Ch([4.742895587179587])
 chElGT = ch.Ch([0.22120681])
 chDistGT = ch.Ch([camDistance])
@@ -215,12 +121,7 @@ Amod_list = [SphericalHarmonics(vn=vnchmod[mesh],
 
 vcmod_list = [Amod_list[mesh]*vcch[mesh] for mesh in rangeMeshes]
 
-
-
-# ipdb.set_trace()
-
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-
 
 rendererGT = setupTexturedRenderer(vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum)
 
@@ -256,10 +157,14 @@ chImageWhite = ch.Ch(imageWhiteMask)
 E_raw = renderer - rendererGT
 SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
-
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-stds = ch.Ch([0.025])
+global initialPixelStdev
+global reduceVariance
+initialPixelStdev = 0.5
+reduceVariance = False
+# finalPixelStdev = 0.05
+stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
 globalPrior = ch.Ch([0.8])
 
@@ -273,16 +178,16 @@ pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(rendererGT,
 
 post = score_image.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-models = [negLikModel, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
-modelsDescr = ["Gaussian Model", "Outlier model"]
+models = [negLikModel, negLikModelRobust, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
 global model
-model = 1
+model = 0
 
-pixelErrorFun = pixelLikelihoodRobustCh
-errorFun = negLikModelRobust
+pixelErrorFun = pixelModels[model]
+errorFun = models[model]
 
 iterat = 0
 
@@ -546,8 +451,6 @@ def cb(_):
 
     t = time.time()
 
-
-
 def cb2(_):
     global t
     elapsed_time = time.time() - t
@@ -566,6 +469,13 @@ def cb2(_):
     global performance
     global azimuths
     global elevations
+
+    if reduceVariance:
+        #What is the average angle distance from the predictions, the best variance at that point, and the best variance when we are near the groundtruth - e.g. 5 degrees.
+        #Either that or simply base it on the rate of change of the cost function? When the step becomes too small (approx gradient's magintude is smaller than previous steps,at certain threshold, then start decreasing the variance.
+        # k = 1 / (1 + np.exp(-iterat))
+        #Rougly in 10 iterations we go from 0.5 to 0.05... but iterations are different for different minimization methods...
+        stds[:] = stds.r[:]*0.9
 
     refreshSubplots()
 
@@ -605,7 +515,6 @@ def cb2(_):
         gradEl[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradEl[(model, chAzGT.r[0], chElGT.r[0])], drEl)
 
         plotSurface()
-
 
     plt.pause(0.1)
     plt.show()
@@ -1329,13 +1238,18 @@ def readKeys(window, key, scancode, action, mods):
     global models
     global modelsDescr
     global pixelModels
-
+    global reduceVariance
     if key == glfw.KEY_O and action == glfw.RELEASE:
         # drawSurf = False
         model = (model + 1) % len(models)
         print("Using " + modelsDescr[model])
         errorFun = models[model]
         pixelErrorFun = pixelModels[model]
+
+        if model == 2:
+            reduceVariance = True
+        else:
+            reduceVariance = False
 
         refresh = True
 

@@ -1,0 +1,619 @@
+GT Azimuth: [ 1.48352986]
+GT Elevation: [ 0.52359878]
+Occlusion is 79.1333613799 %
+
+**
+GT Azimuth: [ 1.3962634]
+GT Elevation: [ 0.52359878]
+Occlusion is 85.1288550908 %
+Gaussian
+Avg Eucl. distance. approx gradients - finite differenes: 81.6997861029
+Avg Angle. approx gradients - finite differenes: 0.912647172648
+No overdraw:
+Avg Eucl. distance. approx gradients - finite differenes: 76.5651198717
+Avg Angle. approx gradients - finite differenes: 0.908498848194
+Multisample 1 with overdraw:
+Avg Eucl. distance. approx gradients - finite differenes: 79.2377949074
+Avg Angle. approx gradients - finite differenes: 0.845691624812
+
+* Robust
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.686739770773
+Avg Angle.: 1.55582059879
+Num opposite (red) gradients: 48
+* No overdraw:
+Avg Eucl. distance. approx gradients - finite differenes: 0.718853103976
+Avg Angle. approx gradients - finite differenes: 1.62214865732
+* Multisample 1 with overdraw:
+Avg Eucl. distance. approx gradients - finite differenes: 0.76216046262
+Avg Angle. approx gradients - finite differenes: 1.71472681868
+
+* Normal Gaussian large std 125/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.130718722478
+Avg Angle.: 0.9125591491
+Num opposite (red) gradients: 15
+* Normal Gaussian small std 5/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 81.6992015486
+Avg Angle.: 0.9125591491 
+Num opposite (red) gradients: 15
+
+* Normal Gaussian small std 250/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.0510620009679
+Avg Angle.: 0.9125591491
+Num opposite (red) gradients: 15
+
+
+* Normal Gaussian small std 250/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 3.29262861693
+Avg Angle.: 0.930982816577
+Num opposite (red) gradients: 15
+
+
+* Robust large variance 125/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.0417428151941
+Avg Angle.: 0.980122043236
+Num opposite (red) gradients: 19
+
+* Robust large variance 125/255 and 0.5 global outlier prior
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.0167998916809
+Avg Angle.: 0.983492134726
+Num opposite (red) gradients: 20
+
+* Robust large variance 25/255 and 0.5 global outlier prior
+** Approx gradients - finite differenes.
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.506774782969
+Avg Angle.: 1.50484196247
+Num opposite (red) gradients: 48
+
+
+
+* 
+
+[ 0.52359878]
+# chAzGT = ch.Ch([1.30899694])
+60%
+
+
+**** Statistics ****
+GT Azimuth: [ 1.13446401]
+GT Elevation: [ 0.34906585]
+** Approx gradients - finite differenes.
+*Gaussian (multisample 1)
+Avg Eucl. distance :: 99.0476029579
+Avg Angle.: 0.581261294902
+Num opposite (red) gradients: 5
+*Robust (multisample 1)
+Avg Eucl. distance :: 1.88375479698
+Avg Angle.: 0.845430194414
+Num opposite (red) gradients: 21
+*Robust No Multisample
+Avg Eucl. distance :: 2.6245997208
+Avg Angle.: 0.898467528049
+Num opposite (red) gradients: 26
+*Gaussian No Multisample
+Avg Eucl. distance :: 139.932469293
+Avg Angle.: 0.82792289203
+Num opposite (red) gradients: 17
+*Gaussian No Multisample and overdraw line
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 139.932469293
+Avg Angle.: 0.82792289203
+Num opposite (red) gradients: 17
+*Robust no multisample and overdraw line
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 2.6245997208
+Avg Angle.: 0.898467528049
+Num opposite (red) gradients: 26
+*Normal Gaussian
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 101.353784177
+Avg Angle.: 0.617828016023
+Num opposite (red) gradients: 4
+*Normal Robust
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 1.79766912185
+Avg Angle.: 0.767355114417
+Num opposite (red) gradients: 17
+* Normal gaussian Without boundary
+Avg Eucl. distance :: 114.034854996
+Avg Angle.: 0.727746715691
+Num opposite (red) gradients: 3
+* Normal Robust without boundary
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 1.78135420088
+Avg Angle.: 0.818473626778
+Num opposite (red) gradients: 23
+* Normal Gaussian with std: 125/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.162166054683
+Avg Angle.: 0.617828016023
+Num opposite (red) gradients: 4
+
+* Robust Gaussian with std: 125/255
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.0433517896201
+Avg Angle.: 0.405682328751!!!
+Num opposite (red) gradients: 3!!!
+
+
+
+First notices: Seems like in general robust gives a more accute basin of attraction surface which makes it work better especially with instantiation parameters that are far away from the ground truth. However, so far the approximate gradients  with the occlusion model are generally worse in the presence of occlusions. Why?
+
+Also, multisamples is important for a much better gradient approximatino which show the importance of properly drawn edges. If edges are important, e.g. more so than texture / lighting variations, what happens if  we increase its factors?
+
+Thoughts:
+- If something is occluding we want to explain in (give an adequate probability) it so as to ignore it wrt the gradients as they give no information as to what pose the object is in. What really matters in terms of the gradients are the actual object's boundaries. Hence:
+    - How do we ignore large differences in occlusions vs large differenecs due to different pose (or other params.)?
+    - Does focusing more on edges help? What happens with texture and lighting?
+    - Feels like the shading and approx gradient produces an arbitrary estimate of the gradient.
+    - So... we want to ignore two things: the approximated gradients on ligthing differences (hence ignoring small differences, e.g. large variance) and at the same time ignoring large differences created by occlusion. While we want the cost function to be sensitive to boundaries differences and strong appearance differences due to pose. 
+    - So... we need to "ignore occlusion (esp around edges)" while "factoring in strong appearance difference"... and ignore 
+
+Solutions
+    - E.g. Knowing the 2D shape of the masks can certainly help.
+    - E.g. Focusing on edges.
+    - E.g. Statstical model of colors. 
+    - E.g. Downsampled renders.
+    - That is, multiple Differentiable renderers: Complete appearance, edges and mask (2D shape).
+        - Mask: isntead of global prior, use prior on shape as per the SBM. This might be more important when we don't know shape and appearance, but can help a little to ignore certain approx. gradients.
+        - Edges: Make a differentiable distance transform as a function of the image gradients of GT image and the renderer (or use a BoundaryRenderer instead).
+        - Appearance: the current model. Maybe something a bit more fancy in terms of mixtures (a-la remembering colors)
+
+Second notices: Seems like the approx gradeients fail more often when the azimuth has been shifted towards one specific side. Simple examples can show that.
+
+**** Statistics ****
+GT Azimuth: [ 1.22173047]
+GT Elevation: [ 0.52359878]
+Occlusion is 33.0038676407 %
+
+Robust
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.00328405815871
+Avg Angle.: 0.607137740148
+Num opposite (red) gradients: 4
+
+
+
+**** Statistics **** Good cost function but wrong approximations. OCCLUDED SPOUT.
+
+GT Azimuth: [ 1.55334304]
+Azimuth: [ 1.51843645]
+GT Elevation: [ 0.82173048]
+Elevation: [ 0.82173048]
+
+
+****** no occlusion. 200x200
+
+**** Statistics ****
+GT Azimuth: [5.742895587179587]
+Azimuth: [-0.52283642]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82120681]
+Dr wrt Azimuth:   (0, 0)    0.422214380249
+Dr wrt Elevation:   (0, 0)  -2.08153283791
+Occlusion is 0.0 %
+Current Azimuth difference of [-0.99994924]
+Current Elevation difference of [ 0.]
+
+
+with my changes:
+
+small variance
+
+Gaussian
+
+Avg Eucl. distance :: 0.725755140192
+Avg Angle.: 0.682183073116
+Num opposite (red) gradients: 12
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+
+robust 
+
+Avg Eucl. distance :: 0.277988329113
+Avg Angle.: 0.743337203132
+Num opposite (red) gradients: 14
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+Large variance
+
+gaussian 
+
+Avg Eucl. distance :: 0.0637151289058
+Avg Angle.: 0.682183073116
+Num opposite (red) gradients: 12
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+
+robust 
+
+Avg Eucl. distance :: 0.0368706622509
+Avg Angle.: 0.885016683711
+Num opposite (red) gradients: 20
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+WITHout my changes.
+
+little variance
+
+gaussian
+
+Avg Eucl. distance :: 0.334667634087
+Avg Angle.: 0.419201731552
+Num opposite (red) gradients: 3
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+
+robust
+
+Avg Eucl. distance :: 0.305621414784
+Avg Angle.: 0.802735423959
+Num opposite (red) gradients: 21
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+
+
+
+
+
+==== without -x
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    0.120777622982
+Dr wrt Elevation:   (0, 0)  0.0346005703334
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.593209073934
+Avg Angle.: 0.734524454497
+Num opposite (red) gradients: 16
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+Reading keys...
+Using Outlier model
+Sq Error: [ 0.43121879]
+Reading keys...
+Reading keys...
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    0.064235664126
+Dr wrt Elevation:   (0, 0)  0.0377447423815
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.296382569213
+Avg Angle.: 0.65180490566
+Num opposite (red) gradients: 9
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+
+with -x (both -)
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.0353451789405
+Dr wrt Elevation:   (0, 0)  0.0197232103231
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.417941896706
+Avg Angle.: 0.584765084995
+Num opposite (red) gradients: 9
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+Reading keys...
+Using Outlier model
+Sq Error: [ 0.43121879]
+Reading keys...
+Reading keys...
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.0184159505845
+Dr wrt Elevation:   (0, 0)  0.026453000725
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.286299368328
+Avg Angle.: 0.487362103679
+Num opposite (red) gradients: 4
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+
+== With no edge fix
+
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.0445468842116
+Dr wrt Elevation:   (0, 0)  -0.101599735735
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.299423965318
+Avg Angle.: 0.460194065748
+Num opposite (red) gradients: 6
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+Reading keys...
+Using Outlier model
+Sq Error: [ 0.43121879]
+Reading keys...
+Reading keys...
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.00343098986534
+Dr wrt Elevation:   (0, 0)  -0.0381466876599
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.299700611813
+Avg Angle.: 0.646335919541
+Num opposite (red) gradients: 12
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+== with edges dvs = 0
+
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.0375992593648
+Dr wrt Elevation:   (0, 0)  0.0210751637229
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.44750201777
+Avg Angle.: 0.610552758524
+Num opposite (red) gradients: 9
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+Reading keys...
+Reading keys...
+Using Outlier model
+Sq Error: [ 0.43121879]
+Reading keys...
+Reading keys...
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.034150987609
+Dr wrt Elevation:   (0, 0)  0.0225951365728
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.279888039212
+Avg Angle.: 0.438374009091
+Num opposite (red) gradients: 3
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+== with edges but only -1 or +1 
+
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.0846243245997
+Dr wrt Elevation:   (0, 0)  -0.1352997865
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.335971818889
+Avg Angle.: 0.503541274018
+Num opposite (red) gradients: 6
+Minimum Azimuth difference of [ 17.24396264]
+Minimum Elevation difference of [ 2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+Reading keys...
+Reading keys...
+Using Outlier model
+Sq Error: [ 0.43121879]
+Reading keys...
+Reading keys...
+**** Statistics ****
+GT Azimuth: [ 5.74289559]
+Azimuth: [ 5.74289559]
+GT Elevation: [ 0.82120681]
+Elevation: [ 0.82173048]
+Dr wrt Azimuth:   (0, 0)    -0.0146806350145
+Dr wrt Elevation:   (0, 0)  -0.0480049335377
+Occlusion is 0.0 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.269571084568
+Avg Angle.: 0.448151815832
+Num opposite (red) gradients: 5
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [-2.49920771]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+
+
+*******
+
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.72544229]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22173048]
+Dr wrt Azimuth:   (0, 0)    0.0879849265413
+Dr wrt Elevation:   (0, 0)  -0.139759052748
+Occlusion is 65.6031288596 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.367562688842
+Avg Angle.: 0.246419115294
+Num opposite (red) gradients: 3
+Minimum Azimuth difference of [-12.40386435]
+Minimum Elevation difference of [-2.95745579]
+Current Azimuth difference of [ 0.99994924]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.72544229]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22173048]
+Dr wrt Azimuth:   (0, 0)    0.0120324484456
+Dr wrt Elevation:   (0, 0)  -0.114002024369
+Occlusion is 65.6031288596 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.389171829955
+Avg Angle.: 0.8990086174
+Num opposite (red) gradients: 16
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [ 0.94943429]
+Current Azimuth difference of [ 0.99994924]
+Current Elevation difference of [-0.03000408]
+Reading keys...
+
+vs (dr edges = 0)
+
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.74289559]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22173048]
+Dr wrt Azimuth:   (0, 0)    0.112401212381
+Dr wrt Elevation:   (0, 0)  -0.159960011618
+Occlusion is 65.6031288596 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.402964660415
+Avg Angle.: 0.945531618922
+Num opposite (red) gradients: 20
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [ 0.94943429]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+vs (dr edges * 2)
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.74289559]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22173048]
+Dr wrt Azimuth:   (0, 0)    0.201084344835
+Dr wrt Elevation:   (0, 0)  -0.120651895831
+Occlusion is 65.6031288596 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.388320515702
+Avg Angle.: 0.888102277972
+Num opposite (red) gradients: 11
+Minimum Azimuth difference of [ 2.49920771]
+Minimum Elevation difference of [ 0.94943429]
+Current Azimuth difference of [ 0.]
+Current Elevation difference of [-0.03000408]
+
+
+LARGE VARIANCE 
+
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.91742851]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22120681]
+Dr wrt Azimuth:   (0, 0)    0.038489005312
+Dr wrt Elevation:   (0, 0)  -0.0691267356372
+Occlusion is 65.6031288596 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.0322688780328
+Avg Angle.: 0.246419115294
+Num opposite (red) gradients: 3
+Minimum Azimuth difference of [-12.40386435]
+Minimum Elevation difference of [-2.95745579]
+Current Azimuth difference of [-9.95022626]
+Current Elevation difference of [ 0.]
+Reading keys...
+
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.91742851]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22120681]
+Dr wrt Azimuth:   (0, 0)    0.0233711737569
+Dr wrt Elevation:   (0, 0)  -0.0420540304559
+Occlusion is 65.6031288596 %
+** Approx gradients - finite differenes.
+Avg Eucl. distance :: 0.0257575855627
+Avg Angle.: 0.195586213869
+Num opposite (red) gradients: 3
+Minimum Azimuth difference of [ 12.40386435]
+Minimum Elevation difference of [ 0.94943429]
+Current Azimuth difference of [-9.95022626]
+Current Elevation difference of [ 0.]
+
+
+**** Statistics ****
+GT Azimuth: [ 4.74289559]
+Azimuth: [ 4.64147166]
+GT Elevation: [ 0.22120681]
+Elevation: [ 0.22081677]
+Dr wrt Azimuth:   (0, 0)    -0.593674497532
+Dr wrt Elevation:   (0, 0)  -0.150886592675
+Occlusion is 65.6005444029 %
+Current Azimuth difference of [ 3.95584613]
+Current Elevation difference of [ 0.01423049]
+
+
+
