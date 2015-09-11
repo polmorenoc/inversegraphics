@@ -327,8 +327,8 @@ def placeNewTarget(scene, target, targetPosition):
     target.layers[2] = True
     scene.objects.link(target)
     target.matrix_world = mathutils.Matrix.Translation(targetPosition)
-    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-    original_matrix_world = teapot.matrix_world.copy()
+    center = centerOfGeometry(target.dupli_group.objects, target.matrix_world)
+    original_matrix_world = target.matrix_world.copy()
     camera = scene.camera
     scene.update()
     look_at(camera, center)

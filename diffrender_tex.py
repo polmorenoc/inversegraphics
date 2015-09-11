@@ -2,7 +2,6 @@ __author__ = 'pol'
 
 import matplotlib
 matplotlib.use('Qt4Agg')
-
 import bpy
 import sceneimport
 import mathutils
@@ -46,7 +45,7 @@ elevation = 33
 
 sceneIdx = 0
 
-v, f_list, vc, vn, uv, haveTextures_list, textures_list, scene, targetPosition = sceneimport.loadSceneBlenderToOpenDR(0, True, width, height)
+v, f_list, vc, vn, uv, haveTextures_list, textures_list,  scene, targetPosition = sceneimport.loadSceneBlenderToOpenDR(0, True, True, width, height)
 
 blenderCamera = scene.camera
 
@@ -58,27 +57,11 @@ placeCamera(blenderCamera, azimuth, elevation, camDistance, center)
 
 scene.update()
 
-vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapot, teapotIdx, True)
+vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapot, teapotIdx, True, True)
 
-addObjectData(vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  vmod[0], fmod_list[0], vcmod[0], vnmod[0], uvmod[0], haveTexturesmod_list[0], texturesmod_list[0])
 
-updateRendererData()
-
-removeObjectData(objIdx)
-
-rangeMeshes = range(len(v))
-vch = [ch.array(v[mesh]) for mesh in rangeMeshes]
-if len(vch)==1:
-    vstack = vch[0]
-else:
-    vstack = ch.vstack(vch)
-
-rangeMeshes = range(len(vmod))
-vchmod = [ch.array(vmod[mesh]) for mesh in rangeMeshes]
-if len(vchmod)==1:
-    vstackmod = vchmod[0]
-else:
-    vstackmod = ch.vstack(vchmod)
+# removeObjectData(objIdx, v, f_list, vc, vn, uv, haveTextures_list, textures_list, objects)
 
 chAz = ch.Ch([4.742895587179587])
 chEl = ch.Ch([0.22173048])
@@ -87,49 +70,53 @@ chDist = ch.Ch([camDistance])
 chAzGT = ch.Ch([4.742895587179587])
 chElGT = ch.Ch([0.22120681])
 chDistGT = ch.Ch([camDistance])
-
-cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center, width, height)
-
-camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, center, width, height)
-
-rangeMeshes = range(len(v))
-
-vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vn[mesh])))) for mesh in rangeMeshes]
-vcch = [ch.array(vc[mesh]) for mesh in rangeMeshes]
-
-light_color=ch.ones(3)
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
-
-A_list = [SphericalHarmonics(vn=vnch[mesh],
-                       components=chComponentGT,
-                       light_color=light_color) for mesh in rangeMeshes]
-
-vc_list = [A_list[mesh]*vcch[mesh] for mesh in rangeMeshes]
-
-rangeMeshes = range(len(vmod))
-
-vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmod[mesh])))) for mesh in rangeMeshes]
-vcchmod = [ch.array(vcmod[mesh]) for mesh in rangeMeshes]
-
 light_color=ch.ones(3)
-chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
-
-Amod_list = [SphericalHarmonics(vn=vnchmod[mesh],
-                       components=chComponent,
-                       light_color=light_color) for mesh in rangeMeshes]
-
-vcmod_list = [Amod_list[mesh]*vcch[mesh] for mesh in rangeMeshes]
-
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 
-rendererGT = setupTexturedRenderer(vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum)
 
-renderer = setupTexturedRenderer(vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum)
+#Setup backrpojection renderer
+vmodflat = [item for sublist in vmod for item in sublist]
+rangeMeshes = range(len(vmodflat))
+vchmod = [ch.array(vmodflat[mesh]) for mesh in rangeMeshes]
+if len(vchmod)==1:
+    vstackmod = vchmod[0]
+else:
+    vstackmod = ch.vstack(vchmod)
+camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, center, width, height)
+vnmodflat = [item for sublist in vnmod for item in sublist]
+vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmodflat[mesh])))) for mesh in rangeMeshes]
+vcmodflat = [item for sublist in vcmod for item in sublist]
+vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
+vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
+renderer = TexturedRenderer()
+setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum)
 
-vis_gt = np.array(rendererGT.image_mesh_bool(0)).copy().astype(np.bool)
+
+
+#Setup ground truth renderer
+vflat = [item for sublist in v for item in sublist]
+rangeMeshes = range(len(vflat))
+vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+if len(vch)==1:
+    vstack = vch[0]
+else:
+    vstack = ch.vstack(vch)
+cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center, width, height)
+vnflat = [item for sublist in vn for item in sublist]
+vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vnflat[mesh])))) for mesh in rangeMeshes]
+vcflat = [item for sublist in vc for item in sublist]
+vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+rendererGT = TexturedRenderer()
+setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum)
+
+ipdb.set_trace()
+
+vis_gt = np.array(renderer.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
-vis_im = np.array(renderer.image_mesh_bool(0)).copy().astype(np.bool)
+vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
 
 oldChAz = chAz[0].r
 oldChEl = chEl[0].r
@@ -139,12 +126,13 @@ shapeIm = vis_gt.shape
 numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
+
 print("Beginning render.")
 t = time.time()
 rendererGT.r
 elapsed_time = time.time() - t
 print("Ended render in  " + str(elapsed_time))
-plt.imsave('opendr_opengl_first.png', rendererGT.r)
+plt.imsave('opendr_GT.png', rendererGT.r)
 
 imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
 chImage = ch.array(imagegt)
@@ -190,6 +178,8 @@ pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 iterat = 0
+
+
 
 f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
 pos1 = ax1.get_position()
@@ -1274,6 +1264,8 @@ def readKeys(window, key, scancode, action, mods):
     global minimize
     if key == glfw.KEY_M and action == glfw.RELEASE:
         minimize = True
+
+
 
 glfw.make_context_current(renderer.win)
 

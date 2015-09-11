@@ -194,7 +194,7 @@ def loadTargetModels(experimentTeapots):
 
 
 
-def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, width, height):
+def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, serializeScene, width, height):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLineNums = numpy.arange(len(sceneLines))
@@ -205,7 +205,7 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, width, height):
     sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
     sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
     targetIndex = int(sceneParts[1])
-    instances = sceneimport.loadScene('../databaseFull/scenes/' + sceneFileName)
+    instances = loadScene('../databaseFull/scenes/' + sceneFileName)
     targetParentPosition = instances[targetIndex][2]
     targetParentIndex = instances[targetIndex][1]
 
@@ -217,34 +217,34 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, width, height):
     sceneDic = {}
 
     #We can store the OpenDR scene data as a pickle file for much faster loading.
+
+    [blenderScenes, modelInstances] = importBlenderScenes(instances, True, targetIndex)
+
+    targetParentInstance = modelInstances[targetParentIndex]
+    targetParentInstance.layers[2] = True
+
+    roomName = ''
+    for model in modelInstances:
+        reg = re.compile('(room[0-9]+)')
+        res = reg.match(model.name)
+        if res:
+            roomName = res.groups()[0]
+
+    scene = composeScene(modelInstances, targetIndex)
+
+    roomInstance = scene.objects[roomName]
+    roomInstance.layers[2] = True
+    targetParentInstance.layers[2] = True
+
+    setupScene(scene, targetIndex,roomName, world, camera, width, height, 16, False, False)
+
+    scene.update()
+
+    scene.render.filepath = 'opendr_blender.png'
     if not loadSavedScene:
-        [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, True, targetIndex)
-
-        targetParentInstance = modelInstances[targetParentIndex]
-        targetParentInstance.layers[2] = True
-
-        roomName = ''
-        for model in modelInstances:
-            reg = re.compile('(room[0-9]+)')
-            res = reg.match(model.name)
-            if res:
-                roomName = res.groups()[0]
-
-        scene = sceneimport.composeScene(modelInstances, targetIndex)
-
-        roomInstance = scene.objects[roomName]
-        roomInstance.layers[2] = True
-        targetParentInstance.layers[2] = True
-
-        setupScene(scene, targetIndex,roomName, world, camDistance, camera, width, height, 16, False, False)
-
-        scene.update()
-
-        scene.render.filepath = 'opendr_blender.png'
         # bpy.ops.render.render( write_still=True )
-
         # ipdb.set_trace()
-        # v,f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackObjects(teapot)
+        # v,f_list, vc, vn, uv, haveTextures_list, textures_list = unpackObjects(teapot)
         v = []
         f_list = []
         vc  = []
@@ -255,7 +255,7 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, width, height):
         print("Unpacking blender data for OpenDR.")
         for modelInstance in scene.objects:
             if modelInstance.dupli_group != None:
-                vmod,f_listmod, vcmod, vnmod, uvmod, haveTextures_listmod, textures_listmod = sceneimport.unpackObjects(modelInstance)
+                vmod,f_listmod, vcmod, vnmod, uvmod, haveTextures_listmod, textures_listmod = unpackObjects(modelInstance, 0, False, False)
                 # gray = np.dot(np.array([0.3, 0.59, 0.11]), vcmod[0].T).T
                 # sat = 0.5
                 # vcmod[0][:,0] = vcmod[0][:,0] * sat + (1-sat) * gray
@@ -270,9 +270,10 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, width, height):
                 textures_list = textures_list + textures_listmod
 
         #Serialize
-        sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
-        with open(sceneDicFile, 'wb') as pfile:
-            pickle.dump(sceneDic, pfile)
+        if serializeScene:
+            sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
+            with open(sceneDicFile, 'wb') as pfile:
+                pickle.dump(sceneDic, pfile)
 
         print("Serialized scene!")
     else:
@@ -288,10 +289,10 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, width, height):
 
         print("Loaded serialized scene!")
 
-    return v, f_list, vc, vn, uv, haveTextures_list, textures_list, scene, targetPosition
+    return v, f_list, vc, vn, uv, haveTextures_list, textures_list, scene, targetParentPosition
 
-def unpackObjects(target, teapotIdx, loadTarget):
-    targetDicFile = 'data/target' + str(teapotIdx) + '.pickle'
+def unpackObjects(target, targetIdx, loadTarget, saveData):
+    targetDicFile = 'data/target' + str(targetIdx) + '.pickle'
     targetDic = {}
     if not loadTarget:
         f_list = []
@@ -322,11 +323,12 @@ def unpackObjects(target, teapotIdx, loadTarget):
 
                 vertexMeshIndex = vertexMeshIndex + len(vmesh)
         #Serialize
-        targetDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
-        with open(targetDicFile, 'wb') as pfile:
-            pickle.dump(targetDic, pfile)
+        if saveData:
+            targetDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
+            with open(targetDicFile, 'wb') as pfile:
+                pickle.dump(targetDic, pfile)
 
-        print("Serialized scene!")
+            print("Serialized scene!")
 
     else:
         with open(targetDicFile, 'rb') as pfile:
@@ -340,7 +342,7 @@ def unpackObjects(target, teapotIdx, loadTarget):
             textures_list = targetDic['textures_list']
         print("Loaded serialized target!")
 
-    return v,f_list,vc,vn, uv, haveTextures_list, textures_list
+    return [v],[f_list],[vc],[vn], [uv], [haveTextures_list], [textures_list]
 
 def buildData (msh):
 
