@@ -53,7 +53,9 @@ def computeSphericalHarmonics(vn, vc, light_color, components):
     vc_list = [A_list[mesh]*vc[mesh] for mesh in rangeMeshes]
     return vc_list
 
-def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, haveTextures_list, textures_list, camera, frustum):
+
+
+def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, haveTextures_list, textures_list, camera, frustum, sharedWin=None):
 
     f = []
     f_listflat = [item for sublist in f_list for item in sublist]
@@ -94,8 +96,9 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
         texture_stack = ch.concatenate([tex.ravel() for tex in texturesch])
 
     haveTextures_listflat = [item for sublist in haveTextures_list for item in sublist]
-    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=True)
 
+    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=True)
+    renderer.sharedWin = sharedWin
     # renderer.clear()
     renderer.initGL()
     renderer.initGLTexture()

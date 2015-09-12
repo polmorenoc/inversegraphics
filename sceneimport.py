@@ -144,9 +144,23 @@ def loadTargetModels(experimentTeapots):
         matrix_world = mathutils.Matrix.Identity(4)
         minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
         minY, maxY = modelDepth(scene.objects, mathutils.Matrix.Identity(4))
+
         scaleZ = 0.265/(maxZ-minZ)
         scaleY = 0.18/(maxY-minY)
-        scale = min(scaleZ, scaleY)
+
+        ratio =  (maxZ-minZ)/(maxY-minY)
+
+        # scaleZ = 0.265/(maxZ-minZ)
+        # scaleY = 0.18/(maxY-minY)
+        #
+        # scaleZ = 0.265/(maxZ-minZ)
+        # scaleY = 0.18/(maxY-minY)
+        if ratio > 0.265/0.18:
+            scale = scaleZ
+        else:
+            scale = scaleY
+        # scale = min(scaleZ, scaleY)
+
         scaleMat = mathutils.Matrix.Scale(scale, 4)
         for mesh in scene.objects:
             if mesh.type == 'MESH':
@@ -241,7 +255,7 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, serializeScene, width, he
     scene.update()
 
     scene.render.filepath = 'opendr_blender.png'
-    if not loadSavedScene:
+    if not loadSavedScene or not os.path.exists(sceneDicFile):
         # bpy.ops.render.render( write_still=True )
         # ipdb.set_trace()
         # v,f_list, vc, vn, uv, haveTextures_list, textures_list = unpackObjects(teapot)
@@ -294,7 +308,7 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, serializeScene, width, he
 def unpackObjects(target, targetIdx, loadTarget, saveData):
     targetDicFile = 'data/target' + str(targetIdx) + '.pickle'
     targetDic = {}
-    if not loadTarget:
+    if not loadTarget or not os.path.exists(targetDicFile):
         f_list = []
         v = []
         vc = []
@@ -331,6 +345,7 @@ def unpackObjects(target, targetIdx, loadTarget, saveData):
             print("Serialized scene!")
 
     else:
+
         with open(targetDicFile, 'rb') as pfile:
             targetDic = pickle.load(pfile)
             v = targetDic['v']
