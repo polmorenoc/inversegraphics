@@ -206,9 +206,7 @@ def loadTargetModels(experimentTeapots):
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
 
-
-
-def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, serializeScene, width, height):
+def loadBlenderScene(sceneIdx, width, height):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLineNums = numpy.arange(len(sceneLines))
@@ -222,140 +220,131 @@ def loadSceneBlenderToOpenDR(sceneIdx, loadSavedScene, serializeScene, width, he
     instances = loadScene('../databaseFull/scenes/' + sceneFileName)
     targetParentPosition = instances[targetIndex][2]
     targetParentIndex = instances[targetIndex][1]
-
     cam = bpy.data.cameras.new("MainCamera")
     camera = bpy.data.objects.new("MainCamera", cam)
     world = bpy.data.worlds.new("MainWorld")
-
-    sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
-    sceneDic = {}
-
     #We can store the OpenDR scene data as a pickle file for much faster loading.
-
     [blenderScenes, modelInstances] = importBlenderScenes(instances, True, targetIndex)
-
     targetParentInstance = modelInstances[targetParentIndex]
     targetParentInstance.layers[2] = True
-
     roomName = ''
     for model in modelInstances:
         reg = re.compile('(room[0-9]+)')
         res = reg.match(model.name)
         if res:
             roomName = res.groups()[0]
-
     scene = composeScene(modelInstances, targetIndex)
-
     roomInstance = scene.objects[roomName]
     roomInstance.layers[2] = True
     targetParentInstance.layers[2] = True
-
     setupScene(scene, targetIndex,roomName, world, camera, width, height, 16, False, False)
-
     scene.update()
-
     scene.render.filepath = 'opendr_blender.png'
-    if not loadSavedScene or not os.path.exists(sceneDicFile):
-        # bpy.ops.render.render( write_still=True )
-        # ipdb.set_trace()
-        # v,f_list, vc, vn, uv, haveTextures_list, textures_list = unpackObjects(teapot)
-        v = []
-        f_list = []
-        vc  = []
-        vn  = []
-        uv  = []
-        haveTextures_list  = []
-        textures_list  = []
-        print("Unpacking blender data for OpenDR.")
-        for modelInstance in scene.objects:
-            if modelInstance.dupli_group != None:
-                vmod,f_listmod, vcmod, vnmod, uvmod, haveTextures_listmod, textures_listmod = unpackObjects(modelInstance, 0, False, False)
-                # gray = np.dot(np.array([0.3, 0.59, 0.11]), vcmod[0].T).T
-                # sat = 0.5
-                # vcmod[0][:,0] = vcmod[0][:,0] * sat + (1-sat) * gray
-                # vcmod[0][:,1] = vcmod[0][:,1] * sat + (1-sat) * gray
-                # vcmod[0][:,2] = vcmod[0][:,2] * sat + (1-sat) * gray
-                v = v + vmod
-                f_list = f_list + f_listmod
-                vc = vc + vcmod
-                vn = vn + vnmod
-                uv = uv + uvmod
-                haveTextures_list = haveTextures_list + haveTextures_listmod
-                textures_list = textures_list + textures_listmod
+    return scene, targetParentPosition
 
-        #Serialize
-        if serializeScene:
-            sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
-            with open(sceneDicFile, 'wb') as pfile:
-                pickle.dump(sceneDic, pfile)
-
-        print("Serialized scene!")
-    else:
-        with open(sceneDicFile, 'rb') as pfile:
-            sceneDic = pickle.load(pfile)
-            v = sceneDic['v']
-            f_list = sceneDic['f_list']
-            vc = sceneDic['vc']
-            uv = sceneDic['uv']
-            haveTextures_list = sceneDic['haveTextures_list']
-            vn = sceneDic['vn']
-            textures_list = sceneDic['textures_list']
+def loadSavedScene(sceneDicFile):
+    with open(sceneDicFile, 'rb') as pfile:
+        sceneDic = pickle.load(pfile)
+        v = sceneDic['v']
+        f_list = sceneDic['f_list']
+        vc = sceneDic['vc']
+        uv = sceneDic['uv']
+        haveTextures_list = sceneDic['haveTextures_list']
+        vn = sceneDic['vn']
+        textures_list = sceneDic['textures_list']
 
         print("Loaded serialized scene!")
 
-    return v, f_list, vc, vn, uv, haveTextures_list, textures_list, scene, targetParentPosition
+    return v, f_list, vc, vn, uv, haveTextures_list, textures_list
 
-def unpackObjects(target, targetIdx, loadTarget, saveData):
-    targetDicFile = 'data/target' + str(targetIdx) + '.pickle'
-    targetDic = {}
-    if not loadTarget or not os.path.exists(targetDicFile):
-        f_list = []
-        v = []
-        vc = []
-        vn = []
-        uv = []
-        haveTextures = []
-        textures_list = []
-        vertexMeshIndex = 0
-        for mesh in target.dupli_group.objects:
-            if mesh.type == 'MESH':
-                # mesh.data.validate(verbose=True, clean_customdata=True)
-                fmesh, vmesh, vcmesh,  nmesh, uvmesh, haveTexture, textures  = buildData(mesh.data)
-                f_list = f_list + [fmesh]
-                vc = vc + [vcmesh]
-                transf = np.array(np.dot(target.matrix_world, mesh.matrix_world))
-                vmesh = np.hstack([vmesh, np.ones([vmesh.shape[0],1])])
-                vmesh = ( np.dot(transf , vmesh.T)).T[:,0:3]
-                v = v + [vmesh]
-                transInvMat = np.linalg.inv(transf).T
-                nmesh = np.hstack([nmesh, np.ones([nmesh.shape[0],1])])
-                nmesh = (np.dot(transInvMat , nmesh.T)).T[:,0:3]
-                vn = vn + [normalize(nmesh, axis=1)]
-                uv = uv + [uvmesh]
-                haveTextures_list = haveTextures + [haveTexture]
-                textures_list = textures_list + [textures]
+def unpackBlenderScene(scene, sceneDicFile, serializeScene):
+    # bpy.ops.render.render( write_still=True )
+    # ipdb.set_trace()
+    # v,f_list, vc, vn, uv, haveTextures_list, textures_list = unpackObjects(teapot)
+    v = []
+    f_list = []
+    vc  = []
+    vn  = []
+    uv  = []
+    haveTextures_list  = []
+    textures_list  = []
+    print("Unpacking blender data for OpenDR.")
+    for modelInstance in scene.objects:
+        if modelInstance.dupli_group != None:
+            vmod,f_listmod, vcmod, vnmod, uvmod, haveTextures_listmod, textures_listmod = unpackBlenderObject(modelInstance, '', False)
+            # gray = np.dot(np.array([0.3, 0.59, 0.11]), vcmod[0].T).T
+            # sat = 0.5
+            # vcmod[0][:,0] = vcmod[0][:,0] * sat + (1-sat) * gray
+            # vcmod[0][:,1] = vcmod[0][:,1] * sat + (1-sat) * gray
+            # vcmod[0][:,2] = vcmod[0][:,2] * sat + (1-sat) * gray
+            v = v + vmod
+            f_list = f_list + f_listmod
+            vc = vc + vcmod
+            vn = vn + vnmod
+            uv = uv + uvmod
+            haveTextures_list = haveTextures_list + haveTextures_listmod
+            textures_list = textures_list + textures_listmod
 
-                vertexMeshIndex = vertexMeshIndex + len(vmesh)
-        #Serialize
-        if saveData:
-            targetDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
-            with open(targetDicFile, 'wb') as pfile:
-                pickle.dump(targetDic, pfile)
+    #Serialize
+    if serializeScene:
+        sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
+        with open(sceneDicFile, 'wb') as pfile:
+            pickle.dump(sceneDic, pfile)
 
-            print("Serialized scene!")
+    print("Serialized scene!")
 
-    else:
 
-        with open(targetDicFile, 'rb') as pfile:
-            targetDic = pickle.load(pfile)
-            v = targetDic['v']
-            f_list = targetDic['f_list']
-            vc = targetDic['vc']
-            uv = targetDic['uv']
-            haveTextures_list = targetDic['haveTextures_list']
-            vn = targetDic['vn']
-            textures_list = targetDic['textures_list']
-        print("Loaded serialized target!")
+    return v, f_list, vc, vn, uv, haveTextures_list, textures_list
+
+def loadSavedObject(objectDicFile):
+    with open(objectDicFile, 'rb') as pfile:
+        targetDic = pickle.load(pfile)
+        v = targetDic['v']
+        f_list = targetDic['f_list']
+        vc = targetDic['vc']
+        uv = targetDic['uv']
+        haveTextures_list = targetDic['haveTextures_list']
+        vn = targetDic['vn']
+        textures_list = targetDic['textures_list']
+    print("Loaded serialized target!")
+    return v, f_list, vc, vn, uv, haveTextures_list, textures_list
+
+
+def unpackBlenderObject(object, objectDicFile, saveData):
+    f_list = []
+    v = []
+    vc = []
+    vn = []
+    uv = []
+    haveTextures = []
+    textures_list = []
+    vertexMeshIndex = 0
+    for mesh in object.dupli_group.objects:
+        if mesh.type == 'MESH':
+            # mesh.data.validate(verbose=True, clean_customdata=True)
+            fmesh, vmesh, vcmesh,  nmesh, uvmesh, haveTexture, textures  = buildData(mesh.data)
+            f_list = f_list + [fmesh]
+            vc = vc + [vcmesh]
+            transf = np.array(np.dot(object.matrix_world, mesh.matrix_world))
+            vmesh = np.hstack([vmesh, np.ones([vmesh.shape[0],1])])
+            vmesh = ( np.dot(transf , vmesh.T)).T[:,0:3]
+            v = v + [vmesh]
+            transInvMat = np.linalg.inv(transf).T
+            nmesh = np.hstack([nmesh, np.ones([nmesh.shape[0],1])])
+            nmesh = (np.dot(transInvMat , nmesh.T)).T[:,0:3]
+            vn = vn + [normalize(nmesh, axis=1)]
+            uv = uv + [uvmesh]
+            haveTextures_list = haveTextures + [haveTexture]
+            textures_list = textures_list + [textures]
+
+            vertexMeshIndex = vertexMeshIndex + len(vmesh)
+    #Serialize
+    if saveData:
+        targetDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
+        with open(objectDicFile, 'wb') as pfile:
+            pickle.dump(targetDic, pfile)
+
+        print("Serialized scene!")
 
     return [v],[f_list],[vc],[vn], [uv], [haveTextures_list], [textures_list]
 
@@ -369,13 +358,10 @@ def buildData (msh):
     luvl = [] # local uv list
     lvcnt = 0 # local vertices count
     isSmooth = False
-
     texdic = {} # local dictionary
-
     msh.calc_tessface()
     # if len(msh.tessfaces) == 0 or msh.tessfaces is None:
     #     msh.calc_tessface()
-
     textureNames = []
     haveUVs = []
 
@@ -404,13 +390,9 @@ def buildData (msh):
         textureNames = textureNames + [texname]
         haveUVs = haveUVs + [hasUV]
 
-
         for j,v in enumerate(f.vertices):
-
             vec = msh.vertices[v].co
-
             vec = r3d(vec)
-
             if (isSmooth):  # use vertex normal
                 nor = msh.vertices[v].normal
             else:           # use face normal
@@ -420,18 +402,14 @@ def buildData (msh):
             if vcolor == (0.0,0.0,0.0) and msh.materials[f.material_index].specular_color[:] != (0.0,0.0,0.0):
                 vcolor = msh.materials[f.material_index].specular_color[:]
                 # print("Using specular!")
-
             nor = r3d(nor)
             co = (0.0, 0.0)
-
             if hasUV:
                 co = activeUV[i].uv[j]
                 co = r2d(co)
                 vcolor = (1.0,1.0,1.0)
-
             key = vec, nor, co
             vinx = lvdic.get(key)
-
             if (vinx is None): # vertex not found
 
                 lvdic[key] = lvcnt

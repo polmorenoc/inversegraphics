@@ -40,6 +40,7 @@ glfw.window_hint(glfw.VISIBLE, GL.GL_TRUE)
 win = glfw.create_window(width, height, "Demo",  None, None)
 glfw.make_context_current(win)
 
+useBlender = True
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -54,22 +55,31 @@ teapotNum = 4
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
 teapotIdx =renderTeapotsList[teapotNum]
-[targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
-teapot = targetModels[teapotNum]
-teapot.layers[1] = True
-teapot.layers[2] = True
+
+if useBlender:
+    [targetScenes,  targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+    teapot = targetModels[teapotNum]
+    teapot.layers[1] = True
+    teapot.layers[2] = True
 
 sceneIdx = 0
 
-v, f_list, vc, vn, uv, haveTextures_list, textures_list,  scene, targetPosition = sceneimport.loadSceneBlenderToOpenDR(0, True, True, width, height)
+v, f_list, vc, vn, uv, haveTextures_list, textures_list,  scene, targetPosition = sceneimport.loadSceneBlenderToOpenDR(0, True, width, height)
 
-blenderCamera = scene.camera
-placeNewTarget(scene, teapot, targetPosition)
-center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-placeCamera(blenderCamera, azimuth, elevation, camDistance, center)
-scene.update()
+if useBlender:
+    blenderCamera = scene.camera
+    placeNewTarget(scene, teapot, targetPosition)
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    placeCamera(blenderCamera, azimuth, elevation, camDistance, center)
+    scene.update()
 
-vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapot, teapotIdx, True, True)
+loadBlenderScene(sceneIdx, width, height)
+ loadSavedScene(sceneDicFile):
+unpackBlenderScene(scene, sceneDicFile, targetParentPosition, serializeScene):
+loadSavedObject(objectDicFile):
+ unpackBlenderObject(object, targetIdx, saveData):
+
+vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapotIdx, True)
 
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  vmod[0], fmod_list[0], vcmod[0], vnmod[0], uvmod[0], haveTexturesmod_list[0], texturesmod_list[0])
 

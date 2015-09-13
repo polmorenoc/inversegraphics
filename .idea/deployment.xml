@@ -1,19 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="PublishConfigData" autoUpload="Always" serverName="Render Osiris">
-    <serverData>
-      <paths name="Render Osiris">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/render" local="$PROJECT_DIR$" web="/" />
-          </mappings>
-          <excludedPaths>
-            <excludedPath path="/render/output" />
-            <excludedPath path="/render/aztest" />
-          </excludedPaths>
-        </serverdata>
-      </paths>
-    </serverData>
     <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>
