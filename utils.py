@@ -137,8 +137,8 @@ def setMaterial(ob, mat):
 
 def look_at(obj_camera, point):
     loc_camera = obj_camera.location
-
-    direction = point - loc_camera
+    vecPoint = mathutils.Vector((point[0],point[1],point[2]))
+    direction = vecPoint - loc_camera
     # point the cameras '-Z' and use its 'Y' as up
     rot_quat = direction.to_track_quat('-Z', 'Y')
 
@@ -357,7 +357,7 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
 
         cycles = bpy.context.scene.cycles
 
-        cycles.samples = 1024
+        cycles.samples = 256
         cycles.max_bounces = 36
         cycles.min_bounces = 4
         cycles.caustics_reflective = True

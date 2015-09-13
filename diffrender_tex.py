@@ -41,6 +41,7 @@ win = glfw.create_window(width, height, "Demo",  None, None)
 glfw.make_context_current(win)
 
 useBlender = True
+groundTruthBlender = False
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -50,72 +51,134 @@ camDistance = 0.4
 azimuth = 275
 elevation = 33
 
-teapotNum = 4
-
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
-teapotIdx =renderTeapotsList[teapotNum]
 
+v_teapots = []
+f_list_teapots = []
+vc_teapots = []
+vn_teapots = []
+uv_teapots = []
+haveTextures_list_teapots = []
+textures_list_teapots = []
+renderer_teapots = []
+blender_teapots = []
+center_teapots = []
+
+
+unpackModelsFromBlender = False
 if useBlender:
-    [targetScenes,  targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
-    teapot = targetModels[teapotNum]
-    teapot.layers[1] = True
-    teapot.layers[2] = True
+    [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+for teapotIdx in renderTeapotsList:
+    teapotNum = renderTeapotsList[teapotIdx]
+    objectDicFile = 'data/target' + str(teapotNum) + '.pickle'
+    if useBlender:
+        teapot = targetModels[teapotNum]
+        teapot.layers[1] = True
+        teapot.layers[2] = True
+        blender_teapots = blender_teapots + [teapot]
+    if unpackModelsFromBlender:
+        vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackBlenderObject(teapot, objectDicFile, True)
+    else:
+        vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.loadSavedObject(objectDicFile)
+    v_teapots = v_teapots + [[vmod]]
+    f_list_teapots = f_list_teapots + [[fmod_list]]
+    vc_teapots = vc_teapots + [[vcmod]]
+    vn_teapots = vn_teapots + [[vnmod]]
+    uv_teapots = uv_teapots + [[uvmod]]
+    haveTextures_list_teapots = haveTextures_list_teapots + [[haveTexturesmod_list]]
+    textures_list_teapots = textures_list_teapots + [[texturesmod_list]]
+    vflat = [item for sublist in vmod for item in sublist]
+    varray = np.vstack(vflat)
+    center_teapots = center_teapots + [np.sum(varray, axis=0)/len(varray)]
 
 sceneIdx = 0
+sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
-v, f_list, vc, vn, uv, haveTextures_list, textures_list,  scene, targetPosition = sceneimport.loadSceneBlenderToOpenDR(0, True, width, height)
-
+unpackSceneFromBlender = False
 if useBlender:
-    blenderCamera = scene.camera
-    placeNewTarget(scene, teapot, targetPosition)
-    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-    placeCamera(blenderCamera, azimuth, elevation, camDistance, center)
-    scene.update()
+    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height)
+    targetPosition = np.array(targetPosition)
+if unpackSceneFromBlender:
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
+else:
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
 
-loadBlenderScene(sceneIdx, width, height)
- loadSavedScene(sceneDicFile):
-unpackBlenderScene(scene, sceneDicFile, targetParentPosition, serializeScene):
-loadSavedObject(objectDicFile):
- unpackBlenderObject(object, targetIdx, saveData):
+# 1 Prepare each teapot renderer.
+# 2 Add first teapot to blender scene and GT renderer.
 
-vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapotIdx, True)
-
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  vmod[0], fmod_list[0], vcmod[0], vnmod[0], uvmod[0], haveTexturesmod_list[0], texturesmod_list[0])
-
-# removeObjectData(objIdx, v, f_list, vc, vn, uv, haveTextures_list, textures_list, objects)
-
-chAz = ch.Ch([4.742895587179587])
-chEl = ch.Ch([0.22173048])
+# chAz = ch.Ch([4.742895587179587])
+# chEl = ch.Ch([0.22173048])
+# chDist = ch.Ch([camDistance])
+chAz = ch.Ch([0])
+chEl = ch.Ch([0.0])
 chDist = ch.Ch([camDistance])
 
-chAzGT = ch.Ch([4.742895587179587])
-chElGT = ch.Ch([0.22120681])
+
+chAzGT = ch.Ch([0.0])
+chElGT = ch.Ch([0.0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 light_color=ch.ones(3)
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
+chColor = ch.Ch([0.2,0.2,0.2])
+chColorGT = ch.Ch([0.2,0.2,0.2])
 
+for teapot_i in range(len(renderTeapotsList)):
+    if useBlender:
+        teapot = blender_teapots[teapot_i]
+        teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
 
-#Setup backrpojection renderer
-vmodflat = [item for sublist in vmod for item in sublist]
-rangeMeshes = range(len(vmodflat))
-vchmod = [ch.array(vmodflat[mesh]) for mesh in rangeMeshes]
-if len(vchmod)==1:
-    vstackmod = vchmod[0]
-else:
-    vstackmod = ch.vstack(vchmod)
-camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, center, width, height)
-vnmodflat = [item for sublist in vnmod for item in sublist]
-vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmodflat[mesh])))) for mesh in rangeMeshes]
-vcmodflat = [item for sublist in vcmod for item in sublist]
-vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
-vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
-renderer = TexturedRenderer()
-setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
-renderer.r
+    vmod = v_teapots[teapot_i]
+    fmod_list = f_list_teapots[teapot_i]
+    vcmod = vc_teapots[teapot_i]
+    vnmod = vn_teapots[teapot_i]
+    uvmod = uv_teapots[teapot_i]
+    haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
+    texturesmod_list = textures_list_teapots[teapot_i]
+    centermod = center_teapots[teapot_i]
 
+    #Add targetPosition to vertex coordinates.
+    for obj_i in range(len(vmod)):
+        for mesh_i in range(len(vmod[obj_i])):
+            vmod[obj_i][mesh_i] = vmod[obj_i][mesh_i] + targetPosition
+
+    #Setup backrpojection renderer
+    vmodflat = [item for sublist in vmod for item in sublist]
+    rangeMeshes = range(len(vmodflat))
+    vchmod = [ch.array(vmodflat[mesh]) for mesh in rangeMeshes]
+    if len(vchmod)==1:
+        vstackmod = vchmod[0]
+    else:
+        vstackmod = ch.vstack(vchmod)
+    camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, centermod + targetPosition, width, height)
+    vnmodflat = [item for sublist in vnmod for item in sublist]
+    vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmodflat[mesh])))) for mesh in rangeMeshes]
+    vcmodflat = [item for sublist in vcmod for item in sublist]
+    vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
+    vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
+    renderer = TexturedRenderer()
+
+    setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
+    renderer.r
+    renderer_teapots = renderer_teapots + [renderer]
+
+currentTeapotModel = 0
+renderer = renderer_teapots[currentTeapotModel]
+if useBlender:
+    teapot = blender_teapots[currentTeapotModel]
+    teapotGT = blender_teapots[currentTeapotModel]
+    placeNewTarget(scene, teapot, targetPosition)
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+    scene.update()
+    bpy.ops.render.render( write_still=True )
+    image = cv2.imread(scene.render.filepath)
+    image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+    blenderRender = image
+
+addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 #Setup ground truth renderer
 vflat = [item for sublist in v for item in sublist]
@@ -125,7 +188,9 @@ if len(vch)==1:
     vstack = vch[0]
 else:
     vstack = ch.vstack(vch)
-cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center, width, height)
+
+center = center_teapots[currentTeapotModel]
+cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
 vnflat = [item for sublist in vn for item in sublist]
 vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vnflat[mesh])))) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
@@ -135,57 +200,7 @@ rendererGT = TexturedRenderer()
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
 
-chAz[0] = chAz[0].r - radians(5)
-chAzGT[0] = chAz[0].r - radians(5)
-
-teapotNum = 3
-teapotIdx = renderTeapotsList[teapotNum]
-teapot2 = targetModels[teapotNum]
-teapot2.matrix_world = mathutils.Matrix.Translation(targetPosition)
-vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = sceneimport.unpackObjects(teapot2, teapotIdx, True, True)
-#Setup backrpojection renderer
-vmodflat = [item for sublist in vmod for item in sublist]
-rangeMeshes = range(len(vmodflat))
-vchmod = [ch.array(vmodflat[mesh]) for mesh in rangeMeshes]
-if len(vchmod)==1:
-    vstackmod = vchmod[0]
-else:
-    vstackmod = ch.vstack(vchmod)
-camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, center, width, height)
-vnmodflat = [item for sublist in vnmod for item in sublist]
-vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmodflat[mesh])))) for mesh in rangeMeshes]
-vcmodflat = [item for sublist in vcmod for item in sublist]
-vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
-vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
-renderer2 = TexturedRenderer()
-setupTexturedRenderer(renderer2, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
-renderer2.r
-
-chAz[0] = chAz[0].r - radians(5)
-chAzGT[0] = chAz[0].r - radians(5)
-
-ipdb.set_trace()
-
-removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  vmod[0], fmod_list[0], vcmod[0], vnmod[0], uvmod[0], haveTexturesmod_list[0], texturesmod_list[0])
-vflat = [item for sublist in v for item in sublist]
-rangeMeshes = range(len(vflat))
-vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
-if len(vch)==1:
-    vstack = vch[0]
-else:
-    vstack = ch.vstack(vch)
-vnflat = [item for sublist in vn for item in sublist]
-vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vnflat[mesh])))) for mesh in rangeMeshes]
-vcflat = [item for sublist in vc for item in sublist]
-vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
-rendererGT.clear()
-del rendererGT
-rendererGT = TexturedRenderer()
-setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
-
-ipdb.set_trace()
+# ipdb.set_trace()
 
 vis_gt = np.array(renderer.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -199,8 +214,17 @@ shapeIm = vis_gt.shape
 numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
+def imageGT():
+    global groundTruthBlender
+    global rendererGT
+    global blenderRender
 
-imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
+    if groundTruthBlender:
+        return blenderRender
+    else:
+        return np.copy(np.array(rendererGT.r)).astype(np.float64)
+
+imagegt = imageGT()
 chImage = ch.array(imagegt)
 # E_raw_simple = renderer - rendererGT
 negVisGT = ~vis_gt
@@ -213,8 +237,6 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-global initialPixelStdev
-global reduceVariance
 initialPixelStdev = 0.5
 reduceVariance = False
 # finalPixelStdev = 0.05
@@ -237,7 +259,6 @@ pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobust
 modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
-global model
 model = 0
 
 pixelErrorFun = pixelModels[model]
@@ -259,7 +280,7 @@ ax2.set_title("Backprojection")
 pim2 = ax2.imshow(renderer.r)
 
 edges = renderer.boundarybool_image
-gtoverlay = imagegt.copy()
+gtoverlay = imageGT().copy()
 gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
 pim1 = ax1.imshow(gtoverlay)
 
@@ -298,14 +319,11 @@ plt.pause(0.1)
 
 t = time.time()
 
-global changedGT
 changedGT = False
-global refresh
 refresh = True
-global drawSurf
 drawSurf = False
-global makeVideo
 makeVideo = False
+updateErrorFunctions = False
 
 if makeVideo:
     import matplotlib.animation as animation
@@ -364,10 +382,11 @@ if computePerformance:
 
 ims = []
 
+
 def refreshSubplots():
     #Other subplots visualizing renders and its pixel derivatives
     edges = renderer.boundarybool_image
-    imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
+    imagegt = imageGT()
     gtoverlay = imagegt.copy()
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1.set_data(gtoverlay)
@@ -397,7 +416,12 @@ def plotSurface():
     global plotMinimization
     global chAz
     global chEl
+    global chDist
+    global chAzGT
+    global chElGT
+    global chDistGT
     global model
+    global scene
     if not plotMinimization and not drawSurf:
         figperf.clear()
         global axperf
@@ -589,6 +613,7 @@ method = 1
 exit = False
 minimize = False
 plotMinimization = False
+changeRenderer = False
 global chAzSaved
 global chElSaved
 global chComponentSaved
@@ -603,6 +628,7 @@ def readKeys(window, key, scancode, action, mods):
     global chAz
     global chEl
     global chComponent
+    global changedGT
     refresh = False
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_ESCAPE and action == glfw.RELEASE:
         glfw.set_window_should_close(window, True)
@@ -634,23 +660,106 @@ def readKeys(window, key, scancode, action, mods):
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r + radians(1)
-    if key == glfw.KEY_C and action == glfw.RELEASE:
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
+        if useBlender:
+            if scene.render.engine == 'CYCLES':
+                print("Changed rendering to BLENDER_RENDER")
+                scene.render.engine = 'BLENDER_RENDER'
+            else:
+                print("Changed rendering to CYCLES")
+                scene.render.engine = 'CYCLES'
+            changedGT = True
+            updateErrorFunctions = True
+            refresh = True
+
+    if key != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
         print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01745]))
         print("Scipy grad check: " + ch.optimization.scipyGradCheck({'raw': errorFun}, [chAz]))
-    if key == glfw.KEY_B:
-        refresh = True
-        chComponent[0] = chComponent[0].r + 0.1
+
     if key == glfw.KEY_D:
         refresh = True
+        chComponent[0] = chComponent[0].r + 0.1
+    if key == glfw.MOD_SHIFT and glfw.KEY_D:
+        refresh = True
         chComponent[0] = chComponent[0].r - 0.1
-    global changedGT
     global drawSurf
     global model
     global models
+    global updateErrorFunctions
     if key == glfw.KEY_G and action == glfw.RELEASE:
         refresh = True
         changedGT = True
+        updateErrorFunctions = True
 
+    global targetPosition
+    global center
+    global vstack
+    global vch
+    global f_list
+    global vc_list
+    global vnch
+    global uv
+    global haveTextures_list
+    global textures_list
+    global cameraGT
+    global rendererGT
+    global renderer
+    global teapotGT
+    global teapot
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_G and action == glfw.RELEASE:
+
+        glfw.make_context_current(rendererGT.win)
+        rendererGT.clear()
+        del rendererGT
+
+        removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+        addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+        vflat = [item for sublist in v for item in sublist]
+        rangeMeshes = range(len(vflat))
+        vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+        if len(vch)==1:
+            vstack = vch[0]
+        else:
+            vstack = ch.vstack(vch)
+        center = center_teapots[currentTeapotModel]
+        cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
+        vnflat = [item for sublist in vn for item in sublist]
+        vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vnflat[mesh])))) for mesh in rangeMeshes]
+        vcflat = [item for sublist in vc for item in sublist]
+        vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+        vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+
+        rendererGT = TexturedRenderer()
+        setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
+
+        updateErrorFunctions = True
+        refresh = True
+        changedGT = True
+
+        #Unlink and place the new teapot for Blender.
+        if useBlender:
+            scene.objects.unlink(teapotGT)
+            teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
+            teapotGT = blender_teapots[currentTeapotModel]
+            placeNewTarget(scene, teapotGT, targetPosition)
+            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+            scene.update()
+
+    global groundTruthBlender
+    global blenderRender
+    if key == glfw.KEY_B and action == glfw.RELEASE:
+        if useBlender:
+            updateErrorFunctions = True
+            groundTruthBlender = not groundTruthBlender
+            changedGT = True
+            if groundTruthBlender:
+                    bpy.ops.render.render( write_still=True )
+                    image = cv2.imread(scene.render.filepath)
+                    image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+                    blenderRender = image
+            refresh = True
+
+    #Compute in order to plot the surface neighouring the azimuth/el of the gradients and error function.
     if key == glfw.KEY_E and action == glfw.RELEASE:
         if computePerformance:
             print("Estimating cost function surface and gradients...")
@@ -757,8 +866,6 @@ def readKeys(window, key, scancode, action, mods):
             print("Avg Angle.: " + str(np.mean(avgAngle)))
             print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
             idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
-            # distGTMin = np.sqrt((chAzGT*180/np.pi - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]*180/np.pi)**2 + (chAzGT*180/np.pi-elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]*180/np.pi)**2)
-            # print("Dist of minimum to groundtruth: " + str(distGTMin))
             azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
             elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
             print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
@@ -805,7 +912,26 @@ def readKeys(window, key, scancode, action, mods):
         drawSurf = False
         plotMinimization = False
 
-    import regression_methods
+    global changeRenderer
+    global currentTeapotModel
+    changeRenderer = False
+    if key == glfw.KEY_KP_7 and action == glfw.RELEASE:
+        currentTeapotModel = (currentTeapotModel - 1) % len(renderTeapotsList)
+        changeRenderer = True
+    if key == glfw.KEY_KP_8 and action == glfw.RELEASE:
+        currentTeapotModel = (currentTeapotModel + 1) % len(renderTeapotsList)
+        changeRenderer = True
+
+    global renderer
+    global negLikModel
+    global negLikModelRobust
+    global pixelLikelihoodCh
+    global pixelLikelihoodRobustCh
+    global post
+    global models
+    global pixelModels
+    global pixelErrorFun
+    global errorFun
     global trainAzsGT
     global trainElevsGT
     global testAzsGT
@@ -815,7 +941,6 @@ def readKeys(window, key, scancode, action, mods):
     global randForestModel
     global linRegModel
     global testSize
-    import imageproc
     global occlusions
     global hogfeats
     global randForestModelCosAzs
@@ -826,8 +951,9 @@ def readKeys(window, key, scancode, action, mods):
     global randForestModelSinElevs
     global linRegModelCosElevs
     global linRegModelSinElevs
+    import imageproc
+    import regression_methods
     if key == glfw.KEY_T and action == glfw.RELEASE:
-
         print("Training recognition models.")
         trainSize = 500
         testSize = 20
@@ -844,7 +970,6 @@ def readKeys(window, key, scancode, action, mods):
         images = []
         occlusions = np.array([])
         hogs = []
-
         # split = 0.8
         # setTrain = np.arange(np.floor(trainSize*split)).astype(np.uint8)
         print("Generating renders")
@@ -1266,7 +1391,6 @@ def readKeys(window, key, scancode, action, mods):
 
         directory = 'results/'
 
-
         #Write statistics to file.
         with open(directory + 'performance.txt', 'w') as expfile:
             # expfile.write(str(z))
@@ -1339,15 +1463,13 @@ while not exit:
     if changedGT:
         drawSurf = False
         plotMinimization = False
-        imagegt = np.copy(np.array(rendererGT.r)).astype(np.float64)
+        imagegt = imageGT()
         chImage[:,:,:] = imagegt[:,:,:]
 
         chAzGT[:] = chAz.r[:]
         chElGT[:] = chEl.r[:]
         chDistGT[:] = chDist.r[:]
         chComponentGT[:] = chComponent.r[:]
-
-        changedGT = False
 
         if makeVideo:
             ims = []
@@ -1368,6 +1490,60 @@ while not exit:
         gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
         gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
+        if useBlender:
+            print("Updating Ground Truth blender camera!")
+            scene.update()
+            center = centerOfGeometry(teapotGT.dupli_group.objects, teapotGT.matrix_world)
+            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+            scene.update()
+
+        if useBlender and groundTruthBlender:
+            scene.update()
+            bpy.ops.render.render( write_still=True )
+            image = cv2.imread(scene.render.filepath)
+            image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+            blenderRender = image
+
+        changedGT = False
+
+    if changeRenderer:
+        print("New teapot model " + str(currentTeapotModel))
+        drawSurf = False
+        plotMinimization = False
+        refresh = True
+        renderer = renderer_teapots[currentTeapotModel]
+        updateErrorFunctions = True
+        if useBlender:
+            teapot = blender_teapots[currentTeapotModel]
+        changeRenderer = False
+
+    if updateErrorFunctions:
+        currentGT = rendererGT
+        if useBlender and groundTruthBlender:
+            scene.update()
+            bpy.ops.render.render( write_still=True )
+            image = cv2.imread(scene.render.filepath)
+            image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+            currentGT = image
+        negLikModel = -score_image.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
+        negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+        pixelLikelihoodCh = score_image.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
+        pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
+        post = score_image.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+        models = [negLikModel, negLikModelRobust, negLikModelRobust]
+        pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+        pixelErrorFun = pixelModels[model]
+        errorFun = models[model]
+
+        updateErrorFunctions = False
+
+    if minimize:
+        iterat = 0
+        print("Minimizing with method " + methods[method])
+        ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
+        plotMinimization = True
+        minimize = False
+
     if refresh:
         print("Sq Error: " + str(errorFun.r))
 
@@ -1379,13 +1555,6 @@ while not exit:
         plt.pause(0.1)
         plt.draw()
         refresh = False
-
-    if minimize:
-        iterat = 0
-        print("Minimizing with method " + methods[method])
-        ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
-        plotMinimization = True
-        minimize = False
 
 refreshSubplots()
 

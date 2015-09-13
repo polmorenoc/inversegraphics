@@ -169,7 +169,7 @@ def loadTargetModels(experimentTeapots):
 
         matrix_world = scaleMat * matrix_world
 
-        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z') 
+        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
         rotateMatrixWorld(scene,  rot )
 
         matrix_world  = rot * matrix_world
@@ -252,12 +252,13 @@ def loadSavedScene(sceneDicFile):
         haveTextures_list = sceneDic['haveTextures_list']
         vn = sceneDic['vn']
         textures_list = sceneDic['textures_list']
+        targetPosition = sceneDic['targetPosition']
 
         print("Loaded serialized scene!")
 
-    return v, f_list, vc, vn, uv, haveTextures_list, textures_list
+    return v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition
 
-def unpackBlenderScene(scene, sceneDicFile, serializeScene):
+def unpackBlenderScene(scene, sceneDicFile, targetPosition, serializeScene):
     # bpy.ops.render.render( write_still=True )
     # ipdb.set_trace()
     # v,f_list, vc, vn, uv, haveTextures_list, textures_list = unpackObjects(teapot)
@@ -287,7 +288,7 @@ def unpackBlenderScene(scene, sceneDicFile, serializeScene):
 
     #Serialize
     if serializeScene:
-        sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
+        sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list, 'targetPosition': targetPosition}
         with open(sceneDicFile, 'wb') as pfile:
             pickle.dump(sceneDic, pfile)
 
@@ -344,7 +345,7 @@ def unpackBlenderObject(object, objectDicFile, saveData):
         with open(objectDicFile, 'wb') as pfile:
             pickle.dump(targetDic, pfile)
 
-        print("Serialized scene!")
+        print("Serialized object!")
 
     return [v],[f_list],[vc],[vn], [uv], [haveTextures_list], [textures_list]
 

@@ -21,7 +21,7 @@ def getOcclusionFraction(renderer):
 def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
 
     chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
-    chToObjectTranslate = geometry.Translate(x=objCenter.x, y=objCenter.y, z=objCenter.z)
+    chToObjectTranslate = geometry.Translate(x=objCenter[0], y=objCenter[1], z=objCenter[2])
 
     chRotAzMat = geometry.RotateZ(a=chAz)
     chRotElMat = geometry.RotateX(a=-chEl)
@@ -84,9 +84,10 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
     texturesch = []
     textures_listflat = [item for sublist in textures_list for item in sublist]
     for texture_list in textures_listflat:
-        for texture in texture_list:
-            if texture != None:
-                texturesch = texturesch + [ch.array(texture)]
+        if texture_list != None:
+            for texture in texture_list:
+                if texture != None:
+                    texturesch = texturesch + [ch.array(texture)]
 
     if len(texturesch) == 0:
         texture_stack = ch.Ch([])
