@@ -40,7 +40,7 @@ glfw.window_hint(glfw.VISIBLE, GL.GL_TRUE)
 win = glfw.create_window(width, height, "Demo",  None, None)
 glfw.make_context_current(win)
 
-useBlender = True
+useBlender = False
 groundTruthBlender = False
 
 angle = 60 * 180 / numpy.pi
@@ -48,8 +48,6 @@ clip_start = 0.05
 clip_end = 10
 
 camDistance = 0.4
-azimuth = 275
-elevation = 33
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
@@ -120,10 +118,29 @@ chElGT = ch.Ch([0.0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
-light_color=ch.ones(3)
+
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-chColor = ch.Ch([0.2,0.2,0.2])
-chColorGT = ch.Ch([0.2,0.2,0.2])
+
+chPointLightIntensity = ch.Ch([1])
+chPointLightIntensityGT = ch.Ch([1])
+chLightAz = ch.Ch([0.0])
+chLightEl = ch.Ch([np.pi/2])
+chLightDist = ch.Ch([0.5])
+chLightDistGT = ch.Ch([0.5])
+chLightAzGT = ch.Ch([0.0])
+chLightElGT = ch.Ch([np.pi/2])
+
+ligthTransf = computeHemisphereTransformation(chLightAz, chLightEl, chLightDist, targetPosition)
+ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
+
+lightPos = ch.dot(ligthTransf, ch.Ch([0.,0.,0.,1.]))[0:3]
+lightPosGT = ch.dot(ligthTransfGT, ch.Ch([0.,0.,0.,1.]))[0:3]
+
+chGlobalConstant = ch.Ch([0.5])
+chGlobalConstantGT = ch.Ch([0.5])
+light_color = ch.ones(3)*chPointLightIntensity
+light_colorGT = ch.ones(3)*chPointLightIntensityGT
+
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -154,12 +171,12 @@ for teapot_i in range(len(renderTeapotsList)):
         vstackmod = ch.vstack(vchmod)
     camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, centermod + targetPosition, width, height)
     vnmodflat = [item for sublist in vnmod for item in sublist]
-    vnchmod = [ch.transpose(ch.dot(modelRotation, ch.transpose(ch.array(vnmodflat[mesh])))) for mesh in rangeMeshes]
+    vnchmod = [ch.array(vnmodflat[mesh]) for mesh in rangeMeshes]
     vcmodflat = [item for sublist in vcmod for item in sublist]
     vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
-    vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
+    # vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
+    vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
-
     setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
@@ -192,10 +209,11 @@ else:
 center = center_teapots[currentTeapotModel]
 cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
 vnflat = [item for sublist in vn for item in sublist]
-vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vnflat[mesh])))) for mesh in rangeMeshes]
+vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+# vc_list = computeSphericalHarmonics(vnch, vcch, light_colorGT, chComponentGT)
+vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 rendererGT = TexturedRenderer()
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
@@ -724,10 +742,11 @@ def readKeys(window, key, scancode, action, mods):
         center = center_teapots[currentTeapotModel]
         cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
         vnflat = [item for sublist in vn for item in sublist]
-        vnch = [ch.transpose(ch.dot(modelRotationGT, ch.transpose(ch.array(vnflat[mesh])))) for mesh in rangeMeshes]
+        vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
         vcflat = [item for sublist in vc for item in sublist]
         vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-        vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+        # vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+        vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
         rendererGT = TexturedRenderer()
         setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)

@@ -94,6 +94,7 @@ def importBlenderScenes(instances, completeScene, targetIndex):
                     # mesh.matrix_world = scaleMat * mesh.matrix_world
                      # ipdb.set_trace()
                     # mesh.data.show_double_sided = True
+                    mesh.update()
 
             modelInstance = bpy.data.objects.new(modelId, None)
             modelInstance.dupli_type = 'GROUP'
@@ -103,6 +104,7 @@ def importBlenderScenes(instances, completeScene, targetIndex):
             modelInstances.append(modelInstance)
             modelNum = modelNum + 1
             # ipdb.set_trace()
+            scene.update()
             blenderScenes.append(scene)
 
 
@@ -194,6 +196,7 @@ def loadTargetModels(experimentTeapots):
 
         transformations = transformations + [matrix_world]
         for mesh in scene.objects:
+            mesh.update()
             targetGroup.objects.link(mesh)
             mesh.pass_index = 1
 
@@ -202,6 +205,7 @@ def loadTargetModels(experimentTeapots):
         targetInstance.dupli_group = targetGroup
         targetInstance.pass_index = 1
         targetInstances.append(targetInstance)
+        scene.update()
         blenderTeapots.append(scene)
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations

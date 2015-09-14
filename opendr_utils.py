@@ -9,6 +9,7 @@ from math import radians
 from opendr.camera import ProjectPoints
 from opendr.renderer import TexturedRenderer
 from opendr.lighting import SphericalHarmonics
+from opendr.lighting import LambertianPointLight
 import ipdb
 
 def getOcclusionFraction(renderer):
@@ -20,12 +21,7 @@ def getOcclusionFraction(renderer):
 
 def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
 
-    chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
-    chToObjectTranslate = geometry.Translate(x=objCenter[0], y=objCenter[1], z=objCenter[2])
-
-    chRotAzMat = geometry.RotateZ(a=chAz)
-    chRotElMat = geometry.RotateX(a=-chEl)
-    chCamModelWorld = ch.dot(chToObjectTranslate, ch.dot(chRotAzMat, ch.dot(chRotElMat,chDistMat)))
+    chCamModelWorld = computeHemisphereTransformation(chAz, chEl, chDist, objCenter)
 
     chMVMat = ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(270), 4, 'X')))
 
@@ -41,6 +37,17 @@ def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
     camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
     return camera, modelRotation
 
+def computeHemisphereTransformation(chAz, chEl, chDist, objCenter):
+
+    chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
+    chToObjectTranslate = geometry.Translate(x=objCenter[0], y=objCenter[1], z=objCenter[2])
+
+    chRotAzMat = geometry.RotateZ(a=chAz)
+    chRotElMat = geometry.RotateX(a=-chEl)
+    chCamModelWorld = ch.dot(chToObjectTranslate, ch.dot(chRotAzMat, ch.dot(chRotElMat,chDistMat)))
+
+    return chCamModelWorld
+
 def computeSphericalHarmonics(vn, vc, light_color, components):
 
     # vnflat = [item for sublist in vn for item in sublist]
@@ -53,7 +60,22 @@ def computeSphericalHarmonics(vn, vc, light_color, components):
     vc_list = [A_list[mesh]*vc[mesh] for mesh in rangeMeshes]
     return vc_list
 
+def computeGlobalAndPointLighting(v, vn, vc, light_pos, globalConstant, light_color):
+    # Construct point light source
+    rangeMeshes = range(len(vn))
+    vc_list = []
+    for mesh in rangeMeshes:
+        l1 = LambertianPointLight(
+            v=v[mesh],
+            vn=vn[mesh],
+            num_verts=len(v[mesh]),
+            light_pos=light_pos,
+            vc=vc[mesh],
+            light_color=light_color)
 
+        vcmesh = vc[mesh]*(l1 + globalConstant)
+        vc_list = vc_list + [vcmesh]
+    return vc_list
 
 def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, haveTextures_list, textures_list, camera, frustum, sharedWin=None):
 
