@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from opendr_utils import *
 from OpenGL.arrays import vbo
 import OpenGL.GL as GL
+import light_probes
 
 plt.ion()
 
@@ -40,8 +41,9 @@ glfw.window_hint(glfw.VISIBLE, GL.GL_TRUE)
 win = glfw.create_window(width, height, "Demo",  None, None)
 glfw.make_context_current(win)
 
-useBlender = False
+useBlender = True
 groundTruthBlender = False
+useCycles = True
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -95,7 +97,7 @@ sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
 unpackSceneFromBlender = False
 if useBlender:
-    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height)
+    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
     targetPosition = np.array(targetPosition)
 if unpackSceneFromBlender:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
@@ -111,7 +113,6 @@ else:
 chAz = ch.Ch([0])
 chEl = ch.Ch([0.0])
 chDist = ch.Ch([camDistance])
-
 
 chAzGT = ch.Ch([0.0])
 chElGT = ch.Ch([0.0])
@@ -140,7 +141,6 @@ chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -174,8 +174,8 @@ for teapot_i in range(len(renderTeapotsList)):
     vnchmod = [ch.array(vnmodflat[mesh]) for mesh in rangeMeshes]
     vcmodflat = [item for sublist in vcmod for item in sublist]
     vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
-    # vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
-    vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
+    vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
+    # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
     setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
     renderer.r
@@ -183,6 +183,50 @@ for teapot_i in range(len(renderTeapotsList)):
 
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
+loadSavedSH = True
+shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
+
+if useBlender:
+    if not loadSavedSH:
+        #Spherical harmonics
+        bpy.context.scene.render.engine = 'CYCLES'
+        for item in bpy.context.selectable_objects:
+            item.select = False
+        light_probes.lightProbeOp(bpy.context)
+        lightProbe = bpy.context.scene.objects[0]
+        lightProbe.select = True
+        bpy.context.scene.objects.active = lightProbe
+        lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.3))
+        scene.update()
+        lp_data = light_probes.bakeOp(bpy.context)
+        scene.objects.unlink(lightProbe)
+        scene.update()
+
+        shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-2']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['2']]
+        shCoeffsRGB = np.vstack(shCoeffsList)
+        shCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+        with open(shCoefficientsFile, 'wb') as pfile:
+            shCoeffsDic = {'shCoeffs':shCoeffs}
+            pickle.dump(shCoeffsDic, pfile)
+        chComponentGT[:] = shCoeffs.ravel()*20
+
+if loadSavedSH:
+    if os.path.isfile(shCoefficientsFile):
+        with open(shCoefficientsFile, 'rb') as pfile:
+            shCoeffsDic = pickle.load(pfile)
+            shCoeffs = shCoeffsDic['shCoeffs']
+            chComponentGT[:] = shCoeffs.ravel()*20
+
+chComponent[:] = chComponentGT.r[:]
+
 if useBlender:
     teapot = blender_teapots[currentTeapotModel]
     teapotGT = blender_teapots[currentTeapotModel]
@@ -195,6 +239,7 @@ if useBlender:
     image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
     blenderRender = image
 
+    bpy.ops.wm.save_as_mainfile(filepath="data/scene" + str(sceneIdx) + ".blend")
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 #Setup ground truth renderer
@@ -212,15 +257,16 @@ vnflat = [item for sublist in vn for item in sublist]
 vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-# vc_list = computeSphericalHarmonics(vnch, vcch, light_colorGT, chComponentGT)
-vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+vc_list = computeSphericalHarmonics(vnch, vcch, light_colorGT, chComponentGT)
+# vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 rendererGT = TexturedRenderer()
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
 
+
 # ipdb.set_trace()
 
-vis_gt = np.array(renderer.indices_image!=1).copy().astype(np.bool)
+vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
 vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
 
@@ -678,17 +724,17 @@ def readKeys(window, key, scancode, action, mods):
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r + radians(1)
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
-        if useBlender:
-            if scene.render.engine == 'CYCLES':
-                print("Changed rendering to BLENDER_RENDER")
-                scene.render.engine = 'BLENDER_RENDER'
-            else:
-                print("Changed rendering to CYCLES")
-                scene.render.engine = 'CYCLES'
-            changedGT = True
-            updateErrorFunctions = True
-            refresh = True
+    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
+    #     if useBlender:
+    #         if scene.render.engine == 'CYCLES':
+    #             print("Changed rendering to BLENDER_RENDER")
+    #             scene.render.engine = 'BLENDER_RENDER'
+    #         else:
+    #             print("Changed rendering to CYCLES")
+    #             scene.render.engine = 'CYCLES'
+    #         changedGT = True
+    #         updateErrorFunctions = True
+    #         refresh = True
 
     if key != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
         print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01745]))
@@ -745,8 +791,8 @@ def readKeys(window, key, scancode, action, mods):
         vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
         vcflat = [item for sublist in vc for item in sublist]
         vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-        # vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
-        vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+        vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+        # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
         rendererGT = TexturedRenderer()
         setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
@@ -766,17 +812,18 @@ def readKeys(window, key, scancode, action, mods):
 
     global groundTruthBlender
     global blenderRender
-    if key == glfw.KEY_B and action == glfw.RELEASE:
+    if key != glfw.MOD_SHIFT and key == glfw.KEY_B and action == glfw.RELEASE:
         if useBlender:
             updateErrorFunctions = True
             groundTruthBlender = not groundTruthBlender
             changedGT = True
-            if groundTruthBlender:
-                    bpy.ops.render.render( write_still=True )
-                    image = cv2.imread(scene.render.filepath)
-                    image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-                    blenderRender = image
+            # if groundTruthBlender:
+            #         bpy.ops.render.render( write_still=True )
+            #         image = cv2.imread(scene.render.filepath)
+            #         image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+            #         blenderRender = image
             refresh = True
+
 
     #Compute in order to plot the surface neighouring the azimuth/el of the gradients and error function.
     if key == glfw.KEY_E and action == glfw.RELEASE:
@@ -862,7 +909,7 @@ def readKeys(window, key, scancode, action, mods):
         chComponent[0] = chComponentSaved
         refresh = True
 
-    if key == glfw.KEY_S and action == glfw.RELEASE:
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_S and action == glfw.RELEASE:
         print("**** Statistics ****" )
         print("GT Azimuth: " + str(chAzGT))
         print("Azimuth: " + str(chAz))
@@ -872,7 +919,6 @@ def readKeys(window, key, scancode, action, mods):
         print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
         print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
         # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
-
         print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
 
         if drawSurf:
@@ -1539,11 +1585,12 @@ while not exit:
     if updateErrorFunctions:
         currentGT = rendererGT
         if useBlender and groundTruthBlender:
-            scene.update()
-            bpy.ops.render.render( write_still=True )
-            image = cv2.imread(scene.render.filepath)
-            image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-            currentGT = image
+            currentGT = blenderRender
+            # scene.update()
+            # bpy.ops.render.render( write_still=True )
+            # image = cv2.imread(scene.render.filepath)
+            # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+            # currentGT = image
         negLikModel = -score_image.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
         negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
         pixelLikelihoodCh = score_image.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)

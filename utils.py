@@ -229,16 +229,12 @@ def AutoNode():
         cmat.use_nodes=True
         TreeNodes=cmat.node_tree
         links = TreeNodes.links
-    
         shader=''
         for n in TreeNodes.nodes:
-    
             if n.type == 'ShaderNodeTexImage' or n.type == 'RGBTOBW':
                 TreeNodes.nodes.remove(n)
-
             if n.type == 'OUTPUT_MATERIAL':
-                shout = n       
-                        
+                shout = n
             if n.type == 'BACKGROUND':
                 shader=n              
             if n.type == 'BSDF_DIFFUSE':
@@ -256,8 +252,7 @@ def AutoNode():
             if n.type == 'EMISSION':
                 shader=n 
             if n.type == 'HOLDOUT':
-                shader=n   
-
+                shader=n
         if cmat.raytrace_mirror.use and cmat.raytrace_mirror.reflect_factor>0.001:
             print("MIRROR")
             if shader:
@@ -267,42 +262,30 @@ def AutoNode():
                     shader = TreeNodes.nodes.new('BSDF_GLOSSY')    # RGB node
                     shader.location = 0,450
                     #print(shader.glossy)
-                    links.new(shader.outputs[0],shout.inputs[0]) 
-                        
+                    links.new(shader.outputs[0],shout.inputs[0])
         if not shader:
             shader = TreeNodes.nodes.new('BSDF_DIFFUSE')    # RGB node
             shader.location = 0,450
-             
             shout = TreeNodes.nodes.new('OUTPUT_MATERIAL')
             shout.location = 200,400          
-            links.new(shader.outputs[0],shout.inputs[0])                
-                   
-                   
-                   
+            links.new(shader.outputs[0],shout.inputs[0])
         if shader:                         
             textures = cmat.texture_slots
             for tex in textures:
-                                
                 if tex:
                     if tex.texture.type=='IMAGE':
-                         
                         img = tex.texture.image
                         #print(img.name)  
                         shtext = TreeNodes.nodes.new('ShaderNodeTexImage')
-          
-                        shtext.location = -200,400 
-        
+                        shtext.location = -200,400
                         shtext.image=img
-        
                         if tex.use_map_color_diffuse:
-                            links.new(shtext.outputs[0],shader.inputs[0]) 
-    
+                            links.new(shtext.outputs[0],shader.inputs[0])
                         if tex.use_map_normal:
                             t = TreeNodes.nodes.new('RGBTOBW')
                             t.location = -0,300 
                             links.new(t.outputs[0],shout.inputs[2]) 
                             links.new(shtext.outputs[0],t.inputs[0]) 
-
 
 
 def cameraLookingInsideRoom(cameraAzimuth):
@@ -344,6 +327,7 @@ def placeCamera(camera, azimuth, elevation, camDistance, center):
 
 
 def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSamples, useCycles, useGPU):
+
     if useCycles:
         #Switch Engine to Cycles
         scene.render.engine = 'CYCLES'
@@ -389,25 +373,23 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     ceilMinZ, ceilMaxZ = modelHeight(roomInstance.dupli_group.objects, roomInstance.matrix_world)
     ceilPos =  mathutils.Vector(((ceilMaxX + ceilMinX) / 2.0, (ceilMaxY + ceilMinY) / 2.0 , ceilMaxZ))
 
-    numLights = int(numpy.floor((ceilWidth-0.2)/1.15))
+    numLights = int(numpy.floor((ceilWidth-0.2)/1.2))
     lightInterval = ceilWidth/numLights
 
     for light in range(numLights):
         lightXPos = light*lightInterval + lightInterval/2.0
         lamp_data = bpy.data.lamps.new(name="Rect", type='AREA')
         lamp = bpy.data.objects.new(name="Rect", object_data=lamp_data)
-        lamp.data.size = 0.15
+        lamp.data.size = 0.2
         lamp.data.size_y = ceilDepth - 0.2
         lamp.data.shape = 'RECTANGLE'
         lamp.location = mathutils.Vector((ceilPos.x - ceilWidth/2.0 + lightXPos, ceilPos.y, ceilMaxZ))
         lamp.data.energy = 0.0025
-        # if not useCycles:
-        #     lamp.data.energy = 0.0015
-
         if useCycles:
             lamp.data.cycles.use_multiple_importance_sampling = True
             lamp.data.use_nodes = True
-            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 5
+            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 50
+
         scene.objects.link(lamp)
         lamp.layers[1] = True
         lamp.layers[2] = True
@@ -452,9 +434,7 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.layers[0].use_pass_object_index = True
     scene.render.layers[1].use_pass_object_index = True
     scene.render.layers[1].use_pass_combined = True
-
     camera.layers[2] = True
-
     scene.layers[1] = False
     scene.layers[2] = False
     scene.layers[0] = True

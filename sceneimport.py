@@ -30,7 +30,7 @@ def loadScene(sceneFile):
 
 def composeScene(modelInstances, targetIndex):
 
-    bpy.ops.scene.new()
+    unpackBlenderScene
     bpy.context.scene.name = 'Main Scene'
     scene = bpy.context.scene
     scene.unit_settings.system = 'METRIC'
@@ -94,7 +94,7 @@ def importBlenderScenes(instances, completeScene, targetIndex):
                     # mesh.matrix_world = scaleMat * mesh.matrix_world
                      # ipdb.set_trace()
                     # mesh.data.show_double_sided = True
-                    mesh.update()
+                    mesh.data.update()
 
             modelInstance = bpy.data.objects.new(modelId, None)
             modelInstance.dupli_type = 'GROUP'
@@ -168,6 +168,7 @@ def loadTargetModels(experimentTeapots):
             if mesh.type == 'MESH':
 
                 mesh.matrix_world =  scaleMat * mesh.matrix_world
+                mesh.data.update()
 
         matrix_world = scaleMat * matrix_world
 
@@ -196,7 +197,7 @@ def loadTargetModels(experimentTeapots):
 
         transformations = transformations + [matrix_world]
         for mesh in scene.objects:
-            mesh.update()
+            # mesh.update()
             targetGroup.objects.link(mesh)
             mesh.pass_index = 1
 
@@ -210,7 +211,7 @@ def loadTargetModels(experimentTeapots):
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
 
-def loadBlenderScene(sceneIdx, width, height):
+def loadBlenderScene(sceneIdx, width, height, useCycles):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLineNums = numpy.arange(len(sceneLines))
@@ -241,7 +242,7 @@ def loadBlenderScene(sceneIdx, width, height):
     roomInstance = scene.objects[roomName]
     roomInstance.layers[2] = True
     targetParentInstance.layers[2] = True
-    setupScene(scene, targetIndex,roomName, world, camera, width, height, 16, False, False)
+    setupScene(scene, targetIndex,roomName, world, camera, width, height, 16, useCycles, False)
     scene.update()
     scene.render.filepath = 'opendr_blender.png'
     return scene, targetParentPosition
