@@ -8,6 +8,7 @@ from bpy.utils import register_module, unregister_module
 from bpy import props as p
 import json
 import ipdb
+import matplotlib.pyplot as plt
 
 # bl_info = {
 #     "name": "Lightprobe",
@@ -159,18 +160,20 @@ def setup_material(ob):
     diffuse_out = diffuse.outputs["BSDF"]
     
     output = tree.nodes.new("ShaderNodeOutputMaterial")
+    # output.color_space = 'NONE'
     output_in = output.inputs["Surface"]
     
     tree.links.new(diffuse_out, output_in)
     
     bake_node = tree.nodes.new("ShaderNodeTexImage")
     bake_node.label = bake_node.name
+    bake_node.color_space = 'NONE'
     bake_out = bake_node.outputs["Color"]
     
     texture = create_lightmap_image(ob, 128, 128)
     bake_node.image = texture
-    
-    
+    bake_node.image.colorspace_settings.name = 'Raw'
+
     ob.data.uv_textures["lightmap"].active = True
 
     color_uvmap = tree.nodes.new("ShaderNodeUVMap")
@@ -415,7 +418,8 @@ def get_coefficients(ob, lightmap, l, m, theta_res, phi_res):
     l and m """
     c = mathutils.Color((0, 0, 0))
     harmonic = spherical_harmonics[(l, m)]
-    
+    # ipdb.set_trace()
+    # plt.imsave("lightmap.png", lightmap)
     for theta in (pi * y / float(theta_res) for y in range(theta_res)):
         for phi in (pi * 2 * x / float(phi_res) for x in range(phi_res)):
             color = sample_icosphere_color(ob, lightmap, theta, phi)
@@ -542,7 +546,7 @@ def lightProbeOp(context):
 
 def probeProperties():
     name = ""
-    theta_res = 10
-    phi_res = 20
+    theta_res = 20
+    phi_res = 40
     samples = 1000
     return name, theta_res, phi_res, samples

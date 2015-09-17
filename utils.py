@@ -341,17 +341,21 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
 
         cycles = bpy.context.scene.cycles
 
-        cycles.samples = 256
+        cycles.samples = 512
         cycles.max_bounces = 36
         cycles.min_bounces = 4
-        cycles.caustics_reflective = True
-        cycles.caustics_refractive = True
+        cycles.caustics_reflective = False
+        cycles.caustics_refractive = False
         cycles.diffuse_bounces = 36
         cycles.glossy_bounces = 12
-        cycles.transmission_bounces = 12
+        cycles.transmission_bounces = 2
         cycles.volume_bounces = 12
-        cycles.transparent_min_bounces = 4
-        cycles.transparent_max_bounces = 12
+        cycles.transparent_min_bounces = 2
+        cycles.transparent_max_bounces = 2
+
+    scene.render.threads = 4
+    scene.render.tile_x = 75
+    scene.render.tile_y = 75
 
     scene.render.image_settings.compression = 0
     scene.render.resolution_x = width #perhaps set resolution in code
@@ -388,7 +392,7 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         if useCycles:
             lamp.data.cycles.use_multiple_importance_sampling = True
             lamp.data.use_nodes = True
-            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 50
+            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 40
 
         scene.objects.link(lamp)
         lamp.layers[1] = True
@@ -424,7 +428,7 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     # world.exposure = 1.1
     # world.light_settings.use_indirect_light = True
 
-    # scene.sequencer_colorspace_settings.name = 'Linear'
+    scene.sequencer_colorspace_settings.name = 'Raw'
     scene.update()
 
     bpy.ops.scene.render_layer_add()

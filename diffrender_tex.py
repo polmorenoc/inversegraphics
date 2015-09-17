@@ -28,7 +28,7 @@ import light_probes
 
 plt.ion()
 
-width, height = (110, 110)
+width, height = (150, 150)
 
 glfw.init()
 glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -41,7 +41,7 @@ glfw.window_hint(glfw.VISIBLE, GL.GL_TRUE)
 win = glfw.create_window(width, height, "Demo",  None, None)
 glfw.make_context_current(win)
 
-useBlender = True
+useBlender = False
 groundTruthBlender = False
 useCycles = True
 
@@ -104,6 +104,7 @@ if unpackSceneFromBlender:
 else:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
 
+
 # 1 Prepare each teapot renderer.
 # 2 Add first teapot to blender scene and GT renderer.
 
@@ -135,13 +136,15 @@ ligthTransf = computeHemisphereTransformation(chLightAz, chLightEl, chLightDist,
 ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
 
 lightPos = ch.dot(ligthTransf, ch.Ch([0.,0.,0.,1.]))[0:3]
+lightPos = ch.Ch([targetPosition[0]+0.5,targetPosition[1],targetPosition[2] + 0.5])
 lightPosGT = ch.dot(ligthTransfGT, ch.Ch([0.,0.,0.,1.]))[0:3]
 
 chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-
+chVColors = ch.Ch([0.4,0.4,0.4])
+chVColorsGT = ch.Ch([1.0,0.0,0.0])
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
         teapot = blender_teapots[teapot_i]
@@ -173,7 +176,8 @@ for teapot_i in range(len(renderTeapotsList)):
     vnmodflat = [item for sublist in vnmod for item in sublist]
     vnchmod = [ch.array(vnmodflat[mesh]) for mesh in rangeMeshes]
     vcmodflat = [item for sublist in vcmod for item in sublist]
-    vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
+    vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+    # vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
     vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
@@ -187,9 +191,20 @@ loadSavedSH = True
 shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
 
 if useBlender:
+    #Add directional light to test spherical harmonics
+    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
+    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
+    lamp.layers[1] = True
+    lamp.layers[2] = True
+    lamp.location = mathutils.Vector((targetPosition[0]+0.5,targetPosition[1],targetPosition[2] + 0.5))
+    lamp.data.cycles.use_multiple_importance_sampling = True
+    lamp.data.use_nodes = True
+    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 20
+    scene.objects.link(lamp)
     if not loadSavedSH:
         #Spherical harmonics
         bpy.context.scene.render.engine = 'CYCLES'
+        scene.sequencer_colorspace_settings.name = 'Linear'
         for item in bpy.context.selectable_objects:
             item.select = False
         light_probes.lightProbeOp(bpy.context)
@@ -203,9 +218,9 @@ if useBlender:
         scene.update()
 
         shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
         shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
         shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-2']]
         shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-1']]
         shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['0']]
@@ -216,14 +231,15 @@ if useBlender:
         with open(shCoefficientsFile, 'wb') as pfile:
             shCoeffsDic = {'shCoeffs':shCoeffs}
             pickle.dump(shCoeffsDic, pfile)
-        chComponentGT[:] = shCoeffs.ravel()*20
+        chComponentGT[:] = shCoeffs.ravel()*30
 
 if loadSavedSH:
     if os.path.isfile(shCoefficientsFile):
         with open(shCoefficientsFile, 'rb') as pfile:
             shCoeffsDic = pickle.load(pfile)
             shCoeffs = shCoeffsDic['shCoeffs']
-            chComponentGT[:] = shCoeffs.ravel()*20
+            chComponentGT[:] = shCoeffs.ravel()*30
+
 
 chComponent[:] = chComponentGT.r[:]
 
@@ -234,12 +250,12 @@ if useBlender:
     center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
     placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
     scene.update()
-    bpy.ops.render.render( write_still=True )
-    image = cv2.imread(scene.render.filepath)
-    image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-    blenderRender = image
+    # bpy.ops.render.render( write_still=True )
+    # image = cv2.imread(scene.render.filepath)
+    # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+    # blenderRender = image
+    # bpy.ops.wm.save_as_mainfile(filepath="data/scene" + str(sceneIdx) + ".blend")
 
-    bpy.ops.wm.save_as_mainfile(filepath="data/scene" + str(sceneIdx) + ".blend")
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 #Setup ground truth renderer
@@ -257,12 +273,12 @@ vnflat = [item for sublist in vn for item in sublist]
 vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
 vc_list = computeSphericalHarmonics(vnch, vcch, light_colorGT, chComponentGT)
 # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 rendererGT = TexturedRenderer()
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
-
 
 # ipdb.set_trace()
 
@@ -388,6 +404,7 @@ refresh = True
 drawSurf = False
 makeVideo = False
 updateErrorFunctions = False
+pendingCyclesRender = True
 
 if makeVideo:
     import matplotlib.animation as animation
@@ -403,7 +420,7 @@ if makeVideo:
 
     plt.tight_layout()
 
-computePerformance = True
+computePerformance = False
 performance = {}
 elevations = {}
 azimuths = {}
@@ -791,6 +808,7 @@ def readKeys(window, key, scancode, action, mods):
         vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
         vcflat = [item for sublist in vc for item in sublist]
         vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+        vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
         vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
         # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
@@ -816,7 +834,7 @@ def readKeys(window, key, scancode, action, mods):
         if useBlender:
             updateErrorFunctions = True
             groundTruthBlender = not groundTruthBlender
-            changedGT = True
+            # changedGT = True
             # if groundTruthBlender:
             #         bpy.ops.render.render( write_still=True )
             #         image = cv2.imread(scene.render.filepath)
@@ -1535,6 +1553,7 @@ while not exit:
         chElGT[:] = chEl.r[:]
         chDistGT[:] = chDist.r[:]
         chComponentGT[:] = chComponent.r[:]
+        chVColorsGT[:] = chVColors.r[:]
 
         if makeVideo:
             ims = []
@@ -1562,14 +1581,18 @@ while not exit:
             placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
             scene.update()
 
-        if useBlender and groundTruthBlender:
-            scene.update()
-            bpy.ops.render.render( write_still=True )
-            image = cv2.imread(scene.render.filepath)
-            image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-            blenderRender = image
+        if useBlender:
+            pendingCyclesRender = True
 
         changedGT = False
+
+    if groundTruthBlender and pendingCyclesRender:
+        scene.update()
+        bpy.ops.render.render( write_still=True )
+        image = cv2.imread(scene.render.filepath)
+        image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+        blenderRender = image
+        pendingCyclesRender = False
 
     if changeRenderer:
         print("New teapot model " + str(currentTeapotModel))
