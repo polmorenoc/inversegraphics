@@ -318,13 +318,16 @@ def placeNewTarget(scene, target, targetPosition):
     scene.update()
 
 def placeCamera(camera, azimuth, elevation, camDistance, center):
-    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
-    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
-    originalLoc = mathutils.Vector((0,-camDistance, 0))
-    location = center + azimuthRot * elevationRot * originalLoc
+    location = getRelativeLocation(azimuth, elevation, camDistance, center)
     camera.location = location
     look_at(camera, center)
 
+def getRelativeLocation(azimuth, elevation, distance, center):
+    azimuthRot = mathutils.Matrix.Rotation(radians(-azimuth), 4, 'Z')
+    elevationRot = mathutils.Matrix.Rotation(radians(-elevation), 4, 'X')
+    originalLoc = mathutils.Vector((0,-distance, 0))
+    location = center + azimuthRot * elevationRot * originalLoc
+    return location
 
 def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSamples, useCycles, useGPU):
 

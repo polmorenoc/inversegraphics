@@ -143,8 +143,8 @@ chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-chVColors = ch.Ch([0.4,0.4,0.4])
-chVColorsGT = ch.Ch([1.0,0.0,0.0])
+chVColors = ch.Ch([0.4,0.4,0.1])
+chVColorsGT = ch.Ch([0.4,0.4,0.4])
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
         teapot = blender_teapots[teapot_i]
@@ -190,17 +190,10 @@ renderer = renderer_teapots[currentTeapotModel]
 loadSavedSH = True
 shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
 
+chAmbientIntensityGT = ch.Ch([30])
+clampedCosCoeffs = clampedCosineCoefficients()
+chAmbientSHGT = ch.zeros([9])
 if useBlender:
-    #Add directional light to test spherical harmonics
-    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
-    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
-    lamp.layers[1] = True
-    lamp.layers[2] = True
-    lamp.location = mathutils.Vector((targetPosition[0]+0.5,targetPosition[1],targetPosition[2] + 0.5))
-    lamp.data.cycles.use_multiple_importance_sampling = True
-    lamp.data.use_nodes = True
-    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 20
-    scene.objects.link(lamp)
     if not loadSavedSH:
         #Spherical harmonics
         bpy.context.scene.render.engine = 'CYCLES'
@@ -231,30 +224,46 @@ if useBlender:
         with open(shCoefficientsFile, 'wb') as pfile:
             shCoeffsDic = {'shCoeffs':shCoeffs}
             pickle.dump(shCoeffsDic, pfile)
-        chComponentGT[:] = shCoeffs.ravel()*30
+        chAmbientSHGT = shCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
 
 if loadSavedSH:
     if os.path.isfile(shCoefficientsFile):
         with open(shCoefficientsFile, 'rb') as pfile:
             shCoeffsDic = pickle.load(pfile)
             shCoeffs = shCoeffsDic['shCoeffs']
-            chComponentGT[:] = shCoeffs.ravel()*30
+            chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
 
-
-chComponent[:] = chComponentGT.r[:]
+chLightRadGT = ch.Ch([0.1])
+chLightDistGT = ch.Ch([0.5])
+chLightIntensityGT = ch.Ch([10])
+chPhiGT = ch.Ch([0])
+chThetaGT = ch.Ch([0])
+angle = ch.arcsin(chLightRadGT/chLightDistGT)
+zGT = chZonalHarmonics(angle)
+shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chThetaGT, chPhiGT - np.pi/2)
+chComponentGT = shDirLightGT.r[:]*chLightIntensityGT
+# chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
 
 if useBlender:
+    #Add directional light to match spherical harmonics
+    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
+    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
+    lamp.layers[1] = True
+    lamp.layers[2] = True
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    lampLoc = getRelativeLocation(chThetaGT.r, chPhiGT.r, chLightDistGT, center)
+    lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
+    lamp.data.cycles.use_multiple_importance_sampling = True
+    lamp.data.use_nodes = True
+    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 20
+    scene.objects.link(lamp)
+
     teapot = blender_teapots[currentTeapotModel]
     teapotGT = blender_teapots[currentTeapotModel]
     placeNewTarget(scene, teapot, targetPosition)
-    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+
     placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
     scene.update()
-    # bpy.ops.render.render( write_still=True )
-    # image = cv2.imread(scene.render.filepath)
-    # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-    # blenderRender = image
-    # bpy.ops.wm.save_as_mainfile(filepath="data/scene" + str(sceneIdx) + ".blend")
 
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
@@ -682,7 +691,7 @@ def cb2(_):
     t = time.time()
 
 # , chComponent[0]
-free_variables = [chAz, chEl]
+free_variables = [chAz, chEl, chComponent, chVColors]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -1552,7 +1561,7 @@ while not exit:
         chAzGT[:] = chAz.r[:]
         chElGT[:] = chEl.r[:]
         chDistGT[:] = chDist.r[:]
-        chComponentGT[:] = chComponent.r[:]
+        # chComponentGT[:] = chComponent.r[:]
         chVColorsGT[:] = chVColors.r[:]
 
         if makeVideo:

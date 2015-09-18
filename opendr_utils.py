@@ -11,6 +11,8 @@ from opendr.renderer import TexturedRenderer
 from opendr.lighting import SphericalHarmonics
 from opendr.lighting import LambertianPointLight
 import ipdb
+import light_probes
+
 
 def getOcclusionFraction(renderer):
 
@@ -18,6 +20,62 @@ def getOcclusionFraction(renderer):
     vis_im = np.array(renderer.image_mesh_bool([0])).copy().astype(np.bool)
 
     return 1. - np.sum(vis_occluded)/np.sum(vis_im)
+
+#From http://www.ppsloan.org/publications/StupidSH36.pdf
+def chZonalHarmonics(a):
+    zl0 = -ch.sqrt(ch.pi)*(-1.0 + ch.cos(a))
+    zl1 = 0.5*ch.sqrt(3.0*ch.pi)*ch.sin(a)**2
+    zl2 = -0.5*ch.sqrt(5.0*ch.pi)*ch.cos(a)*(-1.0 + ch.cos(a))*(ch.cos(a)+1.0)
+    z = [zl0, zl1, zl2]
+    return ch.concatenate(z)
+
+# http://cseweb.ucsd.edu/~ravir/papers/envmap/envmap.pdf
+chSpherical_harmonics = {
+    (0, 0): lambda theta, phi: ch.Ch([0.282095]),
+
+    (1, -1): lambda theta, phi: 0.488603 * ch.sin(theta) * ch.sin(phi),
+    (1, 0): lambda theta, phi: 0.488603 * ch.cos(theta),
+    (1, 1): lambda theta, phi: 0.488603 * ch.sin(theta) * ch.cos(phi),
+
+    (2, -2): lambda theta, phi: 1.092548 * ch.sin(theta) * ch.cos(phi) * ch.sin(theta) * ch.sin(phi),
+    (2, -1): lambda theta, phi: 1.092548 * ch.sin(theta) * ch.sin(phi) * ch.cos(theta),
+    (2, 0): lambda theta, phi: 0.315392 * (3 * ch.cos(theta)**2 - 1),
+    (2, 1): lambda theta, phi: 1.092548 * ch.sin(theta) * ch.cos(phi) * ch.cos(theta),
+    (2, 2): lambda theta, phi: 0.546274 * (((ch.sin(theta) * ch.cos(phi)) ** 2) - ((ch.sin(theta) * ch.sin(phi)) ** 2))
+}
+
+#From http://www.ppsloan.org/publications/StupidSH36.pdf
+def chZonalToSphericalHarmonics(z, theta, phi):
+    sphCoeffs = []
+    for l in np.arange(len(z)):
+        for m in np.arange(np.int(-(l*2+1)/2),np.int((l*2+1)/2) + 1):
+            ylm_d = chSpherical_harmonics[(l,m)](theta,phi)
+            sh = np.sqrt(4*np.pi/(2*l + 1))*z[l]*ylm_d
+            sphCoeffs = sphCoeffs + [sh]
+
+    #Correct order in band l=1.
+    sphCoeffs[1],sphCoeffs[3] = sphCoeffs[3],sphCoeffs[1]
+    chSphCoeffs = ch.concatenate(sphCoeffs) * clampedCosineCoefficients()
+    return chSphCoeffs
+
+#From http://www.ppsloan.org/publications/StupidSH36.pdf
+def clampedCosineCoefficients():
+
+    constants = []
+    for l in np.arange(3):
+        for m in np.arange(np.int(-(l*2+1)/2),np.int((l*2+1)/2) + 1):
+            normConstant = np.pi
+            if l > 1 and l % 1 == 0:
+                normConstant = 0
+            if l == 1:
+                normConstant = 2*np.pi/3
+            if l > 1 and l % 2 == 0:
+                normConstant = 2*np.pi*(((-1)**(l/2.-1.))/((l+2)*(l-1)))*(np.math.factorial(l)/((2**(l))*(np.math.factorial(l/2)**2)))
+                # normConstant = 0.785398
+
+            constants = constants + [normConstant]
+
+    return np.array(constants)
 
 def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
 
