@@ -28,7 +28,7 @@ import light_probes
 
 plt.ion()
 
-width, height = (150, 150)
+width, height = (100, 100)
 
 glfw.init()
 glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -120,7 +120,6 @@ chElGT = ch.Ch([0.0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
-
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 
 chPointLightIntensity = ch.Ch([1])
@@ -145,6 +144,66 @@ light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
 chVColors = ch.Ch([0.4,0.4,0.1])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
+
+loadSavedSH = True
+shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
+
+chAmbientIntensityGT = ch.Ch([10])
+clampedCosCoeffs = clampedCosineCoefficients()
+chAmbientSHGT = ch.zeros([9])
+if useBlender:
+    if not loadSavedSH:
+        #Spherical harmonics
+        bpy.context.scene.render.engine = 'CYCLES'
+        scene.sequencer_colorspace_settings.name = 'Linear'
+        for item in bpy.context.selectable_objects:
+            item.select = False
+        light_probes.lightProbeOp(bpy.context)
+        lightProbe = bpy.context.scene.objects[0]
+        lightProbe.select = True
+        bpy.context.scene.objects.active = lightProbe
+        lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.15))
+        scene.update()
+        lp_data = light_probes.bakeOp(bpy.context)
+        scene.objects.unlink(lightProbe)
+        scene.update()
+
+        shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-2']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['0']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['1']]
+        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['2']]
+        shCoeffsRGB = np.vstack(shCoeffsList)
+        shCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+        with open(shCoefficientsFile, 'wb') as pfile:
+            shCoeffsDic = {'shCoeffs':shCoeffs}
+            pickle.dump(shCoeffsDic, pfile)
+        chAmbientSHGT = shCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
+
+if loadSavedSH:
+    if os.path.isfile(shCoefficientsFile):
+        with open(shCoefficientsFile, 'rb') as pfile:
+            shCoeffsDic = pickle.load(pfile)
+            shCoeffs = shCoeffsDic['shCoeffs']
+            chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
+
+chLightRadGT = ch.Ch([0.1])
+chLightDistGT = ch.Ch([0.5])
+chLightIntensityGT = ch.Ch([10])
+chLightAzGT = ch.Ch([np.pi/2])
+chLightElGT = ch.Ch([np.pi/4])
+angle = ch.arcsin(chLightRadGT/chLightDistGT)
+zGT = chZonalHarmonics(angle)
+shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
+chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT
+# chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
+
+chComponent[:] = chAmbientSHGT.r[:]
+
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
         teapot = blender_teapots[teapot_i]
@@ -187,62 +246,7 @@ for teapot_i in range(len(renderTeapotsList)):
 
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
-loadSavedSH = True
-shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([30])
-clampedCosCoeffs = clampedCosineCoefficients()
-chAmbientSHGT = ch.zeros([9])
-if useBlender:
-    if not loadSavedSH:
-        #Spherical harmonics
-        bpy.context.scene.render.engine = 'CYCLES'
-        scene.sequencer_colorspace_settings.name = 'Linear'
-        for item in bpy.context.selectable_objects:
-            item.select = False
-        light_probes.lightProbeOp(bpy.context)
-        lightProbe = bpy.context.scene.objects[0]
-        lightProbe.select = True
-        bpy.context.scene.objects.active = lightProbe
-        lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.3))
-        scene.update()
-        lp_data = light_probes.bakeOp(bpy.context)
-        scene.objects.unlink(lightProbe)
-        scene.update()
-
-        shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-2']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['2']]
-        shCoeffsRGB = np.vstack(shCoeffsList)
-        shCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
-        with open(shCoefficientsFile, 'wb') as pfile:
-            shCoeffsDic = {'shCoeffs':shCoeffs}
-            pickle.dump(shCoeffsDic, pfile)
-        chAmbientSHGT = shCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
-
-if loadSavedSH:
-    if os.path.isfile(shCoefficientsFile):
-        with open(shCoefficientsFile, 'rb') as pfile:
-            shCoeffsDic = pickle.load(pfile)
-            shCoeffs = shCoeffsDic['shCoeffs']
-            chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
-
-chLightRadGT = ch.Ch([0.1])
-chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([10])
-chPhiGT = ch.Ch([0])
-chThetaGT = ch.Ch([0])
-angle = ch.arcsin(chLightRadGT/chLightDistGT)
-zGT = chZonalHarmonics(angle)
-shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chThetaGT, chPhiGT - np.pi/2)
-chComponentGT = shDirLightGT.r[:]*chLightIntensityGT
-# chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
 
 if useBlender:
     #Add directional light to match spherical harmonics
@@ -354,57 +358,59 @@ pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 iterat = 0
+showSubplots = False
 
-f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
-pos1 = ax1.get_position()
-pos5 = ax5.get_position()
-pos5.x0 = pos1.x0
-ax5.set_position(pos5)
+if showSubplots:
+    f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
+    pos1 = ax1.get_position()
+    pos5 = ax5.get_position()
+    pos5.x0 = pos1.x0
+    ax5.set_position(pos5)
 
-f.tight_layout()
+    f.tight_layout()
 
-ax1.set_title("Ground Truth")
+    ax1.set_title("Ground Truth")
 
-ax2.set_title("Backprojection")
-pim2 = ax2.imshow(renderer.r)
+    ax2.set_title("Backprojection")
+    pim2 = ax2.imshow(renderer.r)
 
-edges = renderer.boundarybool_image
-gtoverlay = imageGT().copy()
-gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-pim1 = ax1.imshow(gtoverlay)
+    edges = renderer.boundarybool_image
+    gtoverlay = imageGT().copy()
+    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+    pim1 = ax1.imshow(gtoverlay)
 
-ax3.set_title("Pixel negative log probabilities")
-pim3 = ax3.imshow(-pixelErrorFun.r)
-cb3 = plt.colorbar(pim3, ax=ax3,use_gridspec=True)
-cb3.mappable = pim3
+    ax3.set_title("Pixel negative log probabilities")
+    pim3 = ax3.imshow(-pixelErrorFun.r)
+    cb3 = plt.colorbar(pim3, ax=ax3,use_gridspec=True)
+    cb3.mappable = pim3
 
-ax4.set_title("Posterior probabilities")
-ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    ax4.set_title("Posterior probabilities")
+    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-ax5.set_title("Dr wrt. Azimuth")
-drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
-cb5.mappable = img5
+    ax5.set_title("Dr wrt. Azimuth")
+    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
+    cb5.mappable = img5
 
-ax6.set_title("Dr wrt. Elevation")
-drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
-cb6.mappable = img6
+    ax6.set_title("Dr wrt. Elevation")
+    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
+    cb6.mappable = img6
 
-pos1 = ax1.get_position()
-pos5 = ax5.get_position()
-pos5.x0 = pos1.x0
-ax5.set_position(pos5)
+    pos1 = ax1.get_position()
+    pos5 = ax5.get_position()
+    pos5.x0 = pos1.x0
+    ax5.set_position(pos5)
 
-pos1 = ax1.get_position()
-pos5 = ax5.get_position()
-pos5.x0 = pos1.x0
-ax5.set_position(pos5)
+    pos1 = ax1.get_position()
+    pos5 = ax5.get_position()
+    pos5.x0 = pos1.x0
+    ax5.set_position(pos5)
 
-plt.show()
-plt.pause(0.1)
+    plt.show()
+    plt.pause(0.1)
 
 t = time.time()
 
@@ -474,27 +480,28 @@ ims = []
 
 
 def refreshSubplots():
-    #Other subplots visualizing renders and its pixel derivatives
-    edges = renderer.boundarybool_image
-    imagegt = imageGT()
-    gtoverlay = imagegt.copy()
-    gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-    pim1.set_data(gtoverlay)
-    pim2.set_data(renderer.r)
-    pim3 = ax3.imshow(-pixelErrorFun.r)
-    cb3.mappable = pim3
-    cb3.update_normal(pim3)
-    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    cb5.mappable = img5
-    cb5.update_normal(img5)
-    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-    img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    cb6.mappable = img6
-    cb6.update_normal(img6)
-    f.canvas.draw()
-    plt.pause(0.1)
+    if showSubplots:
+        #Other subplots visualizing renders and its pixel derivatives
+        edges = renderer.boundarybool_image
+        imagegt = imageGT()
+        gtoverlay = imagegt.copy()
+        gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
+        pim1.set_data(gtoverlay)
+        pim2.set_data(renderer.r)
+        pim3 = ax3.imshow(-pixelErrorFun.r)
+        cb3.mappable = pim3
+        cb3.update_normal(pim3)
+        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+        drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb5.mappable = img5
+        cb5.update_normal(img5)
+        drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb6.mappable = img6
+        cb6.update_normal(img6)
+        f.canvas.draw()
+        plt.pause(0.1)
 
 def plotSurface():
     global figperf
@@ -684,20 +691,23 @@ def cb2(_):
 
         plotSurface()
 
-    plt.pause(0.1)
-    plt.show()
-    plt.draw()
-    plt.pause(0.1)
+    if drawSurf or showSubplots:
+        # plt.pause(0.1)
+        plt.show()
+        plt.draw()
+        plt.pause(0.1)
     t = time.time()
 
 # , chComponent[0]
-free_variables = [chAz, chEl, chComponent, chVColors]
+free_variables = [chComponent, chVColors]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
 boundAz = (0, None)
 boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
+bounds = [(None , None ) for sublist in free_variables for item in sublist]
+
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 method = 1
 exit = False
@@ -1162,7 +1172,7 @@ def readKeys(window, key, scancode, action, mods):
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
             cv2.imwrite('results/imgs/predicted-' + str(test_i) + '.png',image)
             testOcclusions = np.append(testOcclusions, getOcclusionFraction(rendererGT))
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
             cv2.imwrite('results/imgs/fitted-gaussian-' + str(test_i) + '.png', image)
             fittedAzsGaussian = np.append(fittedAzsGaussian, chAz.r[0])
@@ -1650,9 +1660,11 @@ while not exit:
         if computePerformance and drawSurf:
             plotSurface()
 
+    if showSubplots or drawSurf:
         plt.pause(0.1)
         plt.draw()
-        refresh = False
+
+    refresh = False
 
 refreshSubplots()
 

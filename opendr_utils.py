@@ -55,7 +55,7 @@ def chZonalToSphericalHarmonics(z, theta, phi):
 
     #Correct order in band l=1.
     sphCoeffs[1],sphCoeffs[3] = sphCoeffs[3],sphCoeffs[1]
-    chSphCoeffs = ch.concatenate(sphCoeffs) * clampedCosineCoefficients()
+    chSphCoeffs = ch.concatenate(sphCoeffs)
     return chSphCoeffs
 
 #From http://www.ppsloan.org/publications/StupidSH36.pdf
