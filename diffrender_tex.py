@@ -203,7 +203,14 @@ chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT
 # chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
 
 chComponent[:] = chAmbientSHGT.r[:]
-
+chDisplacement = ch.Ch([0.0, 0.0,0.01])
+chDisplacementGT = ch.Ch([0.0,0.0,0.0])
+chScale = ch.Ch([1.,1.0,1.0])
+chScaleGT = ch.Ch([1,1.,1.])
+scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
+scaleMatGT = geometry.Scale(x=chScaleGT[0], y=chScaleGT[1],z=chScaleGT[2])[0:3,0:3]
+invTranspModel = ch.transpose(ch.inv(scaleMat))
+invTranspModelGT = ch.transpose(ch.inv(scaleMatGT))
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
         teapot = blender_teapots[teapot_i]
@@ -219,28 +226,30 @@ for teapot_i in range(len(renderTeapotsList)):
     centermod = center_teapots[teapot_i]
 
     #Add targetPosition to vertex coordinates.
-    for obj_i in range(len(vmod)):
-        for mesh_i in range(len(vmod[obj_i])):
-            vmod[obj_i][mesh_i] = vmod[obj_i][mesh_i] + targetPosition
+    # for obj_i in range(len(vmod)):
+    #     for mesh_i in range(len(vmod[obj_i])):
+    #         vmod[obj_i][mesh_i] = vmod[obj_i][mesh_i]
 
     #Setup backrpojection renderer
-    vmodflat = [item for sublist in vmod for item in sublist]
+    vmodflat = [item.copy() for sublist in vmod for item in sublist]
     rangeMeshes = range(len(vmodflat))
-    vchmod = [ch.array(vmodflat[mesh]) for mesh in rangeMeshes]
+    # ipdb.set_trace()
+    vchmod = [ch.dot(ch.array(vmodflat[mesh]),scaleMat) + targetPosition for mesh in rangeMeshes]
     if len(vchmod)==1:
         vstackmod = vchmod[0]
     else:
         vstackmod = ch.vstack(vchmod)
-    camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, centermod + targetPosition, width, height)
-    vnmodflat = [item for sublist in vnmod for item in sublist]
-    vnchmod = [ch.array(vnmodflat[mesh]) for mesh in rangeMeshes]
-    vcmodflat = [item for sublist in vcmod for item in sublist]
+    camera, modelRotation = setupCamera(vstackmod, chAz, chEl, chDist, centermod + targetPosition + chDisplacement, width, height)
+    vnmodflat = [item.copy() for sublist in vnmod for item in sublist]
+    vnchmod = [ch.dot(ch.array(vnmodflat[mesh]),invTranspModel) for mesh in rangeMeshes]
+    vnchmodnorm = [vnchmod[mesh]/ch.sqrt(vnchmod[mesh][:,0]**2 + vnchmod[mesh][:,1]**2 + vnchmod[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
+    vcmodflat = [item.copy() for sublist in vcmod for item in sublist]
     vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
     # vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
-    vcmod_list = computeSphericalHarmonics(vnchmod, vcchmod, light_color, chComponent)
+    vcmod_list = computeSphericalHarmonics(vnchmodnorm, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
-    setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmod,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
+    setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmodnorm,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
 
@@ -255,7 +264,7 @@ if useBlender:
     lamp.layers[1] = True
     lamp.layers[2] = True
     center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-    lampLoc = getRelativeLocation(chThetaGT.r, chPhiGT.r, chLightDistGT, center)
+    lampLoc = getRelativeLocation(chLightAzGT.r, chLightElGT.r, chLightDistGT, center)
     lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
     lamp.data.cycles.use_multiple_importance_sampling = True
     lamp.data.use_nodes = True
@@ -275,22 +284,25 @@ addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapot
 vflat = [item for sublist in v for item in sublist]
 rangeMeshes = range(len(vflat))
 vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
 if len(vch)==1:
     vstack = vch[0]
 else:
     vstack = ch.vstack(vch)
 
 center = center_teapots[currentTeapotModel]
-cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
+cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition + chDisplacementGT, width, height)
 vnflat = [item for sublist in vn for item in sublist]
 vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+vnch[0] = ch.dot(vnch[0], invTranspModelGT)
+vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
 vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
-vc_list = computeSphericalHarmonics(vnch, vcch, light_colorGT, chComponentGT)
+vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
 # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 rendererGT = TexturedRenderer()
-setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
+setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
 
 # ipdb.set_trace()
@@ -358,9 +370,9 @@ pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 iterat = 0
-showSubplots = False
+demoMode = True
 
-if showSubplots:
+if demoMode:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
     pos1 = ax1.get_position()
     pos5 = ax5.get_position()
@@ -480,7 +492,7 @@ ims = []
 
 
 def refreshSubplots():
-    if showSubplots:
+    if demoMode:
         #Other subplots visualizing renders and its pixel derivatives
         edges = renderer.boundarybool_image
         imagegt = imageGT()
@@ -691,7 +703,7 @@ def cb2(_):
 
         plotSurface()
 
-    if drawSurf or showSubplots:
+    if drawSurf or demoMode:
         # plt.pause(0.1)
         plt.show()
         plt.draw()
@@ -699,7 +711,8 @@ def cb2(_):
     t = time.time()
 
 # , chComponent[0]
-free_variables = [chComponent, chVColors]
+
+free_variables = [chVColors, chComponent]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -817,6 +830,7 @@ def readKeys(window, key, scancode, action, mods):
         vflat = [item for sublist in v for item in sublist]
         rangeMeshes = range(len(vflat))
         vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+        vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
         if len(vch)==1:
             vstack = vch[0]
         else:
@@ -825,14 +839,16 @@ def readKeys(window, key, scancode, action, mods):
         cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
         vnflat = [item for sublist in vn for item in sublist]
         vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+        vnch[0] = ch.dot(vnch[0], invTranspModelGT)
+        vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
         vcflat = [item for sublist in vc for item in sublist]
         vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
         vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
-        vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponentGT)
+        vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_color, chComponentGT)
         # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
         rendererGT = TexturedRenderer()
-        setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
+        setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 
         updateErrorFunctions = True
         refresh = True
@@ -1660,7 +1676,7 @@ while not exit:
         if computePerformance and drawSurf:
             plotSurface()
 
-    if showSubplots or drawSurf:
+    if demoMode or drawSurf:
         plt.pause(0.1)
         plt.draw()
 

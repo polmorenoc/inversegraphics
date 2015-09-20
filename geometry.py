@@ -37,6 +37,26 @@ class RotateX(Ch):
         if wrt is self.a:
             return np.array([[0, 0, 0, 0],[0, -np.sin(self.a.r)[0], -np.cos(self.a.r)[0], 0], [0, np.cos(self.a.r)[0], -np.sin(self.a.r)[0],0],[0,0,0,0]]).reshape(16,1)
 
+class Scale(Ch):
+    dterms = 'x', 'y','z'
+
+    def compute_r(self):
+        return np.array([[self.x.r, 0, 0, 0],[0, self.y.r, 0, 0], [0, 0, self.z.r,0],[0,0,0,1]])
+
+    def compute_dr_wrt(self, wrt):
+        return
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is not self.x and wrt is not self.y and wrt is not self.z:
+            return
+        if wrt is self.x:
+            return np.array([[1, 0, 0, 0],[0, 0, 0, 0], [0, 0, 0,0],[0,0,0,0]]).reshape(16,1)
+        if wrt is self.y:
+            return np.array([[0, 0, 0, 0],[0, 1, 0, 0], [0, 0, 0,0],[0,0,0,0]]).reshape(16,1)
+        if wrt is self.z:
+            return np.array([[0, 0, 0, 0],[0, 0, 0, 0], [0, 0, 1, 0],[0,0,0,0]]).reshape(16,1)
+
+
 class Translate(Ch):
     dterms = 'x', 'y', 'z'
 
