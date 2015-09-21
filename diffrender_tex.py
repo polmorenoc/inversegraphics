@@ -14,7 +14,8 @@ from opendr.lighting import LambertianPointLight
 from opendr.lighting import SphericalHarmonics
 from opendr.filters import gaussian_pyramid
 import geometry
-
+import imageproc
+import recognition_models
 import numpy as np
 import cv2
 from utils import *
@@ -28,7 +29,11 @@ import light_probes
 
 plt.ion()
 
-width, height = (100, 100)
+prefix = 'light'
+trainDataName = 'experiments/train_' + prefix + '.pickle'
+testDataName = 'experiments/test_' + prefix + '.pickle'
+
+width, height = (150, 150)
 
 glfw.init()
 glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -129,7 +134,7 @@ chLightEl = ch.Ch([np.pi/2])
 chLightDist = ch.Ch([0.5])
 chLightDistGT = ch.Ch([0.5])
 chLightAzGT = ch.Ch([0.0])
-chLightElGT = ch.Ch([np.pi/2])
+chLightElGT = ch.Ch([np.pi/4])
 
 ligthTransf = computeHemisphereTransformation(chLightAz, chLightEl, chLightDist, targetPosition)
 ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
@@ -142,7 +147,7 @@ chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-chVColors = ch.Ch([0.4,0.4,0.1])
+chVColors = ch.Ch([0.4,0.4,0.4])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
 
 loadSavedSH = True
@@ -194,7 +199,7 @@ if loadSavedSH:
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])
 chLightIntensityGT = ch.Ch([10])
-chLightAzGT = ch.Ch([np.pi/2])
+chLightAzGT = ch.Ch([0])
 chLightElGT = ch.Ch([np.pi/4])
 angle = ch.arcsin(chLightRadGT/chLightDistGT)
 zGT = chZonalHarmonics(angle)
@@ -202,11 +207,11 @@ shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAz
 chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT
 # chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
 
-chComponent[:] = chAmbientSHGT.r[:]
-chDisplacement = ch.Ch([0.0, 0.0,0.01])
+chComponent[:] = chComponentGT.r[:]
+chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
-chScale = ch.Ch([1.,1.0,1.0])
-chScaleGT = ch.Ch([1,1.,1.])
+chScale = ch.Ch([1.0,1.0,1.0])
+chScaleGT = ch.Ch([1, 1.,1.])
 scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
 scaleMatGT = geometry.Scale(x=chScaleGT[0], y=chScaleGT[1],z=chScaleGT[2])[0:3,0:3]
 invTranspModel = ch.transpose(ch.inv(scaleMat))
@@ -256,7 +261,6 @@ for teapot_i in range(len(renderTeapotsList)):
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 
-
 if useBlender:
     #Add directional light to match spherical harmonics
     lamp_data = bpy.data.lamps.new(name="point", type='POINT')
@@ -268,7 +272,7 @@ if useBlender:
     lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
     lamp.data.cycles.use_multiple_importance_sampling = True
     lamp.data.use_nodes = True
-    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 20
+    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 10
     scene.objects.link(lamp)
 
     teapot = blender_teapots[currentTeapotModel]
@@ -370,7 +374,7 @@ pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 iterat = 0
-demoMode = True
+demoMode = False
 
 if demoMode:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
@@ -712,7 +716,7 @@ def cb2(_):
 
 # , chComponent[0]
 
-free_variables = [chVColors, chComponent]
+free_variables = [chVColors, chComponent, chScale[0], chAz, chEl]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -727,6 +731,13 @@ exit = False
 minimize = False
 plotMinimization = False
 changeRenderer = False
+printStats = False
+beginTraining = False
+createGroundTruth = False
+beginTesting = False
+exploreSurface = False
+newTeapotAsGT = False
+
 global chAzSaved
 global chElSaved
 global chComponentSaved
@@ -773,17 +784,28 @@ def readKeys(window, key, scancode, action, mods):
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r + radians(1)
-    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
-    #     if useBlender:
-    #         if scene.render.engine == 'CYCLES':
-    #             print("Changed rendering to BLENDER_RENDER")
-    #             scene.render.engine = 'BLENDER_RENDER'
-    #         else:
-    #             print("Changed rendering to CYCLES")
-    #             scene.render.engine = 'CYCLES'
-    #         changedGT = True
-    #         updateErrorFunctions = True
-    #         refresh = True
+
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
+        refresh = True
+        chScale[0] = chScale[0].r + 0.05
+
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
+        refresh = True
+        chScale[0] = chScale[0].r - 0.05
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
+        refresh = True
+        chScale[1] = chScale[1].r + 0.05
+
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
+        refresh = True
+        chScale[1] = chScale[1].r - 0.05
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
+        refresh = True
+        chScale[2] = chScale[2].r + 0.05
+
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
+        refresh = True
+        chScale[2] = chScale[2].r - 0.05
 
     if key != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
         print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01745]))
@@ -806,62 +828,17 @@ def readKeys(window, key, scancode, action, mods):
 
     global targetPosition
     global center
-    global vstack
-    global vch
-    global f_list
-    global vc_list
-    global vnch
-    global uv
-    global haveTextures_list
-    global textures_list
+
     global cameraGT
     global rendererGT
     global renderer
     global teapotGT
     global teapot
+
+    global newTeapotAsGT
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_G and action == glfw.RELEASE:
 
-        glfw.make_context_current(rendererGT.win)
-        rendererGT.clear()
-        del rendererGT
-
-        removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
-        addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
-        vflat = [item for sublist in v for item in sublist]
-        rangeMeshes = range(len(vflat))
-        vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
-        vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
-        if len(vch)==1:
-            vstack = vch[0]
-        else:
-            vstack = ch.vstack(vch)
-        center = center_teapots[currentTeapotModel]
-        cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
-        vnflat = [item for sublist in vn for item in sublist]
-        vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
-        vnch[0] = ch.dot(vnch[0], invTranspModelGT)
-        vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
-        vcflat = [item for sublist in vc for item in sublist]
-        vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-        vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
-        vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_color, chComponentGT)
-        # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
-
-        rendererGT = TexturedRenderer()
-        setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
-
-        updateErrorFunctions = True
-        refresh = True
-        changedGT = True
-
-        #Unlink and place the new teapot for Blender.
-        if useBlender:
-            scene.objects.unlink(teapotGT)
-            teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
-            teapotGT = blender_teapots[currentTeapotModel]
-            placeNewTarget(scene, teapotGT, targetPosition)
-            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
-            scene.update()
+        newTeapotAsGT = True
 
     global groundTruthBlender
     global blenderRender
@@ -877,62 +854,9 @@ def readKeys(window, key, scancode, action, mods):
             #         blenderRender = image
             refresh = True
 
-
     #Compute in order to plot the surface neighouring the azimuth/el of the gradients and error function.
     if key == glfw.KEY_E and action == glfw.RELEASE:
-        if computePerformance:
-            print("Estimating cost function surface and gradients...")
-            drawSurf = True
-            chAzOld = chAz.r[0]
-            chElOld = chEl.r[0]
-
-            for model_num, errorFun in enumerate(models):
-                performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-                gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-                gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-            for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
-                for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
-                    for model_num, errorFun in enumerate(models):
-                        chAz[:] = chAzi
-                        chEl[:] = chEli
-
-                        performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
-                        azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
-                        elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
-                        import scipy.sparse as sp
-                        if sp.issparse(errorFun.dr_wrt(chAz)):
-                            drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
-                        else:
-                            drAz = errorFun.dr_wrt(chAz)[0][0]
-                        if sp.issparse(errorFun.dr_wrt(chEl)):
-                            drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
-                        else:
-                            drEl = errorFun.dr_wrt(chEl)[0][0]
-
-                        gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
-                        gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
-                        chAzOldi = chAz.r[0]
-                        chElOldi = chEl.r[0]
-                        diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
-                        diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
-                        chAz[:] = chAzOldi
-                        chEl[:] = chElOldi
-                        gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
-                        gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
-            errorFun = models[model]
-
-            chAz[:] = chAzOld
-            chEl[:] = chElOld
-
-            refresh = True
-            print("Finshed estimating.")
+        exploreSurface = True
 
     if key == glfw.KEY_P and action == glfw.RELEASE:
         ipdb.set_trace()
@@ -962,37 +886,9 @@ def readKeys(window, key, scancode, action, mods):
         chComponent[0] = chComponentSaved
         refresh = True
 
+    global printStats
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_S and action == glfw.RELEASE:
-        print("**** Statistics ****" )
-        print("GT Azimuth: " + str(chAzGT))
-        print("Azimuth: " + str(chAz))
-        print("GT Elevation: " + str(chElGT))
-        print("Elevation: " + str(chEl))
-
-        print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
-        print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
-        # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
-        print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
-
-        if drawSurf:
-            avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
-            print("** Approx gradients - finite differenes." )
-            print("Avg Eucl. distance :: " + str(avgError))
-            norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
-            norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
-            avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
-            print("Avg Angle.: " + str(np.mean(avgAngle)))
-            print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
-            idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
-            azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-            elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-            print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
-            print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
-
-        azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
-        elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
-        print("Current Azimuth difference of " + str(azDiff*180/np.pi))
-        print("Current Elevation difference of " + str(elDiff*180/np.pi))
+        printStats = True
 
     if key == glfw.KEY_V and action == glfw.RELEASE:
         global ims
@@ -1041,53 +937,206 @@ def readKeys(window, key, scancode, action, mods):
         changeRenderer = True
 
     global renderer
-    global negLikModel
-    global negLikModelRobust
-    global pixelLikelihoodCh
-    global pixelLikelihoodRobustCh
-    global post
-    global models
-    global pixelModels
+    global beginTraining
+    global beginTesting
+    global createGroundTruth
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_T and action == glfw.RELEASE:
+        createGroundTruth = True
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_T and action == glfw.RELEASE:
+        beginTraining = True
+
+    if key == glfw.KEY_I and action == glfw.RELEASE:
+
+        beginTesting = True
+
+    if key == glfw.KEY_R and action == glfw.RELEASE:
+        refresh = True
+
     global pixelErrorFun
-    global errorFun
-    global trainAzsGT
-    global trainElevsGT
-    global testAzsGT
-    global testElevsGT
-    global split
-    global trainSize
-    global randForestModel
-    global linRegModel
-    global testSize
-    global occlusions
-    global hogfeats
-    global randForestModelCosAzs
-    global randForestModelSinAzs
-    global linRegModelCosAzs
-    global linRegModelSinAzs
-    global randForestModelCosElevs
-    global randForestModelSinElevs
-    global linRegModelCosElevs
-    global linRegModelSinElevs
-    import imageproc
-    import regression_methods
-    if key == glfw.KEY_T and action == glfw.RELEASE:
+    global model
+    global models
+    global modelsDescr
+    global pixelModels
+    global reduceVariance
+    if key == glfw.KEY_O and action == glfw.RELEASE:
+        # drawSurf = False
+        model = (model + 1) % len(models)
+        print("Using " + modelsDescr[model])
+        errorFun = models[model]
+        pixelErrorFun = pixelModels[model]
+
+        if model == 2:
+            reduceVariance = True
+        else:
+            reduceVariance = False
+
+        refresh = True
+
+    global method
+    global methods
+    if key == glfw.KEY_1 and action == glfw.RELEASE:
+        method = 0
+        print("Changed to minimizer: " + methods[method])
+    if key == glfw.KEY_2 and action == glfw.RELEASE:
+        method = 1
+        print("Changed to minimizer: " + methods[method])
+    if key == glfw.KEY_3 and action == glfw.RELEASE:
+        method = 2
+        print("Changed to minimizer: " + methods[method])
+    if key == glfw.KEY_4 and action == glfw.RELEASE:
+        print("Changed to minimizer: " + methods[method])
+        method = 3
+    if key == glfw.KEY_5 and action == glfw.RELEASE:
+        method = 4
+        print("Changed to minimizer: " + methods[method])
+
+    global minimize
+    if key == glfw.KEY_M and action == glfw.RELEASE:
+        minimize = True
+
+glfw.set_key_callback(win, readKeys)
+
+while not exit:
+    # Poll for and process events
+    glfw.make_context_current(renderer.win)
+    glfw.poll_events()
+
+    if newTeapotAsGT:
+        glfw.make_context_current(rendererGT.win)
+        rendererGT.clear()
+        del rendererGT
+
+        removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+        addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+        vflat = [item for sublist in v for item in sublist]
+        rangeMeshes = range(len(vflat))
+        vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+        vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
+        if len(vch)==1:
+            vstack = vch[0]
+        else:
+            vstack = ch.vstack(vch)
+        center = center_teapots[currentTeapotModel]
+        cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
+        vnflat = [item for sublist in vn for item in sublist]
+        vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+        vnch[0] = ch.dot(vnch[0], invTranspModelGT)
+        vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
+        vcflat = [item for sublist in vc for item in sublist]
+        vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+        vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+        vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
+        # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+
+        rendererGT = TexturedRenderer()
+        setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
+
+        updateErrorFunctions = True
+        refresh = True
+        changedGT = True
+
+        #Unlink and place the new teapot for Blender.
+        if useBlender:
+            scene.objects.unlink(teapotGT)
+            teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
+            teapotGT = blender_teapots[currentTeapotModel]
+            placeNewTarget(scene, teapotGT, targetPosition)
+            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+            scene.update()
+
+        newTeapotAsGT = False
+
+    if printStats:
+        print("**** Statistics ****" )
+        print("GT Azimuth: " + str(chAzGT))
+        print("Azimuth: " + str(chAz))
+        print("GT Elevation: " + str(chElGT))
+        print("Elevation: " + str(chEl))
+
+        print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
+        print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
+        # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
+        print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
+
+        if drawSurf:
+            avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
+            print("** Approx gradients - finite differenes." )
+            print("Avg Eucl. distance :: " + str(avgError))
+            norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+            norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+            avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
+            print("Avg Angle.: " + str(np.mean(avgAngle)))
+            print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
+            idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
+            azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+            elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+            print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
+            print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
+
+        azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
+        elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
+        print("Current Azimuth difference of " + str(azDiff*180/np.pi))
+        print("Current Elevation difference of " + str(elDiff*180/np.pi))
+
+        printStats = False
+
+    if createGroundTruth:
+        print("Creating Ground Truth")
+        trainSize = 1000
+        testSize = 50
+
+        trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+        trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
+        trainLightAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+        trainLightElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
+        trainLightIntensitiesGT = numpy.random.uniform(5,10, trainSize)
+        trainVColorGT = numpy.random.uniform(0,1, [trainSize, 3])
+
+        trainData = {'trainAzsGT':trainAzsGT,'trainElevsGT':trainElevsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightElevsGT':trainLightElevsGT,'trainLightIntensitiesGT':trainLightIntensitiesGT, 'trainVColorGT':trainVColorGT}
+
+        # testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
+        testAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
+        testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
+        testLightAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
+        testLightElevsGT = numpy.random.uniform(0,np.pi/2, testSize)
+        testLightIntensitiesGT = numpy.random.uniform(5,10, testSize)
+        testVColorGT = numpy.random.uniform(0,1, [testSize, 3])
+        testData = {'testAzsGT':testAzsGT,'testElevsGT':testElevsGT,'testLightAzsGT':testLightAzsGT,'testLightAzsGT':testLightAzsGT,'testLightElevsGT':testLightElevsGT,'testLightIntensitiesGT':testLightIntensitiesGT, 'testVColorGT':testVColorGT}
+
+        with open(trainDataName, 'wb') as pfile:
+            pickle.dump(trainData, pfile)
+
+        with open(testDataName, 'wb') as pfile:
+            pickle.dump(testData, pfile)
+
+        createGroundTruth = False
+
+    if beginTraining:
         print("Training recognition models.")
-        trainSize = 500
-        testSize = 20
+        trainData = {}
+
+        with open(trainDataName, 'rb') as pfile:
+            trainData = pickle.load(pfile)
+
+        trainAzsGT = trainData['trainAzsGT']
+        trainElevsGT = trainData['trainElevsGT']
+        trainLightAzsGT = trainData['trainLightAzsGT']
+        trainLightElevsGT = trainData['trainLightElevsGT']
+        trainLightIntensitiesGT = trainData['trainLightIntensitiesGT']
+        trainVColorGT = trainData['trainVColorGT']
+        # trainTeapots  = trainData['trainTeapots']
+
         chAzOld = chAz.r[0]
         chElOld = chEl.r[0]
         chAzGTOld = chAzGT.r[0]
         chElGTOld = chElGT.r[0]
 
-        trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
-        trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
-
-        testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
-        testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
         images = []
         occlusions = np.array([])
         hogs = []
+        # vcolorsfeats = []
+        illumfeats = []
+        occludedInstances = []
         # split = 0.8
         # setTrain = np.arange(np.floor(trainSize*split)).astype(np.uint8)
         print("Generating renders")
@@ -1096,22 +1145,52 @@ def readKeys(window, key, scancode, action, mods):
             eli = trainElevsGT[train_i]
             chAzGT[:] = azi
             chElGT[:] = eli
+            chLightAzGT[:] = trainLightAzsGT[train_i]
+            chLightElGT[:] = trainLightElevsGT[train_i]
+            chLightIntensityGT[:] = trainLightIntensitiesGT[train_i]
+            chVColorsGT[:] = trainVColorGT[train_i]
             image = rendererGT.r.copy()
-            images = images + [image]
-            occlusions = np.append(occlusions, getOcclusionFraction(rendererGT))
-            hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
+
+            occlusion = getOcclusionFraction(rendererGT)
+            if occlusion < 0.9:
+                images = images + [image]
+                occlusions = np.append(occlusions, occlusion)
+                hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
+
+                # vcolorsfeats = vcolorsfeats +  [imageproc.medianColor(image,40)]
+                illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,40)]
+            else:
+                occludedInstances = occludedInstances + [train_i]
+
+        trainAzsGT = np.delete(trainAzsGT, occludedInstances)
+        trainElevsGT = np.delete(trainElevsGT, occludedInstances)
+        trainLightAzsGT = np.delete(trainLightAzsGT, occludedInstances)
+        trainLightElevsGT = np.delete(trainLightElevsGT, occludedInstances)
+        trainLightIntensitiesGT = np.delete(trainLightIntensitiesGT, occludedInstances)
+        trainVColorGT = np.delete(trainVColorGT, occludedInstances, 0)
 
         hogfeats = np.vstack(hogs)
+        illumfeats = np.vstack(illumfeats)
+
         print("Training RFs")
-        randForestModelCosAzs = regression_methods.trainRandomForest(hogfeats, np.cos(trainAzsGT))
-        randForestModelSinAzs = regression_methods.trainRandomForest(hogfeats, np.sin(trainAzsGT))
-        randForestModelCosElevs = regression_methods.trainRandomForest(hogfeats, np.cos(trainElevsGT))
-        randForestModelSinElevs = regression_methods.trainRandomForest(hogfeats, np.sin(trainElevsGT))
+        randForestModelCosAzs = recognition_models.trainRandomForest(hogfeats, np.cos(trainAzsGT))
+        randForestModelSinAzs = recognition_models.trainRandomForest(hogfeats, np.sin(trainAzsGT))
+        randForestModelCosElevs = recognition_models.trainRandomForest(hogfeats, np.cos(trainElevsGT))
+        randForestModelSinElevs = recognition_models.trainRandomForest(hogfeats, np.sin(trainElevsGT))
+
+        randForestModelLightCosAzs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightAzsGT))
+        randForestModelLightSinAzs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightAzsGT))
+        randForestModelLightCosElevs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightElevsGT))
+        randForestModelLightSinElevs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightElevsGT))
+
+        imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
+        randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
+
         # print("Training LR")
-        # linRegModelCosAzs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
-        # linRegModelSinAzs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
-        # linRegModelCosElevs = regression_methods.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
-        # linRegModelSinElevs = regression_methods.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
+        # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
+        # linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
+        # linRegModelCosElevs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
+        # linRegModelSinElevs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
 
         chAz[:] = chAzOld
         chEl[:] = chElOld
@@ -1119,53 +1198,97 @@ def readKeys(window, key, scancode, action, mods):
         chElGT[:] = chElGTOld
 
         print("Finished training recognition models.")
+        beginTraining = False
 
-    if key == glfw.KEY_I and action == glfw.RELEASE:
+
+    if beginTesting:
         chAzOld = chAz.r[0]
         chElOld = chEl.r[0]
         print("Backprojecting and fitting estimates.")
+
+        with open(testDataName, 'rb') as pfile:
+            testData = pickle.load(pfile)
+
+        testAzsGT = testData['testAzsGT']
+        testElevsGT = testData['testElevsGT']
+        testLightAzsGT = testData['testLightAzsGT']
+        testLightElevsGT = testData['testLightElevsGT']
+        testLightIntensitiesGT = testData['testLightIntensitiesGT']
+        testVColorGT = testData['testVColorGT']
+
         testImages = []
         testHogs = []
-
+        testIllumfeats = []
+        testPredVColors = []
         print("Generating renders")
         for test_i in range(len(testAzsGT)):
             azi = testAzsGT[test_i]
             eli = testElevsGT[test_i]
             chAzGT[:] = azi
             chElGT[:] = eli
+            chLightAzGT[:] = testLightAzsGT[test_i]
+            chLightElGT[:] = testLightElevsGT[test_i]
+            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+            chVColorsGT[:] = testVColorGT[test_i]
             testImage = rendererGT.r.copy()
             testImages = testImages + [testImage]
+            testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,40)]
             testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
-
+            testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 40)]
         print("Predicting with RFs")
         testHogfeats = np.vstack(testHogs)
+        testIllumfeats = np.vstack(testIllumfeats)
+        testPredVColors = np.vstack(testPredVColors)
+        cosAzsPredRF = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeats)
+        sinAzsPredRF = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeats)
+        cosElevsPredRF = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeats)
+        sinElevsPredRF = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeats)
 
-        cosAzsPredRF = regression_methods.testRandomForest(randForestModelCosAzs, testHogfeats)
-        sinAzsPredRF = regression_methods.testRandomForest(randForestModelSinAzs, testHogfeats)
-        cosElevsPredRF = regression_methods.testRandomForest(randForestModelCosElevs, testHogfeats)
-        sinElevsPredRF = regression_methods.testRandomForest(randForestModelSinElevs, testHogfeats)
+        cosAzsLightPredRF = recognition_models.testRandomForest(randForestModelLightCosAzs, testIllumfeats)
+        sinAzsLightPredRF = recognition_models.testRandomForest(randForestModelLightSinAzs, testIllumfeats)
+        cosElevsLightPredRF = recognition_models.testRandomForest(randForestModelLightCosElevs, testIllumfeats)
+        sinElevsLightPredRF = recognition_models.testRandomForest(randForestModelLightSinElevs, testIllumfeats)
 
         # print("Predicting with LR")
-        # cosAzsPredLR = regression_methods.testLinearRegression(linRegModelCosAzs, testHogfeats)
-        # sinAzsPredLR = regression_methods.testLinearRegression(linRegModelSinAzs, testHogfeats)
-        # cosElevsPredLR = regression_methods.testLinearRegression(linRegModelCosElevs, testHogfeats)
-        # sinElevsPredLR = regression_methods.testLinearRegression(linRegModelSinElevs, testHogfeats)
+        # cosAzsPredLR = recognition_models.testLinearRegression(linRegModelCosAzs, testHogfeats)
+        # sinAzsPredLR = recognition_models.testLinearRegression(linRegModelSinAzs, testHogfeats)
+        # cosElevsPredLR = recognition_models.testLinearRegression(linRegModelCosElevs, testHogfeats)
+        # sinElevsPredLR = recognition_models.testLinearRegression(linRegModelSinElevs, testHogfeats)
 
         elevsPredRF = np.arctan2(sinElevsPredRF, cosElevsPredRF)
         azsPredRF = np.arctan2(sinAzsPredRF, cosAzsPredRF)
 
+        lightElevsPredRF = np.arctan2(sinElevsLightPredRF, cosElevsLightPredRF)
+        lightAzsPredRF = np.arctan2(sinAzsLightPredRF, cosAzsLightPredRF)
+
+        testImagesStack = np.vstack([testImage.reshape([1,-1]) for testImage in testImages])
+        lightIntensityPredRF = recognition_models.testRandomForest(randForestModelLightIntensity, testImagesStack)
+
+        componentPreds=[]
+        for test_i in range(len(testAzsGT)):
+
+            shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - lightElevsPredRF[test_i], lightAzsPredRF[test_i] - np.pi/2) * clampedCosCoeffs
+
+            componentPreds = componentPreds + [chAmbientSHGT + shDirLightGT*lightIntensityPredRF[test_i]]
+
+        componentPreds = np.vstack(componentPreds)
+
         # elevsPredLR = np.arctan2(sinElevsPredLR, cosElevsPredLR)
         # azsPredLR = np.arctan2(sinAzsPredLR, cosAzsPredLR)
 
-        errorsRF = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredRF, elevsPredRF)
-        # errorsLR = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
+        errorsRF = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, azsPredRF, elevsPredRF)
+
+        errorsLightRF = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, lightAzsPredRF, lightElevsPredRF)
+        # errorsLR = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
 
         meanAbsErrAzsRF = np.mean(np.abs(errorsRF[0]))
         meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
+
+        meanAbsErrLightAzsRF = np.mean(np.abs(errorsLightRF[0]))
+        meanAbsErrLightElevsRF = np.mean(np.abs(errorsLightRF[1]))
+
         # meanAbsErrAzsLR = np.mean(np.abs(errorsLR[0]))
         # meanAbsErrElevsLR = np.mean(np.abs(errorsLR[1]))
-
-        ipdb.set_trace()
 
         #Fit:
         print("Fitting predictions")
@@ -1177,12 +1300,24 @@ def readKeys(window, key, scancode, action, mods):
         fittedAzsGaussian = np.array([])
         fittedElevsGaussian = np.array([])
         testOcclusions = np.array([])
+        free_variables = [chVColors, chComponent, chScale, chDisplacement, chAz, chEl]
+
         for test_i in range(len(testAzsGT)):
-            print("Minimizing loss of prediction " + str(test_i) + "of " + str(testSize))
+            print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
             chAzGT[:] = testAzsGT[test_i]
             chElGT[:] = testElevsGT[test_i]
+            chLightAzGT[:] = testLightAzsGT[test_i]
+            chLightElGT[:] = testLightElevsGT[test_i]
+            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+            chVColorsGT[:] = testVColorGT[test_i]
             chAz[:] = azsPredRF[test_i]
             chEl[:] = elevsPredRF[test_i]
+            chVColors[:] = testPredVColors[test_i]
+            chComponent[:] = componentPreds[test_i]
+
+            chDisplacement = ch.Ch([0.0, 0.0,0.0])
+            chScale = ch.Ch([1.0,1.0,1.0])
+
             image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
             cv2.imwrite('results/imgs/groundtruth-' + str(test_i) + '.png', image)
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
@@ -1194,7 +1329,7 @@ def readKeys(window, key, scancode, action, mods):
             fittedAzsGaussian = np.append(fittedAzsGaussian, chAz.r[0])
             fittedElevsGaussian = np.append(fittedElevsGaussian, chEl.r[0])
 
-        errorsFittedRFGaussian = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
+        errorsFittedRFGaussian = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
         meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
         meanAbsErrElevsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[1]))
 
@@ -1205,18 +1340,27 @@ def readKeys(window, key, scancode, action, mods):
         fittedAzsRobust = np.array([])
         fittedElevsRobust = np.array([])
         for test_i in range(len(testAzsGT)):
-            print("Minimizing loss of prediction " + str(test_i) + "of " + str(testSize))
+            print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
             chAzGT[:] = testAzsGT[test_i]
             chElGT[:] = testElevsGT[test_i]
+            chLightAzGT[:] = testLightAzsGT[test_i]
+            chLightElGT[:] = testLightElevsGT[test_i]
+            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+            chVColorsGT[:] = testVColorGT[test_i]
             chAz[:] = azsPredRF[test_i]
             chEl[:] = elevsPredRF[test_i]
+            chVColors[:] = testPredVColors[test_i]
+            chComponent[:] = componentPreds[test_i]
+            chDisplacement = ch.Ch([0.0, 0.0,0.0])
+            chScale = ch.Ch([1.0,1.0,1.0])
+
             ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
             cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
             fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
             fittedElevsRobust = np.append(fittedElevsRobust, chEl.r[0])
 
-        errorsFittedRFRobust = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
+        errorsFittedRFRobust = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
         meanAbsErrAzsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[0]))
         meanAbsErrElevsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[1]))
 
@@ -1227,11 +1371,20 @@ def readKeys(window, key, scancode, action, mods):
         fittedAzsBoth = np.array([])
         fittedElevsBoth = np.array([])
         for test_i in range(len(testAzsGT)):
-            print("Minimizing loss of prediction " + str(test_i) + "of " + str(testSize))
+            print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
             chAzGT[:] = testAzsGT[test_i]
             chElGT[:] = testElevsGT[test_i]
+            chLightAzGT[:] = testLightAzsGT[test_i]
+            chLightElGT[:] = testLightElevsGT[test_i]
+            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+            chVColorsGT[:] = testLightIntensitiesGT[test_i]
             chAz[:] = azsPredRF[test_i]
             chEl[:] = elevsPredRF[test_i]
+            chVColors[:] = testPredVColors[test_i]
+            chComponent[:] = componentPreds[test_i]
+            chDisplacement = ch.Ch([0.0, 0.0,0.0])
+            chScale = ch.Ch([1.0,1.0,1.0])
+
             model = 0
             errorFun = models[model]
             pixelErrorFun = pixelModels[model]
@@ -1245,7 +1398,7 @@ def readKeys(window, key, scancode, action, mods):
             fittedAzsBoth = np.append(fittedAzsBoth, chAz.r[0])
             fittedElevsBoth = np.append(fittedElevsBoth, chEl.r[0])
 
-        errorsFittedRFBoth = regression_methods.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
+        errorsFittedRFBoth = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
         meanAbsErrAzsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[0]))
         meanAbsErrElevsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[1]))
 
@@ -1508,7 +1661,6 @@ def readKeys(window, key, scancode, action, mods):
         plt.ion()
 
         directory = 'results/'
-
         #Write statistics to file.
         with open(directory + 'performance.txt', 'w') as expfile:
             # expfile.write(str(z))
@@ -1525,58 +1677,11 @@ def readKeys(window, key, scancode, action, mods):
 
         chAz[:] = chAzOld
         chEl[:] = chElOld
+
+
         print("Finished backprojecting and fitting estimates.")
 
-    if key == glfw.KEY_R and action == glfw.RELEASE:
-        global errorFun
-    global pixelErrorFun
-    global model
-    global models
-    global modelsDescr
-    global pixelModels
-    global reduceVariance
-    if key == glfw.KEY_O and action == glfw.RELEASE:
-        # drawSurf = False
-        model = (model + 1) % len(models)
-        print("Using " + modelsDescr[model])
-        errorFun = models[model]
-        pixelErrorFun = pixelModels[model]
-
-        if model == 2:
-            reduceVariance = True
-        else:
-            reduceVariance = False
-
-        refresh = True
-
-    global method
-    global methods
-    if key == glfw.KEY_1 and action == glfw.RELEASE:
-        method = 0
-        print("Changed to minimizer: " + methods[method])
-    if key == glfw.KEY_2 and action == glfw.RELEASE:
-        method = 1
-        print("Changed to minimizer: " + methods[method])
-    if key == glfw.KEY_3 and action == glfw.RELEASE:
-        method = 2
-        print("Changed to minimizer: " + methods[method])
-    if key == glfw.KEY_4 and action == glfw.RELEASE:
-        print("Changed to minimizer: " + methods[method])
-        method = 3
-    if key == glfw.KEY_5 and action == glfw.RELEASE:
-        method = 4
-        print("Changed to minimizer: " + methods[method])
-
-    global minimize
-    if key == glfw.KEY_M and action == glfw.RELEASE:
-        minimize = True
-
-glfw.set_key_callback(win, readKeys)
-
-while not exit:
-    # Poll for and process events
-    glfw.make_context_current(renderer.win)
-    glfw.poll_events()
+        beginTesting = False
 
     if changedGT:
         drawSurf = False
@@ -1588,7 +1693,7 @@ while not exit:
         chElGT[:] = chEl.r[:]
         chDistGT[:] = chDist.r[:]
         # chComponentGT[:] = chComponent.r[:]
-        chVColorsGT[:] = chVColors.r[:]
+        # chVColorsGT[:] = chVColors.r[:]
 
         if makeVideo:
             ims = []
@@ -1620,6 +1725,63 @@ while not exit:
             pendingCyclesRender = True
 
         changedGT = False
+
+    if exploreSurface:
+        if computePerformance:
+            print("Estimating cost function surface and gradients...")
+            drawSurf = True
+            chAzOld = chAz.r[0]
+            chElOld = chEl.r[0]
+
+            for model_num, errorFun in enumerate(models):
+                performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
+                for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
+                    for model_num, errorFun in enumerate(models):
+                        chAz[:] = chAzi
+                        chEl[:] = chEli
+
+                        performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
+                        azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
+                        elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
+                        import scipy.sparse as sp
+                        if sp.issparse(errorFun.dr_wrt(chAz)):
+                            drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
+                        else:
+                            drAz = errorFun.dr_wrt(chAz)[0][0]
+                        if sp.issparse(errorFun.dr_wrt(chEl)):
+                            drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
+                        else:
+                            drEl = errorFun.dr_wrt(chEl)[0][0]
+
+                        gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
+                        gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
+                        chAzOldi = chAz.r[0]
+                        chElOldi = chEl.r[0]
+                        diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+                        diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+                        chAz[:] = chAzOldi
+                        chEl[:] = chElOldi
+                        gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
+                        gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
+            errorFun = models[model]
+
+            chAz[:] = chAzOld
+            chEl[:] = chElOld
+
+            refresh = True
+            print("Finshed estimating.")
+
+        exploreSurface = False
 
     if groundTruthBlender and pendingCyclesRender:
         scene.update()

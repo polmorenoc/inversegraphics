@@ -5,6 +5,7 @@ from sklearn.cross_validation import ShuffleSplit
 from sklearn.metrics import r2_score
 from collections import defaultdict
 from sklearn.ensemble import RandomForestRegressor
+import ipdb
 
 def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
 
@@ -14,7 +15,7 @@ def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
 
 def trainRandomForest(xtrain, ytrain):
 
-    randForest = RandomForestRegressor(n_estimators=200, n_jobs=-1)
+    randForest = RandomForestRegressor(n_estimators=10, n_jobs=-1)
     rf = randForest.fit(xtrain, ytrain)
 
     return rf
@@ -23,6 +24,13 @@ def testRandomForest(randForest, xtest):
 
     return randForest.predict(xtest)
 
+
+def meanColor(image, win):
+
+    image = np.mean(image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:], axis=0)
+    color = np.mean(image, axis=0)
+
+    return color
 
 def trainLinearRegression(xtrain, ytrain):
 

@@ -15,8 +15,7 @@ import light_probes
 
 
 def getOcclusionFraction(renderer):
-
-    vis_occluded = np.array(renderer.indices_image!=0).copy().astype(np.bool)
+    vis_occluded = np.array(renderer.indices_image==1).copy().astype(np.bool)
     vis_im = np.array(renderer.image_mesh_bool([0])).copy().astype(np.bool)
 
     return 1. - np.sum(vis_occluded)/np.sum(vis_im)

@@ -3,9 +3,21 @@ __author__ = 'pol'
 from skimage.feature import hog
 from skimage import data, color, exposure
 import numpy as np
+import ipdb
 
 # conf.cellSize = cellSize;
 # conf.numOrientations = 9;
+
+
+def featuresIlluminationDirection(image,win):
+    # ipdb.set_trace()
+    image = color.rgb2gray(image)
+    coeffs = np.fft.fft2(image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win])
+    magnitudes =  np.sqrt(coeffs.real**2 + coeffs.imag**2)
+
+    phases = np.angle(coeffs)
+
+    return np.concatenate([magnitudes.ravel(), phases.ravel()])
 
 def computeHoG(image):
 
