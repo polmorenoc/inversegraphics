@@ -382,7 +382,7 @@ pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 iterat = 0
-demoMode = False
+demoMode = True
 
 if demoMode:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
@@ -724,7 +724,7 @@ def cb2(_):
 
 # , chComponent[0]
 
-free_variables = [chVColors, chComponent, chScale[0], chAz, chEl]
+free_variables = [chVColors, chComponent, chAz, chEl]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -734,7 +734,7 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-method = 4
+method = 3
 exit = False
 minimize = False
 plotMinimization = False
@@ -814,10 +814,28 @@ def readKeys(window, key, scancode, action, mods):
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
         refresh = True
         chScale[2] = chScale[2].r - 0.05
-
+    global errorFun
     if key != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
-        print("Grad check: " + ch.optimization.gradCheck(errorFun, [chAz], [0.01745]))
-        print("Scipy grad check: " + ch.optimization.scipyGradCheck({'raw': errorFun}, [chAz]))
+        print("Azimuth grad check: ")
+        jacs, approxjacs, check = ch.optimization.gradCheck(errorFun, [chAz], [1.49e-08])
+        print("Grad check jacs: " + "%.2f" % jacs)
+        print("Grad check fin jacs: " + "%.2f" % approxjacs)
+        print("Grad check check: " + "%.2f" % check)
+        # print("Scipy grad check: " + "%.2f" % ch.optimization.scipyGradCheck({'raw': errorFun}, [chAz]))
+
+        print("Elevation grad check: ")
+        jacs, approxjacs, check = ch.optimization.gradCheck(errorFun, [chEl], [1])
+        print("Grad check jacs: " + "%.2f" % jacs)
+        print("Grad check fin jacs: " + "%.2f" % approxjacs)
+        print("Grad check check: " + "%.2f" % check)
+        # print("Scipy grad check: " + "%.2f" % ch.optimization.scipyGradCheck({'raw': errorFun}, [chEl]))
+
+        print("Red VColor grad check: ")
+        jacs, approxjacs, check = ch.optimization.gradCheck(errorFun, [chVColors[0]], [0.01])
+        print("Grad check jacs: " + "%.2f" % jacs)
+        print("Grad check fin jacs: " + "%.2f" % approxjacs)
+        print("Grad check check: " + "%.2f" % check)
+        # print("Scipy grad check: " + "%.2f" % ch.optimization.scipyGradCheck({'raw': errorFun}, [chVColors]))
 
     if key == glfw.KEY_D:
         refresh = True
