@@ -29,11 +29,19 @@ import light_probes
 
 plt.ion()
 
-prefix = 'light'
-trainDataName = 'experiments/train_' + prefix + '.pickle'
-testDataName = 'experiments/test_' + prefix + '.pickle'
+numpy.random.seed(1)
+trainprefix = 'train1/'
+testGTprefix = 'test1/'
+testprefix = 'test1-simplex-smallstd/'
+if not os.path.exists('experiments/' + trainprefix):
+    os.makedirs('experiments/' + trainprefix)
+if not os.path.exists('experiments/' + testGTprefix):
+    os.makedirs('experiments/' + testprefix)
+trainDataName = 'experiments/' + trainprefix + 'groundtruth.pickle'
+testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
+trainedModels = {}
 
-width, height = (150, 150)
+width, height = (110, 110)
 
 glfw.init()
 glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -153,7 +161,7 @@ chVColorsGT = ch.Ch([0.4,0.4,0.4])
 loadSavedSH = True
 shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([10])
+chAmbientIntensityGT = ch.Ch([7])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 if useBlender:
@@ -199,7 +207,7 @@ if loadSavedSH:
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])
 chLightIntensityGT = ch.Ch([10])
-chLightAzGT = ch.Ch([0])
+chLightAzGT = ch.Ch([np.pi*3/2])
 chLightElGT = ch.Ch([np.pi/4])
 angle = ch.arcsin(chLightRadGT/chLightDistGT)
 zGT = chZonalHarmonics(angle)
@@ -346,7 +354,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.5
+initialPixelStdev = 0.075
 reduceVariance = False
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
@@ -726,7 +734,7 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-method = 1
+method = 4
 exit = False
 minimize = False
 plotMinimization = False
@@ -1083,25 +1091,25 @@ while not exit:
     if createGroundTruth:
         print("Creating Ground Truth")
         trainSize = 1000
-        testSize = 50
+        testSize = 20
 
         trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
         trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
         trainLightAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
-        trainLightElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
+        trainLightElevsGT = numpy.random.uniform(0,np.pi/3, trainSize)
         trainLightIntensitiesGT = numpy.random.uniform(5,10, trainSize)
-        trainVColorGT = numpy.random.uniform(0,1, [trainSize, 3])
+        trainVColorGT = numpy.random.uniform(0,0.7, [trainSize, 3])
 
-        trainData = {'trainAzsGT':trainAzsGT,'trainElevsGT':trainElevsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightElevsGT':trainLightElevsGT,'trainLightIntensitiesGT':trainLightIntensitiesGT, 'trainVColorGT':trainVColorGT}
+        trainData = {'trainAzsGT':trainAzsGT,'trainElevsGT':trainElevsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightElevsGT':trainLightElevsGT,'trainLightIntensitiesGT':trainLightIntensitiesGT, 'trainVColorGT':trainVColorGT}
 
         # testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
         testAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
         testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
         testLightAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
-        testLightElevsGT = numpy.random.uniform(0,np.pi/2, testSize)
+        testLightElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
         testLightIntensitiesGT = numpy.random.uniform(5,10, testSize)
-        testVColorGT = numpy.random.uniform(0,1, [testSize, 3])
-        testData = {'testAzsGT':testAzsGT,'testElevsGT':testElevsGT,'testLightAzsGT':testLightAzsGT,'testLightAzsGT':testLightAzsGT,'testLightElevsGT':testLightElevsGT,'testLightIntensitiesGT':testLightIntensitiesGT, 'testVColorGT':testVColorGT}
+        testVColorGT = numpy.random.uniform(0,0.7, [testSize, 3])
+        testData = {'testAzsGT':testAzsGT,'testElevsGT':testElevsGT,'testLightAzsGT':testLightAzsGT,'testLightElevsGT':testLightElevsGT,'testLightIntensitiesGT':testLightIntensitiesGT, 'testVColorGT':testVColorGT}
 
         with open(trainDataName, 'wb') as pfile:
             pickle.dump(trainData, pfile)
@@ -1186,6 +1194,11 @@ while not exit:
         imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
         randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
 
+        trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelLightCosAzs':randForestModelLightCosAzs,'randForestModelLightSinAzs':randForestModelLightSinAzs,'randForestModelLightCosElevs':randForestModelLightCosElevs,'randForestModelLightSinElevs':randForestModelLightSinElevs,'randForestModelLightIntensity':randForestModelLightIntensity}
+        with open('experiments/' + trainprefix + 'models.pickle', 'wb') as pfile:
+            pickle.dump(trainedModels, pfile)
+
+
         # print("Training LR")
         # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
         # linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
@@ -1202,6 +1215,7 @@ while not exit:
 
 
     if beginTesting:
+
         chAzOld = chAz.r[0]
         chElOld = chEl.r[0]
         print("Backprojecting and fitting estimates.")
@@ -1216,10 +1230,26 @@ while not exit:
         testLightIntensitiesGT = testData['testLightIntensitiesGT']
         testVColorGT = testData['testVColorGT']
 
+        if trainedModels == {}:
+            with open('experiments/' + trainprefix +  'models.pickle', 'rb') as pfile:
+                trainedModels = pickle.load(pfile)
+
+            randForestModelCosAzs = trainedModels['randForestModelCosAzs']
+            randForestModelSinAzs = trainedModels['randForestModelSinAzs']
+            randForestModelCosElevs = trainedModels['randForestModelCosElevs']
+            randForestModelSinElevs = trainedModels['randForestModelSinElevs']
+            randForestModelLightCosAzs = trainedModels['randForestModelLightCosAzs']
+            randForestModelLightSinAzs = trainedModels['randForestModelLightSinAzs']
+            randForestModelLightCosElevs = trainedModels['randForestModelLightCosElevs']
+            randForestModelLightSinElevs = trainedModels['randForestModelLightSinElevs']
+            randForestModelLightIntensity = trainedModels['randForestModelLightIntensity']
+
         testImages = []
         testHogs = []
         testIllumfeats = []
         testPredVColors = []
+        occludedInstances = []
+
         print("Generating renders")
         for test_i in range(len(testAzsGT)):
             azi = testAzsGT[test_i]
@@ -1231,10 +1261,22 @@ while not exit:
             chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
             chVColorsGT[:] = testVColorGT[test_i]
             testImage = rendererGT.r.copy()
-            testImages = testImages + [testImage]
-            testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,40)]
-            testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
-            testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 40)]
+            occlusion = getOcclusionFraction(rendererGT)
+            if occlusion < 0.95:
+                testImages = testImages + [testImage]
+                testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,40)]
+                testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
+                testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 40)]
+            else:
+                occludedInstances = occludedInstances + [test_i]
+
+        testAzsGT = np.delete(testAzsGT, occludedInstances)
+        testElevsGT = np.delete(testElevsGT, occludedInstances)
+        testLightAzsGT = np.delete(testLightAzsGT, occludedInstances)
+        testLightElevsGT = np.delete(testLightElevsGT, occludedInstances)
+        testLightIntensitiesGT = np.delete(testLightIntensitiesGT, occludedInstances)
+        testVColorGT = np.delete(testVColorGT, occludedInstances, 0)
+
         print("Predicting with RFs")
         testHogfeats = np.vstack(testHogs)
         testIllumfeats = np.vstack(testIllumfeats)
@@ -1267,9 +1309,9 @@ while not exit:
         componentPreds=[]
         for test_i in range(len(testAzsGT)):
 
-            shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - lightElevsPredRF[test_i], lightAzsPredRF[test_i] - np.pi/2) * clampedCosCoeffs
+            shDirLightGTTest = chZonalToSphericalHarmonics(zGT, np.pi/2 - lightElevsPredRF[test_i], lightAzsPredRF[test_i] - np.pi/2) * clampedCosCoeffs
 
-            componentPreds = componentPreds + [chAmbientSHGT + shDirLightGT*lightIntensityPredRF[test_i]]
+            componentPreds = componentPreds + [chAmbientSHGT + shDirLightGTTest*lightIntensityPredRF[test_i]]
 
         componentPreds = np.vstack(componentPreds)
 
@@ -1299,8 +1341,17 @@ while not exit:
         pixelErrorFun = pixelModels[model]
         fittedAzsGaussian = np.array([])
         fittedElevsGaussian = np.array([])
+        fittedLightAzsGaussian = np.array([])
+        fittedLightElevsGaussian = np.array([])
         testOcclusions = np.array([])
-        free_variables = [chVColors, chComponent, chScale, chDisplacement, chAz, chEl]
+        free_variables = [chVColors, chComponent, chAz, chEl]
+
+
+        if not os.path.exists('results/' + testprefix + 'imgs/'):
+            os.makedirs('results/' + testprefix + 'imgs/')
+
+        if not os.path.exists('results/' + testprefix ):
+            os.makedirs('results/' + testprefix )
 
         for test_i in range(len(testAzsGT)):
             print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
@@ -1315,23 +1366,27 @@ while not exit:
             chVColors[:] = testPredVColors[test_i]
             chComponent[:] = componentPreds[test_i]
 
-            chDisplacement = ch.Ch([0.0, 0.0,0.0])
-            chScale = ch.Ch([1.0,1.0,1.0])
+            chDisplacement[:] = np.array([0.0, 0.0,0.0])
+            chScale[:] = np.array([1.0,1.0,1.0])
 
             image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/groundtruth-' + str(test_i) + '.png', image)
+            cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'groundtruth' + '.png', image)
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/predicted-' + str(test_i) + '.png',image)
+            cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'predicted'+ '.png',image)
             testOcclusions = np.append(testOcclusions, getOcclusionFraction(rendererGT))
             ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/fitted-gaussian-' + str(test_i) + '.png', image)
+            cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'fitted-gaussian' + '.png', image)
             fittedAzsGaussian = np.append(fittedAzsGaussian, chAz.r[0])
             fittedElevsGaussian = np.append(fittedElevsGaussian, chEl.r[0])
-
+            fittedLightAzsGaussian = np.append(fittedLightAzsGaussian, chLightAz.r[0])
+            fittedLightElevsGaussian = np.append(fittedLightElevsGaussian, chLightEl.r[0])
         errorsFittedRFGaussian = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
+        # errorsLightFittedRFGaussian = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, fittedLightAzsGaussian, fittedLightElevsGaussian)
         meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
         meanAbsErrElevsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[1]))
+        # meanAbsErrLightAzsFittedRFGaussian = np.mean(np.abs(errorsLightFittedRFGaussian[0]))
+        # meanAbsErrLightElevsFittedRFGaussian = np.mean(np.abs(errorsLightFittedRFGaussian[1]))
 
         model = 1
         print("Using " + modelsDescr[model])
@@ -1339,6 +1394,8 @@ while not exit:
         pixelErrorFun = pixelModels[model]
         fittedAzsRobust = np.array([])
         fittedElevsRobust = np.array([])
+        fittedLightAzsRobust = np.array([])
+        fittedLightElevsRobust = np.array([])
         for test_i in range(len(testAzsGT)):
             print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
             chAzGT[:] = testAzsGT[test_i]
@@ -1351,60 +1408,67 @@ while not exit:
             chEl[:] = elevsPredRF[test_i]
             chVColors[:] = testPredVColors[test_i]
             chComponent[:] = componentPreds[test_i]
-            chDisplacement = ch.Ch([0.0, 0.0,0.0])
-            chScale = ch.Ch([1.0,1.0,1.0])
+
+            chDisplacement[:] = np.array([0.0, 0.0,0.0])
+            chScale[:] = np.array([1.0,1.0,1.0])
 
             ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
             image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
+            cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'fitted-robust' + '.png', image)
             fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
             fittedElevsRobust = np.append(fittedElevsRobust, chEl.r[0])
+
+            # fittedLightAzsRobust = np.append(fittedLightAzsRobust, chLightAz.r[0])
+            # fittedLightElevsRobust = np.append(fittedLightElevsRobust, chLightEl.r[0])
 
         errorsFittedRFRobust = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
         meanAbsErrAzsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[0]))
         meanAbsErrElevsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[1]))
+        # errorsLightFittedRFRobust = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, fittedLightAzsRobust, fittedLightElevsRobust)
+        # meanAbsErrLightAzsFittedRFRobust = np.mean(np.abs(errorsLightFittedRFRobust[0]))
+        # meanAbsErrLightElevsFittedRFRobust = np.mean(np.abs(errorsLightFittedRFRobust[1]))
 
-        model = 1
-        print("Using Both")
-        errorFun = models[model]
-        pixelErrorFun = pixelModels[model]
-        fittedAzsBoth = np.array([])
-        fittedElevsBoth = np.array([])
-        for test_i in range(len(testAzsGT)):
-            print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
-            chAzGT[:] = testAzsGT[test_i]
-            chElGT[:] = testElevsGT[test_i]
-            chLightAzGT[:] = testLightAzsGT[test_i]
-            chLightElGT[:] = testLightElevsGT[test_i]
-            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
-            chVColorsGT[:] = testLightIntensitiesGT[test_i]
-            chAz[:] = azsPredRF[test_i]
-            chEl[:] = elevsPredRF[test_i]
-            chVColors[:] = testPredVColors[test_i]
-            chComponent[:] = componentPreds[test_i]
-            chDisplacement = ch.Ch([0.0, 0.0,0.0])
-            chScale = ch.Ch([1.0,1.0,1.0])
-
-            model = 0
-            errorFun = models[model]
-            pixelErrorFun = pixelModels[model]
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
-            model = 1
-            errorFun = models[model]
-            pixelErrorFun = pixelModels[model]
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
-            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
-            fittedAzsBoth = np.append(fittedAzsBoth, chAz.r[0])
-            fittedElevsBoth = np.append(fittedElevsBoth, chEl.r[0])
-
-        errorsFittedRFBoth = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
-        meanAbsErrAzsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[0]))
-        meanAbsErrElevsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[1]))
+        # model = 1
+        # print("Using Both")
+        # errorFun = models[model]
+        # pixelErrorFun = pixelModels[model]
+        # fittedAzsBoth = np.array([])
+        # fittedElevsBoth = np.array([])
+        # for test_i in range(len(testAzsGT)):
+        #     print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
+        #     chAzGT[:] = testAzsGT[test_i]
+        #     chElGT[:] = testElevsGT[test_i]
+        #     chLightAzGT[:] = testLightAzsGT[test_i]
+        #     chLightElGT[:] = testLightElevsGT[test_i]
+        #     chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+        #     chVColorsGT[:] = testLightIntensitiesGT[test_i]
+        #     chAz[:] = azsPredRF[test_i]
+        #     chEl[:] = elevsPredRF[test_i]
+        #     chVColors[:] = testPredVColors[test_i]
+        #     chComponent[:] = componentPreds[test_i]
+        #     chDisplacement[:] = np.array([0.0, 0.0,0.0])
+        #     chScale[:] = np.array([1.0,1.0,1.0])
+        #
+        #     model = 0
+        #     errorFun = models[model]
+        #     pixelErrorFun = pixelModels[model]
+        #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+        #     model = 1
+        #     errorFun = models[model]
+        #     pixelErrorFun = pixelModels[model]
+        #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+        #     image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+        #     cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
+        #     fittedAzsBoth = np.append(fittedAzsBoth, chAz.r[0])
+        #     fittedElevsBoth = np.append(fittedElevsBoth, chEl.r[0])
+        #
+        # errorsFittedRFBoth = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
+        # meanAbsErrAzsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[0]))
+        # meanAbsErrElevsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[1]))
 
         plt.ioff()
 
-        directory = 'results/predicted-azimuth-error'
+        directory = 'results/' + testprefix + 'predicted-azimuth-error'
 
         fig = plt.figure()
         plt.scatter(testElevsGT*180/np.pi, errorsRF[0])
@@ -1446,7 +1510,7 @@ while not exit:
         fig.savefig(directory  + '_performance-histogram.png')
         plt.close(fig)
 
-        directory = 'results/predicted-elevation-error'
+        directory = 'results/' + testprefix + 'predicted-elevation-error'
 
         fig = plt.figure()
         plt.scatter(testElevsGT*180/np.pi, errorsRF[1])
@@ -1490,7 +1554,7 @@ while not exit:
 
         #Fitted predictions plots:
 
-        directory = 'results/fitted-azimuth-error'
+        directory = 'results/' + testprefix + 'fitted-azimuth-error'
 
         fig = plt.figure()
         plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[0])
@@ -1532,7 +1596,7 @@ while not exit:
         fig.savefig(directory  + '_performance-histogram.png')
         plt.close(fig)
 
-        directory = 'results/fitted-elevation-error'
+        directory = 'results/' + testprefix + 'fitted-elevation-error'
 
         fig = plt.figure()
         plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[1])
@@ -1574,7 +1638,7 @@ while not exit:
         fig.savefig(directory  + '_performance-histogram.png')
         plt.close(fig)
 
-        directory = 'results/fitted-robust-azimuth-error'
+        directory = 'results/' + testprefix + 'fitted-robust-azimuth-error'
 
         fig = plt.figure()
         plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[0])
@@ -1616,7 +1680,7 @@ while not exit:
         fig.savefig(directory  + '_performance-histogram.png')
         plt.close(fig)
 
-        directory = 'results/fitted-robust-elevation-error'
+        directory = 'results/' + testprefix + 'fitted-robust-elevation-error'
 
         fig = plt.figure()
         plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[1])
@@ -1660,18 +1724,23 @@ while not exit:
 
         plt.ion()
 
-        directory = 'results/'
         #Write statistics to file.
-        with open(directory + 'performance.txt', 'w') as expfile:
+        with open('results/' + testprefix + 'performance.txt', 'w') as expfile:
             # expfile.write(str(z))
-            expfile.write("meanAbsErrAzsRF " +  str(meanAbsErrAzsRF) + '\n')
-            expfile.write("meanAbsErrElevsRF " +  str(meanAbsErrElevsRF)+ '\n')
-            expfile.write("meanAbsErrAzsFittedRFGaussian " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
-            expfile.write("meanAbsErrElevsFittedRFGaussian " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
-            expfile.write("meanAbsErrAzsFittedRFRobust " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
-            expfile.write("meanAbsErrElevsFittedRFRobust " +  str(meanAbsErrElevsFittedRFRobust)+ '\n')
-            expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
-            expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
+            expfile.write("Mean Azimuth Error (predicted) " +  str(meanAbsErrAzsRF) + '\n')
+            expfile.write("Mean Elevation Error (predicted) " +  str(meanAbsErrElevsRF)+ '\n')
+            expfile.write("Mean Azimuth Error (gaussian) " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
+            expfile.write("Mean Elevation Error (gaussian) " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
+            expfile.write("Mean Azimuth Error (robust) " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
+            expfile.write("Mean Elevation Error (robust) " +  str(meanAbsErrElevsFittedRFRobust)+ '\n\n')
+            expfile.write("Mean Light Azimuth Error (predicted) " +  str(meanAbsErrLightAzsRF)+ '\n')
+            expfile.write("Mean Light Elevation Error (predicted) " +  str(meanAbsErrLightElevsRF)+ '\n')
+            # expfile.write("Mean Light Azimuth Error (gaussian) " +  str(meanAbsErrLightAzsFittedRFGaussian)+ '\n')
+            # expfile.write("Mean Light Elevation Error (gaussian)" +  str(meanAbsErrLightElevsFittedRFGaussian)+ '\n')
+            # expfile.write("Mean Light Azimuth Error (robust)" +  str(meanAbsErrLightAzsFittedRFRobust)+ '\n')
+            # expfile.write("Mean Light Elevation Error (robust) " +  str(meanAbsErrLightElevsFittedRFRobust)+ '\n')
+            # expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
+            # expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
 
             expfile.write("Occlusions " +  str(testOcclusions)+ '\n')
 
