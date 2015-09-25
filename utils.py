@@ -395,7 +395,7 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         if useCycles:
             lamp.data.cycles.use_multiple_importance_sampling = True
             lamp.data.use_nodes = True
-            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 40
+            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 30
 
         scene.objects.link(lamp)
         lamp.layers[1] = True

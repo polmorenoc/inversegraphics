@@ -32,6 +32,32 @@ def meanColor(image, win):
 
     return color
 
+
+from sklearn import mixture
+
+def colorGMM(image, win):
+    np.random.seed(1)
+    gmm = mixture.GMM(n_components=2)
+    colors = image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:][:,3]
+    gmm.fit(colors)
+    return gmm
+
+import scipy.stats.vonmises as vonmises
+def poseGMM(azimuth, elevation):
+    np.random.seed(1)
+    components = [0.5,0.1,0.1,0.05,0.05,0.05,0.05]
+    azs = np.random.uniform(0,2*np.pi, 6)
+    elevs = np.random.uniform(0,np.pi/2, 6)
+    kappa = 15*np.pi/180
+    distsAz = [vonmises(azs[i],kappa) for i in azs]
+    distsEl = [vonmises(elevs[i], kappa) for i in elevs]
+
+    distsAz = [vonmises(azimuth, kappa)]  + distsAz
+    distsEl = [vonmises(elevation, kappa)]  + distsEl
+
+    return components, distsAz, distsEl
+
+
 def trainLinearRegression(xtrain, ytrain):
 
     # Create linear regression object
