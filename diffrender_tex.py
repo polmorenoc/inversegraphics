@@ -30,18 +30,18 @@ import light_probes
 plt.ion()
 
 numpy.random.seed(1)
-trainprefix = 'train1/'
-testGTprefix = 'test1/'
-testprefix = 'test1-simplex-smallstd/'
+trainprefix = 'train2/'
+testGTprefix = 'test2/'
+testprefix = 'test2-robust/'
 if not os.path.exists('experiments/' + trainprefix):
     os.makedirs('experiments/' + trainprefix)
 if not os.path.exists('experiments/' + testGTprefix):
-    os.makedirs('experiments/' + testprefix)
+    os.makedirs('experiments/' + testGTprefix)
 trainDataName = 'experiments/' + trainprefix + 'groundtruth.pickle'
 testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
-width, height = (200, 200)
+width, height = (100, 100)
 
 glfw.init()
 glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -222,8 +222,8 @@ shDirLight = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT
 chComponentStuff = chAmbientSHGT + shDirLight*chLightIntensityGT
 chComponent[:] = chComponentStuff.r[:]
 
-chComponentGT = ch.Ch(np.array([2, 0., 0., 0.,0.,0.,0.,0.,0.]))
-chComponent = ch.Ch(np.array([2, 0., 0., 0.,0.,0.,0.,0.,0.]))
+# chComponentGT = ch.Ch(np.array([2, 0., 0., 0.,0.,0.,0.,0.,0.]))
+# chComponent = ch.Ch(np.array([2, 0., 0., 0.,0.,0.,0.,0.,0.]))
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
@@ -269,8 +269,8 @@ for teapot_i in range(len(renderTeapotsList)):
     vnchmod = [ch.dot(ch.array(vnmodflat[mesh]),invTranspModel) for mesh in rangeMeshes]
     vnchmodnorm = [vnchmod[mesh]/ch.sqrt(vnchmod[mesh][:,0]**2 + vnchmod[mesh][:,1]**2 + vnchmod[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcmodflat = [item.copy() for sublist in vcmod for item in sublist]
-    # vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
-    vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
+    vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+    # vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
     vcmod_list = computeSphericalHarmonics(vnchmodnorm, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
@@ -322,7 +322,7 @@ vnch[0] = ch.dot(vnch[0], invTranspModelGT)
 vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-# vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
 vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
 # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
@@ -339,7 +339,6 @@ currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 # ipdb.set_trace()
 
-ipdb.set_trace()
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -404,7 +403,7 @@ pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 iterat = 0
-demoMode = True
+demoMode = False
 refreshWhileMinimizing = False
 
 if demoMode:
@@ -1073,7 +1072,7 @@ while not exit:
         vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
         vcflat = [item for sublist in vc for item in sublist]
         vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-        # vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+        vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
         vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
         # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
@@ -1207,7 +1206,7 @@ while not exit:
                 hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
 
                 # vcolorsfeats = vcolorsfeats +  [imageproc.medianColor(image,40)]
-                illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,40)]
+                illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
             else:
                 occludedInstances = occludedInstances + [train_i]
 
@@ -1306,10 +1305,10 @@ while not exit:
             occlusion = getOcclusionFraction(rendererGT)
             if occlusion < 0.95:
                 testImages = testImages + [testImage]
-                testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,40)]
+                testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,20)]
                 testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
-                testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 40)]
-                testPredVColorGMMs = testPredVColorGMMs + [recognition_models.colorGMM(testImage, 40)]
+                testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 20)]
+                testPredVColorGMMs = testPredVColorGMMs + [recognition_models.colorGMM(testImage, 20)]
             else:
                 occludedInstances = occludedInstances + [test_i]
 
@@ -1343,8 +1342,10 @@ while not exit:
         elevsPredRF = np.arctan2(sinElevsPredRF, cosElevsPredRF)
         azsPredRF = np.arctan2(sinAzsPredRF, cosAzsPredRF)
 
+
         for test_i in range(len(testAzsGT)):
-            testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azPredRF[test_i], elevsPredRF[test_i])]
+            # testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(testAzsGT[test_i], testElevsGT[test_i])]
+            testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPredRF[test_i], elevsPredRF[test_i])]
 
         lightElevsPredRF = np.arctan2(sinElevsLightPredRF, cosElevsLightPredRF)
         lightAzsPredRF = np.arctan2(sinAzsLightPredRF, cosAzsLightPredRF)
@@ -1357,7 +1358,8 @@ while not exit:
 
             shDirLightGTTest = chZonalToSphericalHarmonics(zGT, np.pi/2 - lightElevsPredRF[test_i], lightAzsPredRF[test_i] - np.pi/2) * clampedCosCoeffs
 
-            componentPreds = componentPreds + [chAmbientSHGT + shDirLightGTTest*lightIntensityPredRF[test_i]]
+            # componentPreds = componentPreds + [chAmbientSHGT + shDirLightGTTest*lightIntensityPredRF[test_i]]
+            componentPreds = componentPreds + [chAmbientSHGT]
 
         componentPreds = np.vstack(componentPreds)
 
@@ -1395,9 +1397,16 @@ while not exit:
 
         if not os.path.exists('results/' + testprefix + 'imgs/'):
             os.makedirs('results/' + testprefix + 'imgs/')
+        if not os.path.exists('results/' + testprefix + 'imgs/samples/'):
+            os.makedirs('results/' + testprefix + 'imgs/samples/')
 
         if not os.path.exists('results/' + testprefix ):
             os.makedirs('results/' + testprefix )
+
+        model = 1
+        print("Using " + modelsDescr[model])
+        errorFun = models[model]
+        pixelErrorFun = pixelModels[model]
 
         maxiter = 5
         for test_i in range(len(testAzsGT)):
@@ -1409,7 +1418,7 @@ while not exit:
             bestComponent = chComponent.r
 
             colorGMM = testPredVColorGMMs[test_i]
-            poseComps, distAz, distEl = testPredPoseGMMs[test_i]
+            poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
             print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
             chAzGT[:] = testAzsGT[test_i]
             chElGT[:] = testElevsGT[test_i]
@@ -1420,29 +1429,33 @@ while not exit:
 
             image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
             cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'groundtruth' + '.png', image)
-            image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'predicted'+ '.png',image)
-            for sample in range(20):
+            for sample in range(10):
                 from numpy.random import choice
-                sampleComp = choice(np.arange(len(poseComps)), p=poseComps[0])
-                az = distAz[sampleComp].rvs(size=1)
-                el = distEl[sampleComp].rvs(size=1)
-                color = colorGMM.sample(n_samples=1)
+
+                sampleComp = choice(len(poseComps), size=1, p=poseComps)
+                az = np.random.vonmises(vmAzParams[sampleComp][0],vmAzParams[sampleComp][1],1)
+                el = np.random.vonmises(vmElParams[sampleComp][0],vmElParams[sampleComp][1],1)
+                color = colorGMM.sample(n_samples=1)[0]
                 chAz[:] = az
                 chEl[:] = el
-                chVColors[:] = color
-                chVColors[:] = testPredVColors[test_i]
-                chComponent[:] = componentPreds[test_i]
+
+                chVColors[:] = color.copy()
+                # chVColors[:] = testPredVColors[test_i]
+                chComponent[:] = componentPreds[test_i].copy()
+                image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+                cv2.imwrite('results/' + testprefix + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png',image)
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
 
                 if errorFun.r < bestModelLik:
-                    bestModelLik = errorFun.r
-                    bestPredAz = chAz.r
-                    bestPredEl = chEl.r
-                    bestVColors = chVColors.r
-                    bestComponent = chComponent.r
+                    bestModelLik = errorFun.r.copy()
+                    bestPredAz = chAz.r.copy()
+                    bestPredEl = chEl.r.copy()
+                    bestVColors = chVColors.r.copy()
+                    bestComponent = chComponent.r.copy()
                     image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-                    cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'fitted-gaussian' + '.png', image)
+                    cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + '_best'+ '.png',image)
+                image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+                cv2.imwrite('results/' + testprefix + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_fitted'+ '.png',image)
 
             chDisplacement[:] = np.array([0.0, 0.0,0.0])
             chScale[:] = np.array([1.0,1.0,1.0])

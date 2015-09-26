@@ -15,7 +15,7 @@ def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
 
 def trainRandomForest(xtrain, ytrain):
 
-    randForest = RandomForestRegressor(n_estimators=100, n_jobs=-1)
+    randForest = RandomForestRegressor(n_estimators=200, n_jobs=-1)
     rf = randForest.fit(xtrain, ytrain)
 
     return rf
@@ -37,25 +37,27 @@ from sklearn import mixture
 
 def colorGMM(image, win):
     np.random.seed(1)
-    gmm = mixture.GMM(n_components=2)
+    gmm = mixture.GMM(n_components=8, covariance_type='spherical')
     colors = image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:][:,3]
     gmm.fit(colors)
+    gmm._weights=np.array([0.6,0.3,0.1,0,0,0,0,0])
     return gmm
 
-import scipy.stats.vonmises as vonmises
+from scipy.stats import vonmises
 def poseGMM(azimuth, elevation):
     np.random.seed(1)
-    components = [0.5,0.1,0.1,0.05,0.05,0.05,0.05]
+    components = [0.7,0.05,0.05,0.05,0.05,0.05,0.05]
     azs = np.random.uniform(0,2*np.pi, 6)
     elevs = np.random.uniform(0,np.pi/2, 6)
-    kappa = 15*np.pi/180
-    distsAz = [vonmises(azs[i],kappa) for i in azs]
-    distsEl = [vonmises(elevs[i], kappa) for i in elevs]
+    kappa = 50
 
-    distsAz = [vonmises(azimuth, kappa)]  + distsAz
-    distsEl = [vonmises(elevation, kappa)]  + distsEl
+    vmParamsAz = [(azs[i],kappa) for i in azs]
+    vmParamsEl = [(elevs[i], kappa) for i in elevs]
 
-    return components, distsAz, distsEl
+    vmParamsAz = [(azimuth, kappa)]  + vmParamsAz
+    vmParamsEl = [(elevation, kappa)]  + vmParamsEl
+
+    return components, vmParamsAz, vmParamsEl
 
 
 def trainLinearRegression(xtrain, ytrain):
