@@ -5,6 +5,7 @@ from sklearn.cross_validation import ShuffleSplit
 from sklearn.metrics import r2_score
 from collections import defaultdict
 from sklearn.ensemble import RandomForestRegressor
+from sklearn import mixture
 import ipdb
 
 def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
@@ -33,7 +34,6 @@ def meanColor(image, win):
     return color
 
 
-from sklearn import mixture
 
 def colorGMM(image, win):
     np.random.seed(1)
@@ -44,6 +44,7 @@ def colorGMM(image, win):
     return gmm
 
 from scipy.stats import vonmises
+
 def poseGMM(azimuth, elevation):
     np.random.seed(1)
     components = [0.7,0.05,0.05,0.05,0.05,0.05,0.05]
