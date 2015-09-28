@@ -74,5 +74,5 @@ while True:
     chZ[:] = ze
     ipdb.set_trace()
     pu = chRecSoftmax
-    L = ch.log(pu) + ch.sum(ch.log(chLikelihoodsZ)) - ch.sum(ch.log(chRecLikelihoods))
+    L = ch.log(pu) + ch.sum(ch.log(chLikelihoodsZ.ravel())) - ch.sum(ch.log(chRecLikelihoods.ravel()))
     ch.minimize({'raw': -L}, bounds=None, method=methods[1], x0=free_vars, callback=None, options={'disp':False, 'maxiter':1})
