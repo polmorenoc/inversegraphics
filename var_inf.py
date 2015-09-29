@@ -16,7 +16,7 @@ image = cv2.imread('opendr_GT.png')
 image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
 
 nComps = 5
-nRecComps = 3
+nRecComps = 4
 gmm = mixture.GMM(n_components=nComps, covariance_type='spherical')
 win = 40
 colors = image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:].reshape([4*win*win,3])
@@ -24,55 +24,77 @@ gmm.fit(colors)
 
 imshape = [win*2,win*2,3]
 
+numPixels = win*2 * win*2
 chInput = ch.Ch(colors)
+numVars = chInput.size
 
-recSoftmaxW = [ch.Ch([np.random.uniform(0,1, imshape).ravel()])/chInput.size for comp in range(nRecComps)]
 
-recLogistic = [ch.exp(ch.dot(recSoftmaxW[comp],chInput.ravel())) for comp in range(nRecComps)]
-chRecLogistic = ch.concatenate(recLogistic)
-chRecSoftmax = chRecLogistic/ch.sum(chRecLogistic)
+recSoftmaxW = ch.Ch([np.random.uniform(0,1, [nRecComps,numVars])])/numVars
 
-chZ = ch.zeros(imshape)
+chRecLogistic = ch.exp(ch.dot(recSoftmaxW,chInput.reshape([numVars,1])))
+chRecSoftmax = chRecLogistic.ravel()/ch.sum(chRecLogistic)
 
-recMeans = [ch.Ch(np.random.uniform(0,1, 3)) for mean in range(nRecComps)]
+chZ = ch.zeros([numVars])
+
+recMeans = ch.Ch(np.random.uniform(0,1, [3,nRecComps]))
 recCovars = 0.2
-recLikelihoods = [(ch.exp( - (chZ - recMeans[comp])**2 / (2 * recCovars))  * (1/(ch.sqrt(recCovars) * np.sqrt(2 * np.pi)))).ravel() for comp in range(nRecComps)]
-chRecLikelihoods = ch.concatenate(recLikelihoods)
+chRecLogLikelihoods = - (chZ.reshape([numPixels,3, 1]) - ch.tile(recMeans, [numPixels, 1,1])) - ch.log((2 * recCovars)  * (1/(ch.sqrt(recCovars) * np.sqrt(2 * np.pi))))
 
+genZCovars = 0.2
 chGenComponentsProbs = ch.Ch(gmm.weights_)
-means = [ch.Ch(mean) for mean in gmm.means_]
-covars = 0.2
-# covars = [ch.Ch([covar] for covar in gmm.covars_)]
+chCompMeans = ch.zeros([nComps, 3])
 
-likelihoods = [chGenComponentsProbs[comp]*ch.exp( - (chInput - means[comp])**2 / (2 * covars))  * (1/(ch.sqrt(covars) * np.sqrt(2 * np.pi))) for comp in range(nComps)]
-chLikelihoods = ch.concatenate(likelihoods)
+for comp in range(nComps):
+    chCompMeans[comp, :] = gmm.means_[comp]
+
+chPZComp = ch.exp( - (ch.tile(chZ.reshape([numPixels,3,1]), [1, 1, nComps]) - chCompMeans.reshape([1,3, nComps]))**2 / (2 * genZCovars))  * (1/(ch.sqrt(genZCovars) * np.sqrt(2 * np.pi)))
+
+chPZ = ch.dot(chGenComponentsProbs.reshape([1,nComps]), chPZComp.reshape([5, numVars]))
+
+
+
+prec = 0.5
+
+covars = np.eye(colors.size, colors.size)
+# for row in np.arange(covars.shape[0]):
+#     cols = [max(row-1, 0), min(row+1,colors.size-1)]
+#     covars[row, cols[0]] = prec
+#     covars[row, cols[1]] = prec
+#     covars[cols[0], row] = prec
+#     covars[cols[1], row] = prec
+
+# covars = np.linalg.inv(covars)
+detCov = 1
+# detCov = np.linalg.det(covars)
+# covars = [ch.Ch([covar] for covar in gmm.covars_)]
+chResiduals = chInput.reshape([numVars,1]) - chZ.reshape([numVars,1])
+chLogLikelihoods = ch.log(chPZ) - ch.dot(ch.dot(chResiduals.T, covars),chResiduals)  - 0.5*(ch.log(detCov) + numVars*ch.log((2 * np.pi)))
 # chGenMarginal = ch.prod(chLikelihoods)
 
-likelihoodsZ = [chGenComponentsProbs[comp]*ch.exp( - (chInput - chZ)**2 / (2 * covars))  * (1/(ch.sqrt(covars) * np.sqrt(2 * np.pi))) for comp in range(nComps)]
-chLikelihoodsZ = ch.concatenate(likelihoods)
-chGenMarginalZ = ch.exp(ch.sum(ch.log(chLikelihoodsZ)))
+# likelihoodsZ = [chGenComponentsProbs[comp]*ch.exp( - (chInput - chZ)**2 / (2 * covars))  * (1/(ch.sqrt(covars) * np.sqrt(2 * np.pi))) for comp in range(nComps)]
+# chLikelihoodsZ = ch.concatenate(likelihoods)
+# chGenMarginalZ = ch.exp(ch.sum(ch.log(chLikelihoodsZ)))
 
 gmmRec = mixture.GMM(n_components=nRecComps, covariance_type='spherical')
 gmmRec.covars_=gmm.covars_.copy()
 
-chInput = ch.Ch(image.ravel())
 
 #Update the mean of the gaussians and update the mixing weights.
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-free_vars = []
-for component in range(nRecComps):
-    free_vars = free_vars + [recMeans[component]] + [recSoftmaxW[component]]
+free_vars = [recMeans.ravel()]
+
 
 print("Beginning optimization.")
 while True:
+
     gmmRec.weights_=np.array(chRecSoftmax.r)
     gmmRec.means_=np.array(ch.concatenate(recMeans))
-    epsilon = np.random.randn(3) * 0.04 + 0
+    epsilon = np.random.randn(numVars) * 0.04
     u = choice(nRecComps, size=1, p=chRecSoftmax.r)
-    z = np.random.multivariate_normal(recMeans[u],np.eye(3)*covars,[imshape[0],imshape[1]])
+    z = np.random.multivariate_normal(recMeans[:,u].ravel(), np.eye(3)*recCovars, numPixels).ravel()
     ze = z + epsilon
     chZ[:] = ze
-    ipdb.set_trace()
     pu = chRecSoftmax
-    L = ch.log(pu) + ch.sum(ch.log(chLikelihoodsZ.ravel())) - ch.sum(ch.log(chRecLikelihoods.ravel()))
+    L = ch.log(pu[u]) + ch.sum(chLogLikelihoods.ravel()) - ch.sum(chRecLogLikelihoods[:,:,u].ravel())
     ch.minimize({'raw': -L}, bounds=None, method=methods[1], x0=free_vars, callback=None, options={'disp':False, 'maxiter':1})
+    ipdb.set_trace()
