@@ -29,16 +29,18 @@ chInput = ch.Ch(colors)
 numVars = chInput.size
 
 
-recSoftmaxW = ch.Ch([np.random.uniform(0,1, [nRecComps,numVars])])/numVars
+recSoftmaxW = ch.Ch(np.random.uniform(0,1, [nRecComps,numVars])/numVars)
 
 chRecLogistic = ch.exp(ch.dot(recSoftmaxW,chInput.reshape([numVars,1])))
 chRecSoftmax = chRecLogistic.ravel()/ch.sum(chRecLogistic)
+
+chZRecComps = ch.zeros([numVars, nRecComps])
 
 chZ = ch.zeros([numVars])
 
 recMeans = ch.Ch(np.random.uniform(0,1, [3,nRecComps]))
 recCovars = 0.2
-chRecLogLikelihoods = - (chZ.reshape([numPixels,3, 1]) - ch.tile(recMeans, [numPixels, 1,1])) - ch.log((2 * recCovars)  * (1/(ch.sqrt(recCovars) * np.sqrt(2 * np.pi))))
+chRecLogLikelihoods = - 0.5*(chZ.reshape([numPixels,3, 1]) - ch.tile(recMeans, [numPixels, 1,1]))**2 - ch.log((2 * recCovars)  * (1/(ch.sqrt(recCovars) * np.sqrt(2 * np.pi))))
 
 genZCovars = 0.2
 chGenComponentsProbs = ch.Ch(gmm.weights_)
@@ -50,8 +52,6 @@ for comp in range(nComps):
 chPZComp = ch.exp( - (ch.tile(chZ.reshape([numPixels,3,1]), [1, 1, nComps]) - chCompMeans.reshape([1,3, nComps]))**2 / (2 * genZCovars))  * (1/(ch.sqrt(genZCovars) * np.sqrt(2 * np.pi)))
 
 chPZ = ch.dot(chGenComponentsProbs.reshape([1,nComps]), chPZComp.reshape([5, numVars]))
-
-
 
 prec = 0.5
 
@@ -67,9 +67,16 @@ covars = np.eye(colors.size, colors.size)
 detCov = 1
 # detCov = np.linalg.det(covars)
 # covars = [ch.Ch([covar] for covar in gmm.covars_)]
-chResiduals = chInput.reshape([numVars,1]) - chZ.reshape([numVars,1])
-chLogLikelihoods = ch.log(chPZ) - ch.dot(ch.dot(chResiduals.T, covars),chResiduals)  - 0.5*(ch.log(detCov) + numVars*ch.log((2 * np.pi)))
+chResiduals = chInput.ravel() - chZ.ravel()
+
+covar = 0.2
+
+ipdb.set_trace()
+
+chLogJoint = ch.log(chPZ.ravel()) - 0.5*covar*ch.dot(chResiduals,chResiduals)  - 0.5*(ch.log(detCov) + numVars*ch.log((2 * np.pi)))
 # chGenMarginal = ch.prod(chLikelihoods)
+
+ipdb.set_trace()
 
 # likelihoodsZ = [chGenComponentsProbs[comp]*ch.exp( - (chInput - chZ)**2 / (2 * covars))  * (1/(ch.sqrt(covars) * np.sqrt(2 * np.pi))) for comp in range(nComps)]
 # chLikelihoodsZ = ch.concatenate(likelihoods)
@@ -81,20 +88,23 @@ gmmRec.covars_=gmm.covars_.copy()
 
 #Update the mean of the gaussians and update the mixing weights.
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-free_vars = [recMeans.ravel()]
-
+free_vars = [recMeans.ravel(), recSoftmaxW]
 
 print("Beginning optimization.")
 while True:
 
     gmmRec.weights_=np.array(chRecSoftmax.r)
     gmmRec.means_=np.array(ch.concatenate(recMeans))
-    epsilon = np.random.randn(numVars) * 0.04
+    epsilon = np.random.randn(numVars)
     u = choice(nRecComps, size=1, p=chRecSoftmax.r)
-    z = np.random.multivariate_normal(recMeans[:,u].ravel(), np.eye(3)*recCovars, numPixels).ravel()
-    ze = z + epsilon
-    chZ[:] = ze
+    chZ[:] = chZRecComps[:,u].r.ravel() + recCovars*epsilon.ravel()
     pu = chRecSoftmax
-    L = ch.log(pu[u]) + ch.sum(chLogLikelihoods.ravel()) - ch.sum(chRecLogLikelihoods[:,:,u].ravel())
-    ch.minimize({'raw': -L}, bounds=None, method=methods[1], x0=free_vars, callback=None, options={'disp':False, 'maxiter':1})
+    L = ch.log(pu[u]) + ch.sum(chLogJoint.ravel()) - ch.sum(chRecLogLikelihoods[:,:,u].ravel())
+    drL = L.dr_wrt(recMeans)/numPixels
+    alpha = 0.1
+
+    recSoftmaxW[:] = recSoftmaxW.r[:] + alpha*L.dr_wrt(recSoftmaxW).reshape(recSoftmaxW.shape)/numPixels
     ipdb.set_trace()
+    chZ[:] = chZ.r[:] + alpha*L.dr_wrt(chZ).reshape(chZ.r.shape)/numPixels
+    chZRecComps[:,u] = chZ.r[:]
+    # ch.minimize({'raw': -L}, bounds=None, method=methods[1], x0=free_vars, callback=None, options={'disp':False, 'maxiter':1})

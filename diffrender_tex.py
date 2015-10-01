@@ -26,6 +26,8 @@ from opendr_utils import *
 from OpenGL.arrays import vbo
 import OpenGL.GL as GL
 import light_probes
+import curses
+
 
 plt.ion()
 
@@ -42,17 +44,20 @@ testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
 width, height = (100, 100)
+glModes = ['glfw','mesa']
+glMode = glModes[1]
+win = -1
+if glMode == 'glfw':
+    glfw.init()
+    glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+    glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+    # glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
+    glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+    glfw.window_hint(glfw.DEPTH_BITS,32)
 
-glfw.init()
-glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
-glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-# glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
-glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-glfw.window_hint(glfw.DEPTH_BITS,32)
-
-glfw.window_hint(glfw.VISIBLE, GL.GL_TRUE)
-win = glfw.create_window(width, height, "Demo",  None, None)
-glfw.make_context_current(win)
+    glfw.window_hint(glfw.VISIBLE, GL.GL_FALSE)
+    win = glfw.create_window(width, height, "Demo",  None, None)
+    glfw.make_context_current(win)
 
 useBlender = False
 groundTruthBlender = False
@@ -235,6 +240,7 @@ invTranspModel = ch.transpose(ch.inv(scaleMat))
 invTranspModelGT = ch.transpose(ch.inv(scaleMatGT))
 
 rendererGT = TexturedRenderer()
+rendererGT.set(glMode=glMode)
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -274,6 +280,7 @@ for teapot_i in range(len(renderTeapotsList)):
     vcmod_list = computeSphericalHarmonics(vnchmodnorm, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
+    renderer.glMode = glMode
     setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmodnorm,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
@@ -775,8 +782,16 @@ chAzSaved = chAz.r[0]
 chElSaved = chEl.r[0]
 chComponentSaved = chComponent.r[0]
 
-def readKeys(window, key, scancode, action, mods):
+
+def readKeysCurses(key):
+
+    if key == curses.KEY_UP:
+        stdscr.addstr(2, 20, "Up")
+    elif key == curses.KEY_DOWN:
+        stdscr.addstr(3, 20, "Down")
+
     print("Reading keys...")
+
     global exit
     global refresh
     global chAz
@@ -784,60 +799,61 @@ def readKeys(window, key, scancode, action, mods):
     global chComponent
     global changedGT
     refresh = False
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_ESCAPE and action == glfw.RELEASE:
-        glfw.set_window_should_close(window, True)
+    if key == curses:
+
         exit = True
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
+
+    if key == curses.KEY_LEFT:
         refresh = True
         chAz[0] = chAz[0].r - radians(5)
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
+    if key == curses.KEY_RIGHT:
         refresh = True
         chAz[0] = chAz[0].r + radians(5)
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
+    if key == curses.KEY_DOWN:
         refresh = True
         chEl[0] = chEl[0].r - radians(5)
         refresh = True
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
+    if key == curses.KEY_UP:
         refresh = True
         chEl[0] = chEl[0].r + radians(5)
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
+    if key == curses.KEY_LEFT:
         print("Left modifier!")
         refresh = True
         chAz[0] = chAz[0].r - radians(1)
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
+    if key == curses.KEY_RIGHT:
         refresh = True
         chAz[0] = chAz[0].r + radians(1)
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
+    if key == curses.KEY_DOWN:
         refresh = True
         chEl[0] = chEl[0].r - radians(1)
         refresh = True
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
+    if key == curses.KEY_UP:
         refresh = True
         chEl[0] = chEl[0].r + radians(1)
 
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
+    if key == ord('x'):
         refresh = True
         chScale[0] = chScale[0].r + 0.05
 
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
+    if key == ord('x'):
         refresh = True
         chScale[0] = chScale[0].r - 0.05
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
+    if key == ord('y'):
         refresh = True
         chScale[1] = chScale[1].r + 0.05
 
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
+    if key == ord('y'):
         refresh = True
         chScale[1] = chScale[1].r - 0.05
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
+    if key == ord('z'):
         refresh = True
         chScale[2] = chScale[2].r + 0.05
 
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
+    if key == ord('z'):
         refresh = True
         chScale[2] = chScale[2].r - 0.05
     global errorFun
-    if key != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
+    if key == ord('c'):
         print("Azimuth grad check: ")
         jacs, approxjacs, check = ch.optimization.gradCheck(errorFun, [chAz], [1.49e-08])
         print("Grad check jacs: " + "%.2f" % jacs)
@@ -859,17 +875,19 @@ def readKeys(window, key, scancode, action, mods):
         print("Grad check check: " + "%.2f" % check)
         # print("Scipy grad check: " + "%.2f" % ch.optimization.scipyGradCheck({'raw': errorFun}, [chVColors]))
 
-    if key == glfw.KEY_D:
+    if key == ord('d'):
         refresh = True
         chComponent[0] = chComponent[0].r + 0.1
-    if key == glfw.MOD_SHIFT and glfw.KEY_D:
+
+    if key == ord('d'):
         refresh = True
         chComponent[0] = chComponent[0].r - 0.1
+
     global drawSurf
     global model
     global models
     global updateErrorFunctions
-    if key == glfw.KEY_G and action == glfw.RELEASE:
+    if key == ord('g'):
         refresh = True
         changedGT = True
         updateErrorFunctions = True
@@ -884,13 +902,13 @@ def readKeys(window, key, scancode, action, mods):
     global teapot
 
     global newTeapotAsGT
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_G and action == glfw.RELEASE:
+    if key == ord('g'):
 
         newTeapotAsGT = True
 
     global groundTruthBlender
     global blenderRender
-    if key != glfw.MOD_SHIFT and key == glfw.KEY_B and action == glfw.RELEASE:
+    if key == ord('b'):
         if useBlender:
             updateErrorFunctions = True
             groundTruthBlender = not groundTruthBlender
@@ -903,14 +921,14 @@ def readKeys(window, key, scancode, action, mods):
             refresh = True
 
     #Compute in order to plot the surface neighouring the azimuth/el of the gradients and error function.
-    if key == glfw.KEY_E and action == glfw.RELEASE:
+    if key == ord('e'):
         exploreSurface = True
 
-    if key == glfw.KEY_P and action == glfw.RELEASE:
+    if key == ord('p'):
         ipdb.set_trace()
         refresh = True
 
-    if key == glfw.KEY_N and action == glfw.RELEASE:
+    if key == ord('n'):
         print("Back to GT!")
         chAz[:] = chAzGT.r[:]
         chEl[:] = chElGT.r[:]
@@ -921,13 +939,13 @@ def readKeys(window, key, scancode, action, mods):
     global chElSaved
     global chComponentSaved
 
-    if key == glfw.KEY_Z and action == glfw.RELEASE:
+    if key == ord('z'):
         print("Saved!")
         chAzSaved = chAz.r[0]
         chElSaved = chEl.r[0]
         chComponentSaved = chComponent.r[0]
 
-    if key == glfw.KEY_X and action == glfw.RELEASE:
+    if key == ord('x'):
         print("Back to Saved!")
         chAz[0] = chAzSaved
         chEl[0] = chElSaved
@@ -935,10 +953,10 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
 
     global printStats
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_S and action == glfw.RELEASE:
+    if key == ord('s'):
         printStats = True
 
-    if key == glfw.KEY_V and action == glfw.RELEASE:
+    if key == ord('v'):
         global ims
         if makeVideo:
             im_ani = animation.ArtistAnimation(figvid, ims, interval=2000, repeat_delay=3000, repeat=False, blit=True)
@@ -948,56 +966,56 @@ def readKeys(window, key, scancode, action, mods):
     global stds
     global globalPrior
     global plotMinimization
-    if key == glfw.KEY_KP_1 and action == glfw.RELEASE:
-        stds[:] = stds.r[0]/1.5
-        print("New standard devs of " + str(stds.r))
-        refresh = True
-        drawSurf = False
-        plotMinimization = False
-    if key == glfw.KEY_KP_2 and action == glfw.RELEASE:
-        stds[:] = stds.r[0]*1.5
-        print("New standard devs of " + str(stds.r))
-        refresh = True
-        drawSurf = False
-        plotMinimization = False
-
-    if key == glfw.KEY_KP_4 and action == glfw.RELEASE:
-        globalPrior[0] = globalPrior.r[0] - 0.05
-        print("New foreground prior of" + str(globalPrior.r))
-        refresh = True
-        drawSurf = False
-        plotMinimization = False
-    if key == glfw.KEY_KP_5 and action == glfw.RELEASE:
-        globalPrior[0] = globalPrior.r[0] + 0.05
-        print("New foreground prior of " + str(globalPrior.r))
-        refresh = True
-        drawSurf = False
-        plotMinimization = False
+    # if key == curses.KEY_KP_1:
+    #     stds[:] = stds.r[0]/1.5
+    #     print("New standard devs of " + str(stds.r))
+    #     refresh = True
+    #     drawSurf = False
+    #     plotMinimization = False
+    # if key == curses.KEY_KP_2:
+    #     stds[:] = stds.r[0]*1.5
+    #     print("New standard devs of " + str(stds.r))
+    #     refresh = True
+    #     drawSurf = False
+    #     plotMinimization = False
+    #
+    # if key == curses.KEY_KP_4:
+    #     globalPrior[0] = globalPrior.r[0] - 0.05
+    #     print("New foreground prior of" + str(globalPrior.r))
+    #     refresh = True
+    #     drawSurf = False
+    #     plotMinimization = False
+    # if key == curses.KEY_KP_5:
+    #     globalPrior[0] = globalPrior.r[0] + 0.05
+    #     print("New foreground prior of " + str(globalPrior.r))
+    #     refresh = True
+    #     drawSurf = False
+    #     plotMinimization = False
 
     global changeRenderer
     global currentTeapotModel
-    changeRenderer = False
-    if key == glfw.KEY_KP_7 and action == glfw.RELEASE:
-        currentTeapotModel = (currentTeapotModel - 1) % len(renderTeapotsList)
-        changeRenderer = True
-    if key == glfw.KEY_KP_8 and action == glfw.RELEASE:
-        currentTeapotModel = (currentTeapotModel + 1) % len(renderTeapotsList)
-        changeRenderer = True
+    # changeRenderer = False
+    # if key == curses.KEY_KP_7:
+    #     currentTeapotModel = (currentTeapotModel - 1) % len(renderTeapotsList)
+    #     changeRenderer = True
+    # if key == curses.KEY_KP_8:
+    #     currentTeapotModel = (currentTeapotModel + 1) % len(renderTeapotsList)
+    #     changeRenderer = True
 
     global renderer
     global beginTraining
     global beginTesting
     global createGroundTruth
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_T and action == glfw.RELEASE:
+    if key == ord('t'):
         createGroundTruth = True
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_T and action == glfw.RELEASE:
+    if key == ord('t'):
         beginTraining = True
 
-    if key == glfw.KEY_I and action == glfw.RELEASE:
+    if key == ord('i'):
 
         beginTesting = True
 
-    if key == glfw.KEY_R and action == glfw.RELEASE:
+    if key == ord('r'):
         refresh = True
 
     global pixelErrorFun
@@ -1006,7 +1024,7 @@ def readKeys(window, key, scancode, action, mods):
     global modelsDescr
     global pixelModels
     global reduceVariance
-    if key == glfw.KEY_O and action == glfw.RELEASE:
+    if key == ord('o'):
         # drawSurf = False
         model = (model + 1) % len(models)
         print("Using " + modelsDescr[model])
@@ -1022,35 +1040,51 @@ def readKeys(window, key, scancode, action, mods):
 
     global method
     global methods
-    if key == glfw.KEY_1 and action == glfw.RELEASE:
+    if key == ord('1'):
         method = 0
         print("Changed to minimizer: " + methods[method])
-    if key == glfw.KEY_2 and action == glfw.RELEASE:
+    if key == ord('2'):
         method = 1
         print("Changed to minimizer: " + methods[method])
-    if key == glfw.KEY_3 and action == glfw.RELEASE:
+    if key == ord('3'):
         method = 2
         print("Changed to minimizer: " + methods[method])
-    if key == glfw.KEY_4 and action == glfw.RELEASE:
+    if key == ord('4'):
         print("Changed to minimizer: " + methods[method])
         method = 3
-    if key == glfw.KEY_5 and action == glfw.RELEASE:
+    if key == ord('5'):
         method = 4
         print("Changed to minimizer: " + methods[method])
 
     global minimize
-    if key == glfw.KEY_M and action == glfw.RELEASE:
+    if ord('m'):
         minimize = True
 
-glfw.set_key_callback(win, readKeys)
+# stdscr.addstr(0,10,"Hit 'q' to quit")
+# stdscr.refresh()
+stdscr = curses.initscr()
+# curses.cbreak()
+stdscr.keypad(1)
+key = stdscr.getch()
+stdscr.addch(20,25,key)
+stdscr.refresh()
+
+# glfw.set_key_callback(win, readKeys)
 
 while not exit:
     # Poll for and process events
-    glfw.make_context_current(renderer.win)
-    glfw.poll_events()
+
+    key = stdscr.getch()
+    readKeysCurses(key)
+    stdscr.clear()
+
+    # glfw.make_context_current(renderer.win)
+    # glfw.poll_events()
 
     if newTeapotAsGT:
-        glfw.make_context_current(rendererGT.win)
+
+        rendererGT.makeCurrentContext()
+
         rendererGT.clear()
         del rendererGT
 
@@ -1077,6 +1111,7 @@ while not exit:
         # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
         rendererGT = TexturedRenderer()
+        rendererGT.set(glMode=glMode)
         setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 
         updateErrorFunctions = True
@@ -2007,4 +2042,5 @@ refreshSubplots()
 
 plt.imsave('opendr_opengl_final.png', rendererGT.r)
 
-glfw.terminate()
+if glMode == 'glfw':
+    glfw.terminate()
