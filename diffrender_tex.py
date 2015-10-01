@@ -45,7 +45,7 @@ trainedModels = {}
 
 width, height = (100, 100)
 glModes = ['glfw','mesa']
-glMode = glModes[0]
+glMode = glModes[1]
 win = -1
 demoMode = False
 
@@ -63,8 +63,8 @@ if glMode == 'glfw':
     win = glfw.create_window(width, height, "Demo",  None, None)
     glfw.make_context_current(win)
 
-useBlender = False
-groundTruthBlender = False
+useBlender = True
+groundTruthBlender = True
 useCycles = True
 
 angle = 60 * 180 / numpy.pi
@@ -88,7 +88,7 @@ blender_teapots = []
 center_teapots = []
 
 
-unpackModelsFromBlender = False
+unpackModelsFromBlender = True
 if useBlender:
     [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
 for teapotIdx in renderTeapotsList:
@@ -117,7 +117,7 @@ for teapotIdx in renderTeapotsList:
 sceneIdx = 0
 sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
-unpackSceneFromBlender = False
+unpackSceneFromBlender = True
 if useBlender:
     scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
     targetPosition = np.array(targetPosition)
