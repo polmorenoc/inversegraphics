@@ -284,7 +284,7 @@ for teapot_i in range(len(renderTeapotsList)):
     vcmod_list = computeSphericalHarmonics(vnchmodnorm, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
-    renderer.glMode = glMode
+    renderer.set(glMode = glMode)
     setupTexturedRenderer(renderer, vstackmod, vchmod, fmod_list, vcmod_list, vnchmodnorm,  uvmod, haveTexturesmod_list, texturesmod_list, camera, frustum, win)
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
