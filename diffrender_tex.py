@@ -63,8 +63,8 @@ if glMode == 'glfw':
     win = glfw.create_window(width, height, "Demo",  None, None)
     glfw.make_context_current(win)
 
-useBlender = True
-groundTruthBlender = True
+useBlender = False
+groundTruthBlender = False
 useCycles = True
 
 angle = 60 * 180 / numpy.pi
