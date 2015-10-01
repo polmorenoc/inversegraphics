@@ -88,7 +88,7 @@ blender_teapots = []
 center_teapots = []
 
 
-unpackModelsFromBlender = True
+unpackModelsFromBlender = False
 if useBlender:
     [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
 for teapotIdx in renderTeapotsList:
@@ -117,7 +117,7 @@ for teapotIdx in renderTeapotsList:
 sceneIdx = 0
 sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
-unpackSceneFromBlender = True
+unpackSceneFromBlender = False
 if useBlender:
     scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
     targetPosition = np.array(targetPosition)
