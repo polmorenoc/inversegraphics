@@ -167,7 +167,7 @@ light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
 chVColors = ch.Ch([0.4,0.4,0.4])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
-
+ 
 loadSavedSH = True
 shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
 
