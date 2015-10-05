@@ -43,7 +43,7 @@ trainedModels = {}
 
 width, height = (100, 100)
 glModes = ['glfw','mesa']
-glMode = glModes[1]
+glMode = glModes[0]
 win = -1
 demoMode = False
 
@@ -211,6 +211,7 @@ if loadSavedSH:
             shCoeffsDic = pickle.load(pfile)
             shCoeffs = shCoeffsDic['shCoeffs']
             chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
+
 
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])

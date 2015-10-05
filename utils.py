@@ -339,6 +339,8 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
             bpy.context.user_preferences.system.compute_device_type = 'CUDA'
             bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_0'
 
+        scene.use_nodes = True
+
         AutoNode()
         # bpy.context.scene.render.engine = 'BLENDER_RENDER'
 
@@ -366,6 +368,8 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.resolution_percentage = 100
 
     scene.camera = camera
+    scene.objects.link(camera)
+
     camera.up_axis = 'Y'
     camera.data.angle = 60 * 180 / numpy.pi
     camera.data.clip_start = 0.01
@@ -448,6 +452,8 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.layers[0].use = True
     scene.render.layers[1].use = False
     scene.render.layers[2].use = False
+    scene.render.use_sequencer = False
+    bpy.ops.file.pack_all()
 
 def targetSceneCollision(target, scene):
 

@@ -45,7 +45,7 @@ trainedModels = {}
 
 width, height = (100, 100)
 glModes = ['glfw','mesa']
-glMode = glModes[1]
+glMode = glModes[0]
 win = -1
 demoMode = False
 
@@ -63,7 +63,7 @@ if glMode == 'glfw':
     win = glfw.create_window(width, height, "Demo",  None, None)
     glfw.make_context_current(win)
 
-useBlender = False
+useBlender = True
 groundTruthBlender = False
 useCycles = True
 
@@ -86,7 +86,6 @@ textures_list_teapots = []
 renderer_teapots = []
 blender_teapots = []
 center_teapots = []
-
 
 unpackModelsFromBlender = False
 if useBlender:
@@ -339,6 +338,8 @@ vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT
 
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
+
+ipdb.set_trace()
 
 useGTasBackground = False
 if useGTasBackground:
