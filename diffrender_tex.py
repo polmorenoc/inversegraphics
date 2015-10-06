@@ -188,21 +188,24 @@ if useBlender:
         # lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.15))
         # scene.update()
         # lp_data = light_probes.bakeOp(bpy.context)
+        # coeffs = lp_data[0]['coeffs']
         # scene.objects.unlink(lightProbe)
         # scene.update()
 
         #Option 2:
         envMapCoeffs = light_probes.getEquirectangularCoefficients(envMapTexture)
-        coeffs = envMap
-        shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-2']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['2']]
+        coeffs = envMapCoeffs
+
+
+        shCoeffsList = [coeffs[0]['coeffs']['0']['0']]
+        shCoeffsList = shCoeffsList + [coeffs['1']['1']]
+        shCoeffsList = shCoeffsList + [coeffs['1']['0']]
+        shCoeffsList = shCoeffsList + [coeffs['1']['-1']]
+        shCoeffsList = shCoeffsList + [coeffs['2']['-2']]
+        shCoeffsList = shCoeffsList + [coeffs['2']['-1']]
+        shCoeffsList = shCoeffsList + [coeffs['2']['0']]
+        shCoeffsList = shCoeffsList + [coeffs['2']['1']]
+        shCoeffsList = shCoeffsList + [coeffs['2']['2']]
         shCoeffsRGB = np.vstack(shCoeffsList)
         shCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
         with open(shCoefficientsFile, 'wb') as pfile:
