@@ -10,9 +10,6 @@ import timeit
 import time
 import opendr
 import chumpy as ch
-from opendr.lighting import LambertianPointLight
-from opendr.lighting import SphericalHarmonics
-from opendr.filters import gaussian_pyramid
 import geometry
 import imageproc
 import recognition_models
@@ -26,8 +23,6 @@ from opendr_utils import *
 from OpenGL.arrays import vbo
 import OpenGL.GL as GL
 import light_probes
-import curses
-
 
 plt.ion()
 
@@ -167,29 +162,38 @@ light_colorGT = ch.ones(3)*chPointLightIntensityGT
 chVColors = ch.Ch([0.4,0.4,0.4])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
-loadSavedSH = True
-shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
+loadSavedSH = False
+shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
 chAmbientIntensityGT = ch.Ch([7])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
+
+import imageio
+envMapTexture = imageio.imread('data/hdr/dataset/studio023.hdr')
+
 if useBlender:
     if not loadSavedSH:
         #Spherical harmonics
         bpy.context.scene.render.engine = 'CYCLES'
-        scene.sequencer_colorspace_settings.name = 'Linear'
-        for item in bpy.context.selectable_objects:
-            item.select = False
-        light_probes.lightProbeOp(bpy.context)
-        lightProbe = bpy.context.scene.objects[0]
-        lightProbe.select = True
-        bpy.context.scene.objects.active = lightProbe
-        lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.15))
-        scene.update()
-        lp_data = light_probes.bakeOp(bpy.context)
-        scene.objects.unlink(lightProbe)
-        scene.update()
 
+        #Option 1: Sph Harmonic from Light probes using Cycles:
+        # scene.sequencer_colorspace_settings.name = 'Linear'
+        # for item in bpy.context.selectable_objects:
+        #     item.select = False
+        # light_probes.lightProbeOp(bpy.context)
+        # lightProbe = bpy.context.scene.objects[0]
+        # lightProbe.select = True
+        # bpy.context.scene.objects.active = lightProbe
+        # lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.15))
+        # scene.update()
+        # lp_data = light_probes.bakeOp(bpy.context)
+        # scene.objects.unlink(lightProbe)
+        # scene.update()
+
+        #Option 2:
+        envMapCoeffs = light_probes.getEquirectangularCoefficients(envMapTexture)
+        coeffs = envMap
         shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
         shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
         shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]

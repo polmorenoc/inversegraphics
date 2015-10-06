@@ -1,6 +1,7 @@
 from math import sin, cos, ceil, floor, pi
 import importlib
 import bpy
+import numpy as np
 import mathutils
 from contextlib import contextmanager
 from uuid import uuid4
@@ -427,7 +428,30 @@ def get_coefficients(ob, lightmap, l, m, theta_res, phi_res):
                 / (theta_res * phi_res))
             
     return c.r, c.g, c.b
-            
+
+
+def getEquirectangularCoefficients(envMap):
+    """ returns the RGB spherical harmonic coefficients for a given
+    l and m """
+    mapping = {}
+    for l, m in spherical_harmonics.keys():
+
+        c = mathutils.Color((0, 0, 0))
+
+        harmonic = spherical_harmonics[(l, m)]
+        # ipdb.set_trace()
+        # plt.imsave("lightmap.png", lightmap)
+        for row in np.arange(envMap.shape[0]):
+            for col in np.arange(envMap.shape[1]):
+                theta = np.pi * row / envMap.shape[0]
+                phi = 2 * np.pi * col / envMap.shape[1]
+                color = envMap[row,col,:]
+                c += (color * harmonic(theta, phi) * sin(theta))
+
+        mapping.setdefault(l, {})[m] = c.r, c.g, c.b
+
+    return mapping
+
 def sample_icosphere_color(ob, lightmap, theta, phi):
     """ takes a theta and phi and casts a ray out from the center of an
     icosphere, bilinearly sampling the surface where the ray intersects """

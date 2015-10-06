@@ -2,6 +2,7 @@ from utils import *
 from sklearn.preprocessing import normalize
 from collections import OrderedDict
 
+
 def loadScene(sceneFile):
     sceneLines = [line.strip() for line in open(sceneFile)]
 

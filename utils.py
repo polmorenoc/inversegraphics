@@ -15,6 +15,7 @@ import os
 import pickle
 import ipdb
 import re
+from collision import instancesIntersect
 
 inchToMeter = 0.0254
 
@@ -358,6 +359,9 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         cycles.transparent_min_bounces = 2
         cycles.transparent_max_bounces = 2
 
+        world.cycles_visibility.camera = False
+        world.use_nodes = True
+
     scene.render.threads = 4
     scene.render.tile_x = 75
     scene.render.tile_y = 75
@@ -376,6 +380,9 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     camera.data.clip_end = 10
 
     roomInstance = scene.objects[roomName]
+
+    if useCycles:
+        roomInstance.cycles_visibility.shadow = False
 
     ceilMinX, ceilMaxX = modelWidth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
     ceilWidth = (ceilMaxX - ceilMinX)
@@ -424,6 +431,8 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         scene.world.light_settings.indirect_factor = 1
         scene.world.light_settings.gather_method = 'APPROXIMATE'
 
+
+
     world.light_settings.use_environment_light = False
     world.light_settings.environment_energy = 0.0
     world.horizon_color = mathutils.Color((0.0,0.0,0.0))
@@ -455,11 +464,12 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.use_sequencer = False
     bpy.ops.file.pack_all()
 
+
 def targetSceneCollision(target, scene):
 
     for sceneInstance in scene.objects:
         if sceneInstance.type == 'EMPTY' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
-            if instancesIntersect(teapot, sceneInstance):
+            if instancesIntersect(target, sceneInstance):
                 return True
 
     return False
