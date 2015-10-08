@@ -20,13 +20,27 @@ import glfw
 import score_image
 import matplotlib.pyplot as plt
 from opendr_utils import *
-from OpenGL.arrays import vbo
 import OpenGL.GL as GL
 import light_probes
 
 plt.ion()
 
+#Main script options:
+useBlender = True
+loadBlenderSceneFile = True
+groundTruthBlender = False
+useCycles = True
+demoMode = False
+unpackModelsFromBlender = False
+unpackSceneFromBlender = False
+loadSavedSH = False
+useGTasBackground = False
+refreshWhileMinimizing = False
+computePerformance = False
+
+
 numpy.random.seed(1)
+
 trainprefix = 'train2/'
 testGTprefix = 'test2/'
 testprefix = 'test2-robust/'
@@ -42,7 +56,6 @@ width, height = (100, 100)
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 win = -1
-demoMode = False
 
 if glMode == 'glfw':
     glfw.init()
@@ -58,9 +71,6 @@ if glMode == 'glfw':
     win = glfw.create_window(width, height, "Demo",  None, None)
     glfw.make_context_current(win)
 
-useBlender = True
-groundTruthBlender = False
-useCycles = True
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -82,9 +92,9 @@ renderer_teapots = []
 blender_teapots = []
 center_teapots = []
 
-unpackModelsFromBlender = False
 if useBlender:
     [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+
 for teapotIdx in renderTeapotsList:
     teapotNum = renderTeapotsList[teapotIdx]
     objectDicFile = 'data/target' + str(teapotNum) + '.pickle'
@@ -111,22 +121,21 @@ for teapotIdx in renderTeapotsList:
 sceneIdx = 0
 sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
-unpackSceneFromBlender = False
-if useBlender:
+if useBlender and not loadBlenderSceneFile:
     scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
     targetPosition = np.array(targetPosition)
+    #Save barebones scene.
+    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+elif useBlender and loadBlenderSceneFile:
+    bpy.ops.wm.open_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+    scene = bpy.data.scenes['Main Scene']
+    bpy.context.screen.scene = scene
+    targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx))
 if unpackSceneFromBlender:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
 else:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
 
-
-# 1 Prepare each teapot renderer.
-# 2 Add first teapot to blender scene and GT renderer.
-
-# chAz = ch.Ch([4.742895587179587])
-# chEl = ch.Ch([0.22173048])
-# chDist = ch.Ch([camDistance])
 
 chAz = ch.Ch([1.1693706])
 chEl =  ch.Ch([0.95993109])
@@ -162,15 +171,11 @@ light_colorGT = ch.ones(3)*chPointLightIntensityGT
 chVColors = ch.Ch([0.4,0.4,0.4])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
-loadSavedSH = False
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([7])
+chAmbientIntensityGT = ch.Ch([10])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
-
-import imageio
-envMapTexture = imageio.imread('data/hdr/dataset/studio023.hdr')
 
 if useBlender:
     if not loadSavedSH:
@@ -191,27 +196,48 @@ if useBlender:
         # coeffs = lp_data[0]['coeffs']
         # scene.objects.unlink(lightProbe)
         # scene.update()
-
+        # shCoeffsList = [coeffs[0]['coeffs']['0']['0']]
+        # shCoeffsList = shCoeffsList + [coeffs['1']['1']]
+        # shCoeffsList = shCoeffsList + [coeffs['1']['0']]
+        # shCoeffsList = shCoeffsList + [coeffs['1']['-1']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['-2']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['-1']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['0']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['1']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['2']]
+        # shCoeffsRGB = np.vstack(shCoeffsList)
         #Option 2:
-        envMapCoeffs = light_probes.getEquirectangularCoefficients(envMapTexture)
-        coeffs = envMapCoeffs
 
+        # with open(shCoefficientsFile, 'wb') as pfile:
+        #     shCoeffsDic = {'shCoeffs':shCoeffs}
+        #     pickle.dump(shCoeffsDic, pfile)
 
-        shCoeffsList = [coeffs[0]['coeffs']['0']['0']]
-        shCoeffsList = shCoeffsList + [coeffs['1']['1']]
-        shCoeffsList = shCoeffsList + [coeffs['1']['0']]
-        shCoeffsList = shCoeffsList + [coeffs['1']['-1']]
-        shCoeffsList = shCoeffsList + [coeffs['2']['-2']]
-        shCoeffsList = shCoeffsList + [coeffs['2']['-1']]
-        shCoeffsList = shCoeffsList + [coeffs['2']['0']]
-        shCoeffsList = shCoeffsList + [coeffs['2']['1']]
-        shCoeffsList = shCoeffsList + [coeffs['2']['2']]
-        shCoeffsRGB = np.vstack(shCoeffsList)
-        shCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
-        with open(shCoefficientsFile, 'wb') as pfile:
-            shCoeffsDic = {'shCoeffs':shCoeffs}
-            pickle.dump(shCoeffsDic, pfile)
-        chAmbientSHGT = shCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
+import imageio
+sphericalMap = False
+envMapFilename = 'data/hdr/dataset/03-Ueno-Shrine_3k.hdr'
+envMapTexture = np.array(imageio.imread(envMapFilename))
+phiOffset = 0
+if sphericalMap:
+    mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
+    mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
+    distMask = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    envMapTexture[distMask > mask.shape[0]/2,:] = 0
+    envMapTexture[distMask <= mask.shape[0]/2, :] = envMapTexture[distMask <= mask.shape[0]/2]/envMapTexture[distMask <= mask.shape[0]/2].mean()
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, phiOffset, 'spherical')
+else:
+    envMapMean = envMapTexture.mean()
+    envMapTexture = envMapTexture/envMapMean
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, phiOffset, 'equirectangular')
+
+if useBlender:
+    # cleanBPYScene(scene)
+    addEnvironmentMapWorld(envMapFilename, scene)
+    setEnviornmentMapStrength(1/envMapMean, scene)
+    rotateEnviornmentMap(0, scene)
+
+shCoeffsRGB = ch.Ch(envMapCoeffs)
+chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
 
 if loadSavedSH:
     if os.path.isfile(shCoefficientsFile):
@@ -222,7 +248,7 @@ if loadSavedSH:
 
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([10])
+chLightIntensityGT = ch.Ch([0])
 chLightAzGT = ch.Ch([np.pi*3/2])
 chLightElGT = ch.Ch([np.pi/4])
 angle = ch.arcsin(chLightRadGT/chLightDistGT)
@@ -298,27 +324,6 @@ for teapot_i in range(len(renderTeapotsList)):
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 
-if useBlender:
-    #Add directional light to match spherical harmonics
-    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
-    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
-    lamp.layers[1] = True
-    lamp.layers[2] = True
-    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-    lampLoc = getRelativeLocation(chLightAzGT.r, chLightElGT.r, chLightDistGT, center)
-    lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
-    lamp.data.cycles.use_multiple_importance_sampling = True
-    lamp.data.use_nodes = True
-    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 7
-    scene.objects.link(lamp)
-
-    teapot = blender_teapots[currentTeapotModel]
-    teapotGT = blender_teapots[currentTeapotModel]
-    placeNewTarget(scene, teapot, targetPosition)
-
-    placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
-    scene.update()
-
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 #Setup ground truth renderer
@@ -346,9 +351,6 @@ vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
 
-ipdb.set_trace()
-
-useGTasBackground = False
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
@@ -357,7 +359,6 @@ if useGTasBackground:
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 # ipdb.set_trace()
-
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -370,6 +371,35 @@ oldChEl = chEl[0].r
 shapeIm = vis_gt.shape
 numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
+
+if useBlender:
+
+    #Add ambient lighting to scene (rectangular lights at even intervals).
+    # addAmbientLightingScene(scene, useCycles)
+
+    #Add directional light to match spherical harmonics
+    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
+    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
+    lamp.layers[1] = True
+    lamp.layers[2] = True
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    lampLoc = getRelativeLocation(chLightAzGT.r, chLightElGT.r, chLightDistGT, center)
+    lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
+    lamp.data.cycles.use_multiple_importance_sampling = True
+    lamp.data.use_nodes = True
+    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = chLightIntensityGT.r
+    scene.objects.link(lamp)
+
+    teapot = blender_teapots[currentTeapotModel]
+    teapotGT = blender_teapots[currentTeapotModel]
+    placeNewTarget(scene, teapot, targetPosition)
+
+    placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+    scene.update()
+
+    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '_complete.blend')
+
+ipdb.set_trace()
 
 def imageGT():
     global groundTruthBlender
@@ -423,7 +453,6 @@ errorFun = models[model]
 
 iterat = 0
 
-refreshWhileMinimizing = False
 
 if demoMode:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
@@ -500,7 +529,6 @@ if makeVideo:
 
     plt.tight_layout()
 
-computePerformance = False
 performance = {}
 elevations = {}
 azimuths = {}
@@ -542,7 +570,6 @@ if computePerformance:
     gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
 ims = []
-
 
 def refreshSubplots():
     #Other subplots visualizing renders and its pixel derivatives
@@ -687,7 +714,6 @@ def cb(_):
     global azimuths
     global elevations
 
-
     t = time.time()
 
 def cb2(_):
@@ -763,8 +789,6 @@ def cb2(_):
         plt.pause(0.01)
     t = time.time()
 
-# , chComponent[0]
-
 free_variables = [ chAz, chEl]
 
 mintime = time.time()
@@ -793,7 +817,6 @@ global chComponentSaved
 chAzSaved = chAz.r[0]
 chElSaved = chEl.r[0]
 chComponentSaved = chComponent.r[0]
-
 
 def readKeys(window, key, scancode, action, mods):
     print("Reading keys...")
@@ -1079,12 +1102,8 @@ def readKeys(window, key, scancode, action, mods):
 while not exit:
     # Poll for and process events
 
-    key = stdscr.getch()
-    readKeysCurses(key)
-    stdscr.clear()
-
-    # glfw.make_context_current(renderer.win)
-    # glfw.poll_events()
+    glfw.make_context_current(renderer.win)
+    glfw.poll_events()
 
     if newTeapotAsGT:
 

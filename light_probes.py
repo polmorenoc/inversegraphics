@@ -26,20 +26,7 @@ import matplotlib.pyplot as plt
 JSON_FILE_NAME = "lightprobes.json"
 FAILSAFE_OFFSET = 0.00001
 
-# http://cseweb.ucsd.edu/~ravir/papers/envmap/envmap.pdf
-spherical_harmonics = {
-    (0, 0): lambda theta, phi: 0.282095,
-    
-    (1, -1): lambda theta, phi: 0.488603 * sin(theta) * sin(phi),
-    (1, 0): lambda theta, phi: 0.488603 * cos(theta),
-    (1, 1): lambda theta, phi: 0.488603 * sin(theta) * cos(phi),
-    
-    (2, -2): lambda theta, phi: 1.092548 * sin(theta) * cos(phi) * sin(theta) * sin(phi),
-    (2, -1): lambda theta, phi: 1.092548 * sin(theta) * sin(phi) * cos(theta),
-    (2, 0): lambda theta, phi: 0.315392 * (3 * cos(theta)**2 - 1),
-    (2, 1): lambda theta, phi: 1.092548 * sin(theta) * cos(phi) * cos(theta),
-    (2, 2): lambda theta, phi: 0.546274 * (((sin(theta) * cos(phi)) ** 2) - ((sin(theta) * sin(phi)) ** 2))
-}
+
 
 
 def is_lightprobe(ob):
@@ -419,7 +406,7 @@ def get_coefficients(ob, lightmap, l, m, theta_res, phi_res):
     l and m """
     c = mathutils.Color((0, 0, 0))
     harmonic = spherical_harmonics[(l, m)]
-    # ipdb.set_trace()
+
     # plt.imsave("lightmap.png", lightmap)
     for theta in (pi * y / float(theta_res) for y in range(theta_res)):
         for phi in (pi * 2 * x / float(phi_res) for x in range(phi_res)):
@@ -428,29 +415,63 @@ def get_coefficients(ob, lightmap, l, m, theta_res, phi_res):
                 / (theta_res * phi_res))
             
     return c.r, c.g, c.b
+# http://cseweb.ucsd.edu/~ravir/papers/envmap/envmap.pdf
+spherical_harmonics = {
+    (0, 0): lambda theta, phi: 0.282095,
+
+    (1, 1): lambda theta, phi: 0.488603 * sin(theta) * cos(phi),
+    (1, 0): lambda theta, phi: 0.488603 * cos(theta),
+    (1, -1): lambda theta, phi: 0.488603 * sin(theta) * sin(phi),
 
 
-def getEquirectangularCoefficients(envMap):
+    (2, -2): lambda theta, phi: 1.092548 * sin(theta) * cos(phi) * sin(theta) * sin(phi),
+    (2, -1): lambda theta, phi: 1.092548 * sin(theta) * sin(phi) * cos(theta),
+    (2, 0): lambda theta, phi: 0.315392 * (3 * cos(theta)**2 - 1),
+    (2, 1): lambda theta, phi: 1.092548 * sin(theta) * cos(phi) * cos(theta),
+    (2, 2): lambda theta, phi: 0.546274 * (((sin(theta) * cos(phi)) ** 2) - ((sin(theta) * sin(phi)) ** 2))
+}
+
+spherical_harmonics_coeffs = np.array([
+    0.282095,
+    0.488603 ,
+    0.488603 ,
+     0.488603,
+     1.092548,
+     1.092548,
+    0.315392 ,
+    1.092548 ,
+    0.546274 ])
+
+def getEnvironmentMapCoefficients(envMap, phiOffset, type):
     """ returns the RGB spherical harmonic coefficients for a given
     l and m """
-    mapping = {}
-    for l, m in spherical_harmonics.keys():
+    if type == 'equirectangular':
+        phis = 2*np.pi*np.tile((np.arange(envMap.shape[1])/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
+        thetas = np.pi*np.tile((np.arange(envMap.shape[0])/envMap.shape[0]).reshape([envMap.shape[0],1,1]), [1,envMap.shape[1],3])
+    elif type == 'spherical':
+        vcoords = (-envMap.shape[0]/2 + np.tile(np.arange(envMap.shape[0]).reshape([envMap.shape[0], 1,1]), [1,envMap.shape[1],3]))/(envMap.shape[0]/2)
+        ucoords = (-envMap.shape[1]/2 + np.tile(np.arange(envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3]))/(envMap.shape[1]/2)
+        thetas=np.arctan2(vcoords,ucoords)
+        phis=pi*np.sqrt(ucoords*ucoords + vcoords*vcoords)
+    else:
+        print("Environment map format not recognized")
+        return
 
-        c = mathutils.Color((0, 0, 0))
+    phis = phis + phiOffset % 2*np.pi
 
-        harmonic = spherical_harmonics[(l, m)]
-        # ipdb.set_trace()
-        # plt.imsave("lightmap.png", lightmap)
-        for row in np.arange(envMap.shape[0]):
-            for col in np.arange(envMap.shape[1]):
-                theta = np.pi * row / envMap.shape[0]
-                phi = 2 * np.pi * col / envMap.shape[1]
-                color = envMap[row,col,:]
-                c += (color * harmonic(theta, phi) * sin(theta))
+    L = np.zeros([9,3])
+    # ipdb.set_trace()
+    L[0] = np.sum(envMap * spherical_harmonics_coeffs[0], axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[1] = np.sum(envMap *spherical_harmonics_coeffs[1]*np.sin(thetas) * np.cos(phis)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[2] = np.sum(envMap *spherical_harmonics_coeffs[2]*np.cos(thetas)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[3] = np.sum(envMap *spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(phis)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[4] = np.sum(envMap *spherical_harmonics_coeffs[4]*np.sin(thetas) * np.cos(phis) * np.sin(thetas) * np.sin(phis)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[5] = np.sum(envMap *spherical_harmonics_coeffs[5]*np.sin(thetas) * np.sin(phis) * np.cos(thetas) * np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[6] = np.sum(envMap *spherical_harmonics_coeffs[6]*(3 * np.cos(thetas)**2 - 1)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[7] = np.sum(envMap *spherical_harmonics_coeffs[7]*np.sin(thetas) * np.cos(phis) * np.cos(thetas)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
+    L[8] = np.sum(envMap *spherical_harmonics_coeffs[8]*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2))* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1])
 
-        mapping.setdefault(l, {})[m] = c.r, c.g, c.b
-
-    return mapping
+    return L
 
 def sample_icosphere_color(ob, lightmap, theta, phi):
     """ takes a theta and phi and casts a ray out from the center of an

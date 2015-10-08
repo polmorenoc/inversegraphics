@@ -212,6 +212,21 @@ def loadTargetModels(experimentTeapots):
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
 
+def getSceneTargetParentPosition(sceneIdx):
+    replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    sceneLineNums = numpy.arange(len(sceneLines))
+    sceneNum =  sceneLineNums[sceneIdx]
+    sceneLine = sceneLines[sceneNum]
+    sceneParts = sceneLine.split(' ')
+    sceneFile = sceneParts[0]
+    sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+    sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
+    targetIndex = int(sceneParts[1])
+    instances = loadScene('../databaseFull/scenes/' + sceneFileName)
+    targetParentPosition = instances[targetIndex][2]
+    return targetParentPosition
+
 def loadBlenderScene(sceneIdx, width, height, useCycles):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]

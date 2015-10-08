@@ -288,6 +288,42 @@ def AutoNode():
                             links.new(t.outputs[0],shout.inputs[2]) 
                             links.new(shtext.outputs[0],t.inputs[0]) 
 
+def cleanBPYScene(scene):
+    for blenderScene in bpy.data.scenes:
+        if blenderScene != scene:
+            bpy.data.scenes.remove(blenderScene)
+
+def addEnvironmentMapWorld(envMapFilename, scene):
+    scene.world.use_nodes = True
+    treeNodes=scene.world.node_tree
+    envTextureNode = treeNodes.nodes.new('ShaderNodeTexEnvironment')
+    mappingNode = treeNodes.nodes.new('ShaderNodeMapping')
+    links = treeNodes.links
+    links.new(mappingNode.outputs[0],envTextureNode.inputs[0])
+    links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+
+    texCoordNode = treeNodes.nodes.new('ShaderNodeTexCoord')
+    links.new(texCoordNode.outputs[0],mappingNode.inputs[0])
+    mathNode = treeNodes.nodes.new('ShaderNodeMath')
+    links.new(envTextureNode.outputs[0],mathNode.inputs[0])
+    links.new(mathNode.outputs[0],treeNodes.nodes['Background'].inputs[1])
+    mathNode.inputs[1].default_value = 1
+    image = bpy.data.images.load(envMapFilename)
+    envTextureNode.image = image
+
+def setEnviornmentMapStrength(strength, scene):
+    mathNode = scene.world.node_tree.nodes['Math']
+    mathNode.inputs[1].default_value = strength
+
+def updateEnviornmentMap(envMapFilename, scene):
+    envTextureNode = scene.world.node_tree.nodes['Environment Texture']
+    bpy.data.images.remove(envTextureNode.image)
+    image = bpy.data.images.load(envMapFilename)
+    envTextureNode.image = image
+
+def rotateEnviornmentMap(angle, scene):
+    mappingNode = scene.world.node_tree.nodes['Mapping']
+    mappingNode.rotation[2] = angle
 
 def cameraLookingInsideRoom(cameraAzimuth):
     if cameraAzimuth > 270 and cameraAzimuth < 90:
@@ -362,6 +398,9 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         world.cycles_visibility.camera = False
         world.use_nodes = True
 
+        world.cycles.sample_as_light = True
+        world.cycles.sample_map_resolution = 2048
+
     scene.render.threads = 4
     scene.render.tile_x = 75
     scene.render.tile_y = 75
@@ -384,34 +423,6 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     if useCycles:
         roomInstance.cycles_visibility.shadow = False
 
-    ceilMinX, ceilMaxX = modelWidth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
-    ceilWidth = (ceilMaxX - ceilMinX)
-    ceilMinY, ceilMaxY = modelDepth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
-    ceilDepth = (ceilMaxY - ceilMinY) 
-    ceilMinZ, ceilMaxZ = modelHeight(roomInstance.dupli_group.objects, roomInstance.matrix_world)
-    ceilPos =  mathutils.Vector(((ceilMaxX + ceilMinX) / 2.0, (ceilMaxY + ceilMinY) / 2.0 , ceilMaxZ))
-
-    numLights = int(numpy.floor((ceilWidth-0.2)/1.2))
-    lightInterval = ceilWidth/numLights
-
-    for light in range(numLights):
-        lightXPos = light*lightInterval + lightInterval/2.0
-        lamp_data = bpy.data.lamps.new(name="Rect", type='AREA')
-        lamp = bpy.data.objects.new(name="Rect", object_data=lamp_data)
-        lamp.data.size = 0.2
-        lamp.data.size_y = ceilDepth - 0.2
-        lamp.data.shape = 'RECTANGLE'
-        lamp.location = mathutils.Vector((ceilPos.x - ceilWidth/2.0 + lightXPos, ceilPos.y, ceilMaxZ))
-        lamp.data.energy = 0.0025
-        if useCycles:
-            lamp.data.cycles.use_multiple_importance_sampling = True
-            lamp.data.use_nodes = True
-            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 30
-
-        scene.objects.link(lamp)
-        lamp.layers[1] = True
-        lamp.layers[2] = True
-
     scene.world = world
     scene.world.light_settings.distance = 0.1
 
@@ -430,8 +441,6 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         scene.world.light_settings.ao_factor = 1
         scene.world.light_settings.indirect_factor = 1
         scene.world.light_settings.gather_method = 'APPROXIMATE'
-
-
 
     world.light_settings.use_environment_light = False
     world.light_settings.environment_energy = 0.0
@@ -463,6 +472,44 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.layers[2].use = False
     scene.render.use_sequencer = False
     bpy.ops.file.pack_all()
+
+def addAmbientLightingScene(scene, useCycles):
+
+    roomName = ''
+    for model in scene.objects:
+        reg = re.compile('(room[0-9]+)')
+        res = reg.match(model.name)
+        if res:
+            roomName = res.groups()[0]
+
+    roomInstance = scene.objects[roomName]
+    ceilMinX, ceilMaxX = modelWidth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
+    ceilWidth = (ceilMaxX - ceilMinX)
+    ceilMinY, ceilMaxY = modelDepth(roomInstance.dupli_group.objects, roomInstance.matrix_world)
+    ceilDepth = (ceilMaxY - ceilMinY)
+    ceilMinZ, ceilMaxZ = modelHeight(roomInstance.dupli_group.objects, roomInstance.matrix_world)
+    ceilPos =  mathutils.Vector(((ceilMaxX + ceilMinX) / 2.0, (ceilMaxY + ceilMinY) / 2.0 , ceilMaxZ))
+
+    numLights = int(numpy.floor((ceilWidth-0.2)/1.2))
+    lightInterval = ceilWidth/numLights
+
+    for light in range(numLights):
+        lightXPos = light*lightInterval + lightInterval/2.0
+        lamp_data = bpy.data.lamps.new(name="Rect", type='AREA')
+        lamp = bpy.data.objects.new(name="Rect", object_data=lamp_data)
+        lamp.data.size = 0.2
+        lamp.data.size_y = ceilDepth - 0.2
+        lamp.data.shape = 'RECTANGLE'
+        lamp.location = mathutils.Vector((ceilPos.x - ceilWidth/2.0 + lightXPos, ceilPos.y, ceilMaxZ))
+        lamp.data.energy = 0.0025
+        if useCycles:
+            lamp.data.cycles.use_multiple_importance_sampling = True
+            lamp.data.use_nodes = True
+            lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 30
+
+        scene.objects.link(lamp)
+        lamp.layers[1] = True
+        lamp.layers[2] = True
 
 
 def targetSceneCollision(target, scene):
