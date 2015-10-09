@@ -111,6 +111,7 @@ def importBlenderScenes(instances, completeScene, targetIndex):
 
     return blenderScenes, modelInstances
 
+
 def loadTargetModels(experimentTeapots):
 
     teapots = [line.strip() for line in open('teapots.txt')]
@@ -123,7 +124,7 @@ def loadTargetModels(experimentTeapots):
     modelNum = 0
 
     selection = [ teapots[i] for i in experimentTeapots]
-    for teapot in selection:
+    for teapotidx, teapot in enumerate(selection):
         targetGroup = bpy.data.groups.new(teapot)
         fullTeapot = baseDir + teapot + '.obj'
         modelPath = fullTeapot
@@ -207,6 +208,8 @@ def loadTargetModels(experimentTeapots):
         targetInstance.dupli_group = targetGroup
         targetInstance.pass_index = 1
         targetInstances.append(targetInstance)
+        targetInstance.name = 'teapotInstance' + str(experimentTeapots[teapotidx])
+        scene.objects.link(targetInstance)
         scene.update()
         blenderTeapots.append(scene)
     # ipdb.set_trace()

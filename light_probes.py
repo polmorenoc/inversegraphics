@@ -457,7 +457,7 @@ def getEnvironmentMapCoefficients(envMap, phiOffset, type):
         print("Environment map format not recognized")
         return
 
-    phis = phis + phiOffset % 2*np.pi
+    phis = np.mod(phis + phiOffset, 2*np.pi)
 
     L = np.zeros([9,3])
     # ipdb.set_trace()

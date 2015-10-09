@@ -289,9 +289,12 @@ def AutoNode():
                             links.new(shtext.outputs[0],t.inputs[0]) 
 
 def cleanBPYScene(scene):
+
     for blenderScene in bpy.data.scenes:
         if blenderScene != scene:
-            bpy.data.scenes.remove(blenderScene)
+            if len(blenderScene.name) > 7 and blenderScene.name[0:7] == 'teapots':
+                bpy.data.scenes.remove(blenderScene)
+
 
 def addEnvironmentMapWorld(envMapFilename, scene):
     scene.world.use_nodes = True
@@ -304,16 +307,16 @@ def addEnvironmentMapWorld(envMapFilename, scene):
 
     texCoordNode = treeNodes.nodes.new('ShaderNodeTexCoord')
     links.new(texCoordNode.outputs[0],mappingNode.inputs[0])
-    mathNode = treeNodes.nodes.new('ShaderNodeMath')
-    links.new(envTextureNode.outputs[0],mathNode.inputs[0])
-    links.new(mathNode.outputs[0],treeNodes.nodes['Background'].inputs[1])
-    mathNode.inputs[1].default_value = 1
+    # mathNode = treeNodes.nodes.new('ShaderNodeMath')
+    # links.new(envTextureNode.outputs[0],mathNode.inputs[0])
+    links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+    # mathNode.inputs[1].default_value = 1
     image = bpy.data.images.load(envMapFilename)
     envTextureNode.image = image
 
 def setEnviornmentMapStrength(strength, scene):
-    mathNode = scene.world.node_tree.nodes['Math']
-    mathNode.inputs[1].default_value = strength
+    backgroundNode = scene.world.node_tree.nodes['Background']
+    backgroundNode.inputs[1].default_value = strength
 
 def updateEnviornmentMap(envMapFilename, scene):
     envTextureNode = scene.world.node_tree.nodes['Environment Texture']
@@ -471,7 +474,7 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.layers[1].use = False
     scene.render.layers[2].use = False
     scene.render.use_sequencer = False
-    bpy.ops.file.pack_all()
+
 
 def addAmbientLightingScene(scene, useCycles):
 

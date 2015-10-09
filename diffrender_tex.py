@@ -37,7 +37,9 @@ loadSavedSH = False
 useGTasBackground = False
 refreshWhileMinimizing = False
 computePerformance = False
-
+glModes = ['glfw','mesa']
+glMode = glModes[0]
+sphericalMap = False
 
 numpy.random.seed(1)
 
@@ -53,8 +55,7 @@ testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
 width, height = (100, 100)
-glModes = ['glfw','mesa']
-glMode = glModes[0]
+
 win = -1
 
 if glMode == 'glfw':
@@ -92,9 +93,38 @@ renderer_teapots = []
 blender_teapots = []
 center_teapots = []
 
-if useBlender:
-    [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+sceneIdx = 0
+sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
+if useBlender and not loadBlenderSceneFile:
+    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
+    targetPosition = np.array(targetPosition)
+    #Save barebones scene.
+
+elif useBlender and loadBlenderSceneFile:
+    bpy.ops.wm.open_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+    scene = bpy.data.scenes['Main Scene']
+    bpy.context.screen.scene = scene
+    targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx))
+if unpackSceneFromBlender:
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
+else:
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
+
+targetModels = []
+if useBlender and not loadBlenderSceneFile:
+    [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+elif useBlender:
+    teapots = [line.strip() for line in open('teapots.txt')]
+    selection = [ teapots[i] for i in renderTeapotsList]
+    for teapotIdx, teapotName in enumerate(selection):
+        targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
+
+if useBlender and not loadBlenderSceneFile:
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+
+    # bpy.ops.wm.save_as_mainfile(filepath='data/targets.blend')
 for teapotIdx in renderTeapotsList:
     teapotNum = renderTeapotsList[teapotIdx]
     objectDicFile = 'data/target' + str(teapotNum) + '.pickle'
@@ -117,24 +147,6 @@ for teapotIdx in renderTeapotsList:
     vflat = [item for sublist in vmod for item in sublist]
     varray = np.vstack(vflat)
     center_teapots = center_teapots + [np.sum(varray, axis=0)/len(varray)]
-
-sceneIdx = 0
-sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
-
-if useBlender and not loadBlenderSceneFile:
-    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
-    targetPosition = np.array(targetPosition)
-    #Save barebones scene.
-    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
-elif useBlender and loadBlenderSceneFile:
-    bpy.ops.wm.open_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
-    scene = bpy.data.scenes['Main Scene']
-    bpy.context.screen.scene = scene
-    targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx))
-if unpackSceneFromBlender:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
-else:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
 
 
 chAz = ch.Ch([1.1693706])
@@ -173,7 +185,7 @@ chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([10])
+chAmbientIntensityGT = ch.Ch([1])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 
@@ -213,8 +225,8 @@ if useBlender:
         #     pickle.dump(shCoeffsDic, pfile)
 
 import imageio
-sphericalMap = False
-envMapFilename = 'data/hdr/dataset/03-Ueno-Shrine_3k.hdr'
+
+envMapFilename = 'data/hdr/dataset/salon_land.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))
 phiOffset = 0
 if sphericalMap:
@@ -226,14 +238,13 @@ if sphericalMap:
     envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, phiOffset, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
-    envMapTexture = envMapTexture/envMapMean
+    # envMapTexture = envMapTexture - envMapMean + 1
     envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, phiOffset, 'equirectangular')
 
 if useBlender:
-    # cleanBPYScene(scene)
     addEnvironmentMapWorld(envMapFilename, scene)
-    setEnviornmentMapStrength(1/envMapMean, scene)
-    rotateEnviornmentMap(0, scene)
+    setEnviornmentMapStrength(0.5/envMapMean, scene)
+    rotateEnviornmentMap(-np.pi - angle, scene)
 
 shCoeffsRGB = ch.Ch(envMapCoeffs)
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
@@ -396,10 +407,10 @@ if useBlender:
 
     placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
     scene.update()
-
-    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '_complete.blend')
-
-ipdb.set_trace()
+    # bpy.ops.file.pack_all()
+    # bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '_complete.blend')
+    scene.render.filepath = 'blender_envmap_render.png'
+    # bpy.ops.render.render(write_still=True)
 
 def imageGT():
     global groundTruthBlender
@@ -1098,973 +1109,972 @@ def readKeys(window, key, scancode, action, mods):
 # stdscr.refresh()
 
 # glfw.set_key_callback(win, readKeys)
+if demoMode:
+    while not exit:
+        # Poll for and process events
 
-while not exit:
-    # Poll for and process events
+        glfw.make_context_current(renderer.win)
+        glfw.poll_events()
 
-    glfw.make_context_current(renderer.win)
-    glfw.poll_events()
+        if newTeapotAsGT:
 
-    if newTeapotAsGT:
+            rendererGT.makeCurrentContext()
 
-        rendererGT.makeCurrentContext()
+            rendererGT.clear()
+            del rendererGT
 
-        rendererGT.clear()
-        del rendererGT
-
-        removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
-        addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
-        vflat = [item for sublist in v for item in sublist]
-        rangeMeshes = range(len(vflat))
-        vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
-        vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
-        if len(vch)==1:
-            vstack = vch[0]
-        else:
-            vstack = ch.vstack(vch)
-        center = center_teapots[currentTeapotModel]
-        cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
-        vnflat = [item for sublist in vn for item in sublist]
-        vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
-        vnch[0] = ch.dot(vnch[0], invTranspModelGT)
-        vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
-        vcflat = [item for sublist in vc for item in sublist]
-        vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-        vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
-        vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
-        # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
-
-        rendererGT = TexturedRenderer()
-        rendererGT.set(glMode=glMode)
-        setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
-
-        updateErrorFunctions = True
-        refresh = True
-        changedGT = True
-
-        #Unlink and place the new teapot for Blender.
-        if useBlender:
-            scene.objects.unlink(teapotGT)
-            teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
-            teapotGT = blender_teapots[currentTeapotModel]
-            placeNewTarget(scene, teapotGT, targetPosition)
-            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
-            scene.update()
-
-        newTeapotAsGT = False
-
-    if printStats:
-        print("**** Statistics ****" )
-        print("GT Azimuth: " + str(chAzGT))
-        print("Azimuth: " + str(chAz))
-        print("GT Elevation: " + str(chElGT))
-        print("Elevation: " + str(chEl))
-
-        print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
-        print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
-        # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
-        print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
-
-        if drawSurf:
-            avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
-            print("** Approx gradients - finite differenes." )
-            print("Avg Eucl. distance :: " + str(avgError))
-            norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
-            norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
-            avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
-            print("Avg Angle.: " + str(np.mean(avgAngle)))
-            print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
-            idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
-            azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-            elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-            print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
-            print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
-
-        azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
-        elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
-        print("Current Azimuth difference of " + str(azDiff*180/np.pi))
-        print("Current Elevation difference of " + str(elDiff*180/np.pi))
-
-        printStats = False
-
-    if createGroundTruth:
-        print("Creating Ground Truth")
-        trainSize = 1000
-        testSize = 20
-
-        trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
-        trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
-        trainLightAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
-        trainLightElevsGT = numpy.random.uniform(0,np.pi/3, trainSize)
-        trainLightIntensitiesGT = numpy.random.uniform(5,10, trainSize)
-        trainVColorGT = numpy.random.uniform(0,0.7, [trainSize, 3])
-
-        trainData = {'trainAzsGT':trainAzsGT,'trainElevsGT':trainElevsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightElevsGT':trainLightElevsGT,'trainLightIntensitiesGT':trainLightIntensitiesGT, 'trainVColorGT':trainVColorGT}
-
-        # testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
-        testAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
-        testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
-        testLightAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
-        testLightElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
-        testLightIntensitiesGT = numpy.random.uniform(5,10, testSize)
-        testVColorGT = numpy.random.uniform(0,0.7, [testSize, 3])
-        testData = {'testAzsGT':testAzsGT,'testElevsGT':testElevsGT,'testLightAzsGT':testLightAzsGT,'testLightElevsGT':testLightElevsGT,'testLightIntensitiesGT':testLightIntensitiesGT, 'testVColorGT':testVColorGT}
-
-        with open(trainDataName, 'wb') as pfile:
-            pickle.dump(trainData, pfile)
-
-        with open(testDataName, 'wb') as pfile:
-            pickle.dump(testData, pfile)
-
-        createGroundTruth = False
-
-    if beginTraining:
-        print("Training recognition models.")
-        trainData = {}
-
-        with open(trainDataName, 'rb') as pfile:
-            trainData = pickle.load(pfile)
-
-        trainAzsGT = trainData['trainAzsGT']
-        trainElevsGT = trainData['trainElevsGT']
-        trainLightAzsGT = trainData['trainLightAzsGT']
-        trainLightElevsGT = trainData['trainLightElevsGT']
-        trainLightIntensitiesGT = trainData['trainLightIntensitiesGT']
-        trainVColorGT = trainData['trainVColorGT']
-        # trainTeapots  = trainData['trainTeapots']
-
-        chAzOld = chAz.r[0]
-        chElOld = chEl.r[0]
-        chAzGTOld = chAzGT.r[0]
-        chElGTOld = chElGT.r[0]
-
-        images = []
-        occlusions = np.array([])
-        hogs = []
-        # vcolorsfeats = []
-        illumfeats = []
-        occludedInstances = []
-        # split = 0.8
-        # setTrain = np.arange(np.floor(trainSize*split)).astype(np.uint8)
-        print("Generating renders")
-        for train_i in range(len(trainAzsGT)):
-            azi = trainAzsGT[train_i]
-            eli = trainElevsGT[train_i]
-            chAzGT[:] = azi
-            chElGT[:] = eli
-            chLightAzGT[:] = trainLightAzsGT[train_i]
-            chLightElGT[:] = trainLightElevsGT[train_i]
-            chLightIntensityGT[:] = trainLightIntensitiesGT[train_i]
-            chVColorsGT[:] = trainVColorGT[train_i]
-            image = rendererGT.r.copy()
-
-            occlusion = getOcclusionFraction(rendererGT)
-            if occlusion < 0.9:
-                images = images + [image]
-                occlusions = np.append(occlusions, occlusion)
-                hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
-
-                # vcolorsfeats = vcolorsfeats +  [imageproc.medianColor(image,40)]
-                illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
+            removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+            vflat = [item for sublist in v for item in sublist]
+            rangeMeshes = range(len(vflat))
+            vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+            vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
+            if len(vch)==1:
+                vstack = vch[0]
             else:
-                occludedInstances = occludedInstances + [train_i]
+                vstack = ch.vstack(vch)
+            center = center_teapots[currentTeapotModel]
+            cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
+            vnflat = [item for sublist in vn for item in sublist]
+            vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+            vnch[0] = ch.dot(vnch[0], invTranspModelGT)
+            vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
+            vcflat = [item for sublist in vc for item in sublist]
+            vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+            vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+            vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
+            # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+
+            rendererGT = TexturedRenderer()
+            rendererGT.set(glMode=glMode)
+            setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
+
+            updateErrorFunctions = True
+            refresh = True
+            changedGT = True
+
+            #Unlink and place the new teapot for Blender.
+            if useBlender:
+                scene.objects.unlink(teapotGT)
+                teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
+                teapotGT = blender_teapots[currentTeapotModel]
+                placeNewTarget(scene, teapotGT, targetPosition)
+                placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+                scene.update()
+
+            newTeapotAsGT = False
+
+        if printStats:
+            print("**** Statistics ****" )
+            print("GT Azimuth: " + str(chAzGT))
+            print("Azimuth: " + str(chAz))
+            print("GT Elevation: " + str(chElGT))
+            print("Elevation: " + str(chEl))
+
+            print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
+            print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
+            # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
+            print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
+
+            if drawSurf:
+                avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
+                print("** Approx gradients - finite differenes." )
+                print("Avg Eucl. distance :: " + str(avgError))
+                norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+                norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+                avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
+                print("Avg Angle.: " + str(np.mean(avgAngle)))
+                print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
+                idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
+                azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+                elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+                print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
+                print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
+
+            azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
+            elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
+            print("Current Azimuth difference of " + str(azDiff*180/np.pi))
+            print("Current Elevation difference of " + str(elDiff*180/np.pi))
+
+            printStats = False
+
+        if createGroundTruth:
+            print("Creating Ground Truth")
+            trainSize = 1000
+            testSize = 20
+
+            trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+            trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
+            trainLightAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+            trainLightElevsGT = numpy.random.uniform(0,np.pi/3, trainSize)
+            trainLightIntensitiesGT = numpy.random.uniform(5,10, trainSize)
+            trainVColorGT = numpy.random.uniform(0,0.7, [trainSize, 3])
+
+            trainData = {'trainAzsGT':trainAzsGT,'trainElevsGT':trainElevsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightElevsGT':trainLightElevsGT,'trainLightIntensitiesGT':trainLightIntensitiesGT, 'trainVColorGT':trainVColorGT}
+
+            # testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
+            testAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
+            testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
+            testLightAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
+            testLightElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
+            testLightIntensitiesGT = numpy.random.uniform(5,10, testSize)
+            testVColorGT = numpy.random.uniform(0,0.7, [testSize, 3])
+            testData = {'testAzsGT':testAzsGT,'testElevsGT':testElevsGT,'testLightAzsGT':testLightAzsGT,'testLightElevsGT':testLightElevsGT,'testLightIntensitiesGT':testLightIntensitiesGT, 'testVColorGT':testVColorGT}
+
+            with open(trainDataName, 'wb') as pfile:
+                pickle.dump(trainData, pfile)
+
+            with open(testDataName, 'wb') as pfile:
+                pickle.dump(testData, pfile)
+
+            createGroundTruth = False
+
+        if beginTraining:
+            print("Training recognition models.")
+            trainData = {}
+
+            with open(trainDataName, 'rb') as pfile:
+                trainData = pickle.load(pfile)
 
-        trainAzsGT = np.delete(trainAzsGT, occludedInstances)
-        trainElevsGT = np.delete(trainElevsGT, occludedInstances)
-        trainLightAzsGT = np.delete(trainLightAzsGT, occludedInstances)
-        trainLightElevsGT = np.delete(trainLightElevsGT, occludedInstances)
-        trainLightIntensitiesGT = np.delete(trainLightIntensitiesGT, occludedInstances)
-        trainVColorGT = np.delete(trainVColorGT, occludedInstances, 0)
+            trainAzsGT = trainData['trainAzsGT']
+            trainElevsGT = trainData['trainElevsGT']
+            trainLightAzsGT = trainData['trainLightAzsGT']
+            trainLightElevsGT = trainData['trainLightElevsGT']
+            trainLightIntensitiesGT = trainData['trainLightIntensitiesGT']
+            trainVColorGT = trainData['trainVColorGT']
+            # trainTeapots  = trainData['trainTeapots']
 
-        hogfeats = np.vstack(hogs)
-        illumfeats = np.vstack(illumfeats)
-
-        print("Training RFs")
-        randForestModelCosAzs = recognition_models.trainRandomForest(hogfeats, np.cos(trainAzsGT))
-        randForestModelSinAzs = recognition_models.trainRandomForest(hogfeats, np.sin(trainAzsGT))
-        randForestModelCosElevs = recognition_models.trainRandomForest(hogfeats, np.cos(trainElevsGT))
-        randForestModelSinElevs = recognition_models.trainRandomForest(hogfeats, np.sin(trainElevsGT))
-
-        randForestModelLightCosAzs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightAzsGT))
-        randForestModelLightSinAzs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightAzsGT))
-        randForestModelLightCosElevs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightElevsGT))
-        randForestModelLightSinElevs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightElevsGT))
-
-        imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
-        randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
-
-        trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelLightCosAzs':randForestModelLightCosAzs,'randForestModelLightSinAzs':randForestModelLightSinAzs,'randForestModelLightCosElevs':randForestModelLightCosElevs,'randForestModelLightSinElevs':randForestModelLightSinElevs,'randForestModelLightIntensity':randForestModelLightIntensity}
-        with open('experiments/' + trainprefix + 'models.pickle', 'wb') as pfile:
-            pickle.dump(trainedModels, pfile)
-
-
-        # print("Training LR")
-        # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
-        # linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
-        # linRegModelCosElevs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
-        # linRegModelSinElevs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
-
-        chAz[:] = chAzOld
-        chEl[:] = chElOld
-        chAzGT[:] = chAzGTOld
-        chElGT[:] = chElGTOld
-
-        print("Finished training recognition models.")
-        beginTraining = False
-
-    if beginTesting:
-
-        chAzOld = chAz.r[0]
-        chElOld = chEl.r[0]
-        print("Backprojecting and fitting estimates.")
-
-        with open(testDataName, 'rb') as pfile:
-            testData = pickle.load(pfile)
-
-        testAzsGT = testData['testAzsGT']
-        testElevsGT = testData['testElevsGT']
-        testLightAzsGT = testData['testLightAzsGT']
-        testLightElevsGT = testData['testLightElevsGT']
-        testLightIntensitiesGT = testData['testLightIntensitiesGT']
-        testVColorGT = testData['testVColorGT']
-
-        if trainedModels == {}:
-            with open('experiments/' + trainprefix +  'models.pickle', 'rb') as pfile:
-                trainedModels = pickle.load(pfile)
-
-            randForestModelCosAzs = trainedModels['randForestModelCosAzs']
-            randForestModelSinAzs = trainedModels['randForestModelSinAzs']
-            randForestModelCosElevs = trainedModels['randForestModelCosElevs']
-            randForestModelSinElevs = trainedModels['randForestModelSinElevs']
-            randForestModelLightCosAzs = trainedModels['randForestModelLightCosAzs']
-            randForestModelLightSinAzs = trainedModels['randForestModelLightSinAzs']
-            randForestModelLightCosElevs = trainedModels['randForestModelLightCosElevs']
-            randForestModelLightSinElevs = trainedModels['randForestModelLightSinElevs']
-            randForestModelLightIntensity = trainedModels['randForestModelLightIntensity']
-
-        testImages = []
-        testHogs = []
-        testIllumfeats = []
-        testPredVColors = []
-        testPredVColorGMMs = []
-        testPredPoseGMMs = []
-        occludedInstances = []
-
-        print("Generating renders")
-        for test_i in range(len(testAzsGT)):
-            azi = testAzsGT[test_i]
-            eli = testElevsGT[test_i]
-            chAzGT[:] = azi
-            chElGT[:] = eli
-            chLightAzGT[:] = testLightAzsGT[test_i]
-            chLightElGT[:] = testLightElevsGT[test_i]
-            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
-            chVColorsGT[:] = testVColorGT[test_i]
-            testImage = rendererGT.r.copy()
-            occlusion = getOcclusionFraction(rendererGT)
-            if occlusion < 0.95:
-                testImages = testImages + [testImage]
-                testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,20)]
-                testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
-                testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 20)]
-                testPredVColorGMMs = testPredVColorGMMs + [recognition_models.colorGMM(testImage, 20)]
-            else:
-                occludedInstances = occludedInstances + [test_i]
-
-        testAzsGT = np.delete(testAzsGT, occludedInstances)
-        testElevsGT = np.delete(testElevsGT, occludedInstances)
-        testLightAzsGT = np.delete(testLightAzsGT, occludedInstances)
-        testLightElevsGT = np.delete(testLightElevsGT, occludedInstances)
-        testLightIntensitiesGT = np.delete(testLightIntensitiesGT, occludedInstances)
-        testVColorGT = np.delete(testVColorGT, occludedInstances, 0)
-
-        print("Predicting with RFs")
-        testHogfeats = np.vstack(testHogs)
-        testIllumfeats = np.vstack(testIllumfeats)
-        testPredVColors = np.vstack(testPredVColors)
-        cosAzsPredRF = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeats)
-        sinAzsPredRF = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeats)
-        cosElevsPredRF = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeats)
-        sinElevsPredRF = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeats)
-
-        cosAzsLightPredRF = recognition_models.testRandomForest(randForestModelLightCosAzs, testIllumfeats)
-        sinAzsLightPredRF = recognition_models.testRandomForest(randForestModelLightSinAzs, testIllumfeats)
-        cosElevsLightPredRF = recognition_models.testRandomForest(randForestModelLightCosElevs, testIllumfeats)
-        sinElevsLightPredRF = recognition_models.testRandomForest(randForestModelLightSinElevs, testIllumfeats)
-
-        # print("Predicting with LR")
-        # cosAzsPredLR = recognition_models.testLinearRegression(linRegModelCosAzs, testHogfeats)
-        # sinAzsPredLR = recognition_models.testLinearRegression(linRegModelSinAzs, testHogfeats)
-        # cosElevsPredLR = recognition_models.testLinearRegression(linRegModelCosElevs, testHogfeats)
-        # sinElevsPredLR = recognition_models.testLinearRegression(linRegModelSinElevs, testHogfeats)
-
-        elevsPredRF = np.arctan2(sinElevsPredRF, cosElevsPredRF)
-        azsPredRF = np.arctan2(sinAzsPredRF, cosAzsPredRF)
-
-
-        for test_i in range(len(testAzsGT)):
-            # testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(testAzsGT[test_i], testElevsGT[test_i])]
-            testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPredRF[test_i], elevsPredRF[test_i])]
-
-        lightElevsPredRF = np.arctan2(sinElevsLightPredRF, cosElevsLightPredRF)
-        lightAzsPredRF = np.arctan2(sinAzsLightPredRF, cosAzsLightPredRF)
-
-        testImagesStack = np.vstack([testImage.reshape([1,-1]) for testImage in testImages])
-        lightIntensityPredRF = recognition_models.testRandomForest(randForestModelLightIntensity, testImagesStack)
-
-        componentPreds=[]
-        for test_i in range(len(testAzsGT)):
-
-            shDirLightGTTest = chZonalToSphericalHarmonics(zGT, np.pi/2 - lightElevsPredRF[test_i], lightAzsPredRF[test_i] - np.pi/2) * clampedCosCoeffs
-
-            # componentPreds = componentPreds + [chAmbientSHGT + shDirLightGTTest*lightIntensityPredRF[test_i]]
-            componentPreds = componentPreds + [chAmbientSHGT]
-
-        componentPreds = np.vstack(componentPreds)
-
-        # elevsPredLR = np.arctan2(sinElevsPredLR, cosElevsPredLR)
-        # azsPredLR = np.arctan2(sinAzsPredLR, cosAzsPredLR)
-
-        errorsRF = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, azsPredRF, elevsPredRF)
-
-        errorsLightRF = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, lightAzsPredRF, lightElevsPredRF)
-        # errorsLR = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
-
-        meanAbsErrAzsRF = np.mean(np.abs(errorsRF[0]))
-        meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
-
-        meanAbsErrLightAzsRF = np.mean(np.abs(errorsLightRF[0]))
-        meanAbsErrLightElevsRF = np.mean(np.abs(errorsLightRF[1]))
-
-        # meanAbsErrAzsLR = np.mean(np.abs(errorsLR[0]))
-        # meanAbsErrElevsLR = np.mean(np.abs(errorsLR[1]))
-
-        #Fit:
-        print("Fitting predictions")
-
-        model = 0
-        print("Using " + modelsDescr[model])
-        errorFun = models[model]
-        pixelErrorFun = pixelModels[model]
-        fittedAzsGaussian = np.array([])
-        fittedElevsGaussian = np.array([])
-        fittedLightAzsGaussian = np.array([])
-        fittedLightElevsGaussian = np.array([])
-        testOcclusions = np.array([])
-        free_variables = [chVColors, chComponent, chAz, chEl]
-
-
-        if not os.path.exists('results/' + testprefix + 'imgs/'):
-            os.makedirs('results/' + testprefix + 'imgs/')
-        if not os.path.exists('results/' + testprefix + 'imgs/samples/'):
-            os.makedirs('results/' + testprefix + 'imgs/samples/')
-
-        if not os.path.exists('results/' + testprefix ):
-            os.makedirs('results/' + testprefix )
-
-        model = 1
-        print("Using " + modelsDescr[model])
-        errorFun = models[model]
-        pixelErrorFun = pixelModels[model]
-
-        maxiter = 5
-        for test_i in range(len(testAzsGT)):
-
-            bestPredAz = chAz.r
-            bestPredEl = chEl.r
-            bestModelLik = np.finfo('f').max
-            bestVColors = chVColors.r
-            bestComponent = chComponent.r
-
-            colorGMM = testPredVColorGMMs[test_i]
-            poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
-            print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
-            chAzGT[:] = testAzsGT[test_i]
-            chElGT[:] = testElevsGT[test_i]
-            chLightAzGT[:] = testLightAzsGT[test_i]
-            chLightElGT[:] = testLightElevsGT[test_i]
-            chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
-            chVColorsGT[:] = testVColorGT[test_i]
-
-            image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
-            cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'groundtruth' + '.png', image)
-            for sample in range(10):
-                from numpy.random import choice
-
-                sampleComp = choice(len(poseComps), size=1, p=poseComps)
-                az = np.random.vonmises(vmAzParams[sampleComp][0],vmAzParams[sampleComp][1],1)
-                el = np.random.vonmises(vmElParams[sampleComp][0],vmElParams[sampleComp][1],1)
-                color = colorGMM.sample(n_samples=1)[0]
-                chAz[:] = az
-                chEl[:] = el
-
-                chVColors[:] = color.copy()
-                # chVColors[:] = testPredVColors[test_i]
-                chComponent[:] = componentPreds[test_i].copy()
-                image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-                cv2.imwrite('results/' + testprefix + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png',image)
-                ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
-
-                if errorFun.r < bestModelLik:
-                    bestModelLik = errorFun.r.copy()
-                    bestPredAz = chAz.r.copy()
-                    bestPredEl = chEl.r.copy()
-                    bestVColors = chVColors.r.copy()
-                    bestComponent = chComponent.r.copy()
-                    image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-                    cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + '_best'+ '.png',image)
-                image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-                cv2.imwrite('results/' + testprefix + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_fitted'+ '.png',image)
-
-            chDisplacement[:] = np.array([0.0, 0.0,0.0])
-            chScale[:] = np.array([1.0,1.0,1.0])
-            testOcclusions = np.append(testOcclusions, getOcclusionFraction(rendererGT))
-
-            fittedAzsGaussian = np.append(fittedAzsGaussian, bestPredAz)
-            fittedElevsGaussian = np.append(fittedElevsGaussian, bestPredEl)
-            # fittedLightAzsGaussian = np.append(fittedLightAzsGaussian, chLightAz.r[0])
-            # fittedLightElevsGaussian = np.append(fittedLightElevsGaussian, chLightEl.r[0])
-        errorsFittedRFGaussian = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
-        # errorsLightFittedRFGaussian = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, fittedLightAzsGaussian, fittedLightElevsGaussian)
-        meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
-        meanAbsErrElevsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[1]))
-        # meanAbsErrLightAzsFittedRFGaussian = np.mean(np.abs(errorsLightFittedRFGaussian[0]))
-        # meanAbsErrLightElevsFittedRFGaussian = np.mean(np.abs(errorsLightFittedRFGaussian[1]))
-
-        # model = 1
-        # print("Using " + modelsDescr[model])
-        # errorFun = models[model]
-        # pixelErrorFun = pixelModels[model]
-        # fittedAzsRobust = np.array([])
-        # fittedElevsRobust = np.array([])
-        # fittedLightAzsRobust = np.array([])
-        # fittedLightElevsRobust = np.array([])
-        # for test_i in range(len(testAzsGT)):
-        #     print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
-        #     chAzGT[:] = testAzsGT[test_i]
-        #     chElGT[:] = testElevsGT[test_i]
-        #     chLightAzGT[:] = testLightAzsGT[test_i]
-        #     chLightElGT[:] = testLightElevsGT[test_i]
-        #     chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
-        #     chVColorsGT[:] = testVColorGT[test_i]
-        #     chAz[:] = azsPredRF[test_i]
-        #     chEl[:] = elevsPredRF[test_i]
-        #     chVColors[:] = testPredVColors[test_i]
-        #     chComponent[:] = componentPreds[test_i]
-        #
-        #     chDisplacement[:] = np.array([0.0, 0.0,0.0])
-        #     chScale[:] = np.array([1.0,1.0,1.0])
-        #
-        #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
-        #     image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-        #     cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'fitted-robust' + '.png', image)
-        #     fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
-        #     fittedElevsRobust = np.append(fittedElevsRobust, chEl.r[0])
-
-            # fittedLightAzsRobust = np.append(fittedLightAzsRobust, chLightAz.r[0])
-            # fittedLightElevsRobust = np.append(fittedLightElevsRobust, chLightEl.r[0])
-
-        # errorsFittedRFRobust = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
-        # meanAbsErrAzsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[0]))
-        # meanAbsErrElevsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[1]))
-        # errorsLightFittedRFRobust = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, fittedLightAzsRobust, fittedLightElevsRobust)
-        # meanAbsErrLightAzsFittedRFRobust = np.mean(np.abs(errorsLightFittedRFRobust[0]))
-        # meanAbsErrLightElevsFittedRFRobust = np.mean(np.abs(errorsLightFittedRFRobust[1]))
-
-        # model = 1
-        # print("Using Both")
-        # errorFun = models[model]
-        # pixelErrorFun = pixelModels[model]
-        # fittedAzsBoth = np.array([])
-        # fittedElevsBoth = np.array([])
-        # for test_i in range(len(testAzsGT)):
-        #     print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
-        #     chAzGT[:] = testAzsGT[test_i]
-        #     chElGT[:] = testElevsGT[test_i]
-        #     chLightAzGT[:] = testLightAzsGT[test_i]
-        #     chLightElGT[:] = testLightElevsGT[test_i]
-        #     chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
-        #     chVColorsGT[:] = testLightIntensitiesGT[test_i]
-        #     chAz[:] = azsPredRF[test_i]
-        #     chEl[:] = elevsPredRF[test_i]
-        #     chVColors[:] = testPredVColors[test_i]
-        #     chComponent[:] = componentPreds[test_i]
-        #     chDisplacement[:] = np.array([0.0, 0.0,0.0])
-        #     chScale[:] = np.array([1.0,1.0,1.0])
-        #
-        #     model = 0
-        #     errorFun = models[model]
-        #     pixelErrorFun = pixelModels[model]
-        #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
-        #     model = 1
-        #     errorFun = models[model]
-        #     pixelErrorFun = pixelModels[model]
-        #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
-        #     image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
-        #     cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
-        #     fittedAzsBoth = np.append(fittedAzsBoth, chAz.r[0])
-        #     fittedElevsBoth = np.append(fittedElevsBoth, chEl.r[0])
-        #
-        # errorsFittedRFBoth = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
-        # meanAbsErrAzsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[0]))
-        # meanAbsErrElevsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[1]))
-
-        plt.ioff()
-
-        directory = 'results/' + testprefix + 'predicted-azimuth-error'
-
-        fig = plt.figure()
-        plt.scatter(testElevsGT*180/np.pi, errorsRF[0])
-        plt.xlabel('Elevation (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,90,-90,90))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_elev-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testOcclusions*100.0,errorsRF[0])
-        plt.xlabel('Occlusion (%)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,100,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_occlusion-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testAzsGT*180/np.pi, errorsRF[0])
-        plt.xlabel('Azimuth (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,360,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory  + '_azimuth-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.hist(np.abs(errorsRF[0]), bins=18)
-        plt.xlabel('Angular error')
-        plt.ylabel('Counts')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((-180,180,y1, y2))
-        plt.title('Performance histogram')
-        fig.savefig(directory  + '_performance-histogram.png')
-        plt.close(fig)
-
-        directory = 'results/' + testprefix + 'predicted-elevation-error'
-
-        fig = plt.figure()
-        plt.scatter(testElevsGT*180/np.pi, errorsRF[1])
-        plt.xlabel('Elevation (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,90,-90,90))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_elev-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testOcclusions*100.0,errorsRF[1])
-        plt.xlabel('Occlusion (%)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,100,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_occlusion-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testAzsGT*180/np.pi, errorsRF[1])
-        plt.xlabel('Azimuth (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,360,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory  + '_azimuth-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.hist(np.abs(errorsRF[1]), bins=18)
-        plt.xlabel('Angular error')
-        plt.ylabel('Counts')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((-180,180,y1, y2))
-        plt.title('Performance histogram')
-        fig.savefig(directory  + '_performance-histogram.png')
-        plt.close(fig)
-
-        #Fitted predictions plots:
-
-        directory = 'results/' + testprefix + 'fitted-azimuth-error'
-
-        fig = plt.figure()
-        plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[0])
-        plt.xlabel('Elevation (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,90,-90,90))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_elev-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[0])
-        plt.xlabel('Occlusion (%)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,100,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_occlusion-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testAzsGT*180/np.pi, errorsFittedRFGaussian[0])
-        plt.xlabel('Azimuth (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,360,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory  + '_azimuth-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.hist(np.abs(errorsFittedRFGaussian[0]), bins=18)
-        plt.xlabel('Angular error')
-        plt.ylabel('Counts')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((-180,180,y1, y2))
-        plt.title('Performance histogram')
-        fig.savefig(directory  + '_performance-histogram.png')
-        plt.close(fig)
-
-        directory = 'results/' + testprefix + 'fitted-elevation-error'
-
-        fig = plt.figure()
-        plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[1])
-        plt.xlabel('Elevation (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,90,-90,90))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_elev-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[1])
-        plt.xlabel('Occlusion (%)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,100,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory + '_occlusion-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.scatter(testAzsGT*180/np.pi, errorsFittedRFGaussian[1])
-        plt.xlabel('Azimuth (degrees)')
-        plt.ylabel('Angular error')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,360,-180,180))
-        plt.title('Performance scatter plot')
-        fig.savefig(directory  + '_azimuth-performance-scatter.png')
-        plt.close(fig)
-
-        fig = plt.figure()
-        plt.hist(np.abs(errorsFittedRFGaussian[1]), bins=18)
-        plt.xlabel('Angular error')
-        plt.ylabel('Counts')
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((-180,180,y1, y2))
-        plt.title('Performance histogram')
-        fig.savefig(directory  + '_performance-histogram.png')
-        plt.close(fig)
-
-        directory = 'results/' + testprefix + 'fitted-robust-azimuth-error'
-
-        # fig = plt.figure()
-        # plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[0])
-        # plt.xlabel('Elevation (degrees)')
-        # plt.ylabel('Angular error')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((0,90,-90,90))
-        # plt.title('Performance scatter plot')
-        # fig.savefig(directory + '_elev-performance-scatter.png')
-        # plt.close(fig)
-        #
-        # fig = plt.figure()
-        # plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[0])
-        # plt.xlabel('Occlusion (%)')
-        # plt.ylabel('Angular error')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((0,100,-180,180))
-        # plt.title('Performance scatter plot')
-        # fig.savefig(directory + '_occlusion-performance-scatter.png')
-        # plt.close(fig)
-        #
-        # fig = plt.figure()
-        # plt.scatter(testAzsGT*180/np.pi, errorsFittedRFRobust[0])
-        # plt.xlabel('Azimuth (degrees)')
-        # plt.ylabel('Angular error')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((0,360,-180,180))
-        # plt.title('Performance scatter plot')
-        # fig.savefig(directory  + '_azimuth-performance-scatter.png')
-        # plt.close(fig)
-        #
-        # fig = plt.figure()
-        # plt.hist(np.abs(errorsFittedRFRobust[0]), bins=18)
-        # plt.xlabel('Angular error')
-        # plt.ylabel('Counts')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((-180,180,y1, y2))
-        # plt.title('Performance histogram')
-        # fig.savefig(directory  + '_performance-histogram.png')
-        # plt.close(fig)
-        #
-        # directory = 'results/' + testprefix + 'fitted-robust-elevation-error'
-        #
-        # fig = plt.figure()
-        # plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[1])
-        # plt.xlabel('Elevation (degrees)')
-        # plt.ylabel('Angular error')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((0,90,-90,90))
-        # plt.title('Performance scatter plot')
-        # fig.savefig(directory + '_elev-performance-scatter.png')
-        # plt.close(fig)
-        #
-        # fig = plt.figure()
-        # plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[1])
-        # plt.xlabel('Occlusion (%)')
-        # plt.ylabel('Angular error')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((0,100,-180,180))
-        # plt.title('Performance scatter plot')
-        # fig.savefig(directory + '_occlusion-performance-scatter.png')
-        # plt.close(fig)
-        #
-        # fig = plt.figure()
-        # plt.scatter(testAzsGT*180/np.pi, errorsFittedRFRobust[1])
-        # plt.xlabel('Azimuth (degrees)')
-        # plt.ylabel('Angular error')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((0,360,-180,180))
-        # plt.title('Performance scatter plot')
-        # fig.savefig(directory  + '_azimuth-performance-scatter.png')
-        # plt.close(fig)
-        #
-        # fig = plt.figure()
-        # plt.hist(np.abs(errorsFittedRFRobust[1]), bins=18)
-        # plt.xlabel('Angular error')
-        # plt.ylabel('Counts')
-        # x1,x2,y1,y2 = plt.axis()
-        # plt.axis((-180,180,y1, y2))
-        # plt.title('Performance histogram')
-        # fig.savefig(directory  + '_performance-histogram.png')
-        # plt.close(fig)
-
-        plt.ion()
-
-        #Write statistics to file.
-        with open('results/' + testprefix + 'performance.txt', 'w') as expfile:
-            # expfile.write(str(z))
-            expfile.write("Mean Azimuth Error (predicted) " +  str(meanAbsErrAzsRF) + '\n')
-            expfile.write("Mean Elevation Error (predicted) " +  str(meanAbsErrElevsRF)+ '\n')
-            expfile.write("Mean Azimuth Error (gaussian) " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
-            expfile.write("Mean Elevation Error (gaussian) " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
-            # expfile.write("Mean Azimuth Error (robust) " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
-            # expfile.write("Mean Elevation Error (robust) " +  str(meanAbsErrElevsFittedRFRobust)+ '\n\n')
-            # expfile.write("Mean Light Azimuth Error (predicted) " +  str(meanAbsErrLightAzsRF)+ '\n')
-            # expfile.write("Mean Light Elevation Error (predicted) " +  str(meanAbsErrLightElevsRF)+ '\n')
-            # expfile.write("Mean Light Azimuth Error (gaussian) " +  str(meanAbsErrLightAzsFittedRFGaussian)+ '\n')
-            # expfile.write("Mean Light Elevation Error (gaussian)" +  str(meanAbsErrLightElevsFittedRFGaussian)+ '\n')
-            # expfile.write("Mean Light Azimuth Error (robust)" +  str(meanAbsErrLightAzsFittedRFRobust)+ '\n')
-            # expfile.write("Mean Light Elevation Error (robust) " +  str(meanAbsErrLightElevsFittedRFRobust)+ '\n')
-            # expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
-            # expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
-
-            expfile.write("Occlusions " +  str(testOcclusions)+ '\n')
-
-        chAz[:] = chAzOld
-        chEl[:] = chElOld
-
-
-        print("Finished backprojecting and fitting estimates.")
-
-        beginTesting = False
-
-    if changedGT:
-        drawSurf = False
-        plotMinimization = False
-        imagegt = imageGT()
-        chImage[:,:,:] = imagegt[:,:,:]
-
-        chAzGT[:] = chAz.r[:]
-        chElGT[:] = chEl.r[:]
-        chDistGT[:] = chDist.r[:]
-        # chComponentGT[:] = chComponent.r[:]
-        # chVColorsGT[:] = chVColors.r[:]
-
-        if makeVideo:
-            ims = []
-
-        performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        gradAz[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        gradEl[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-        performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-        gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-        gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-        gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-        if useBlender:
-            print("Updating Ground Truth blender camera!")
-            scene.update()
-            center = centerOfGeometry(teapotGT.dupli_group.objects, teapotGT.matrix_world)
-            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
-            scene.update()
-
-        if useBlender:
-            pendingCyclesRender = True
-
-        if useGTasBackground:
-            for teapot_i in range(len(renderTeapotsList)):
-                renderer_i = renderer_teapots[teapot_i]
-                renderer_i.set(background_image=rendererGT.r)
-
-        changedGT = False
-
-    if exploreSurface:
-        if computePerformance:
-            print("Estimating cost function surface and gradients...")
-            drawSurf = True
             chAzOld = chAz.r[0]
             chElOld = chEl.r[0]
+            chAzGTOld = chAzGT.r[0]
+            chElGTOld = chElGT.r[0]
 
-            for model_num, errorFun in enumerate(models):
-                performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            images = []
+            occlusions = np.array([])
+            hogs = []
+            # vcolorsfeats = []
+            illumfeats = []
+            occludedInstances = []
+            # split = 0.8
+            # setTrain = np.arange(np.floor(trainSize*split)).astype(np.uint8)
+            print("Generating renders")
+            for train_i in range(len(trainAzsGT)):
+                azi = trainAzsGT[train_i]
+                eli = trainElevsGT[train_i]
+                chAzGT[:] = azi
+                chElGT[:] = eli
+                chLightAzGT[:] = trainLightAzsGT[train_i]
+                chLightElGT[:] = trainLightElevsGT[train_i]
+                chLightIntensityGT[:] = trainLightIntensitiesGT[train_i]
+                chVColorsGT[:] = trainVColorGT[train_i]
+                image = rendererGT.r.copy()
 
-                gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                occlusion = getOcclusionFraction(rendererGT)
+                if occlusion < 0.9:
+                    images = images + [image]
+                    occlusions = np.append(occlusions, occlusion)
+                    hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
 
-                gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                    # vcolorsfeats = vcolorsfeats +  [imageproc.medianColor(image,40)]
+                    illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
+                else:
+                    occludedInstances = occludedInstances + [train_i]
 
-            for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
-                for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
-                    for model_num, errorFun in enumerate(models):
-                        chAz[:] = chAzi
-                        chEl[:] = chEli
+            trainAzsGT = np.delete(trainAzsGT, occludedInstances)
+            trainElevsGT = np.delete(trainElevsGT, occludedInstances)
+            trainLightAzsGT = np.delete(trainLightAzsGT, occludedInstances)
+            trainLightElevsGT = np.delete(trainLightElevsGT, occludedInstances)
+            trainLightIntensitiesGT = np.delete(trainLightIntensitiesGT, occludedInstances)
+            trainVColorGT = np.delete(trainVColorGT, occludedInstances, 0)
 
-                        performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
-                        azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
-                        elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
-                        import scipy.sparse as sp
-                        if sp.issparse(errorFun.dr_wrt(chAz)):
-                            drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
-                        else:
-                            drAz = errorFun.dr_wrt(chAz)[0][0]
-                        if sp.issparse(errorFun.dr_wrt(chEl)):
-                            drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
-                        else:
-                            drEl = errorFun.dr_wrt(chEl)[0][0]
+            hogfeats = np.vstack(hogs)
+            illumfeats = np.vstack(illumfeats)
 
-                        gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
-                        gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
-                        chAzOldi = chAz.r[0]
-                        chElOldi = chEl.r[0]
-                        diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
-                        diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
-                        chAz[:] = chAzOldi
-                        chEl[:] = chElOldi
-                        gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
-                        gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
+            print("Training RFs")
+            randForestModelCosAzs = recognition_models.trainRandomForest(hogfeats, np.cos(trainAzsGT))
+            randForestModelSinAzs = recognition_models.trainRandomForest(hogfeats, np.sin(trainAzsGT))
+            randForestModelCosElevs = recognition_models.trainRandomForest(hogfeats, np.cos(trainElevsGT))
+            randForestModelSinElevs = recognition_models.trainRandomForest(hogfeats, np.sin(trainElevsGT))
+
+            randForestModelLightCosAzs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightAzsGT))
+            randForestModelLightSinAzs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightAzsGT))
+            randForestModelLightCosElevs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightElevsGT))
+            randForestModelLightSinElevs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightElevsGT))
+
+            imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
+            randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
+
+            trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelLightCosAzs':randForestModelLightCosAzs,'randForestModelLightSinAzs':randForestModelLightSinAzs,'randForestModelLightCosElevs':randForestModelLightCosElevs,'randForestModelLightSinElevs':randForestModelLightSinElevs,'randForestModelLightIntensity':randForestModelLightIntensity}
+            with open('experiments/' + trainprefix + 'models.pickle', 'wb') as pfile:
+                pickle.dump(trainedModels, pfile)
+
+
+            # print("Training LR")
+            # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
+            # linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
+            # linRegModelCosElevs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
+            # linRegModelSinElevs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
+
+            chAz[:] = chAzOld
+            chEl[:] = chElOld
+            chAzGT[:] = chAzGTOld
+            chElGT[:] = chElGTOld
+
+            print("Finished training recognition models.")
+            beginTraining = False
+
+        if beginTesting:
+
+            chAzOld = chAz.r[0]
+            chElOld = chEl.r[0]
+            print("Backprojecting and fitting estimates.")
+
+            with open(testDataName, 'rb') as pfile:
+                testData = pickle.load(pfile)
+
+            testAzsGT = testData['testAzsGT']
+            testElevsGT = testData['testElevsGT']
+            testLightAzsGT = testData['testLightAzsGT']
+            testLightElevsGT = testData['testLightElevsGT']
+            testLightIntensitiesGT = testData['testLightIntensitiesGT']
+            testVColorGT = testData['testVColorGT']
+
+            if trainedModels == {}:
+                with open('experiments/' + trainprefix +  'models.pickle', 'rb') as pfile:
+                    trainedModels = pickle.load(pfile)
+
+                randForestModelCosAzs = trainedModels['randForestModelCosAzs']
+                randForestModelSinAzs = trainedModels['randForestModelSinAzs']
+                randForestModelCosElevs = trainedModels['randForestModelCosElevs']
+                randForestModelSinElevs = trainedModels['randForestModelSinElevs']
+                randForestModelLightCosAzs = trainedModels['randForestModelLightCosAzs']
+                randForestModelLightSinAzs = trainedModels['randForestModelLightSinAzs']
+                randForestModelLightCosElevs = trainedModels['randForestModelLightCosElevs']
+                randForestModelLightSinElevs = trainedModels['randForestModelLightSinElevs']
+                randForestModelLightIntensity = trainedModels['randForestModelLightIntensity']
+
+            testImages = []
+            testHogs = []
+            testIllumfeats = []
+            testPredVColors = []
+            testPredVColorGMMs = []
+            testPredPoseGMMs = []
+            occludedInstances = []
+
+            print("Generating renders")
+            for test_i in range(len(testAzsGT)):
+                azi = testAzsGT[test_i]
+                eli = testElevsGT[test_i]
+                chAzGT[:] = azi
+                chElGT[:] = eli
+                chLightAzGT[:] = testLightAzsGT[test_i]
+                chLightElGT[:] = testLightElevsGT[test_i]
+                chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+                chVColorsGT[:] = testVColorGT[test_i]
+                testImage = rendererGT.r.copy()
+                occlusion = getOcclusionFraction(rendererGT)
+                if occlusion < 0.95:
+                    testImages = testImages + [testImage]
+                    testIllumfeats = testIllumfeats + [imageproc.featuresIlluminationDirection(testImage,20)]
+                    testHogs = testHogs + [imageproc.computeHoG(testImage).reshape([1,-1])]
+                    testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 20)]
+                    testPredVColorGMMs = testPredVColorGMMs + [recognition_models.colorGMM(testImage, 20)]
+                else:
+                    occludedInstances = occludedInstances + [test_i]
+
+            testAzsGT = np.delete(testAzsGT, occludedInstances)
+            testElevsGT = np.delete(testElevsGT, occludedInstances)
+            testLightAzsGT = np.delete(testLightAzsGT, occludedInstances)
+            testLightElevsGT = np.delete(testLightElevsGT, occludedInstances)
+            testLightIntensitiesGT = np.delete(testLightIntensitiesGT, occludedInstances)
+            testVColorGT = np.delete(testVColorGT, occludedInstances, 0)
+
+            print("Predicting with RFs")
+            testHogfeats = np.vstack(testHogs)
+            testIllumfeats = np.vstack(testIllumfeats)
+            testPredVColors = np.vstack(testPredVColors)
+            cosAzsPredRF = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeats)
+            sinAzsPredRF = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeats)
+            cosElevsPredRF = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeats)
+            sinElevsPredRF = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeats)
+
+            cosAzsLightPredRF = recognition_models.testRandomForest(randForestModelLightCosAzs, testIllumfeats)
+            sinAzsLightPredRF = recognition_models.testRandomForest(randForestModelLightSinAzs, testIllumfeats)
+            cosElevsLightPredRF = recognition_models.testRandomForest(randForestModelLightCosElevs, testIllumfeats)
+            sinElevsLightPredRF = recognition_models.testRandomForest(randForestModelLightSinElevs, testIllumfeats)
+
+            # print("Predicting with LR")
+            # cosAzsPredLR = recognition_models.testLinearRegression(linRegModelCosAzs, testHogfeats)
+            # sinAzsPredLR = recognition_models.testLinearRegression(linRegModelSinAzs, testHogfeats)
+            # cosElevsPredLR = recognition_models.testLinearRegression(linRegModelCosElevs, testHogfeats)
+            # sinElevsPredLR = recognition_models.testLinearRegression(linRegModelSinElevs, testHogfeats)
+
+            elevsPredRF = np.arctan2(sinElevsPredRF, cosElevsPredRF)
+            azsPredRF = np.arctan2(sinAzsPredRF, cosAzsPredRF)
+
+
+            for test_i in range(len(testAzsGT)):
+                # testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(testAzsGT[test_i], testElevsGT[test_i])]
+                testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPredRF[test_i], elevsPredRF[test_i])]
+
+            lightElevsPredRF = np.arctan2(sinElevsLightPredRF, cosElevsLightPredRF)
+            lightAzsPredRF = np.arctan2(sinAzsLightPredRF, cosAzsLightPredRF)
+
+            testImagesStack = np.vstack([testImage.reshape([1,-1]) for testImage in testImages])
+            lightIntensityPredRF = recognition_models.testRandomForest(randForestModelLightIntensity, testImagesStack)
+
+            componentPreds=[]
+            for test_i in range(len(testAzsGT)):
+
+                shDirLightGTTest = chZonalToSphericalHarmonics(zGT, np.pi/2 - lightElevsPredRF[test_i], lightAzsPredRF[test_i] - np.pi/2) * clampedCosCoeffs
+
+                # componentPreds = componentPreds + [chAmbientSHGT + shDirLightGTTest*lightIntensityPredRF[test_i]]
+                componentPreds = componentPreds + [chAmbientSHGT]
+
+            componentPreds = np.vstack(componentPreds)
+
+            # elevsPredLR = np.arctan2(sinElevsPredLR, cosElevsPredLR)
+            # azsPredLR = np.arctan2(sinAzsPredLR, cosAzsPredLR)
+
+            errorsRF = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, azsPredRF, elevsPredRF)
+
+            errorsLightRF = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, lightAzsPredRF, lightElevsPredRF)
+            # errorsLR = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, azsPredLR, elevsPredLR)
+
+            meanAbsErrAzsRF = np.mean(np.abs(errorsRF[0]))
+            meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
+
+            meanAbsErrLightAzsRF = np.mean(np.abs(errorsLightRF[0]))
+            meanAbsErrLightElevsRF = np.mean(np.abs(errorsLightRF[1]))
+
+            # meanAbsErrAzsLR = np.mean(np.abs(errorsLR[0]))
+            # meanAbsErrElevsLR = np.mean(np.abs(errorsLR[1]))
+
+            #Fit:
+            print("Fitting predictions")
+
+            model = 0
+            print("Using " + modelsDescr[model])
             errorFun = models[model]
+            pixelErrorFun = pixelModels[model]
+            fittedAzsGaussian = np.array([])
+            fittedElevsGaussian = np.array([])
+            fittedLightAzsGaussian = np.array([])
+            fittedLightElevsGaussian = np.array([])
+            testOcclusions = np.array([])
+            free_variables = [chVColors, chComponent, chAz, chEl]
+
+
+            if not os.path.exists('results/' + testprefix + 'imgs/'):
+                os.makedirs('results/' + testprefix + 'imgs/')
+            if not os.path.exists('results/' + testprefix + 'imgs/samples/'):
+                os.makedirs('results/' + testprefix + 'imgs/samples/')
+
+            if not os.path.exists('results/' + testprefix ):
+                os.makedirs('results/' + testprefix )
+
+            model = 1
+            print("Using " + modelsDescr[model])
+            errorFun = models[model]
+            pixelErrorFun = pixelModels[model]
+
+            maxiter = 5
+            for test_i in range(len(testAzsGT)):
+
+                bestPredAz = chAz.r
+                bestPredEl = chEl.r
+                bestModelLik = np.finfo('f').max
+                bestVColors = chVColors.r
+                bestComponent = chComponent.r
+
+                colorGMM = testPredVColorGMMs[test_i]
+                poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
+                print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
+                chAzGT[:] = testAzsGT[test_i]
+                chElGT[:] = testElevsGT[test_i]
+                chLightAzGT[:] = testLightAzsGT[test_i]
+                chLightElGT[:] = testLightElevsGT[test_i]
+                chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+                chVColorsGT[:] = testVColorGT[test_i]
+
+                image = cv2.cvtColor(numpy.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR)
+                cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'groundtruth' + '.png', image)
+                for sample in range(10):
+                    from numpy.random import choice
+
+                    sampleComp = choice(len(poseComps), size=1, p=poseComps)
+                    az = np.random.vonmises(vmAzParams[sampleComp][0],vmAzParams[sampleComp][1],1)
+                    el = np.random.vonmises(vmElParams[sampleComp][0],vmElParams[sampleComp][1],1)
+                    color = colorGMM.sample(n_samples=1)[0]
+                    chAz[:] = az
+                    chEl[:] = el
+
+                    chVColors[:] = color.copy()
+                    # chVColors[:] = testPredVColors[test_i]
+                    chComponent[:] = componentPreds[test_i].copy()
+                    image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+                    cv2.imwrite('results/' + testprefix + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png',image)
+                    ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
+
+                    if errorFun.r < bestModelLik:
+                        bestModelLik = errorFun.r.copy()
+                        bestPredAz = chAz.r.copy()
+                        bestPredEl = chEl.r.copy()
+                        bestVColors = chVColors.r.copy()
+                        bestComponent = chComponent.r.copy()
+                        image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+                        cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + '_best'+ '.png',image)
+                    image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+                    cv2.imwrite('results/' + testprefix + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_fitted'+ '.png',image)
+
+                chDisplacement[:] = np.array([0.0, 0.0,0.0])
+                chScale[:] = np.array([1.0,1.0,1.0])
+                testOcclusions = np.append(testOcclusions, getOcclusionFraction(rendererGT))
+
+                fittedAzsGaussian = np.append(fittedAzsGaussian, bestPredAz)
+                fittedElevsGaussian = np.append(fittedElevsGaussian, bestPredEl)
+                # fittedLightAzsGaussian = np.append(fittedLightAzsGaussian, chLightAz.r[0])
+                # fittedLightElevsGaussian = np.append(fittedLightElevsGaussian, chLightEl.r[0])
+            errorsFittedRFGaussian = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
+            # errorsLightFittedRFGaussian = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, fittedLightAzsGaussian, fittedLightElevsGaussian)
+            meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
+            meanAbsErrElevsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[1]))
+            # meanAbsErrLightAzsFittedRFGaussian = np.mean(np.abs(errorsLightFittedRFGaussian[0]))
+            # meanAbsErrLightElevsFittedRFGaussian = np.mean(np.abs(errorsLightFittedRFGaussian[1]))
+
+            # model = 1
+            # print("Using " + modelsDescr[model])
+            # errorFun = models[model]
+            # pixelErrorFun = pixelModels[model]
+            # fittedAzsRobust = np.array([])
+            # fittedElevsRobust = np.array([])
+            # fittedLightAzsRobust = np.array([])
+            # fittedLightElevsRobust = np.array([])
+            # for test_i in range(len(testAzsGT)):
+            #     print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
+            #     chAzGT[:] = testAzsGT[test_i]
+            #     chElGT[:] = testElevsGT[test_i]
+            #     chLightAzGT[:] = testLightAzsGT[test_i]
+            #     chLightElGT[:] = testLightElevsGT[test_i]
+            #     chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+            #     chVColorsGT[:] = testVColorGT[test_i]
+            #     chAz[:] = azsPredRF[test_i]
+            #     chEl[:] = elevsPredRF[test_i]
+            #     chVColors[:] = testPredVColors[test_i]
+            #     chComponent[:] = componentPreds[test_i]
+            #
+            #     chDisplacement[:] = np.array([0.0, 0.0,0.0])
+            #     chScale[:] = np.array([1.0,1.0,1.0])
+            #
+            #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
+            #     image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            #     cv2.imwrite('results/' + testprefix + 'imgs/test'+ str(test_i) + 'fitted-robust' + '.png', image)
+            #     fittedAzsRobust = np.append(fittedAzsRobust, chAz.r[0])
+            #     fittedElevsRobust = np.append(fittedElevsRobust, chEl.r[0])
+
+                # fittedLightAzsRobust = np.append(fittedLightAzsRobust, chLightAz.r[0])
+                # fittedLightElevsRobust = np.append(fittedLightElevsRobust, chLightEl.r[0])
+
+            # errorsFittedRFRobust = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsRobust, fittedElevsRobust)
+            # meanAbsErrAzsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[0]))
+            # meanAbsErrElevsFittedRFRobust = np.mean(np.abs(errorsFittedRFRobust[1]))
+            # errorsLightFittedRFRobust = recognition_models.evaluatePrediction(testLightAzsGT, testLightElevsGT, fittedLightAzsRobust, fittedLightElevsRobust)
+            # meanAbsErrLightAzsFittedRFRobust = np.mean(np.abs(errorsLightFittedRFRobust[0]))
+            # meanAbsErrLightElevsFittedRFRobust = np.mean(np.abs(errorsLightFittedRFRobust[1]))
+
+            # model = 1
+            # print("Using Both")
+            # errorFun = models[model]
+            # pixelErrorFun = pixelModels[model]
+            # fittedAzsBoth = np.array([])
+            # fittedElevsBoth = np.array([])
+            # for test_i in range(len(testAzsGT)):
+            #     print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsGT)))
+            #     chAzGT[:] = testAzsGT[test_i]
+            #     chElGT[:] = testElevsGT[test_i]
+            #     chLightAzGT[:] = testLightAzsGT[test_i]
+            #     chLightElGT[:] = testLightElevsGT[test_i]
+            #     chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
+            #     chVColorsGT[:] = testLightIntensitiesGT[test_i]
+            #     chAz[:] = azsPredRF[test_i]
+            #     chEl[:] = elevsPredRF[test_i]
+            #     chVColors[:] = testPredVColors[test_i]
+            #     chComponent[:] = componentPreds[test_i]
+            #     chDisplacement[:] = np.array([0.0, 0.0,0.0])
+            #     chScale[:] = np.array([1.0,1.0,1.0])
+            #
+            #     model = 0
+            #     errorFun = models[model]
+            #     pixelErrorFun = pixelModels[model]
+            #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            #     model = 1
+            #     errorFun = models[model]
+            #     pixelErrorFun = pixelModels[model]
+            #     ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options={'disp':False})
+            #     image = cv2.cvtColor(numpy.uint8(renderer.r*255), cv2.COLOR_RGB2BGR)
+            #     cv2.imwrite('results/imgs/fitted-robust' + str(test_i) + '.png', image)
+            #     fittedAzsBoth = np.append(fittedAzsBoth, chAz.r[0])
+            #     fittedElevsBoth = np.append(fittedElevsBoth, chEl.r[0])
+            #
+            # errorsFittedRFBoth = recognition_models.evaluatePrediction(testAzsGT, testElevsGT, fittedAzsBoth, fittedElevsBoth)
+            # meanAbsErrAzsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[0]))
+            # meanAbsErrElevsFittedRFBoth = np.mean(np.abs(errorsFittedRFBoth[1]))
+
+            plt.ioff()
+
+            directory = 'results/' + testprefix + 'predicted-azimuth-error'
+
+            fig = plt.figure()
+            plt.scatter(testElevsGT*180/np.pi, errorsRF[0])
+            plt.xlabel('Elevation (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,90,-90,90))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_elev-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testOcclusions*100.0,errorsRF[0])
+            plt.xlabel('Occlusion (%)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,100,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_occlusion-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testAzsGT*180/np.pi, errorsRF[0])
+            plt.xlabel('Azimuth (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,360,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.hist(np.abs(errorsRF[0]), bins=18)
+            plt.xlabel('Angular error')
+            plt.ylabel('Counts')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((-180,180,y1, y2))
+            plt.title('Performance histogram')
+            fig.savefig(directory  + '_performance-histogram.png')
+            plt.close(fig)
+
+            directory = 'results/' + testprefix + 'predicted-elevation-error'
+
+            fig = plt.figure()
+            plt.scatter(testElevsGT*180/np.pi, errorsRF[1])
+            plt.xlabel('Elevation (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,90,-90,90))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_elev-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testOcclusions*100.0,errorsRF[1])
+            plt.xlabel('Occlusion (%)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,100,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_occlusion-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testAzsGT*180/np.pi, errorsRF[1])
+            plt.xlabel('Azimuth (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,360,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.hist(np.abs(errorsRF[1]), bins=18)
+            plt.xlabel('Angular error')
+            plt.ylabel('Counts')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((-180,180,y1, y2))
+            plt.title('Performance histogram')
+            fig.savefig(directory  + '_performance-histogram.png')
+            plt.close(fig)
+
+            #Fitted predictions plots:
+
+            directory = 'results/' + testprefix + 'fitted-azimuth-error'
+
+            fig = plt.figure()
+            plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[0])
+            plt.xlabel('Elevation (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,90,-90,90))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_elev-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[0])
+            plt.xlabel('Occlusion (%)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,100,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_occlusion-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testAzsGT*180/np.pi, errorsFittedRFGaussian[0])
+            plt.xlabel('Azimuth (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,360,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.hist(np.abs(errorsFittedRFGaussian[0]), bins=18)
+            plt.xlabel('Angular error')
+            plt.ylabel('Counts')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((-180,180,y1, y2))
+            plt.title('Performance histogram')
+            fig.savefig(directory  + '_performance-histogram.png')
+            plt.close(fig)
+
+            directory = 'results/' + testprefix + 'fitted-elevation-error'
+
+            fig = plt.figure()
+            plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[1])
+            plt.xlabel('Elevation (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,90,-90,90))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_elev-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[1])
+            plt.xlabel('Occlusion (%)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,100,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory + '_occlusion-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.scatter(testAzsGT*180/np.pi, errorsFittedRFGaussian[1])
+            plt.xlabel('Azimuth (degrees)')
+            plt.ylabel('Angular error')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((0,360,-180,180))
+            plt.title('Performance scatter plot')
+            fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            plt.close(fig)
+
+            fig = plt.figure()
+            plt.hist(np.abs(errorsFittedRFGaussian[1]), bins=18)
+            plt.xlabel('Angular error')
+            plt.ylabel('Counts')
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((-180,180,y1, y2))
+            plt.title('Performance histogram')
+            fig.savefig(directory  + '_performance-histogram.png')
+            plt.close(fig)
+
+            directory = 'results/' + testprefix + 'fitted-robust-azimuth-error'
+
+            # fig = plt.figure()
+            # plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[0])
+            # plt.xlabel('Elevation (degrees)')
+            # plt.ylabel('Angular error')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((0,90,-90,90))
+            # plt.title('Performance scatter plot')
+            # fig.savefig(directory + '_elev-performance-scatter.png')
+            # plt.close(fig)
+            #
+            # fig = plt.figure()
+            # plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[0])
+            # plt.xlabel('Occlusion (%)')
+            # plt.ylabel('Angular error')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((0,100,-180,180))
+            # plt.title('Performance scatter plot')
+            # fig.savefig(directory + '_occlusion-performance-scatter.png')
+            # plt.close(fig)
+            #
+            # fig = plt.figure()
+            # plt.scatter(testAzsGT*180/np.pi, errorsFittedRFRobust[0])
+            # plt.xlabel('Azimuth (degrees)')
+            # plt.ylabel('Angular error')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((0,360,-180,180))
+            # plt.title('Performance scatter plot')
+            # fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            # plt.close(fig)
+            #
+            # fig = plt.figure()
+            # plt.hist(np.abs(errorsFittedRFRobust[0]), bins=18)
+            # plt.xlabel('Angular error')
+            # plt.ylabel('Counts')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((-180,180,y1, y2))
+            # plt.title('Performance histogram')
+            # fig.savefig(directory  + '_performance-histogram.png')
+            # plt.close(fig)
+            #
+            # directory = 'results/' + testprefix + 'fitted-robust-elevation-error'
+            #
+            # fig = plt.figure()
+            # plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[1])
+            # plt.xlabel('Elevation (degrees)')
+            # plt.ylabel('Angular error')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((0,90,-90,90))
+            # plt.title('Performance scatter plot')
+            # fig.savefig(directory + '_elev-performance-scatter.png')
+            # plt.close(fig)
+            #
+            # fig = plt.figure()
+            # plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[1])
+            # plt.xlabel('Occlusion (%)')
+            # plt.ylabel('Angular error')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((0,100,-180,180))
+            # plt.title('Performance scatter plot')
+            # fig.savefig(directory + '_occlusion-performance-scatter.png')
+            # plt.close(fig)
+            #
+            # fig = plt.figure()
+            # plt.scatter(testAzsGT*180/np.pi, errorsFittedRFRobust[1])
+            # plt.xlabel('Azimuth (degrees)')
+            # plt.ylabel('Angular error')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((0,360,-180,180))
+            # plt.title('Performance scatter plot')
+            # fig.savefig(directory  + '_azimuth-performance-scatter.png')
+            # plt.close(fig)
+            #
+            # fig = plt.figure()
+            # plt.hist(np.abs(errorsFittedRFRobust[1]), bins=18)
+            # plt.xlabel('Angular error')
+            # plt.ylabel('Counts')
+            # x1,x2,y1,y2 = plt.axis()
+            # plt.axis((-180,180,y1, y2))
+            # plt.title('Performance histogram')
+            # fig.savefig(directory  + '_performance-histogram.png')
+            # plt.close(fig)
+
+            plt.ion()
+
+            #Write statistics to file.
+            with open('results/' + testprefix + 'performance.txt', 'w') as expfile:
+                # expfile.write(str(z))
+                expfile.write("Mean Azimuth Error (predicted) " +  str(meanAbsErrAzsRF) + '\n')
+                expfile.write("Mean Elevation Error (predicted) " +  str(meanAbsErrElevsRF)+ '\n')
+                expfile.write("Mean Azimuth Error (gaussian) " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
+                expfile.write("Mean Elevation Error (gaussian) " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
+                # expfile.write("Mean Azimuth Error (robust) " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
+                # expfile.write("Mean Elevation Error (robust) " +  str(meanAbsErrElevsFittedRFRobust)+ '\n\n')
+                # expfile.write("Mean Light Azimuth Error (predicted) " +  str(meanAbsErrLightAzsRF)+ '\n')
+                # expfile.write("Mean Light Elevation Error (predicted) " +  str(meanAbsErrLightElevsRF)+ '\n')
+                # expfile.write("Mean Light Azimuth Error (gaussian) " +  str(meanAbsErrLightAzsFittedRFGaussian)+ '\n')
+                # expfile.write("Mean Light Elevation Error (gaussian)" +  str(meanAbsErrLightElevsFittedRFGaussian)+ '\n')
+                # expfile.write("Mean Light Azimuth Error (robust)" +  str(meanAbsErrLightAzsFittedRFRobust)+ '\n')
+                # expfile.write("Mean Light Elevation Error (robust) " +  str(meanAbsErrLightElevsFittedRFRobust)+ '\n')
+                # expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
+                # expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
+
+                expfile.write("Occlusions " +  str(testOcclusions)+ '\n')
 
             chAz[:] = chAzOld
             chEl[:] = chElOld
 
+
+            print("Finished backprojecting and fitting estimates.")
+
+            beginTesting = False
+
+        if changedGT:
+            drawSurf = False
+            plotMinimization = False
+            imagegt = imageGT()
+            chImage[:,:,:] = imagegt[:,:,:]
+
+            chAzGT[:] = chAz.r[:]
+            chElGT[:] = chEl.r[:]
+            chDistGT[:] = chDist.r[:]
+            # chComponentGT[:] = chComponent.r[:]
+            # chVColorsGT[:] = chVColors.r[:]
+
+            if makeVideo:
+                ims = []
+
+            performance[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            azimuths[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            elevations[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradAz[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradEl[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            performanceSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            if useBlender:
+                print("Updating Ground Truth blender camera!")
+                scene.update()
+                center = centerOfGeometry(teapotGT.dupli_group.objects, teapotGT.matrix_world)
+                placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+                scene.update()
+
+            if useBlender:
+                pendingCyclesRender = True
+
+            if useGTasBackground:
+                for teapot_i in range(len(renderTeapotsList)):
+                    renderer_i = renderer_teapots[teapot_i]
+                    renderer_i.set(background_image=rendererGT.r)
+
+            changedGT = False
+
+        if exploreSurface:
+            if computePerformance:
+                print("Estimating cost function surface and gradients...")
+                drawSurf = True
+                chAzOld = chAz.r[0]
+                chElOld = chEl.r[0]
+
+                for model_num, errorFun in enumerate(models):
+                    performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                    azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                    elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                    gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                    gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                    gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+                    gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+                for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
+                    for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
+                        for model_num, errorFun in enumerate(models):
+                            chAz[:] = chAzi
+                            chEl[:] = chEli
+
+                            performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
+                            azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
+                            elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
+                            import scipy.sparse as sp
+                            if sp.issparse(errorFun.dr_wrt(chAz)):
+                                drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
+                            else:
+                                drAz = errorFun.dr_wrt(chAz)[0][0]
+                            if sp.issparse(errorFun.dr_wrt(chEl)):
+                                drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
+                            else:
+                                drEl = errorFun.dr_wrt(chEl)[0][0]
+
+                            gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
+                            gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
+                            chAzOldi = chAz.r[0]
+                            chElOldi = chEl.r[0]
+                            diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+                            diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+                            chAz[:] = chAzOldi
+                            chEl[:] = chElOldi
+                            gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
+                            gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
+                errorFun = models[model]
+
+                chAz[:] = chAzOld
+                chEl[:] = chElOld
+
+                refresh = True
+                print("Finshed estimating.")
+
+            exploreSurface = False
+
+        if groundTruthBlender and pendingCyclesRender:
+            scene.update()
+            bpy.ops.render.render( write_still=True )
+            image = cv2.imread(scene.render.filepath)
+            image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+            blenderRender = image
+            pendingCyclesRender = False
+
+        if changeRenderer:
+            print("New teapot model " + str(currentTeapotModel))
+            drawSurf = False
+            plotMinimization = False
             refresh = True
-            print("Finshed estimating.")
+            renderer = renderer_teapots[currentTeapotModel]
+            updateErrorFunctions = True
+            if useBlender:
+                teapot = blender_teapots[currentTeapotModel]
+            changeRenderer = False
 
-        exploreSurface = False
+        if updateErrorFunctions:
+            currentGT = rendererGT
+            if useBlender and groundTruthBlender:
+                currentGT = blenderRender
+                # scene.update()
+                # bpy.ops.render.render( write_still=True )
+                # image = cv2.imread(scene.render.filepath)
+                # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+                # currentGT = image
+            negLikModel = -score_image.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
+            negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+            pixelLikelihoodCh = score_image.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
+            pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
+            post = score_image.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+            models = [negLikModel, negLikModelRobust, negLikModelRobust]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+            pixelErrorFun = pixelModels[model]
+            errorFun = models[model]
 
-    if groundTruthBlender and pendingCyclesRender:
-        scene.update()
-        bpy.ops.render.render( write_still=True )
-        image = cv2.imread(scene.render.filepath)
-        image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-        blenderRender = image
-        pendingCyclesRender = False
+            updateErrorFunctions = False
 
-    if changeRenderer:
-        print("New teapot model " + str(currentTeapotModel))
-        drawSurf = False
-        plotMinimization = False
-        refresh = True
-        renderer = renderer_teapots[currentTeapotModel]
-        updateErrorFunctions = True
-        if useBlender:
-            teapot = blender_teapots[currentTeapotModel]
-        changeRenderer = False
+        if minimize:
+            iterat = 0
+            print("Minimizing with method " + methods[method])
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
+            plotMinimization = True
+            minimize = False
 
-    if updateErrorFunctions:
-        currentGT = rendererGT
-        if useBlender and groundTruthBlender:
-            currentGT = blenderRender
-            # scene.update()
-            # bpy.ops.render.render( write_still=True )
-            # image = cv2.imread(scene.render.filepath)
-            # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-            # currentGT = image
-        negLikModel = -score_image.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
-        negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
-        pixelLikelihoodCh = score_image.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
-        pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
-        post = score_image.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
-        models = [negLikModel, negLikModelRobust, negLikModelRobust]
-        pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
-        pixelErrorFun = pixelModels[model]
-        errorFun = models[model]
+        if refresh:
+            print("Sq Error: " + str(errorFun.r))
 
-        updateErrorFunctions = False
+            if demoMode:
+                refreshSubplots()
 
-    if minimize:
-        iterat = 0
-        print("Minimizing with method " + methods[method])
-        ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
-        plotMinimization = True
-        minimize = False
+            if computePerformance and drawSurf:
+                plotSurface()
 
-    if refresh:
-        print("Sq Error: " + str(errorFun.r))
+        # if demoMode or drawSurf:
+        #     plt.pause(0.1)
+        #     plt.draw()
 
-        if demoMode:
-            refreshSubplots()
+            refresh = False
 
-        if computePerformance and drawSurf:
-            plotSurface()
+    refreshSubplots()
 
-    # if demoMode or drawSurf:
-    #     plt.pause(0.1)
-    #     plt.draw()
-
-        refresh = False
-
-refreshSubplots()
-
-plt.imsave('opendr_opengl_final.png', rendererGT.r)
-
-if glMode == 'glfw':
-    glfw.terminate()
+#
+# if glMode == 'glfw':
+#     glfw.terminate()
