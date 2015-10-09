@@ -446,7 +446,7 @@ def getEnvironmentMapCoefficients(envMap, phiOffset, type):
     """ returns the RGB spherical harmonic coefficients for a given
     l and m """
     if type == 'equirectangular':
-        phis = 2*np.pi*np.tile((np.arange(envMap.shape[1])/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
+        phis = 2*np.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
         thetas = np.pi*np.tile((np.arange(envMap.shape[0])/envMap.shape[0]).reshape([envMap.shape[0],1,1]), [1,envMap.shape[1],3])
     elif type == 'spherical':
         vcoords = (-envMap.shape[0]/2 + np.tile(np.arange(envMap.shape[0]).reshape([envMap.shape[0], 1,1]), [1,envMap.shape[1],3]))/(envMap.shape[0]/2)

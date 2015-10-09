@@ -226,7 +226,7 @@ if useBlender:
 
 import imageio
 
-envMapFilename = 'data/hdr/dataset/salon_land.hdr'
+envMapFilename = 'data/hdr/dataset/canada_montreal_nad_photorealism.exr'
 envMapTexture = np.array(imageio.imread(envMapFilename))
 phiOffset = 0
 if sphericalMap:
@@ -235,11 +235,11 @@ if sphericalMap:
     distMask = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     envMapTexture[distMask > mask.shape[0]/2,:] = 0
     envMapTexture[distMask <= mask.shape[0]/2, :] = envMapTexture[distMask <= mask.shape[0]/2]/envMapTexture[distMask <= mask.shape[0]/2].mean()
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, phiOffset, 'spherical')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, -phiOffset, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
     # envMapTexture = envMapTexture - envMapMean + 1
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, phiOffset, 'equirectangular')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, -phiOffset, 'equirectangular')
 
 if useBlender:
     addEnvironmentMapWorld(envMapFilename, scene)
