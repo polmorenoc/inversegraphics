@@ -303,16 +303,21 @@ def addEnvironmentMapWorld(envMapFilename, scene):
     mappingNode = treeNodes.nodes.new('ShaderNodeMapping')
     links = treeNodes.links
     links.new(mappingNode.outputs[0],envTextureNode.inputs[0])
-    links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+
 
     texCoordNode = treeNodes.nodes.new('ShaderNodeTexCoord')
     links.new(texCoordNode.outputs[0],mappingNode.inputs[0])
     # mathNode = treeNodes.nodes.new('ShaderNodeMath')
     # links.new(envTextureNode.outputs[0],mathNode.inputs[0])
-    links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+    rgbToBWNode = treeNodes.nodes.new('ShaderNodeRGBToBW')
+    # links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+    links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
+    links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+
     # mathNode.inputs[1].default_value = 1
     image = bpy.data.images.load(envMapFilename)
     envTextureNode.image = image
+
 
 def setEnviornmentMapStrength(strength, scene):
     backgroundNode = scene.world.node_tree.nodes['Background']
@@ -320,6 +325,7 @@ def setEnviornmentMapStrength(strength, scene):
 
 def updateEnviornmentMap(envMapFilename, scene):
     envTextureNode = scene.world.node_tree.nodes['Environment Texture']
+    envTextureNode.image.user_clear()
     bpy.data.images.remove(envTextureNode.image)
     image = bpy.data.images.load(envMapFilename)
     envTextureNode.image = image
@@ -405,8 +411,8 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
         world.cycles.sample_map_resolution = 2048
 
     scene.render.threads = 4
-    scene.render.tile_x = 75
-    scene.render.tile_y = 75
+    scene.render.tile_x = height/2
+    scene.render.tile_y = width/2
 
     scene.render.image_settings.compression = 0
     scene.render.resolution_x = width #perhaps set resolution in code

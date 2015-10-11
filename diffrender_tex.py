@@ -54,7 +54,7 @@ trainDataName = 'experiments/' + trainprefix + 'groundtruth.pickle'
 testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
-width, height = (100, 100)
+width, height = (400, 400)
 
 win = -1
 
@@ -77,7 +77,7 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 
-camDistance = 0.4
+camDistance = 0.75
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
@@ -104,6 +104,10 @@ if useBlender and not loadBlenderSceneFile:
 elif useBlender and loadBlenderSceneFile:
     bpy.ops.wm.open_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
     scene = bpy.data.scenes['Main Scene']
+    scene.render.resolution_x = width #perhaps set resolution in code
+    scene.render.resolution_y = height
+    scene.render.tile_x = height/2
+    scene.render.tile_y = width/2
     bpy.context.screen.scene = scene
     targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx))
 if unpackSceneFromBlender:
@@ -185,7 +189,7 @@ chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([1])
+chAmbientIntensityGT = ch.Ch([2])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 
@@ -226,25 +230,26 @@ if useBlender:
 
 import imageio
 
-envMapFilename = 'data/hdr/dataset/canada_montreal_nad_photorealism.exr'
-envMapTexture = np.array(imageio.imread(envMapFilename))
+envMapFilename = 'data/hdr/dataset/studio_land.hdr'
+envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
 phiOffset = 0
 if sphericalMap:
     mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
     mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
     distMask = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     envMapTexture[distMask > mask.shape[0]/2,:] = 0
-    envMapTexture[distMask <= mask.shape[0]/2, :] = envMapTexture[distMask <= mask.shape[0]/2]/envMapTexture[distMask <= mask.shape[0]/2].mean()
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, -phiOffset, 'spherical')
+    envMapMean = envMapTexture[distMask <= mask.shape[0]/2].mean()
+    envMapTexture[distMask <= mask.shape[0]/2, :] = envMapTexture[distMask <= mask.shape[0]/2]
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  -phiOffset, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
-    # envMapTexture = envMapTexture - envMapMean + 1
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, -phiOffset, 'equirectangular')
+
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
 
 if useBlender:
     addEnvironmentMapWorld(envMapFilename, scene)
-    setEnviornmentMapStrength(0.5/envMapMean, scene)
-    rotateEnviornmentMap(-np.pi - angle, scene)
+    setEnviornmentMapStrength(0.3/envMapMean, scene)
+    rotateEnviornmentMap(phiOffset, scene)
 
 shCoeffsRGB = ch.Ch(envMapCoeffs)
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
@@ -322,8 +327,8 @@ for teapot_i in range(len(renderTeapotsList)):
     vnchmod = [ch.dot(ch.array(vnmodflat[mesh]),invTranspModel) for mesh in rangeMeshes]
     vnchmodnorm = [vnchmod[mesh]/ch.sqrt(vnchmod[mesh][:,0]**2 + vnchmod[mesh][:,1]**2 + vnchmod[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcmodflat = [item.copy() for sublist in vcmod for item in sublist]
-    vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
-    # vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
+    # vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+    vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
     vcmod_list = computeSphericalHarmonics(vnchmodnorm, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
@@ -355,7 +360,8 @@ vnch[0] = ch.dot(vnch[0], invTranspModelGT)
 vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+# vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+vcch[0] = vcflat[0]
 vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
 # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
@@ -411,6 +417,34 @@ if useBlender:
     # bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '_complete.blend')
     scene.render.filepath = 'blender_envmap_render.png'
     # bpy.ops.render.render(write_still=True)
+
+import glob
+for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
+
+    envMapFilename = hdrFile
+    envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+    phiOffset = 0
+
+    phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+
+    if not os.path.exists('light_probes/envMap' + str(hdridx)):
+        os.makedirs('light_probes/envMap' + str(hdridx))
+
+    cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
+
+    for phiOffset in phiOffsets:
+        envMapMean = envMapTexture.mean()
+        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
+        shCoeffsRGB[:] = envMapCoeffs
+        if useBlender:
+            updateEnviornmentMap(envMapFilename, scene)
+            setEnviornmentMapStrength(0.3/envMapMean, scene)
+            rotateEnviornmentMap(phiOffset, scene)
+
+        scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
+        bpy.ops.render.render(write_still=True)
+        cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+
 
 def imageGT():
     global groundTruthBlender
