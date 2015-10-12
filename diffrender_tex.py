@@ -26,11 +26,11 @@ import light_probes
 plt.ion()
 
 #Main script options:
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
-demoMode = False
+demoMode = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -41,7 +41,7 @@ glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
 
-numpy.random.seed(1)
+np.random.seed(1)
 
 trainprefix = 'train2/'
 testGTprefix = 'test2/'
@@ -97,7 +97,10 @@ sceneIdx = 0
 sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
 if useBlender and not loadBlenderSceneFile:
-    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
+    scene, targetIndex, roomName, targetPosition = sceneimport.loadBlenderScene(sceneIdx, '../databaseFull/fields/scene_replaceables.txt')
+    sceneimport.setupScene(scene, targetIndex, roomName, scene.world, scene.camera, width, height, 16, useCycles, False)
+    scene.update()
+    scene.render.filepath = 'opendr_blender.png'
     targetPosition = np.array(targetPosition)
     #Save barebones scene.
 
@@ -109,7 +112,7 @@ elif useBlender and loadBlenderSceneFile:
     scene.render.tile_x = height/2
     scene.render.tile_y = width/2
     bpy.context.screen.scene = scene
-    targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx))
+    targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx, '../databaseFull/fields/scene_replaceables.txt'))
 if unpackSceneFromBlender:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
 else:
@@ -121,12 +124,15 @@ if useBlender and not loadBlenderSceneFile:
 elif useBlender:
     teapots = [line.strip() for line in open('teapots.txt')]
     selection = [ teapots[i] for i in renderTeapotsList]
+    sceneimport.loadTargetsBlendData()
     for teapotIdx, teapotName in enumerate(selection):
         targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
 
-if useBlender and not loadBlenderSceneFile:
-    bpy.ops.file.pack_all()
-    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+
+
+# if useBlender and not loadBlenderSceneFile:
+#     bpy.ops.file.pack_all()
+#     bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
 
     # bpy.ops.wm.save_as_mainfile(filepath='data/targets.blend')
 for teapotIdx in renderTeapotsList:
@@ -233,6 +239,7 @@ import imageio
 envMapFilename = 'data/hdr/dataset/studio_land.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
 phiOffset = 0
+
 if sphericalMap:
     mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
     mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
@@ -244,7 +251,7 @@ if sphericalMap:
 else:
     envMapMean = envMapTexture.mean()
 
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
 
 if useBlender:
     addEnvironmentMapWorld(envMapFilename, scene)
@@ -418,32 +425,33 @@ if useBlender:
     scene.render.filepath = 'blender_envmap_render.png'
     # bpy.ops.render.render(write_still=True)
 
-import glob
-for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
+def exportEnvMapCoefficients():
+    import glob
+    for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
 
-    envMapFilename = hdrFile
-    envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
-    phiOffset = 0
+        envMapFilename = hdrFile
+        envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+        phiOffset = 0
 
-    phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+        phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
 
-    if not os.path.exists('light_probes/envMap' + str(hdridx)):
-        os.makedirs('light_probes/envMap' + str(hdridx))
+        if not os.path.exists('light_probes/envMap' + str(hdridx)):
+            os.makedirs('light_probes/envMap' + str(hdridx))
 
-    cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
+        cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
 
-    for phiOffset in phiOffsets:
-        envMapMean = envMapTexture.mean()
-        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
-        shCoeffsRGB[:] = envMapCoeffs
-        if useBlender:
-            updateEnviornmentMap(envMapFilename, scene)
-            setEnviornmentMapStrength(0.3/envMapMean, scene)
-            rotateEnviornmentMap(phiOffset, scene)
+        for phiOffset in phiOffsets:
+            envMapMean = envMapTexture.mean()
+            envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
+            shCoeffsRGB[:] = envMapCoeffs
+            if useBlender:
+                updateEnviornmentMap(envMapFilename, scene)
+                setEnviornmentMapStrength(0.3/envMapMean, scene)
+                rotateEnviornmentMap(phiOffset, scene)
 
-        scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
-        bpy.ops.render.render(write_still=True)
-        cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+            scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
+            bpy.ops.render.render(write_still=True)
+            cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
 
 
 def imageGT():

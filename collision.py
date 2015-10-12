@@ -115,12 +115,11 @@ def bmesh_check_intersect_objects(obj, objTransf,  obj2, obj2Transf):
 def instancesIntersect(instance1, instance2):
     if aabb_intersect(instance1, instance2):
         print ("There's an AABB intersection!")
-        for mesh1 in instance1.dupli_group.objects:
-            for mesh2 in instance2.dupli_group.objects:
-                if bmesh_check_intersect_objects(mesh1, instance1.matrix_world,  mesh2, instance2.matrix_world):
-                    return True
+        for mesh2 in instance2.dupli_group.objects:
+            if bmesh_check_intersect_objects(instance1, instance1.matrix_world,  mesh2, instance2.matrix_world):
+                return True
     else:
-        print ("There's NOT an AABB intersection!")
+        print ("There's NO AABB intersection!")
 
     return False
 

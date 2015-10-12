@@ -10,9 +10,6 @@ import timeit
 import time
 import opendr
 import chumpy as ch
-from opendr.lighting import LambertianPointLight
-from opendr.lighting import SphericalHarmonics
-from opendr.filters import gaussian_pyramid
 import geometry
 import imageproc
 import recognition_models
@@ -23,13 +20,29 @@ import glfw
 import score_image
 import matplotlib.pyplot as plt
 from opendr_utils import *
-from OpenGL.arrays import vbo
 import OpenGL.GL as GL
 import light_probes
-import curses
 
+plt.ion()
+
+#Main script options:
+useBlender = True
+loadBlenderSceneFile = True
+groundTruthBlender = False
+useCycles = True
+demoMode = False
+unpackModelsFromBlender = False
+unpackSceneFromBlender = False
+loadSavedSH = False
+useGTasBackground = False
+refreshWhileMinimizing = False
+computePerformance = False
+glModes = ['glfw','mesa']
+glMode = glModes[1]
+sphericalMap = False
 
 numpy.random.seed(1)
+
 trainprefix = 'train2/'
 testGTprefix = 'test2/'
 testprefix = 'test2-robust/'
@@ -41,11 +54,9 @@ trainDataName = 'experiments/' + trainprefix + 'groundtruth.pickle'
 testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
-width, height = (100, 100)
-glModes = ['glfw','mesa']
-glMode = glModes[0]
+width, height = (400, 400)
+
 win = -1
-demoMode = False
 
 if glMode == 'glfw':
     glfw.init()
@@ -61,15 +72,12 @@ if glMode == 'glfw':
     win = glfw.create_window(width, height, "Demo",  None, None)
     glfw.make_context_current(win)
 
-useBlender = False
-groundTruthBlender = False
-useCycles = True
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 
-camDistance = 0.4
+camDistance = 0.75
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
@@ -85,10 +93,42 @@ renderer_teapots = []
 blender_teapots = []
 center_teapots = []
 
+sceneIdx = 0
+sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
 
-unpackModelsFromBlender = False
-if useBlender:
+if useBlender and not loadBlenderSceneFile:
+    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
+    targetPosition = np.array(targetPosition)
+    #Save barebones scene.
+
+elif useBlender and loadBlenderSceneFile:
+    bpy.ops.wm.open_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+    scene = bpy.data.scenes['Main Scene']
+    scene.render.resolution_x = width #perhaps set resolution in code
+    scene.render.resolution_y = height
+    scene.render.tile_x = height/2
+    scene.render.tile_y = width/2
+    bpy.context.screen.scene = scene
+    targetPosition = np.array(sceneimport.getSceneTargetParentPosition(sceneIdx))
+if unpackSceneFromBlender:
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
+else:
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
+
+targetModels = []
+if useBlender and not loadBlenderSceneFile:
     [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+elif useBlender:
+    teapots = [line.strip() for line in open('teapots.txt')]
+    selection = [ teapots[i] for i in renderTeapotsList]
+    for teapotIdx, teapotName in enumerate(selection):
+        targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
+
+if useBlender and not loadBlenderSceneFile:
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '.blend')
+
+    # bpy.ops.wm.save_as_mainfile(filepath='data/targets.blend')
 for teapotIdx in renderTeapotsList:
     teapotNum = renderTeapotsList[teapotIdx]
     objectDicFile = 'data/target' + str(teapotNum) + '.pickle'
@@ -112,25 +152,6 @@ for teapotIdx in renderTeapotsList:
     varray = np.vstack(vflat)
     center_teapots = center_teapots + [np.sum(varray, axis=0)/len(varray)]
 
-sceneIdx = 0
-sceneDicFile = 'data/scene' + str(sceneIdx) + '.pickle'
-
-unpackSceneFromBlender = False
-if useBlender:
-    scene, targetPosition = sceneimport.loadBlenderScene(sceneIdx, width, height, useCycles)
-    targetPosition = np.array(targetPosition)
-if unpackSceneFromBlender:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
-else:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition = sceneimport.loadSavedScene(sceneDicFile)
-
-
-# 1 Prepare each teapot renderer.
-# 2 Add first teapot to blender scene and GT renderer.
-
-# chAz = ch.Ch([4.742895587179587])
-# chEl = ch.Ch([0.22173048])
-# chDist = ch.Ch([camDistance])
 
 chAz = ch.Ch([1.1693706])
 chEl =  ch.Ch([0.95993109])
@@ -166,44 +187,73 @@ light_colorGT = ch.ones(3)*chPointLightIntensityGT
 chVColors = ch.Ch([0.4,0.4,0.4])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
-loadSavedSH = True
-shCoefficientsFile = 'sceneSH' + str(sceneIdx) + '.pickle'
+shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([7])
+chAmbientIntensityGT = ch.Ch([2])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
+
 if useBlender:
     if not loadSavedSH:
         #Spherical harmonics
         bpy.context.scene.render.engine = 'CYCLES'
-        scene.sequencer_colorspace_settings.name = 'Linear'
-        for item in bpy.context.selectable_objects:
-            item.select = False
-        light_probes.lightProbeOp(bpy.context)
-        lightProbe = bpy.context.scene.objects[0]
-        lightProbe.select = True
-        bpy.context.scene.objects.active = lightProbe
-        lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.15))
-        scene.update()
-        lp_data = light_probes.bakeOp(bpy.context)
-        scene.objects.unlink(lightProbe)
-        scene.update()
 
-        shCoeffsList = [lp_data[0]['coeffs']['0']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['1']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-2']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['-1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['0']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['1']]
-        shCoeffsList = shCoeffsList + [lp_data[0]['coeffs']['2']['2']]
-        shCoeffsRGB = np.vstack(shCoeffsList)
-        shCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
-        with open(shCoefficientsFile, 'wb') as pfile:
-            shCoeffsDic = {'shCoeffs':shCoeffs}
-            pickle.dump(shCoeffsDic, pfile)
-        chAmbientSHGT = shCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
+        #Option 1: Sph Harmonic from Light probes using Cycles:
+        # scene.sequencer_colorspace_settings.name = 'Linear'
+        # for item in bpy.context.selectable_objects:
+        #     item.select = False
+        # light_probes.lightProbeOp(bpy.context)
+        # lightProbe = bpy.context.scene.objects[0]
+        # lightProbe.select = True
+        # bpy.context.scene.objects.active = lightProbe
+        # lightProbe.location = mathutils.Vector((targetPosition[0], targetPosition[1],targetPosition[2] + 0.15))
+        # scene.update()
+        # lp_data = light_probes.bakeOp(bpy.context)
+        # coeffs = lp_data[0]['coeffs']
+        # scene.objects.unlink(lightProbe)
+        # scene.update()
+        # shCoeffsList = [coeffs[0]['coeffs']['0']['0']]
+        # shCoeffsList = shCoeffsList + [coeffs['1']['1']]
+        # shCoeffsList = shCoeffsList + [coeffs['1']['0']]
+        # shCoeffsList = shCoeffsList + [coeffs['1']['-1']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['-2']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['-1']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['0']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['1']]
+        # shCoeffsList = shCoeffsList + [coeffs['2']['2']]
+        # shCoeffsRGB = np.vstack(shCoeffsList)
+        #Option 2:
+
+        # with open(shCoefficientsFile, 'wb') as pfile:
+        #     shCoeffsDic = {'shCoeffs':shCoeffs}
+        #     pickle.dump(shCoeffsDic, pfile)
+
+import imageio
+
+envMapFilename = 'data/hdr/dataset/studio_land.hdr'
+envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+phiOffset = 0
+if sphericalMap:
+    mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
+    mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
+    distMask = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    envMapTexture[distMask > mask.shape[0]/2,:] = 0
+    envMapMean = envMapTexture[distMask <= mask.shape[0]/2].mean()
+    envMapTexture[distMask <= mask.shape[0]/2, :] = envMapTexture[distMask <= mask.shape[0]/2]
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  -phiOffset, 'spherical')
+else:
+    envMapMean = envMapTexture.mean()
+
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
+
+if useBlender:
+    addEnvironmentMapWorld(envMapFilename, scene)
+    setEnviornmentMapStrength(0.3/envMapMean, scene)
+    rotateEnviornmentMap(phiOffset, scene)
+
+shCoeffsRGB = ch.Ch(envMapCoeffs)
+chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
 
 if loadSavedSH:
     if os.path.isfile(shCoefficientsFile):
@@ -212,10 +262,9 @@ if loadSavedSH:
             shCoeffs = shCoeffsDic['shCoeffs']
             chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
 
-
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([10])
+chLightIntensityGT = ch.Ch([0])
 chLightAzGT = ch.Ch([np.pi*3/2])
 chLightElGT = ch.Ch([np.pi/4])
 angle = ch.arcsin(chLightRadGT/chLightDistGT)
@@ -278,8 +327,8 @@ for teapot_i in range(len(renderTeapotsList)):
     vnchmod = [ch.dot(ch.array(vnmodflat[mesh]),invTranspModel) for mesh in rangeMeshes]
     vnchmodnorm = [vnchmod[mesh]/ch.sqrt(vnchmod[mesh][:,0]**2 + vnchmod[mesh][:,1]**2 + vnchmod[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcmodflat = [item.copy() for sublist in vcmod for item in sublist]
-    vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
-    # vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
+    # vcchmod = [np.ones_like(vcmodflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+    vcchmod = [ch.array(vcmodflat[mesh]) for mesh in rangeMeshes]
     vcmod_list = computeSphericalHarmonics(vnchmodnorm, vcchmod, light_color, chComponent)
     # vcmod_list =  computeGlobalAndPointLighting(vchmod, vnchmod, vcchmod, lightPos, chGlobalConstant, light_color)
     renderer = TexturedRenderer()
@@ -290,27 +339,6 @@ for teapot_i in range(len(renderTeapotsList)):
 
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
-
-if useBlender:
-    #Add directional light to match spherical harmonics
-    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
-    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
-    lamp.layers[1] = True
-    lamp.layers[2] = True
-    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-    lampLoc = getRelativeLocation(chLightAzGT.r, chLightElGT.r, chLightDistGT, center)
-    lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
-    lamp.data.cycles.use_multiple_importance_sampling = True
-    lamp.data.use_nodes = True
-    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = 7
-    scene.objects.link(lamp)
-
-    teapot = blender_teapots[currentTeapotModel]
-    teapotGT = blender_teapots[currentTeapotModel]
-    placeNewTarget(scene, teapot, targetPosition)
-
-    placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
-    scene.update()
 
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
@@ -332,14 +360,14 @@ vnch[0] = ch.dot(vnch[0], invTranspModelGT)
 vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
 vcflat = [item for sublist in vc for item in sublist]
 vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
-vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+# vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+vcch[0] = vcflat[0]
 vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
 # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
 setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
 rendererGT.r
 
-useGTasBackground = False
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
@@ -348,7 +376,6 @@ if useGTasBackground:
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 # ipdb.set_trace()
-
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -361,6 +388,62 @@ oldChEl = chEl[0].r
 shapeIm = vis_gt.shape
 numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
+
+if useBlender:
+
+    #Add ambient lighting to scene (rectangular lights at even intervals).
+    # addAmbientLightingScene(scene, useCycles)
+
+    #Add directional light to match spherical harmonics
+    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
+    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
+    lamp.layers[1] = True
+    lamp.layers[2] = True
+    center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+    lampLoc = getRelativeLocation(chLightAzGT.r, chLightElGT.r, chLightDistGT, center)
+    lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
+    lamp.data.cycles.use_multiple_importance_sampling = True
+    lamp.data.use_nodes = True
+    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = chLightIntensityGT.r
+    scene.objects.link(lamp)
+
+    teapot = blender_teapots[currentTeapotModel]
+    teapotGT = blender_teapots[currentTeapotModel]
+    placeNewTarget(scene, teapot, targetPosition)
+
+    placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+    scene.update()
+    # bpy.ops.file.pack_all()
+    # bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '_complete.blend')
+    scene.render.filepath = 'blender_envmap_render.png'
+    # bpy.ops.render.render(write_still=True)
+
+import glob
+for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
+
+    envMapFilename = hdrFile
+    envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+    phiOffset = 0
+
+    phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+
+    if not os.path.exists('light_probes/envMap' + str(hdridx)):
+        os.makedirs('light_probes/envMap' + str(hdridx))
+
+    cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
+
+    for phiOffset in phiOffsets:
+        envMapMean = envMapTexture.mean()
+        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
+        shCoeffsRGB[:] = envMapCoeffs
+        if useBlender:
+            updateEnviornmentMap(envMapFilename, scene)
+            setEnviornmentMapStrength(0.3/envMapMean, scene)
+            rotateEnviornmentMap(phiOffset, scene)
+
+        scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
+        bpy.ops.render.render(write_still=True)
+        cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
 
 def imageGT():
     global groundTruthBlender
@@ -417,27 +500,6 @@ iterat = 0
 
 t = time.time()
 
-changedGT = False
-refresh = True
-updateErrorFunctions = False
-pendingCyclesRender = True
-
-
-computePerformance = False
-performance = {}
-elevations = {}
-azimuths = {}
-gradEl = {}
-gradAz = {}
-performanceSurf = {}
-elevationsSurf = {}
-azimuthsSurf = {}
-gradElSurf = {}
-gradAzSurf = {}
-gradFinElSurf = {}
-gradFinAzSurf = {}
-
-ims = []
 
 def cb(_):
     global t
@@ -457,7 +519,6 @@ def cb(_):
     global performance
     global azimuths
     global elevations
-
 
     t = time.time()
 
@@ -482,14 +543,4 @@ createGroundTruth = False
 beginTesting = False
 exploreSurface = False
 newTeapotAsGT = False
-
-global chAzSaved
-global chElSaved
-global chComponentSaved
-chAzSaved = chAz.r[0]
-chElSaved = chEl.r[0]
-chComponentSaved = chComponent.r[0]
-
-
-plt.imsave('opendr_opengl_final.png', rendererGT.r)
 

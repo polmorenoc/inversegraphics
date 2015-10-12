@@ -41,7 +41,6 @@ def composeScene(modelInstances, targetIndex):
             scene.objects.link(instance)
         modelNum = modelNum + 1
 
-
     return scene
 
 
@@ -111,6 +110,59 @@ def importBlenderScenes(instances, completeScene, targetIndex):
 
     return blenderScenes, modelInstances
 
+import os.path
+
+def createTargetsBlendFile():
+    # bpy.ops.wm.read_homefile(load_ui=False)
+    teapots = [line.strip() for line in open('teapots.txt')]
+    renderTeapotsList = np.arange(len(teapots))
+    [targetScenes, targetModels, transformations] = loadTargetModels(renderTeapotsList)
+    # bpy.data.scenes.remove(bpy.data.scenes['Scene'])
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(filepath='data/targets.blend')
+
+def createSceneBlendFiles(overwrite=False):
+    replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    for sceneIdx in range(len(sceneLines)):
+        sceneLine = sceneLines[sceneIdx]
+        sceneParts = sceneLine.split(' ')
+        sceneFile = sceneParts[0]
+        sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+        blendFilename = 'data/scene' + str(sceneNumber) + '.blend'
+        if overwrite or not os.path.isfile(blendFilename):
+
+            sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
+            scene, targetIndex, roomName, targetPosition = loadBlenderScene(sceneIdx, replaceableScenesFile)
+
+            setupScene(scene, targetIndex, roomName, scene.world, scene.camera, 100, 100, 16, True, False)
+            scene.update()
+            # bpy.data.scenes.remove(bpy.data.scenes['Scene'])
+            bpy.ops.file.pack_all()
+            bpy.ops.wm.save_as_mainfile(filepath=blendFilename)
+            bpy.ops.wm.read_homefile(load_ui=False)
+
+def loadSceneBlendData(sceneIdx, replaceableScenesFile):
+    replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    sceneLine = sceneLines[sceneIdx]
+    sceneParts = sceneLine.split(' ')
+    sceneFile = sceneParts[0]
+    sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+    sceneFilename = 'data/scene' + str(sceneIdx) + '.blend'
+    with bpy.data.libraries.load(filepath=sceneFilename) as (data_from, data_to):
+        for attr in dir(data_to):
+            setattr(data_to, attr, getattr(data_from, attr))
+
+    bpy.context.screen.scene = bpy.data.scenes['Main Scene']
+
+def loadTargetsBlendData():
+    targetsFilename = 'data/targets.blend'
+    with bpy.data.libraries.load(filepath=targetsFilename) as (data_from, data_to):
+        for attr in dir(data_to):
+            setattr(data_to, attr, getattr(data_from, attr))
+
+        return data_to
 
 def loadTargetModels(experimentTeapots):
 
@@ -215,8 +267,8 @@ def loadTargetModels(experimentTeapots):
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
 
-def getSceneTargetParentPosition(sceneIdx):
-    replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
+def getSceneTargetParentPosition(sceneIdx, scenesFile):
+    replaceableScenesFile = scenesFile
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLineNums = numpy.arange(len(sceneLines))
     sceneNum =  sceneLineNums[sceneIdx]
@@ -230,8 +282,26 @@ def getSceneTargetParentPosition(sceneIdx):
     targetParentPosition = instances[targetIndex][2]
     return targetParentPosition
 
-def loadBlenderScene(sceneIdx, width, height, useCycles):
-    replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
+def getSceneTargetParentPositions(sceneIdx, scenesFile):
+    replaceableScenesFile = scenesFile
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    sceneLineNums = numpy.arange(len(sceneLines))
+    sceneNum =  sceneLineNums[sceneIdx]
+    sceneLine = sceneLines[sceneNum]
+    sceneParts = sceneLine.split(' ')
+    sceneFile = sceneParts[0]
+    sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+    sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
+    instances = loadScene('../databaseFull/scenes/' + sceneFileName)
+    targetPositions = []
+    targetIndices = []
+    for targetIndex in int(sceneParts[1::]):
+        targetParentPosition = instances[targetIndex][targetIndex]
+        targetIndices = targetIndices + [targetIndex]
+        targetPositions = targetPositions + [targetParentPosition]
+    return targetIndices, targetPositions
+
+def loadBlenderScene(sceneIdx, replaceableScenesFile):
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLineNums = numpy.arange(len(sceneLines))
     sceneNum =  sceneLineNums[sceneIdx]
@@ -258,13 +328,13 @@ def loadBlenderScene(sceneIdx, width, height, useCycles):
         if res:
             roomName = res.groups()[0]
     scene = composeScene(modelInstances, targetIndex)
+    scene.world = world
+    scene.camera = camera
     roomInstance = scene.objects[roomName]
     roomInstance.layers[2] = True
     targetParentInstance.layers[2] = True
-    setupScene(scene, targetIndex,roomName, world, camera, width, height, 16, useCycles, False)
-    scene.update()
-    scene.render.filepath = 'opendr_blender.png'
-    return scene, targetParentPosition
+
+    return scene, targetIndex, roomName, targetParentPosition
 
 def loadSavedScene(sceneDicFile):
     with open(sceneDicFile, 'rb') as pfile:
