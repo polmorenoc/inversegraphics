@@ -60,7 +60,7 @@ for sceneNum in sceneLineNums[0:1]:
 
     targetIndex = int(sceneParts[1])
 
-    instances = sceneimport.loadScene('../databaseFull/scenes/' + sceneFileName)
+    instances = sceneimport.getSceneInstancesInfo('../databaseFull/scenes/' + sceneFileName)
 
     targetParentPosition = instances[targetIndex][2]
     targetParentIndex = instances[targetIndex][1]

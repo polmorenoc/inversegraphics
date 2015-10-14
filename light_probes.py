@@ -26,8 +26,16 @@ import matplotlib.pyplot as plt
 JSON_FILE_NAME = "lightprobes.json"
 FAILSAFE_OFFSET = 0.00001
 
+import cv2
 
-
+def processSphericalEnvironmentMap(envMapTexture):
+    mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
+    mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
+    distMask = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    envMapTexture[distMask > mask.shape[0]/2,:] = 0
+    envMapMean = envMapTexture[distMask <= mask.shape[0]/2].mean()
+    envMapTexture[distMask <= mask.shape[0]/2, :] = envMapTexture[distMask <= mask.shape[0]/2]
+    return envMapTexture, envMapMean
 
 def is_lightprobe(ob):
     return ob.name.startswith("lightprobe-")

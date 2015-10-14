@@ -12,6 +12,154 @@ from opendr.lighting import SphericalHarmonics
 from opendr.lighting import LambertianPointLight
 import ipdb
 import light_probes
+import sceneimport
+from utils import *
+import imageio
+
+def exportEnvMapCoefficients(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
+    import glob
+    for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
+
+        envMapFilename = hdrFile
+        envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+        phiOffset = 0
+
+        phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+
+        if not os.path.exists('light_probes/envMap' + str(hdridx)):
+            os.makedirs('light_probes/envMap' + str(hdridx))
+
+        cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
+
+        for phiOffset in phiOffsets:
+            envMapMean = envMapTexture.mean()
+            envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
+            shCoeffsRGB[:] = envMapCoeffs
+            if useBlender:
+                updateEnviornmentMap(envMapFilename, scene)
+                setEnviornmentMapStrength(0.3/envMapMean, scene)
+                rotateEnviornmentMap(phiOffset, scene)
+
+            scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
+            bpy.ops.render.render(write_still=True)
+            cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+
+def createRendererTarget(glMode, chAz,chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, scaleMat, invTranspModel, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+    renderer = TexturedRenderer()
+    renderer.set(glMode=glMode)
+
+    vflat = [item.copy() for sublist in v for item in sublist]
+    rangeMeshes = range(len(vflat))
+    vch = [ch.dot(ch.array(vflat[mesh]),scaleMat) + targetPosition for mesh in rangeMeshes]
+    if len(vch)==1:
+        vstack = vch[0]
+    else:
+        vstack = ch.vstack(vch)
+
+    camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+    vnflat = [item for sublist in vn for item in sublist]
+    vnch = [ch.dot(ch.array(vnflat[mesh]),invTranspModel) for mesh in rangeMeshes]
+    # vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+    vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
+    vcflat = [item for sublist in vc for item in sublist]
+    # vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+    vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+
+    vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_color, chComponent)
+    # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+
+    setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    return renderer
+
+
+def createRendererGT(glMode, chAz,chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, scaleMat, invTranspModel, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+    renderer = TexturedRenderer()
+    renderer.set(glMode=glMode)
+
+    vflat = [item for sublist in v for item in sublist]
+    rangeMeshes = range(len(vflat))
+    vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+    vch[0] = ch.dot(vch[0], scaleMat) + targetPosition
+    if len(vch)==1:
+        vstack = vch[0]
+    else:
+        vstack = ch.vstack(vch)
+
+    camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+    vnflat = [item for sublist in vn for item in sublist]
+    vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+    vnch[0] = ch.dot(vnch[0], invTranspModel)
+    # vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
+    vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
+    vcflat = [item for sublist in vc for item in sublist]
+    vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+    vcch[0] = vcflat[0]
+
+    vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_color, chComponent)
+    # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+
+    setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    return renderer
+
+def generateSceneImages(width, height, envMapFilename, envMapMean, phiOffset, chAzGT, chElGT, chDistGT, light_colorGT, chComponentGT, glMode):
+    replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    for sceneIdx in np.arange(len(sceneLines)):
+        sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = sceneimport.getSceneInformation(sceneIdx, replaceableScenesFile)
+        sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
+        bpy.ops.wm.read_factory_settings()
+        sceneimport.loadSceneBlendData(sceneIdx, replaceableScenesFile)
+        scene = bpy.data.scenes['Main Scene']
+        bpy.context.screen.scene = scene
+        sceneimport.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, True, False)
+        scene.update()
+        scene.render.resolution_x = width #perhaps set resolution in code
+        scene.render.resolution_y = height
+        scene.render.tile_x = height/2
+        scene.render.tile_y = width
+        scene.cycles.samples = 100
+        addEnvironmentMapWorld(envMapFilename, scene)
+        setEnviornmentMapStrength(0.3/envMapMean, scene)
+        rotateEnviornmentMap(phiOffset, scene)
+
+        if not os.path.exists('scenes/' + str(sceneNumber)):
+            os.makedirs('scenes/' + str(sceneNumber))
+        for targetIdx, targetIndex in enumerate(targetIndices):
+            targetPosition = targetPositions[targetIdx]
+
+            rendererGT.clear()
+            del rendererGT
+
+            v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.loadSavedScene(sceneDicFile)
+            # removeObjectData(targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+            # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+            vflat = [item for sublist in v for item in sublist]
+            rangeMeshes = range(len(vflat))
+            vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
+            # vch[0] = ch.dot(vch[0], scaleMatGT) + targetPosition
+            if len(vch)==1:
+                vstack = vch[0]
+            else:
+                vstack = ch.vstack(vch)
+            cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, targetPosition, width, height)
+            # cameraGT, modelRotationGT = setupCamera(vstack, chAzGT, chElGT, chDistGT, center + targetPosition, width, height)
+            vnflat = [item for sublist in vn for item in sublist]
+            vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
+            vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
+            vcflat = [item for sublist in vc for item in sublist]
+            vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
+            vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_colorGT, chComponentGT)
+
+            rendererGT = TexturedRenderer()
+            rendererGT.set(glMode=glMode)
+            setupTexturedRenderer(rendererGT, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, cameraGT, frustum, win)
+            cv2.imwrite('scenes/' + str(sceneNumber) + '/opendr_' + str(targetIndex) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+
+            placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, targetPosition)
+            scene.update()
+            scene.render.filepath = 'scenes/' + str(sceneNumber) + '/blender_' + str(targetIndex) + '.png'
+            bpy.ops.render.render(write_still=True)
+
 
 
 def getOcclusionFraction(renderer):
@@ -182,6 +330,7 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
     # renderer.clear()
     renderer.initGL()
     renderer.initGLTexture()
+
 
 def addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list):
     v.insert(0,vmod)

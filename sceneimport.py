@@ -3,7 +3,42 @@ from sklearn.preprocessing import normalize
 from collections import OrderedDict
 
 
-def loadScene(sceneFile):
+def loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels):
+    v_teapots = []
+    f_list_teapots = []
+    vc_teapots = []
+    vn_teapots = []
+    uv_teapots = []
+    haveTextures_list_teapots = []
+    textures_list_teapots = []
+    blender_teapots = []
+    center_teapots = []
+    for teapotIdx in renderTeapotsList:
+        teapotNum = renderTeapotsList[teapotIdx]
+        objectDicFile = 'data/target' + str(teapotNum) + '.pickle'
+        if useBlender:
+            teapot = targetModels[teapotNum]
+            teapot.layers[1] = True
+            teapot.layers[2] = True
+            blender_teapots = blender_teapots + [teapot]
+        if unpackModelsFromBlender:
+            vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = unpackBlenderObject(teapot, objectDicFile, True)
+        else:
+            vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = loadSavedObject(objectDicFile)
+        v_teapots = v_teapots + [[vmod]]
+        f_list_teapots = f_list_teapots + [[fmod_list]]
+        vc_teapots = vc_teapots + [[vcmod]]
+        vn_teapots = vn_teapots + [[vnmod]]
+        uv_teapots = uv_teapots + [[uvmod]]
+        haveTextures_list_teapots = haveTextures_list_teapots + [[haveTexturesmod_list]]
+        textures_list_teapots = textures_list_teapots + [[texturesmod_list]]
+        vflat = [item for sublist in vmod for item in sublist]
+        varray = np.vstack(vflat)
+        center_teapots = center_teapots + [np.sum(varray, axis=0)/len(varray)]
+
+    return v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots
+
+def getSceneInstancesInfo(sceneFile):
     sceneLines = [line.strip() for line in open(sceneFile)]
 
     numModels = sceneLines[2].split()[1]
@@ -29,58 +64,43 @@ def loadScene(sceneFile):
     return instances
 
 
-def composeScene(modelInstances, targetIndex):
-
-    unpackBlenderScene
+def composeScene(modelInstances):
     bpy.context.scene.name = 'Main Scene'
     scene = bpy.context.scene
     scene.unit_settings.system = 'METRIC'
     modelNum = 0
-    for instance in modelInstances:
-        if modelNum != targetIndex:
-            scene.objects.link(instance)
-        modelNum = modelNum + 1
-
+    for instanceidx, instance in enumerate(modelInstances):
+        # if modelNum != targetIndex:
+        instance.name = str(instanceidx)
+        scene.objects.link(instance)
+        # modelNum = modelNum + 1
     return scene
 
-
-def importBlenderScenes(instances, completeScene, targetIndex):
-
+def importBlenderScenes(instances, completeScene):
     baseDir = '../COLLADA/'
     blenderScenes = []
     modelInstances = []
     modelNum = 0
     for instance in instances:
         modelId = instance[0]
-
         reg = re.compile('(room[0-9]+)')
         isRoom = reg.match(modelId)
-
         if completeScene or isRoom:
-
             transform = instance[3]
-
             modelPath = baseDir + modelId + '_cleaned.obj'
             print('Importing ' + modelPath )
-
             # if modelNum != targetIndex:
             bpy.ops.scene.new()
             bpy.context.scene.name = modelId
             scene = bpy.context.scene
-
             # scene.unit_settings.system = 'METRIC'
             # bpy.utils.collada_import(modelPath)
-
-
             bpy.ops.import_scene.obj(filepath=modelPath, split_mode='OFF', use_split_objects=True, use_split_groups=False)
             # ipdb.set_trace()
             sceneGroup = bpy.data.groups.new(modelId)
-
             scene.update()
-
             scaleMat = mathutils.Matrix.Scale(inchToMeter, 4)
             # xrotation = mathutils.Matrix.Rotation(-90,4, 'X')
-
             for mesh in scene.objects:
                 if mesh.type == 'MESH':
                     sceneGroup.objects.link(mesh)
@@ -95,7 +115,6 @@ def importBlenderScenes(instances, completeScene, targetIndex):
                      # ipdb.set_trace()
                     # mesh.data.show_double_sided = True
                     mesh.data.update()
-
             modelInstance = bpy.data.objects.new(modelId, None)
             modelInstance.dupli_type = 'GROUP'
             modelInstance.dupli_group = sceneGroup
@@ -107,12 +126,12 @@ def importBlenderScenes(instances, completeScene, targetIndex):
             scene.update()
             blenderScenes.append(scene)
 
-
     return blenderScenes, modelInstances
 
 import os.path
 
 def createTargetsBlendFile():
+    bpy.ops.wm.read_factory_settings()
     # bpy.ops.wm.read_homefile(load_ui=False)
     teapots = [line.strip() for line in open('teapots.txt')]
     renderTeapotsList = np.arange(len(teapots))
@@ -120,36 +139,48 @@ def createTargetsBlendFile():
     # bpy.data.scenes.remove(bpy.data.scenes['Scene'])
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath='data/targets.blend')
+    bpy.ops.wm.read_factory_settings()
 
-def createSceneBlendFiles(overwrite=False):
+def createSceneBlendFiles(overwrite=True):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     for sceneIdx in range(len(sceneLines)):
-        sceneLine = sceneLines[sceneIdx]
-        sceneParts = sceneLine.split(' ')
-        sceneFile = sceneParts[0]
-        sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+        sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = getSceneInformation(sceneIdx, replaceableScenesFile)
         blendFilename = 'data/scene' + str(sceneNumber) + '.blend'
         if overwrite or not os.path.isfile(blendFilename):
-
-            sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
-            scene, targetIndex, roomName, targetPosition = loadBlenderScene(sceneIdx, replaceableScenesFile)
-
-            setupScene(scene, targetIndex, roomName, scene.world, scene.camera, 100, 100, 16, True, False)
+            print("Importing Scene " + sceneFileName)
+            scene = loadBlenderScene(sceneIdx, replaceableScenesFile)
+            setupScene(scene, roomInstanceNum, scene.world, scene.camera, 100, 100, 16, True, False)
             scene.update()
             # bpy.data.scenes.remove(bpy.data.scenes['Scene'])
             bpy.ops.file.pack_all()
             bpy.ops.wm.save_as_mainfile(filepath=blendFilename)
-            bpy.ops.wm.read_homefile(load_ui=False)
+            bpy.ops.wm.read_factory_settings()
+        # bpy.ops.wm.read_homefile(load_ui=False)
+        # bpy.ops.wm.open_mainfile(filepath='data/Scene.blend')
+
+def createSceneOpenDRFiles(overwrite=True):
+    replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    for sceneIdx in range(len(sceneLines)):
+        sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = getSceneInformation(sceneIdx, replaceableScenesFile)
+        pickleFilename = 'data/scene' + str(sceneNumber) + '.pickle'
+        if overwrite or not os.path.isfile(pickleFilename):
+            print("Unpacking Scene " + str(sceneNumber))
+            loadSceneBlendData(sceneIdx, replaceableScenesFile)
+            scene = bpy.data.scenes['Main Scene']
+            v, f_list, vc, vn, uv, haveTextures_list, textures_list = unpackBlenderScene(scene, pickleFilename, True)
+            bpy.ops.wm.read_factory_settings()
+
 
 def loadSceneBlendData(sceneIdx, replaceableScenesFile):
-    replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+    replaceableScenesFile = replaceableScenesFile
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLine = sceneLines[sceneIdx]
     sceneParts = sceneLine.split(' ')
     sceneFile = sceneParts[0]
     sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
-    sceneFilename = 'data/scene' + str(sceneIdx) + '.blend'
+    sceneFilename = 'data/scene' + str(sceneNumber) + '.blend'
     with bpy.data.libraries.load(filepath=sceneFilename) as (data_from, data_to):
         for attr in dir(data_to):
             setattr(data_to, attr, getattr(data_from, attr))
@@ -267,7 +298,7 @@ def loadTargetModels(experimentTeapots):
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
 
-def getSceneTargetParentPosition(sceneIdx, scenesFile):
+def getSceneInformation(sceneIdx, scenesFile):
     replaceableScenesFile = scenesFile
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     sceneLineNums = numpy.arange(len(sceneLines))
@@ -277,64 +308,45 @@ def getSceneTargetParentPosition(sceneIdx, scenesFile):
     sceneFile = sceneParts[0]
     sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
     sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
-    targetIndex = int(sceneParts[1])
-    instances = loadScene('../databaseFull/scenes/' + sceneFileName)
-    targetParentPosition = instances[targetIndex][2]
-    return targetParentPosition
-
-def getSceneTargetParentPositions(sceneIdx, scenesFile):
-    replaceableScenesFile = scenesFile
-    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-    sceneLineNums = numpy.arange(len(sceneLines))
-    sceneNum =  sceneLineNums[sceneIdx]
-    sceneLine = sceneLines[sceneNum]
-    sceneParts = sceneLine.split(' ')
-    sceneFile = sceneParts[0]
-    sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
-    sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
-    instances = loadScene('../databaseFull/scenes/' + sceneFileName)
+    instances = getSceneInstancesInfo('../databaseFull/scenes/' + sceneFileName)
     targetPositions = []
     targetIndices = []
-    for targetIndex in int(sceneParts[1::]):
-        targetParentPosition = instances[targetIndex][targetIndex]
+    for targetIndex in sceneParts[1::]:
+        targetIndex = int(targetIndex)
+        targetParentPosition = instances[targetIndex][2]
         targetIndices = targetIndices + [targetIndex]
-        targetPositions = targetPositions + [targetParentPosition]
-    return targetIndices, targetPositions
+        targetPositions = targetPositions + [np.array(targetParentPosition)]
+
+    roomName = ''
+    roomInstanceNum = 0
+    for modelIdx, model in enumerate(instances):
+        reg = re.compile('(room[0-9]+)')
+        res = reg.match(model[0])
+        if res:
+            roomName = res.groups()[0]
+            roomInstanceNum = modelIdx
+
+    return sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions
 
 def loadBlenderScene(sceneIdx, replaceableScenesFile):
-    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-    sceneLineNums = numpy.arange(len(sceneLines))
-    sceneNum =  sceneLineNums[sceneIdx]
-    sceneLine = sceneLines[sceneNum]
-    sceneParts = sceneLine.split(' ')
-    sceneFile = sceneParts[0]
-    sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
-    sceneFileName = re.search('.+?(scene[0-9]+\.txt)', sceneFile, re.IGNORECASE).groups()[0]
-    targetIndex = int(sceneParts[1])
-    instances = loadScene('../databaseFull/scenes/' + sceneFileName)
-    targetParentPosition = instances[targetIndex][2]
-    targetParentIndex = instances[targetIndex][1]
+    sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = getSceneInformation(sceneIdx, replaceableScenesFile)
+    # targetParentPosition = instances[targetIndex][2]
+    # targetParentIndex = instances[targetIndex][1]
     cam = bpy.data.cameras.new("MainCamera")
     camera = bpy.data.objects.new("MainCamera", cam)
     world = bpy.data.worlds.new("MainWorld")
-    #We can store the OpenDR scene data as a pickle file for much faster loading.
-    [blenderScenes, modelInstances] = importBlenderScenes(instances, True, targetIndex)
-    targetParentInstance = modelInstances[targetParentIndex]
-    targetParentInstance.layers[2] = True
-    roomName = ''
-    for model in modelInstances:
-        reg = re.compile('(room[0-9]+)')
-        res = reg.match(model.name)
-        if res:
-            roomName = res.groups()[0]
-    scene = composeScene(modelInstances, targetIndex)
+
+    [blenderScenes, modelInstances] = importBlenderScenes(instances, True)
+
+    # targetParentInstance = modelInstances[targetParentIndex]
+    scene = composeScene(modelInstances)
     scene.world = world
     scene.camera = camera
-    roomInstance = scene.objects[roomName]
-    roomInstance.layers[2] = True
-    targetParentInstance.layers[2] = True
+    # roomInstance = scene.objects[roomName]
+    # roomInstance.layers[2] = True
+    # targetParentInstance.layers[2] = True
 
-    return scene, targetIndex, roomName, targetParentPosition
+    return scene
 
 def loadSavedScene(sceneDicFile):
     with open(sceneDicFile, 'rb') as pfile:
@@ -346,13 +358,12 @@ def loadSavedScene(sceneDicFile):
         haveTextures_list = sceneDic['haveTextures_list']
         vn = sceneDic['vn']
         textures_list = sceneDic['textures_list']
-        targetPosition = sceneDic['targetPosition']
 
         print("Loaded serialized scene!")
 
-    return v, f_list, vc, vn, uv, haveTextures_list, textures_list, targetPosition
+    return v, f_list, vc, vn, uv, haveTextures_list, textures_list
 
-def unpackBlenderScene(scene, sceneDicFile, targetPosition, serializeScene):
+def unpackBlenderScene(scene, sceneDicFile, serializeScene):
     # bpy.ops.render.render( write_still=True )
     # ipdb.set_trace()
     # v,f_list, vc, vn, uv, haveTextures_list, textures_list = unpackObjects(teapot)
@@ -382,12 +393,11 @@ def unpackBlenderScene(scene, sceneDicFile, targetPosition, serializeScene):
 
     #Serialize
     if serializeScene:
-        sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list, 'targetPosition': targetPosition}
+        sceneDic = {'v':v,'f_list':f_list,'vc':vc,'uv':uv,'haveTextures_list':haveTextures_list,'vn':vn,'textures_list': textures_list}
         with open(sceneDicFile, 'wb') as pfile:
             pickle.dump(sceneDic, pfile)
 
     print("Serialized scene!")
-
 
     return v, f_list, vc, vn, uv, haveTextures_list, textures_list
 
@@ -481,7 +491,14 @@ def buildData (msh):
                     # print("Tile x: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_x))
                     # print("Tile y: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_y))
                     texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
-                    texdic[texname] = texture
+                    if np.any(np.isnan(texture)) or np.any(texture<0) or np.any(texture>1) or texture.size == 0:
+                        print("Problem with texture from Blender")
+                        texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
+                        hasUV = False
+                        texture = None
+                        texname = None
+                    if hasUV:
+                        texdic[texname] = texture
         textureNames = textureNames + [texname]
         haveUVs = haveUVs + [hasUV]
 

@@ -19,6 +19,19 @@ from collision import instancesIntersect
 
 inchToMeter = 0.0254
 
+def addLamp(scene, lightAz, lightEl, lightDist, center, lightIntensity):
+        #Add directional light to match spherical harmonics
+    lamp_data = bpy.data.lamps.new(name="point", type='POINT')
+    lamp = bpy.data.objects.new(name="point", object_data=lamp_data)
+    lamp.layers[1] = True
+    lamp.layers[2] = True
+    lampLoc = getRelativeLocation(lightAz, lightAz, lightEl, center)
+    lamp.location = mathutils.Vector((lampLoc[0],lampLoc[1],lampLoc[2]))
+    lamp.data.cycles.use_multiple_importance_sampling = True
+    lamp.data.use_nodes = True
+    lamp.data.node_tree.nodes['Emission'].inputs[1].default_value = lightIntensity
+    scene.objects.link(lamp)
+
 def loadData():
     #data
     # fdata = h5py.File('../data/data-all-flipped-cropped-512.mat','r')
@@ -375,7 +388,7 @@ def getRelativeLocation(azimuth, elevation, distance, center):
     location = center + azimuthRot * elevationRot * originalLoc
     return location
 
-def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSamples, useCycles, useGPU):
+def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples, useCycles, useGPU):
 
     if useCycles:
         #Switch Engine to Cycles
@@ -420,14 +433,14 @@ def setupScene(scene, targetIndex, roomName, world, camera, width, height, numSa
     scene.render.resolution_percentage = 100
 
     scene.camera = camera
-    scene.objects.link(camera)
+    # scene.objects.link(camera)
 
     camera.up_axis = 'Y'
     camera.data.angle = 60 * 180 / numpy.pi
     camera.data.clip_start = 0.01
     camera.data.clip_end = 10
 
-    roomInstance = scene.objects[roomName]
+    roomInstance = scene.objects[str(roomInstanceNum)]
 
     if useCycles:
         roomInstance.cycles_visibility.shadow = False

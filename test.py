@@ -189,7 +189,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
             print("Experiment on scene " + sceneFileName)
 
-            instances = sceneimport.loadScene('../databaseFull/scenes/scene' + sceneFileName + '.txt')
+            instances = sceneimport.getSceneInstancesInfo('../databaseFull/scenes/scene' + sceneFileName + '.txt')
 
             targetParentPosition = instances[targetIndex][2]
             targetParentIndex = instances[targetIndex][1]

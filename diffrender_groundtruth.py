@@ -544,3 +544,33 @@ beginTesting = False
 exploreSurface = False
 newTeapotAsGT = False
 
+if createGroundTruth:
+    print("Creating Ground Truth")
+    trainSize = 1000
+    testSize = 20
+
+    trainAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+    trainElevsGT = numpy.random.uniform(0,np.pi/2, trainSize)
+    trainLightAzsGT = numpy.random.uniform(0,2*np.pi, trainSize)
+    trainLightElevsGT = numpy.random.uniform(0,np.pi/3, trainSize)
+    trainLightIntensitiesGT = numpy.random.uniform(5,10, trainSize)
+    trainVColorGT = numpy.random.uniform(0,0.7, [trainSize, 3])
+
+    trainData = {'trainAzsGT':trainAzsGT,'trainElevsGT':trainElevsGT,'trainLightAzsGT':trainLightAzsGT,'trainLightElevsGT':trainLightElevsGT,'trainLightIntensitiesGT':trainLightIntensitiesGT, 'trainVColorGT':trainVColorGT}
+
+    # testAzsGT = numpy.random.uniform(4.742895587179587 - np.pi/4,4.742895587179587 + np.pi/4, testSize)
+    testAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
+    testElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
+    testLightAzsGT = numpy.random.uniform(0,2*np.pi, testSize)
+    testLightElevsGT = numpy.random.uniform(0,np.pi/3, testSize)
+    testLightIntensitiesGT = numpy.random.uniform(5,10, testSize)
+    testVColorGT = numpy.random.uniform(0,0.7, [testSize, 3])
+    testData = {'testAzsGT':testAzsGT,'testElevsGT':testElevsGT,'testLightAzsGT':testLightAzsGT,'testLightElevsGT':testLightElevsGT,'testLightIntensitiesGT':testLightIntensitiesGT, 'testVColorGT':testVColorGT}
+
+    with open(trainDataName, 'wb') as pfile:
+        pickle.dump(trainData, pfile)
+
+    with open(testDataName, 'wb') as pfile:
+        pickle.dump(testData, pfile)
+
+    createGroundTruth = False
