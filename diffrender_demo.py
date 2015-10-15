@@ -29,15 +29,16 @@ useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
-demoMode = True
+demoMode = False
+showSubplots = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
 refreshWhileMinimizing = False
-computePerformance = False
+computePerformance = True
 glModes = ['glfw','mesa']
-glMode = glModes[0]
+glMode = glModes[1]
 sphericalMap = False
 
 
@@ -53,7 +54,7 @@ testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
 np.random.seed(1)
-width, height = (200, 200)
+width, height = (100, 100)
 win = -1
 
 if glMode == 'glfw':
@@ -75,7 +76,7 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-camDistance = 0.75
+camDistance = 0.4
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
@@ -124,12 +125,21 @@ elif useBlender:
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = sceneimport.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
+azimuth = np.pi
+chCosAz = ch.Ch([np.cos(azimuth)])
+chSinAz = ch.Ch([np.sin(azimuth)])
+chAz = 2*ch.arctan(chSinAz/(ch.sqrt(chCosAz**2 + chSinAz**2) + chCosAz))
 chAz = ch.Ch([1.1693706])
+
+elevation = 0
+chLogCosEl = ch.Ch(np.log(np.cos(elevation)))
+chLogSinEl = ch.Ch(np.log(np.sin(elevation)))
+chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(chLogSinEl)**2) + ch.exp(chLogCosEl)))
 chEl =  ch.Ch([0.95993109])
 chDist = ch.Ch([camDistance])
 
-chAzGT = ch.Ch([1.1693706])
-chElGT = ch.Ch([0.95993109])
+chAzGT = ch.Ch(chAz.r[0])
+chElGT = ch.Ch(chEl.r[0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
@@ -360,7 +370,8 @@ gradFinElSurf = {}
 gradFinAzSurf = {}
 ims = []
 
-free_variables = [ chAz, chEl]
+# free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
+free_variables = [chAz, chAz]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -389,7 +400,7 @@ chAzSaved = chAz.r[0]
 chElSaved = chEl.r[0]
 chComponentSaved = chComponent.r[0]
 
-if demoMode:
+if showSubplots:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
     pos1 = ax1.get_position()
     pos5 = ax5.get_position()
@@ -507,6 +518,7 @@ def refreshSubplots():
     cb6.update_normal(img6)
     f.canvas.draw()
     plt.pause(0.01)
+drawSurf = True
 
 def plotSurface():
     global figperf
@@ -536,6 +548,7 @@ def plotSurface():
     fontP.set_size('small')
     scaleSurfGrads = 0
     if drawSurf:
+        print("Drawing gardient surface.")
         from scipy.interpolate import griddata
         x1 = np.linspace((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
         y1 = np.linspace((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).min(), (elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi).max(), len((elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])]*180./np.pi)))
@@ -608,6 +621,40 @@ def plotSurface():
 
     plt.pause(0.01)
     plt.draw()
+
+def printStats():
+    print("**** Statistics ****" )
+    print("GT Azimuth: " + str(chAzGT))
+    print("Azimuth: " + str(chAz))
+    print("GT Elevation: " + str(chElGT))
+    print("Elevation: " + str(chEl))
+
+    print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
+    print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
+    # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
+    print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
+
+    if drawSurf:
+        avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
+        print("** Approx gradients - finite differenes." )
+        print("Avg Eucl. distance :: " + str(avgError))
+        norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+        norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+        avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
+        print("Avg Angle.: " + str(np.mean(avgAngle)))
+        print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
+        idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
+        azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+        elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+        print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
+        print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
+
+    azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
+    elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
+    print("Current Azimuth difference of " + str(azDiff*180/np.pi))
+    print("Current Elevation difference of " + str(elDiff*180/np.pi))
+
+    printStats = False
 
 def cb(_):
     global t
@@ -717,17 +764,36 @@ def readKeys(window, key, scancode, action, mods):
         exit = True
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
         refresh = True
-        chAz[0] = chAz[0].r - radians(5)
+        chAz[:] = chAz.r[0] - radians(5)
+        azimuth = chAz.r[0] - radians(5)
+        chCosAz[:] = np.cos(azimuth)
+        chSinAz[:] = np.sin(azimuth)
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
         refresh = True
-        chAz[0] = chAz[0].r + radians(5)
+        chAz[:]  = chAz.r[0] + radians(5)
+        azimuth = chAz.r[0] + radians(5)
+        chCosAz[:] = np.cos(azimuth)
+        chSinAz[:] = np.sin(azimuth)
+
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
         refresh = True
-        chEl[0] = chEl[0].r - radians(5)
+        chEl[:] = chEl[0].r - radians(5)
+        elevation = chEl[0].r - radians(5)
+        if elevation <= 0:
+            elevation = 0.0001
+
+        chLogCosEl[:] = np.log(np.cos(elevation))
+        chLogSinEl[:] = np.log(np.sin(elevation))
+
         refresh = True
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_UP and action == glfw.RELEASE:
         refresh = True
-        chEl[0] = chEl[0].r + radians(5)
+        chEl[:] = chEl[0].r + radians(5)
+        elevation = chEl[0].r + radians(5)
+        if elevation >= np.pi/2 - 0.0001:
+            elevation = np.pi/2 - 0.0002
+        chLogCosEl[:] = np.log(np.cos(elevation))
+        chLogSinEl[:] = np.log(np.sin(elevation))
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
         print("Left modifier!")
         refresh = True
@@ -961,11 +1027,83 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_M and action == glfw.RELEASE:
         minimize = True
 
+
+def timeRendering(iterations):
+    t = time.time()
+    for i in range(iterations):
+        chAz[:]  = chAz.r[0] + radians(0.001)
+        renderer.r
+    print("Per iteration time of " + str((time.time() - t)/iterations))
+
+
+def timeGradients(iterations):
+    t = time.time()
+    for i in range(iterations):
+            chAz[:] = chAz.r[0] + radians(0.001)
+            errorFun.dr_wrt(chAz)
+    print("Per iteration time of " + str((time.time() - t)/iterations))
+
+def exploreSurface():
+    if computePerformance:
+        print("Estimating cost function surface and gradients...")
+        drawSurf = True
+        chAzOld = chAz.r[0]
+        chElOld = chEl.r[0]
+
+        for model_num, errorFun in enumerate(models):
+            performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+            gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+            gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
+
+        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
+            for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
+                for model_num, errorFun in enumerate(models):
+                    chAz[:] = chAzi
+                    chEl[:] = chEli
+
+                    performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
+                    azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
+                    elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
+                    import scipy.sparse as sp
+                    if sp.issparse(errorFun.dr_wrt(chAz)):
+                        drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
+                    else:
+                        drAz = errorFun.dr_wrt(chAz)[0][0]
+                    if sp.issparse(errorFun.dr_wrt(chEl)):
+                        drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
+                    else:
+                        drEl = errorFun.dr_wrt(chEl)[0][0]
+
+                    gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
+                    gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
+                    chAzOldi = chAz.r[0]
+                    chElOldi = chEl.r[0]
+                    diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+                    diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+                    chAz[:] = chAzOldi
+                    chEl[:] = chElOldi
+                    gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
+                    gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
+        errorFun = models[model]
+
+        chAz[:] = chAzOld
+        chEl[:] = chElOld
+
+        refresh = True
+        print("Finshed estimating.")
+
 if demoMode:
+    glfw.set_key_callback(win, readKeys)
     while not exit:
         # Poll for and process events
 
-        glfw.make_context_current(renderer.win)
+        glfw.make_context_current(win)
         glfw.poll_events()
 
         if newTeapotAsGT:
@@ -996,38 +1134,7 @@ if demoMode:
             newTeapotAsGT = False
 
         if printStats:
-            print("**** Statistics ****" )
-            print("GT Azimuth: " + str(chAzGT))
-            print("Azimuth: " + str(chAz))
-            print("GT Elevation: " + str(chElGT))
-            print("Elevation: " + str(chEl))
-
-            print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
-            print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
-            # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
-            print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
-
-            if drawSurf:
-                avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
-                print("** Approx gradients - finite differenes." )
-                print("Avg Eucl. distance :: " + str(avgError))
-                norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
-                norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
-                avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
-                print("Avg Angle.: " + str(np.mean(avgAngle)))
-                print("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
-                idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
-                azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-                elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-                print("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
-                print("Minimum Elevation difference of " + str(elDiff*180/np.pi))
-
-            azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
-            elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
-            print("Current Azimuth difference of " + str(azDiff*180/np.pi))
-            print("Current Elevation difference of " + str(elDiff*180/np.pi))
-
-            printStats = False
+            printStats()
 
         if changedGT:
             drawSurf = False
@@ -1078,59 +1185,7 @@ if demoMode:
             changedGT = False
 
         if exploreSurface:
-            if computePerformance:
-                print("Estimating cost function surface and gradients...")
-                drawSurf = True
-                chAzOld = chAz.r[0]
-                chElOld = chEl.r[0]
-
-                for model_num, errorFun in enumerate(models):
-                    performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                    azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                    elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-                    gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                    gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-                    gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-                    gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
-
-                for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
-                    for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
-                        for model_num, errorFun in enumerate(models):
-                            chAz[:] = chAzi
-                            chEl[:] = chEli
-
-                            performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(performanceSurf[(model_num, chAzGT.r[0], chElGT.r[0])], errorFun.r)
-                            azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(azimuthsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chAzi)
-                            elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(elevationsSurf[(model_num, chAzGT.r[0], chElGT.r[0])], chEli)
-                            import scipy.sparse as sp
-                            if sp.issparse(errorFun.dr_wrt(chAz)):
-                                drAz = errorFun.dr_wrt(chAz).toarray()[0][0]
-                            else:
-                                drAz = errorFun.dr_wrt(chAz)[0][0]
-                            if sp.issparse(errorFun.dr_wrt(chEl)):
-                                drEl = errorFun.dr_wrt(chEl).toarray()[0][0]
-                            else:
-                                drEl = errorFun.dr_wrt(chEl)[0][0]
-
-                            gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drAz)
-                            gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], drEl)
-                            chAzOldi = chAz.r[0]
-                            chElOldi = chEl.r[0]
-                            diffAz = ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
-                            diffEl = ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
-                            chAz[:] = chAzOldi
-                            chEl[:] = chElOldi
-                            gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffAz)
-                            gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])], diffEl)
-                errorFun = models[model]
-
-                chAz[:] = chAzOld
-                chEl[:] = chElOld
-
-                refresh = True
-                print("Finshed estimating.")
+            exploreSurface()
 
             exploreSurface = False
 
@@ -1176,15 +1231,16 @@ if demoMode:
 
         if minimize:
             iterat = 0
+            maxiter = 100
             print("Minimizing with method " + methods[method])
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':True})
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':False, 'maxiter':maxiter})
             plotMinimization = True
             minimize = False
 
         if refresh:
             print("Sq Error: " + str(errorFun.r))
 
-            if demoMode:
+            if showSubplots:
                 refreshSubplots()
 
             if computePerformance and drawSurf:
@@ -1197,6 +1253,7 @@ if demoMode:
             refresh = False
 
     refreshSubplots()
+
 
 #
 # if glMode == 'glfw':
