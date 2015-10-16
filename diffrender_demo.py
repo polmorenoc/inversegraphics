@@ -29,7 +29,7 @@ useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
-demoMode = False
+demoMode = True
 showSubplots = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
@@ -38,7 +38,7 @@ useGTasBackground = False
 refreshWhileMinimizing = False
 computePerformance = True
 glModes = ['glfw','mesa']
-glMode = glModes[1]
+glMode = glModes[0]
 sphericalMap = False
 
 
@@ -54,7 +54,7 @@ testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
 np.random.seed(1)
-width, height = (100, 100)
+width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
@@ -128,8 +128,11 @@ v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
 chSinAz = ch.Ch([np.sin(azimuth)])
+
 chAz = 2*ch.arctan(chSinAz/(ch.sqrt(chCosAz**2 + chSinAz**2) + chCosAz))
-chAz = ch.Ch([1.1693706])
+chAz = ch.Ch([np.pi/4])
+chObjAz = ch.Ch([np.pi/4])
+chAzRel = chAz - chObjAz
 
 elevation = 0
 chLogCosEl = ch.Ch(np.log(np.cos(elevation)))
@@ -138,7 +141,9 @@ chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(ch
 chEl =  ch.Ch([0.95993109])
 chDist = ch.Ch([camDistance])
 
-chAzGT = ch.Ch(chAz.r[0])
+chAzGT = ch.Ch([np.pi/2])
+chObjAzGT = ch.Ch([np.pi/2])
+chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(chEl.r[0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
@@ -175,20 +180,22 @@ chAmbientSHGT = ch.zeros([9])
 
 envMapFilename = 'data/hdr/dataset/studio_land.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
-phiOffset = 0
+
+phiOffset = np.pi/2
+totalOffset = phiOffset + chObjAzGT.r
 
 if sphericalMap:
     envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  -phiOffset, 'spherical')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  totalOffset, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
 
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, totalOffset, 'equirectangular')
 
 if useBlender:
     addEnvironmentMapWorld(envMapFilename, scene)
     setEnviornmentMapStrength(0.3/envMapMean, scene)
-    rotateEnviornmentMap(phiOffset, scene)
+    rotateEnviornmentMap(-totalOffset, scene)
 
 shCoeffsRGB = ch.Ch(envMapCoeffs)
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
@@ -222,10 +229,6 @@ chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
 chScale = ch.Ch([1.0,1.0,1.0])
 chScaleGT = ch.Ch([1, 1.,1.])
-scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
-scaleMatGT = geometry.Scale(x=chScaleGT[0], y=chScaleGT[1],z=chScaleGT[2])[0:3,0:3]
-invTranspModel = ch.transpose(ch.inv(scaleMat))
-invTranspModelGT = ch.transpose(ch.inv(scaleMatGT))
 
 # vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
 renderer_teapots = []
@@ -244,12 +247,7 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
-    #Add targetPosition to vertex coordinates.
-    # for obj_i in range(len(vmod)):
-    #     for mesh_i in range(len(vmod[obj_i])):
-    #         vmod[obj_i][mesh_i] = vmod[obj_i][mesh_i]
-
-    renderer = createRendererTarget(glMode, chAz,chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, scaleMat, invTranspModel, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
 
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
@@ -260,7 +258,7 @@ renderer = renderer_teapots[currentTeapotModel]
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 center = center_teapots[currentTeapotModel]
-rendererGT = createRendererGT(glMode, chAzGT,chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, scaleMatGT, invTranspModelGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
+rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
@@ -371,7 +369,7 @@ gradFinAzSurf = {}
 ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
-free_variables = [chAz, chAz]
+free_variables = [chAz, chEl]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -386,11 +384,11 @@ exit = False
 minimize = False
 plotMinimization = False
 changeRenderer = False
-printStats = False
+printStatsBool = False
 beginTraining = False
 createGroundTruth = False
 beginTesting = False
-exploreSurface = False
+exploreSurfaceBool = False
 newTeapotAsGT = False
 
 global chAzSaved
@@ -518,7 +516,6 @@ def refreshSubplots():
     cb6.update_normal(img6)
     f.canvas.draw()
     plt.pause(0.01)
-drawSurf = True
 
 def plotSurface():
     global figperf
@@ -624,13 +621,15 @@ def plotSurface():
 
 def printStats():
     print("**** Statistics ****" )
-    print("GT Azimuth: " + str(chAzGT))
-    print("Azimuth: " + str(chAz))
-    print("GT Elevation: " + str(chElGT))
-    print("Elevation: " + str(chEl))
+    print("Relative Azimuth: " + str(chAzRel))
+    print("GT Relative Azimuth: " + str(chAzRelGT))
+    print("GT Cam Azimuth: " + str(chAzGT))
+    print("Cam Azimuth: " + str(chAz))
+    print("GT Cam Elevation: " + str(chElGT))
+    print("Cam Elevation: " + str(chEl))
 
-    print("Dr wrt Azimuth: " + str(errorFun.dr_wrt(chAz)))
-    print("Dr wrt Elevation: " + str(errorFun.dr_wrt(chEl)))
+    print("Dr wrt cam Azimuth: " + str(errorFun.dr_wrt(chAz)))
+    print("Dr wrt cam Elevation: " + str(errorFun.dr_wrt(chEl)))
     # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
     print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
 
@@ -654,7 +653,8 @@ def printStats():
     print("Current Azimuth difference of " + str(azDiff*180/np.pi))
     print("Current Elevation difference of " + str(elDiff*180/np.pi))
 
-    printStats = False
+    global printStatsBool
+    printStatsBool = False
 
 def cb(_):
     global t
@@ -666,7 +666,7 @@ def cb(_):
     global iterat
     iterat = iterat + 1
     print("Callback! " + str(iterat))
-    print("Sq Error: " + str(errorFun.r))
+    print("Model Log Likelihood: " + str(errorFun.r))
     global imagegt
     global renderer
     global gradAz
@@ -687,7 +687,7 @@ def cb2(_):
     global iterat
     iterat = iterat + 1
     print("Callback! " + str(iterat))
-    print("Sq Error: " + str(errorFun.r))
+    print("Model Log Likelihood: " + str(errorFun.r))
     global imagegt
     global renderer
     global gradAz
@@ -697,10 +697,6 @@ def cb2(_):
     global elevations
 
     if reduceVariance:
-        #What is the average angle distance from the predictions, the best variance at that point, and the best variance when we are near the groundtruth - e.g. 5 degrees.
-        #Either that or simply base it on the rate of change of the cost function? When the step becomes too small (approx gradient's magintude is smaller than previous steps,at certain threshold, then start decreasing the variance.
-        # k = 1 / (1 + np.exp(-iterat))
-        #Rougly in 10 iterations we go from 0.5 to 0.05... but iterations are different for different minimization methods...
         stds[:] = stds.r[:]*0.9
 
     if demoMode and refreshWhileMinimizing:
@@ -897,9 +893,10 @@ def readKeys(window, key, scancode, action, mods):
             refresh = True
 
     #Compute in order to plot the surface neighouring the azimuth/el of the gradients and error function.
-    global exploreSurface
+    global exploreSurfaceBool
     if key == glfw.KEY_E and action == glfw.RELEASE:
-        exploreSurface = True
+        print("Key E pressed??")
+        exploreSurfaceBool = True
 
     if key == glfw.KEY_P and action == glfw.RELEASE:
         ipdb.set_trace()
@@ -929,9 +926,9 @@ def readKeys(window, key, scancode, action, mods):
         chComponent[0] = chComponentSaved
         refresh = True
 
-    global printStats
+    global printStatsBool
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_S and action == glfw.RELEASE:
-        printStats = True
+        printStatsBool = True
 
     if key == glfw.KEY_V and action == glfw.RELEASE:
         global ims
@@ -1099,7 +1096,9 @@ def exploreSurface():
         print("Finshed estimating.")
 
 if demoMode:
+
     glfw.set_key_callback(win, readKeys)
+
     while not exit:
         # Poll for and process events
 
@@ -1116,7 +1115,7 @@ if demoMode:
             removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
             addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
-            rendererGT = createRendererGT(glMode, chAzGT,chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, scaleMatGT, invTranspModelGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
+            rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 
             updateErrorFunctions = True
             refresh = True
@@ -1133,7 +1132,7 @@ if demoMode:
 
             newTeapotAsGT = False
 
-        if printStats:
+        if printStatsBool:
             printStats()
 
         if changedGT:
@@ -1184,10 +1183,11 @@ if demoMode:
 
             changedGT = False
 
-        if exploreSurface:
+        if exploreSurfaceBool:
+            print("Explores surface is true??")
             exploreSurface()
 
-            exploreSurface = False
+            exploreSurfaceBool = False
 
         if groundTruthBlender and pendingCyclesRender:
             scene.update()
@@ -1238,7 +1238,7 @@ if demoMode:
             minimize = False
 
         if refresh:
-            print("Sq Error: " + str(errorFun.r))
+            print("Model Log Likelihood: " + str(errorFun.r))
 
             if showSubplots:
                 refreshSubplots()
