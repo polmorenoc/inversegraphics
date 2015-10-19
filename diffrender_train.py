@@ -9,14 +9,14 @@ import geometry
 import image_processing
 import numpy as np
 import cv2
-from blender_utils import *
+from utils import *
 import generative_models
 import matplotlib.pyplot as plt
-import imageio
 plt.ion()
 import recognition_models
 import skimage
-
+import h5py
+import ipdb
 
 #########################################
 # Initialization ends here
@@ -51,21 +51,15 @@ trainComponentsGTRel = groundTruth['trainComponentsGTRel']
 trainIds = groundTruth['trainIds']
 gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,))]
 
-#Create experiment simple sepratation.
-def generateExperiment(size, prefix, ratio, seed):
-    np.random.seed(seed)
-    shuffledData = np.random.shuffle(np.arange(size))
-    train = shuffledData[0:np.int(size*ratio)]
-    test = shuffledData[np.int(size*ratio)::]
 
-    np.save('experiment/' + prefix + 'train.npy', train)
-    np.save('experiment/' + prefix + 'test.npy', test)
+#Create experiment simple sepratation.
 
 generateExperiment(len(trainIds), trainPrefix, 0.8, 1)
 
 trainSet = np.load('experiment/' + trainPrefix + 'train.npy')
 
-imagesDir = gtPrefix + '/images'
+imagesDir = gtDir + 'images/'
+
 #Read images
 image = skimage.io.imread(imagesDir + 'im' + str(trainSet[0]) + '.png')
 width = image.shape[1]
@@ -77,7 +71,7 @@ for imidx, imid in enumerate(trainSet):
 
 #See some images to make sure groundtruth was generated properly.
 
-
+ipdb.set_trace()
 
 # hogs = []
 # # vcolorsfeats = []
