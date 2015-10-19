@@ -1,9 +1,10 @@
 #!/usr/bin/env python3.4m
 
-import sceneimport
+import scene_io_utils
 import re
-from utils import *
+from blender_utils import *
 from collision import *
+
 
 numpy.random.seed(1)
 
@@ -17,7 +18,7 @@ numSamples = 1024
 useCycles = False
 distance = 0.75
 
-sceneimport.loadTargetsBlendData()
+scene_io_utils.loadTargetsBlendData()
 
 sceneCollisions = {}
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
@@ -30,14 +31,14 @@ scaleY = 0.18
 scaleX = 0.35
 cubeScale = mathutils.Matrix([[scaleX/2, 0,0,0], [0,scaleY/2,0 ,0] ,[0,0,scaleZ/2,0],[0,0,0,1]])
 
-for sceneIdx in range(len(sceneLines)):
+for sceneIdx in range(len(sceneLines))[7:8]:
     sceneLine = sceneLines[sceneIdx]
     sceneParts = sceneLine.split(' ')
     sceneFile = sceneParts[0]
     sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
-    sceneimport.loadTargetsBlendData()
+    scene_io_utils.loadTargetsBlendData()
     bpy.ops.wm.read_factory_settings()
-    sceneimport.loadSceneBlendData(sceneIdx, replaceableScenesFile)
+    scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
     scene = bpy.data.scenes['Main Scene']
 
     scene.render.resolution_x = width #perhaps set resolution in code
@@ -45,7 +46,7 @@ for sceneIdx in range(len(sceneLines)):
     scene.render.tile_x = height/2
     scene.render.tile_y = width/2
     scene.cycles.samples = 10
-    sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = sceneimport.getSceneInformation(sceneIdx, replaceableScenesFile)
+    sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 
     roomName = ''
     for model in scene.objects:
@@ -103,6 +104,7 @@ for sceneIdx in range(len(sceneLines)):
         intervals = []
         initInterval = 0
         endInterval = 0
+        ipdb.set_trace()
         for idx, intersection in enumerate(intersections):
             if not intersection[1]:
                 if startInterval:
@@ -131,8 +133,8 @@ for sceneIdx in range(len(sceneLines)):
 
 
     print("Collision detection ended.")
-with open('data/collisions/collisions.pickle', 'wb') as pfile:
-    pickle.dump(sceneCollisions, pfile)
+# with open('data/collisions/collisions.pickle', 'wb') as pfile:
+#     pickle.dump(sceneCollisions, pfile)
     # Cleanup
 
     # for scene in bpy.data.scenes:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3.4m
 import matplotlib
 # matplotlib.use('Agg')
-import sceneimport
+import scene_io_utils
 import re
-from utils import *
+from blender_utils import *
 from collision import *
 
 import matplotlib.pyplot as plt
@@ -34,7 +34,7 @@ camera = bpy.data.objects.new("MainCamera", cam)
 world = bpy.data.worlds.new("MainWorld")
 renderTeapotsList = [2]
 
-[targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+[targetScenes, targetModels, transformations] = scene_io_utils.loadTargetModels(renderTeapotsList)
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
 
@@ -60,12 +60,12 @@ for sceneNum in sceneLineNums[0:1]:
 
     targetIndex = int(sceneParts[1])
 
-    instances = sceneimport.getSceneInstancesInfo('../databaseFull/scenes/' + sceneFileName)
+    instances = scene_io_utils.getSceneInstancesInfo('../databaseFull/scenes/' + sceneFileName)
 
     targetParentPosition = instances[targetIndex][2]
     targetParentIndex = instances[targetIndex][1]
 
-    [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, completeScene, targetIndex)
+    [blenderScenes, modelInstances] = scene_io_utils.importBlenderScenes(instances, completeScene, targetIndex)
     targetParentInstance = modelInstances[targetParentIndex]
     targetParentInstance.layers[2] = True
 
@@ -83,7 +83,7 @@ for sceneNum in sceneLineNums[0:1]:
         if res:
             occludingObjName = res.groups()[0]
 
-    scene = sceneimport.composeScene(modelInstances, targetIndex)
+    scene = scene_io_utils.composeScene(modelInstances, targetIndex)
     roomInstance = scene.objects[roomName]
 
     ipdb.set_trace()

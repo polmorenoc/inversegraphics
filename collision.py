@@ -3,8 +3,8 @@ __author__ = 'pol'
 
 import bpy
 import bmesh
-from utils import *
-import utils
+from blender_utils import *
+import blender_utils
 
 def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, apply_modifiers=False):
     """
@@ -45,13 +45,13 @@ def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, app
 
 def aabb_intersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
 
-    minX1, maxX1 = utils.modelWidth(instanceObjs1, matrix_world1)
-    minY1, maxY1 = utils.modelDepth(instanceObjs1, matrix_world1)
-    minZ1, maxZ1 = utils.modelHeight(instanceObjs1, matrix_world1)
+    minX1, maxX1 = blender_utils.modelWidth(instanceObjs1, matrix_world1)
+    minY1, maxY1 = blender_utils.modelDepth(instanceObjs1, matrix_world1)
+    minZ1, maxZ1 = blender_utils.modelHeight(instanceObjs1, matrix_world1)
 
-    minX2, maxX2 = utils.modelWidth(instanceObjs2, matrix_world2)
-    minY2, maxY2 = utils.modelDepth(instanceObjs2, matrix_world2)
-    minZ2, maxZ2 = utils.modelHeight(instanceObjs2, matrix_world2)
+    minX2, maxX2 = blender_utils.modelWidth(instanceObjs2, matrix_world2)
+    minY2, maxY2 = blender_utils.modelDepth(instanceObjs2, matrix_world2)
+    minZ2, maxZ2 = blender_utils.modelHeight(instanceObjs2, matrix_world2)
 
     return ((maxX1 > minX2) and (minX1 < maxX2) and (maxY1 > minY2) and (minY1 < maxY2) and (maxZ1 > minZ2) and (minZ1 < maxZ2))
 

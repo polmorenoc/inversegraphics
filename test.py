@@ -1,9 +1,9 @@
 #!/usr/bin/env python3.4m
 import matplotlib
 matplotlib.use('Agg')
-import sceneimport
-from utils import *
-from score_image import *
+import scene_io_utils
+from blender_utils import *
+from generative_models import *
 from tabulate import tabulate
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
@@ -80,7 +80,7 @@ partsOccluded = (groundTruth[:,14] == 1) | (groundTruth[:,13] == 1)
 
 indicesPrefix = [ x==y for (x,y) in zip(prefixes, ['_occluded']*len(prefixes))]
 
-[targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(experimentTeapots)
+[targetScenes, targetModels, transformations] = scene_io_utils.loadTargetModels(experimentTeapots)
 
 numExperiments = 100
 
@@ -189,12 +189,12 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
 
             print("Experiment on scene " + sceneFileName)
 
-            instances = sceneimport.getSceneInstancesInfo('../databaseFull/scenes/scene' + sceneFileName + '.txt')
+            instances = scene_io_utils.getSceneInstancesInfo('../databaseFull/scenes/scene' + sceneFileName + '.txt')
 
             targetParentPosition = instances[targetIndex][2]
             targetParentIndex = instances[targetIndex][1]
 
-            [blenderScenes, modelInstances] = sceneimport.importBlenderScenes(instances, completeScene, targetIndex)
+            [blenderScenes, modelInstances] = scene_io_utils.importBlenderScenes(instances, completeScene, targetIndex)
             # targetParentInstance = modelInstances[targetParentIndex]
             roomName = ''
             for model in modelInstances:
@@ -203,7 +203,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
                 if res:
                     roomName = res.groups()[0]
 
-            scene = sceneimport.composeScene(modelInstances, targetIndex)
+            scene = scene_io_utils.composeScene(modelInstances, targetIndex)
 
             # bpy.context.scene.use_nodes = True
             # tree = bpy.context.scene.node_tree

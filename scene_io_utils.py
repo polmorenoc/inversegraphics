@@ -1,4 +1,4 @@
-from utils import *
+from blender_utils import *
 from sklearn.preprocessing import normalize
 from collections import OrderedDict
 

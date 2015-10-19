@@ -1,6 +1,6 @@
-import saveExrImages
-reload(saveExrImages)
-from saveExrImages import exportExrImages
+import save_exr_images
+reload(save_exr_images)
+from save_exr_images import exportExrImages
 import os
 print "Reading xml "
 

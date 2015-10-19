@@ -12,11 +12,11 @@ from opendr.lighting import SphericalHarmonics
 from opendr.lighting import LambertianPointLight
 import ipdb
 import light_probes
-import sceneimport
-from utils import *
+import scene_io_utils
+from blender_utils import *
 import imageio
 
-def exportEnvMapCoefficients(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
+def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
     import glob
     for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
 
@@ -25,6 +25,7 @@ def exportEnvMapCoefficients(shCoeffsRGB, useBlender, scene, width, height, rend
         phiOffset = 0
 
         phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+        # phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
 
         if not os.path.exists('light_probes/envMap' + str(hdridx)):
             os.makedirs('light_probes/envMap' + str(hdridx))
@@ -43,6 +44,33 @@ def exportEnvMapCoefficients(shCoeffsRGB, useBlender, scene, width, height, rend
             scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
             bpy.ops.render.render(write_still=True)
             cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+
+def exportEnvMapSHLightCoefficients():
+    import glob
+    envMapDic = {}
+    hdrs = glob.glob("data/hdr/dataset/*")
+    hdrstorender = hdrs
+
+    for hdridx, hdrFile in enumerate(hdrstorender):
+        print("Processing env map" + str(hdridx))
+        envMapFilename = hdrFile
+        envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+        phiOffset = 0
+
+        if not os.path.exists('light_probes/envMap' + str(hdridx)):
+            os.makedirs('light_probes/envMap' + str(hdridx))
+
+        # cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
+
+        envMapMean = envMapTexture.mean()
+        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
+        ipdb.set_trace()
+        envMapDic[hdrFile] = [hdridx, envMapCoeffs]
+
+    SHFilename = 'data/LightSHCoefficients.pickle'
+    with open(SHFilename, 'wb') as pfile:
+        pickle.dump(envMapDic, pfile)
+
 
 def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
@@ -114,17 +142,18 @@ def createRendererGT(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list,
     setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
 
+#Old method
 def generateSceneImages(width, height, envMapFilename, envMapMean, phiOffset, chAzGT, chElGT, chDistGT, light_colorGT, chComponentGT, glMode):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
     for sceneIdx in np.arange(len(sceneLines)):
-        sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = sceneimport.getSceneInformation(sceneIdx, replaceableScenesFile)
+        sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
         sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
         bpy.ops.wm.read_factory_settings()
-        sceneimport.loadSceneBlendData(sceneIdx, replaceableScenesFile)
+        scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
         scene = bpy.data.scenes['Main Scene']
         bpy.context.screen.scene = scene
-        sceneimport.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, True, False)
+        scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, True, False)
         scene.update()
         scene.render.resolution_x = width #perhaps set resolution in code
         scene.render.resolution_y = height
@@ -143,7 +172,7 @@ def generateSceneImages(width, height, envMapFilename, envMapMean, phiOffset, ch
             rendererGT.clear()
             del rendererGT
 
-            v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.loadSavedScene(sceneDicFile)
+            v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile)
             # removeObjectData(targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
             # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
             vflat = [item for sublist in v for item in sublist]
@@ -338,7 +367,7 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
 
     haveTextures_listflat = [item for sublist in haveTextures_list for item in sublist]
 
-    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=False)
+    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=True)
     renderer.sharedWin = sharedWin
     # renderer.clear()
     renderer.initGL()

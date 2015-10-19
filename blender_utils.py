@@ -12,7 +12,10 @@ import cv2
 import sys
 import io
 import os
-import pickle
+try:
+   import cPickle as pickle
+except:
+   import pickle
 import ipdb
 import re
 from collision import instancesIntersect

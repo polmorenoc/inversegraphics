@@ -28,6 +28,8 @@ FAILSAFE_OFFSET = 0.00001
 
 import cv2
 
+
+
 def processSphericalEnvironmentMap(envMapTexture):
     mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
     mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
@@ -438,6 +440,9 @@ spherical_harmonics = {
     (2, 1): lambda theta, phi: 1.092548 * sin(theta) * cos(phi) * cos(theta),
     (2, 2): lambda theta, phi: 0.546274 * (((sin(theta) * cos(phi)) ** 2) - ((sin(theta) * sin(phi)) ** 2))
 }
+
+def sphericalHarmonicsZRotation(angle):
+    return np.array([[1,0,0,0,0,0,0,0,0],[0, np.cos(angle), 0, np.sin(angle), 0,0,0,0,0],[0,0,1,0,0,0,0,0,0],[0, -np.sin(angle), 0, np.cos(angle), 0,0,0,0,0],[0,0,0,0,np.cos(2*angle),0,0,0,np.sin(2*angle)],[0,0,0,0,0,np.cos(angle), 0, np.sin(angle),0],[0,0,0,0,0,0,1,0,0],[0,0,0,0,0, -np.sin(angle),0, np.cos(angle),0],[0,0,0,0,-np.sin(2*angle),0,0,0,np.cos(2*angle)]])
 
 spherical_harmonics_coeffs = np.array([
     0.282095,

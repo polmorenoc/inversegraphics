@@ -3,7 +3,7 @@ __author__ = 'pol'
 import matplotlib
 matplotlib.use('Qt4Agg')
 import bpy
-import sceneimport
+import scene_io_utils
 import mathutils
 from math import radians
 import timeit
@@ -11,12 +11,12 @@ import time
 import opendr
 import chumpy as ch
 import geometry
-import imageproc
+import image_processing
 import numpy as np
 import cv2
-from utils import *
+from blender_utils import *
 import glfw
-import score_image
+import generative_models
 import matplotlib.pyplot as plt
 from opendr_utils import *
 import OpenGL.GL as GL
@@ -24,13 +24,15 @@ import light_probes
 import imageio
 plt.ion()
 
+#__GL_THREADED_OPTIMIZATIONS
+
 #Main script options:
 useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
-demoMode = True
-showSubplots = True
+demoMode = False
+showSubplots = False
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -54,7 +56,7 @@ testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
 trainedModels = {}
 
 np.random.seed(1)
-width, height = (150, 150)
+width, height = (100, 100)
 win = -1
 
 if glMode == 'glfw':
@@ -78,11 +80,12 @@ clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
 
+
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
 sceneIdx = 0
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
-sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = sceneimport.getSceneInformation(sceneIdx, replaceableScenesFile)
+sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
 targetIndex = targetIndices[targetParentIdx]
@@ -90,15 +93,15 @@ targetParentPosition = targetPositions[targetParentIdx]
 targetPosition = targetParentPosition
 
 if useBlender and not loadBlenderSceneFile:
-    scene = sceneimport.loadBlenderScene(sceneIdx, replaceableScenesFile)
-    sceneimport.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, False)
+    scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
+    scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, False)
     scene.update()
     scene.render.filepath = 'opendr_blender.png'
     targetPosition = np.array(targetPosition)
     #Save barebones scene.
 
 elif useBlender and loadBlenderSceneFile:
-    sceneimport.loadSceneBlendData(sceneIdx, replaceableScenesFile)
+    scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
     scene = bpy.data.scenes['Main Scene']
     scene.render.resolution_x = width #perhaps set resolution in code
     scene.render.resolution_y = height
@@ -107,23 +110,23 @@ elif useBlender and loadBlenderSceneFile:
     bpy.context.screen.scene = scene
 
 if unpackSceneFromBlender:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.unpackBlenderScene(scene, sceneDicFile, True)
 else:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.loadSavedScene(sceneDicFile)
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile)
 
 removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
 targetModels = []
 if useBlender and not loadBlenderSceneFile:
-    [targetScenes, targetModels, transformations] = sceneimport.loadTargetModels(renderTeapotsList)
+    [targetScenes, targetModels, transformations] = scene_io_utils.loadTargetModels(renderTeapotsList)
 elif useBlender:
     teapots = [line.strip() for line in open('teapots.txt')]
     selection = [ teapots[i] for i in renderTeapotsList]
-    sceneimport.loadTargetsBlendData()
+    scene_io_utils.loadTargetsBlendData()
     for teapotIdx, teapotName in enumerate(selection):
         targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
 
-v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = sceneimport.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
+v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
@@ -141,8 +144,8 @@ chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(ch
 chEl =  ch.Ch([0.95993109])
 chDist = ch.Ch([camDistance])
 
-chAzGT = ch.Ch([np.pi/2])
-chObjAzGT = ch.Ch([np.pi/2])
+chObjAzGT = ch.Ch([np.pi*3/2])
+chAzGT = ch.Ch([np.pi*3/2])
 chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(chEl.r[0])
 chDistGT = ch.Ch([camDistance])
@@ -181,7 +184,7 @@ chAmbientSHGT = ch.zeros([9])
 envMapFilename = 'data/hdr/dataset/studio_land.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
 
-phiOffset = np.pi/2
+phiOffset = 0
 totalOffset = phiOffset + chObjAzGT.r
 
 if sphericalMap:
@@ -189,7 +192,7 @@ if sphericalMap:
     envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  totalOffset, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
-
+    envMapCoeffsRel = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
     envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, totalOffset, 'equirectangular')
 
 if useBlender:
@@ -198,15 +201,18 @@ if useBlender:
     rotateEnviornmentMap(-totalOffset, scene)
 
 shCoeffsRGB = ch.Ch(envMapCoeffs)
+shCoeffsRGBRel = ch.Ch(envMapCoeffsRel)
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
 chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
+chAmbientSHGTRel = chShCoeffsRel.ravel() * chAmbientIntensityGT * clampedCosCoeffs
 
-if loadSavedSH:
-    if os.path.isfile(shCoefficientsFile):
-        with open(shCoefficientsFile, 'rb') as pfile:
-            shCoeffsDic = pickle.load(pfile)
-            shCoeffs = shCoeffsDic['shCoeffs']
-            chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
+# if loadSavedSH:
+#     if os.path.isfile(shCoefficientsFile):
+#         with open(shCoefficientsFile, 'rb') as pfile:
+#             shCoeffsDic = pickle.load(pfile)
+#             shCoeffs = shCoeffsDic['shCoeffs']
+#             chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
 
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])
@@ -232,6 +238,8 @@ chScaleGT = ch.Ch([1, 1.,1.])
 
 # vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
 renderer_teapots = []
+
+
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -327,15 +335,15 @@ stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
 globalPrior = ch.Ch([0.8])
 
-negLikModel = -score_image.modelLogLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)/numPixels
+negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)/numPixels
 
-negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
 
-pixelLikelihoodCh = score_image.logPixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)
+pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)
 
-pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
+pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
 
-post = score_image.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
 models = [negLikModel, negLikModelRobust, negLikModelRobust]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
@@ -1112,7 +1120,7 @@ if demoMode:
             rendererGT.clear()
             del rendererGT
 
-            removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+            removeObjectData(len(v) - targetIndex - 1, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
             addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
             rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
@@ -1217,11 +1225,11 @@ if demoMode:
                 # image = cv2.imread(scene.render.filepath)
                 # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
                 # currentGT = image
-            negLikModel = -score_image.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
-            negLikModelRobust = -score_image.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
-            pixelLikelihoodCh = score_image.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
-            pixelLikelihoodRobustCh = ch.log(score_image.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
-            post = score_image.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+            negLikModel = -generative_models.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
+            negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+            pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
+            pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
+            post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
             models = [negLikModel, negLikModelRobust, negLikModelRobust]
             pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
             pixelErrorFun = pixelModels[model]
