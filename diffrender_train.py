@@ -52,19 +52,20 @@ trainIds = groundTruth['trainIds']
 gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,))]
 
 trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
-#Create experiment simple sepratation.
-
-generateExperiment(len(trainIds), trainPrefix, 0.8, 1)
+# Create experiment simple sepratation.
+#
+if not os.path.isfile('experiments/' + trainPrefix + 'train.npy'):
+    generateExperiment(len(trainIds), 'experiments/' + trainPrefix, 0.8, 1)
 
 trainSet = np.load('experiments/' + trainPrefix + 'train.npy')
 
 imagesDir = gtDir + 'images/'
 
-loadFromHdf5 = False
+loadFromHdf5 = True
 writeHdf5 = False
 
 if writeHdf5:
-    writeImagesHdf5(imagesDir, trainSet)
+    writeImagesHdf5(imagesDir, trainIds)
 
 images = readImages(imagesDir, trainSet, loadFromHdf5)
 
@@ -73,41 +74,42 @@ images = readImages(imagesDir, trainSet, loadFromHdf5)
 #Perhaps save these on experiments dir to quickly train new models.
 loadHogFeatures = False
 loadIllumFeatures = False
-
-experimentPrefix = 'experiments/' + trainPrefix
-if loadHogFeatures:
-    hogfeatures = np.load(experimentPrefix + 'hog.npy')
-else:
-    hogfeatures = image_processing.computeHoGFeatures(images)
-    np.save(experimentPrefix + 'hog.npy', hogfeatures)
-
-if loadIllumFeatures:
-    illumfeatures =  np.save(experimentPrefix  + 'illum.npy')
-else:
-    illumfeatures = image_processing.computeIllumFeatures(images)
-    np.save(experimentPrefix  + 'illum.npy', illumfeatures)
-
-# print("Training RFs")
-randForestModelCosAzs = recognition_models.trainRandomForest(hogfeatures, np.cos(trainAzsRel))
-randForestModelSinAzs = recognition_models.trainRandomForest(hogfeatures, np.sin(trainAzsRel))
-randForestModelCosElevs = recognition_models.trainRandomForest(hogfeatures, np.cos(trainElevsGT))
-randForestModelSinElevs = recognition_models.trainRandomForest(hogfeatures, np.sin(trainElevsGT))
-
-randForestModelRelSHComponents = recognition_models.trainRandomForest(illumfeatures, trainComponentsGTRel)
-
-imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
-randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
-
-trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelRelSHComponents':randForestModelRelSHComponents}
-with open('experiments/' + trainPrefix + 'models.pickle', 'wb') as pfile:
-    pickle.dump(trainedModels, pfile)
-
-
-# # print("Training LR")
-# # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeatures, np.cos(trainAzsGT))
-# # linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeatures, np.sin(trainAzsGT))
-# # linRegModelCosElevs = recognition_models.trainLinearRegression(hogfeatures, np.cos(trainElevsGT))
-# # linRegModelSinElevs = recognition_models.trainLinearRegression(hogfeatures, np.sin(trainElevsGT))
 #
+# experimentPrefix = 'experiments/' + trainPrefix
+# if loadHogFeatures:
+#     hogfeatures = np.load(experimentPrefix + 'hog.npy')
+# else:
+#     hogfeatures = image_processing.computeHoGFeatures(images)
+#     np.save(experimentPrefix + 'hog.npy', hogfeatures)
+#
+#
+# if loadIllumFeatures:
+#     illumfeatures =  np.save(experimentPrefix  + 'illum.npy')
+# else:
+#     illumfeatures = image_processing.computeIllumFeatures(images)
+#     np.save(experimentPrefix  + 'illum.npy', illumfeatures)
 
-print("Finished training recognition models.")
+# # print("Training RFs")
+# randForestModelCosAzs = recognition_models.trainRandomForest(hogfeatures, np.cos(trainAzsRel))
+# randForestModelSinAzs = recognition_models.trainRandomForest(hogfeatures, np.sin(trainAzsRel))
+# randForestModelCosElevs = recognition_models.trainRandomForest(hogfeatures, np.cos(trainElevsGT))
+# randForestModelSinElevs = recognition_models.trainRandomForest(hogfeatures, np.sin(trainElevsGT))
+#
+# randForestModelRelSHComponents = recognition_models.trainRandomForest(illumfeatures, trainComponentsGTRel)
+#
+# imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
+# randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
+#
+# trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelRelSHComponents':randForestModelRelSHComponents}
+# with open('experiments/' + trainPrefix + 'models.pickle', 'wb') as pfile:
+#     pickle.dump(trainedModels, pfile)
+#
+#
+# # # print("Training LR")
+# # # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeatures, np.cos(trainAzsGT))
+# # # linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeatures, np.sin(trainAzsGT))
+# # # linRegModelCosElevs = recognition_models.trainLinearRegression(hogfeatures, np.cos(trainElevsGT))
+# # # linRegModelSinElevs = recognition_models.trainLinearRegression(hogfeatures, np.sin(trainElevsGT))
+# #
+#
+# print("Finished training recognition models.")

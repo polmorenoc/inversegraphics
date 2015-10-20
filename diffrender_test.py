@@ -114,18 +114,9 @@ gtPrefix = 'test'
 trainPrefix = gtPrefix + '_' + '1/'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 
+rendererGT = ch.Ch(renderer.r)
+numPixels = width*height
 
-
-
-
-imagegt = imageGT()
-chImage = ch.array(imagegt)
-# E_raw_simple = renderer - rendererGT
-negVisGT = ~vis_gt
-imageWhiteMask = imagegt.copy()
-imageWhiteMask[np.tile(negVisGT.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
-
-chImageWhite = ch.Ch(imageWhiteMask)
 E_raw = renderer - rendererGT
 SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
