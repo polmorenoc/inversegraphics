@@ -43,18 +43,6 @@ glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
 
-
-trainprefix = 'train2/'
-testGTprefix = 'test2/'
-testprefix = 'test2-robust/'
-if not os.path.exists('experiments/' + trainprefix):
-    os.makedirs('experiments/' + trainprefix)
-if not os.path.exists('experiments/' + testGTprefix):
-    os.makedirs('experiments/' + testGTprefix)
-trainDataName = 'experiments/' + trainprefix + 'groundtruth.pickle'
-testDataName = 'experiments/' + testGTprefix +  'groundtruth.pickle'
-trainedModels = {}
-
 np.random.seed(1)
 width, height = (100, 100)
 win = -1

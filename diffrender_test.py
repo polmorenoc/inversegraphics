@@ -2,7 +2,6 @@ __author__ = 'pol'
 
 import matplotlib
 matplotlib.use('Qt4Agg')
-import bpy
 import scene_io_utils
 import mathutils
 from math import radians
@@ -14,37 +13,29 @@ import geometry
 import image_processing
 import numpy as np
 import cv2
-from blender_utils import *
 import glfw
 import generative_models
+import recognition_models
 import matplotlib.pyplot as plt
 from opendr_utils import *
+from utils import *
 import OpenGL.GL as GL
 import light_probes
-import imageio
+from OpenGL import contextdata
+
+
 plt.ion()
-import recognition_models
 
 #########################################
 # Initialization starts here
 #########################################
 
 #Main script options:
-useBlender = False
-loadBlenderSceneFile = True
-groundTruthBlender = False
-useCycles = True
-demoMode = True
-unpackModelsFromBlender = False
-unpackSceneFromBlender = False
-loadSavedSH = False
-useGTasBackground = False
+
 glModes = ['glfw','mesa']
 glMode = glModes[0]
-sphericalMap = False
 
-np.random.seed(1)
-width, height = (200, 200)
+width, height = (100, 100)
 win = -1
 
 if glMode == 'glfw':
@@ -66,312 +57,66 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-camDistance = 0.75
+camDistance = 0.4
 
 teapots = [line.strip() for line in open('teapots.txt')]
+
 renderTeapotsList = np.arange(len(teapots))
-sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
-sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
-targetParentIdx = 0
-targetIndex = targetIndices[targetParentIdx]
-targetParentPosition = targetPositions[targetParentIdx]
-targetPosition = targetParentPosition
-
-if useBlender and not loadBlenderSceneFile:
-    scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
-    scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, False)
-    scene.update()
-    scene.render.filepath = 'opendr_blender.png'
-    targetPosition = np.array(targetPosition)
-    #Save barebones scene.
-
-elif useBlender and loadBlenderSceneFile:
-    scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
-    scene = bpy.data.scenes['Main Scene']
-    scene.render.resolution_x = width #perhaps set resolution in code
-    scene.render.resolution_y = height
-    scene.render.tile_x = height/2
-    scene.render.tile_y = width/2
-    bpy.context.screen.scene = scene
-
-if unpackSceneFromBlender:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.unpackBlenderScene(scene, sceneDicFile, targetPosition, True)
-else:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile)
-
-removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
 targetModels = []
-if useBlender and not loadBlenderSceneFile:
-    [targetScenes, targetModels, transformations] = scene_io_utils.loadTargetModels(renderTeapotsList)
-elif useBlender:
-    teapots = [line.strip() for line in open('teapots.txt')]
-    selection = [ teapots[i] for i in renderTeapotsList]
-    scene_io_utils.loadTargetsBlendData()
-    for teapotIdx, teapotName in enumerate(selection):
-        targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
-chAz = ch.Ch([1.1693706])
+azimuth = np.pi
+chCosAz = ch.Ch([np.cos(azimuth)])
+chSinAz = ch.Ch([np.sin(azimuth)])
+
+chAz = 2*ch.arctan(chSinAz/(ch.sqrt(chCosAz**2 + chSinAz**2) + chCosAz))
+chAz = ch.Ch([np.pi/4])
+chObjAz = ch.Ch([np.pi/4])
+chAzRel = chAz - chObjAz
+
+elevation = 0
+chLogCosEl = ch.Ch(np.log(np.cos(elevation)))
+chLogSinEl = ch.Ch(np.log(np.sin(elevation)))
+chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(chLogSinEl)**2) + ch.exp(chLogCosEl)))
 chEl =  ch.Ch([0.95993109])
 chDist = ch.Ch([camDistance])
 
-chAzGT = ch.Ch([1.1693706])
-chElGT = ch.Ch([0.95993109])
-chDistGT = ch.Ch([camDistance])
-chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
 chPointLightIntensity = ch.Ch([1])
-chPointLightIntensityGT = ch.Ch([1])
+
 chLightAz = ch.Ch([0.0])
 chLightEl = ch.Ch([np.pi/2])
 chLightDist = ch.Ch([0.5])
-chLightDistGT = ch.Ch([0.5])
-chLightAzGT = ch.Ch([0.0])
-chLightElGT = ch.Ch([np.pi/4])
 
-ligthTransf = computeHemisphereTransformation(chLightAz, chLightEl, chLightDist, targetPosition)
-ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
-
-lightPos = ch.dot(ligthTransf, ch.Ch([0.,0.,0.,1.]))[0:3]
-lightPos = ch.Ch([targetPosition[0]+0.5,targetPosition[1],targetPosition[2] + 0.5])
-lightPosGT = ch.dot(ligthTransfGT, ch.Ch([0.,0.,0.,1.]))[0:3]
-
-chGlobalConstant = ch.Ch([0.5])
-chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
-light_colorGT = ch.ones(3)*chPointLightIntensityGT
+
 chVColors = ch.Ch([0.4,0.4,0.4])
-chVColorsGT = ch.Ch([0.4,0.4,0.4])
-
-shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
-
-chAmbientIntensityGT = ch.Ch([2])
-clampedCosCoeffs = clampedCosineCoefficients()
-chAmbientSHGT = ch.zeros([9])
-
-envMapFilename = 'data/hdr/dataset/studio_land.hdr'
-envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
-phiOffset = 0
-
-if sphericalMap:
-    envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  -phiOffset, 'spherical')
-else:
-    envMapMean = envMapTexture.mean()
-
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, -phiOffset, 'equirectangular')
-
-if useBlender:
-    addEnvironmentMapWorld(envMapFilename, scene)
-    setEnviornmentMapStrength(0.3/envMapMean, scene)
-    rotateEnviornmentMap(phiOffset, scene)
-
-shCoeffsRGB = ch.Ch(envMapCoeffs)
-chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
-chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
-
-if loadSavedSH:
-    if os.path.isfile(shCoefficientsFile):
-        with open(shCoefficientsFile, 'rb') as pfile:
-            shCoeffsDic = pickle.load(pfile)
-            shCoeffs = shCoeffsDic['shCoeffs']
-            chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
-
-chLightRadGT = ch.Ch([0.1])
-chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([0])
-chLightAzGT = ch.Ch([np.pi*3/2])
-chLightElGT = ch.Ch([np.pi/4])
-angle = ch.arcsin(chLightRadGT/chLightDistGT)
-zGT = chZonalHarmonics(angle)
-shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
-chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT
-# chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
-
-chLightAzGT = ch.Ch([np.pi/2])
-chLightElGT = ch.Ch([np.pi/4])
-shDirLight = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
-chComponentStuff = chAmbientSHGT + shDirLight*chLightIntensityGT
-chComponent[:] = chComponentStuff.r[:]
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
-chDisplacementGT = ch.Ch([0.0,0.0,0.0])
 chScale = ch.Ch([1.0,1.0,1.0])
-chScaleGT = ch.Ch([1, 1.,1.])
-scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
-scaleMatGT = geometry.Scale(x=chScaleGT[0], y=chScaleGT[1],z=chScaleGT[2])[0:3,0:3]
-invTranspModel = ch.transpose(ch.inv(scaleMat))
-invTranspModelGT = ch.transpose(ch.inv(scaleMatGT))
-
-# vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
-renderer_teapots = []
-
-for teapot_i in range(len(renderTeapotsList)):
-    if useBlender:
-        teapot = blender_teapots[teapot_i]
-        teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
-
-    vmod = v_teapots[teapot_i]
-    fmod_list = f_list_teapots[teapot_i]
-    vcmod = vc_teapots[teapot_i]
-    vnmod = vn_teapots[teapot_i]
-    uvmod = uv_teapots[teapot_i]
-    haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
-    texturesmod_list = textures_list_teapots[teapot_i]
-    centermod = center_teapots[teapot_i]
-
-    #Add targetPosition to vertex coordinates.
-    # for obj_i in range(len(vmod)):
-    #     for mesh_i in range(len(vmod[obj_i])):
-    #         vmod[obj_i][mesh_i] = vmod[obj_i][mesh_i]
-
-    renderer = createRendererTarget(glMode, chAz,chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, scaleMat, invTranspModel, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
-
-    renderer.r
-    renderer_teapots = renderer_teapots + [renderer]
 
 currentTeapotModel = 0
-renderer = renderer_teapots[currentTeapotModel]
-
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 center = center_teapots[currentTeapotModel]
-rendererGT = createRendererGT(glMode, chAzGT,chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, scaleMatGT, invTranspModelGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
-
-if useGTasBackground:
-    for teapot_i in range(len(renderTeapotsList)):
-        renderer = renderer_teapots[teapot_i]
-        renderer.set(background_image=rendererGT.r)
-
-currentTeapotModel = 0
-renderer = renderer_teapots[currentTeapotModel]
-# ipdb.set_trace()
-
-vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
-vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
-vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
-
-oldChAz = chAz[0].r
-oldChEl = chEl[0].r
-
-# Show it
-shapeIm = vis_gt.shape
-numPixels = shapeIm[0] * shapeIm[1]
-shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
 #########################################
 # Initialization ends here
 #########################################
 
 
+seed = 1
+np.random.seed(seed)
 
-print("Training recognition models.")
-trainData = {}
-
-with open(trainDataName, 'rb') as pfile:
-    trainData = pickle.load(pfile)
-
-trainAzsGT = trainData['trainAzsGT']
-trainElevsGT = trainData['trainElevsGT']
-trainLightAzsGT = trainData['trainLightAzsGT']
-trainLightElevsGT = trainData['trainLightElevsGT']
-trainLightIntensitiesGT = trainData['trainLightIntensitiesGT']
-trainVColorGT = trainData['trainVColorGT']
-# trainTeapots  = trainData['trainTeapots']
-
-chAzOld = chAz.r[0]
-chElOld = chEl.r[0]
-chAzGTOld = chAzGT.r[0]
-chElGTOld = chElGT.r[0]
-
-images = []
-occlusions = np.array([])
-hogs = []
-# vcolorsfeats = []
-illumfeats = []
-occludedInstances = []
-# split = 0.8
-# setTrain = np.arange(np.floor(trainSize*split)).astype(np.uint8)
-print("Generating renders")
-for train_i in range(len(trainAzsGT)):
-    azi = trainAzsGT[train_i]
-    eli = trainElevsGT[train_i]
-    chAzGT[:] = azi
-    chElGT[:] = eli
-    chLightAzGT[:] = trainLightAzsGT[train_i]
-    chLightElGT[:] = trainLightElevsGT[train_i]
-    chLightIntensityGT[:] = trainLightIntensitiesGT[train_i]
-    chVColorsGT[:] = trainVColorGT[train_i]
-    image = rendererGT.r.copy()
-
-    occlusion = getOcclusionFraction(rendererGT)
-    if occlusion < 0.9:
-        images = images + [image]
-        occlusions = np.append(occlusions, occlusion)
-        hogs = hogs + [image_processing.computeHoG(image).reshape([1,-1])]
-
-        # vcolorsfeats = vcolorsfeats +  [imageproc.medianColor(image,40)]
-        illumfeats = illumfeats + [image_processing.featuresIlluminationDirection(image,20)]
-    else:
-        occludedInstances = occludedInstances + [train_i]
-
-trainAzsGT = np.delete(trainAzsGT, occludedInstances)
-trainElevsGT = np.delete(trainElevsGT, occludedInstances)
-trainLightAzsGT = np.delete(trainLightAzsGT, occludedInstances)
-trainLightElevsGT = np.delete(trainLightElevsGT, occludedInstances)
-trainLightIntensitiesGT = np.delete(trainLightIntensitiesGT, occludedInstances)
-trainVColorGT = np.delete(trainVColorGT, occludedInstances, 0)
-
-hogfeats = np.vstack(hogs)
-illumfeats = np.vstack(illumfeats)
-
-print("Training RFs")
-randForestModelCosAzs = recognition_models.trainRandomForest(hogfeats, np.cos(trainAzsGT))
-randForestModelSinAzs = recognition_models.trainRandomForest(hogfeats, np.sin(trainAzsGT))
-randForestModelCosElevs = recognition_models.trainRandomForest(hogfeats, np.cos(trainElevsGT))
-randForestModelSinElevs = recognition_models.trainRandomForest(hogfeats, np.sin(trainElevsGT))
-
-randForestModelLightCosAzs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightAzsGT))
-randForestModelLightSinAzs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightAzsGT))
-randForestModelLightCosElevs = recognition_models.trainRandomForest(illumfeats, np.cos(trainLightElevsGT))
-randForestModelLightSinElevs = recognition_models.trainRandomForest(illumfeats, np.sin(trainLightElevsGT))
-
-imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
-randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
-
-trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelLightCosAzs':randForestModelLightCosAzs,'randForestModelLightSinAzs':randForestModelLightSinAzs,'randForestModelLightCosElevs':randForestModelLightCosElevs,'randForestModelLightSinElevs':randForestModelLightSinElevs,'randForestModelLightIntensity':randForestModelLightIntensity}
-with open('experiments/' + trainprefix + 'models.pickle', 'wb') as pfile:
-    pickle.dump(trainedModels, pfile)
+gtPrefix = 'test'
+trainPrefix = gtPrefix + '_' + '1/'
+gtDir = 'groundtruth/' + gtPrefix + '/'
 
 
-# print("Training LR")
-# linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainAzsGT))
-# linRegModelSinAzs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainAzsGT))
-# linRegModelCosElevs = recognition_models.trainLinearRegression(hogfeats, np.cos(trainElevsGT))
-# linRegModelSinElevs = recognition_models.trainLinearRegression(hogfeats, np.sin(trainElevsGT))
 
-chAz[:] = chAzOld
-chEl[:] = chElOld
-chAzGT[:] = chAzGTOld
-chElGT[:] = chElGTOld
 
-print("Finished training recognition models.")
-beginTraining = False
-
-def imageGT():
-    global groundTruthBlender
-    global rendererGT
-    global blenderRender
-
-    if groundTruthBlender:
-        return blenderRender
-    else:
-        return np.copy(np.array(rendererGT.r)).astype(np.float64)
 
 imagegt = imageGT()
 chImage = ch.array(imagegt)
@@ -479,41 +224,7 @@ if trainedModels == {}:
     randForestModelLightSinElevs = trainedModels['randForestModelLightSinElevs']
     randForestModelLightIntensity = trainedModels['randForestModelLightIntensity']
 
-testImages = []
-testHogs = []
-testIllumfeats = []
-testPredVColors = []
-testPredVColorGMMs = []
-testPredPoseGMMs = []
-occludedInstances = []
 
-print("Generating renders")
-for test_i in range(len(testAzsGT)):
-    azi = testAzsGT[test_i]
-    eli = testElevsGT[test_i]
-    chAzGT[:] = azi
-    chElGT[:] = eli
-    chLightAzGT[:] = testLightAzsGT[test_i]
-    chLightElGT[:] = testLightElevsGT[test_i]
-    chLightIntensityGT[:] = testLightIntensitiesGT[test_i]
-    chVColorsGT[:] = testVColorGT[test_i]
-    testImage = rendererGT.r.copy()
-    occlusion = getOcclusionFraction(rendererGT)
-    if occlusion < 0.95:
-        testImages = testImages + [testImage]
-        testIllumfeats = testIllumfeats + [image_processing.featuresIlluminationDirection(testImage,20)]
-        testHogs = testHogs + [image_processing.computeHoG(testImage).reshape([1,-1])]
-        testPredVColors = testPredVColors + [recognition_models.meanColor(testImage, 20)]
-        testPredVColorGMMs = testPredVColorGMMs + [recognition_models.colorGMM(testImage, 20)]
-    else:
-        occludedInstances = occludedInstances + [test_i]
-
-testAzsGT = np.delete(testAzsGT, occludedInstances)
-testElevsGT = np.delete(testElevsGT, occludedInstances)
-testLightAzsGT = np.delete(testLightAzsGT, occludedInstances)
-testLightElevsGT = np.delete(testLightElevsGT, occludedInstances)
-testLightIntensitiesGT = np.delete(testLightIntensitiesGT, occludedInstances)
-testVColorGT = np.delete(testVColorGT, occludedInstances, 0)
 
 print("Predicting with RFs")
 testHogfeats = np.vstack(testHogs)

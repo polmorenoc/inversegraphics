@@ -8,6 +8,24 @@ import ipdb
 # conf.cellSize = cellSize;
 # conf.numOrientations = 9;
 
+def computeHoGFeatures(images):
+    hogs = []
+
+    for image in images:
+        hogs = hogs + computeHoG(image)
+
+    hogfeats = np.vstack(hogs.reshape[1,:])
+    return hogfeats
+
+def computeIllumFeatures(images):
+    illum = []
+    win = 40
+    for image in images:
+        illum = illum + featuresIlluminationDirection(image, win)
+
+    illumfeats = np.vstack(illum.reshape[1,:])
+    return illumfeats
+
 
 def featuresIlluminationDirection(image,win):
     # ipdb.set_trace()

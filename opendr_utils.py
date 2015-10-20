@@ -16,6 +16,9 @@ import scene_io_utils
 from blender_utils import *
 import imageio
 
+
+
+
 def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
     import glob
     for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
@@ -103,6 +106,7 @@ def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_l
 
     vc_list = computeSphericalHarmonics(vnchnorm, vcch, light_color, chComponent)
     # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+
 
     setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnchnorm,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer

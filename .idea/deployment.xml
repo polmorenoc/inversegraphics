@@ -10,6 +10,7 @@
           <excludedPaths>
             <excludedPath path="/experiments" />
             <excludedPath path="/tmp" />
+            <excludedPath path="/groundtruth" />
           </excludedPaths>
         </serverdata>
       </paths>
