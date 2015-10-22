@@ -27,7 +27,7 @@ def readImages(imagesDir, imageSet, loadFromHdf5):
         image = skimage.io.imread(imagesDir + 'im' + str(imageSet[0]) + '.jpeg')
         width = image.shape[1]
         height = image.shape[0]
-        images = np.zeros([len(imageSet), height, width, 3], astype=np.float32)
+        images = np.zeros([len(imageSet), height, width, 3], dtype=np.float32)
         for imageit, imageid  in enumerate(imageSet):
             image = skimage.io.imread(imagesDir + 'im' + str(imageid) + '.jpeg')
             images[imageit, :, :, :] = image/255.0

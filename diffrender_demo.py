@@ -38,7 +38,7 @@ unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
 refreshWhileMinimizing = False
-computePerformance = True
+computePerformance = False
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
@@ -170,7 +170,7 @@ else:
     envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, 0, 'equirectangular')
 
 rotation = ch.Ch([0.0])
-phiOffsetGT = rotation
+phiOffsetGT = 0
 phiOffset = ch.Ch([0])
 
 chObjAzGT = rotation
@@ -182,10 +182,9 @@ chDistGT = ch.Ch([camDistance])
 totalOffsetGT = phiOffsetGT + chObjAzGT
 totalOffset = phiOffset
 
-chAmbientIntensityGT = ch.Ch([0.0])
-
-shCoeffsRGBGT = ch.Ch(np.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(-totalOffsetGT)).T[:])
-shCoeffsRGBGTRel = ch.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(phiOffsetGT)).T
+chAmbientIntensityGT = ch.Ch([1.0])
+shCoeffsRGBGT = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
+shCoeffsRGBGTRel = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
 
 chShCoeffsGT = 0.3*shCoeffsRGBGT[:,0] + 0.59*shCoeffsRGBGT[:,1] + 0.11*shCoeffsRGBGT[:,2]
 chShCoeffsGTRel = 0.3*shCoeffsRGBGTRel[:,0] + 0.59*shCoeffsRGBGTRel[:,1] + 0.11*shCoeffsRGBGTRel[:,2]
@@ -194,13 +193,14 @@ chAmbientSHGTRel = chShCoeffsGTRel.ravel() * chAmbientIntensityGT * clampedCosCo
 
 chLightRadGT = ch.Ch([0.1])
 chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([5])
+chLightIntensityGT = ch.Ch([0])
 chLightAzGT = ch.Ch([0])
 chLightElGT = ch.Ch([0])
 angleGT = ch.arcsin(chLightRadGT/chLightDistGT)
 zGT = chZonalHarmonics(angleGT)
-shDirLightGTOriginal = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2)
-shDirLightGT = ch.Ch(shDirLightGTOriginal.r[:].copy())
+shDirLightGTOriginal = np.array(chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2).r[:]).copy()
+shDirLightGT = ch.Ch(shDirLightGTOriginal.copy())
+chComponentGTOriginal = ch.array(np.array(chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs).copy())
 chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs
 
 chAz = ch.Ch([0])
@@ -803,12 +803,22 @@ def readKeys(window, key, scancode, action, mods):
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
         refresh = True
         # chAz[0] = chAz[0].r + radians(1)
-        rotation[:] = rotation.r[0] + 0.1
-        shCoeffsRGBGT[:] = np.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(-totalOffsetGT.r[:])).T[:]
+        rotation[:] = rotation.r[0] + np.pi/4
+        # rotation[:] = np.pi/2
+        shCoeffsRGBGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
         chAzGT[:] = rotation.r[:]
-        shDirLightGT[:] = np.dot(shDirLightGTOriginal.T,light_probes.sphericalHarmonicsZRotation(rotation)).T[:]
+        # ipdb.set_trace()
+        shOriginal = chComponentGTOriginal[[0,3,2,1,4,5,6,7,8]]
+        shOriginalDir = shDirLightGTOriginal[[0,3,2,1,4,5,6,7,8]]
+        # chComponentGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(rotation), shOriginal)[[0,3,2,1,4,5,6,7,8]]
+        # shDirLightGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(rotation), shOriginalDir)[[0,3,2,1,4,5,6,7,8]]
+        # shDirLightGT[:] = np.dot(shDirLightGTOriginal.T, light_probes.sphericalHarmonicsZRotation(rotation)).T[:]
+        # shDirLightGT[:] = np.sum(np.array(light_probes.sphericalHarmonicsZRotation(rotation) * shDirLightGTOriginal[:,None]), axis=1)
+        # shDirLightGT[:] = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT + rotation[:] - np.pi/2).r[:]
+        print("Original: " + str(shDirLightGTOriginal))
         print(str(shCoeffsRGBGT.r))
         print(str(shDirLightGT.r))
+        print(str(rendererGT.tn[0]))
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r - radians(1)

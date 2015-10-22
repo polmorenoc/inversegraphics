@@ -25,12 +25,10 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'test'
-trainPrefix = 'train1'
+gtPrefix = 'train3'
+trainPrefix = 'train3'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + trainPrefix + '/'
-testPrefix = 'test1'
-resultDir = 'results/' + trainPrefix + '_' + testPrefix + '/'
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
@@ -71,7 +69,7 @@ trainComponentsGTRel = dataElevsGT[trainSet]
 imagesDir = gtDir + 'images/'
 
 loadFromHdf5 = True
-writeHdf5 = False
+writeHdf5 = True
 
 if writeHdf5:
     writeImagesHdf5(imagesDir, dataIds)

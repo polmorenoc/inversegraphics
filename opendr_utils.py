@@ -67,8 +67,9 @@ def exportEnvMapSHLightCoefficients():
         # cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
 
         envMapMean = envMapTexture.mean()
+
         envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
-        ipdb.set_trace()
+
         envMapDic[hdrFile] = [hdridx, envMapCoeffs]
 
     SHFilename = 'data/LightSHCoefficients.pickle'

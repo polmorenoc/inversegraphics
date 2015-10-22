@@ -35,7 +35,7 @@ plt.ion()
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
-width, height = (100, 100)
+width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
@@ -198,10 +198,10 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'perfect2'
+testPrefix = 'train3'
 
-gtPrefix = 'test'
-trainPrefix = 'train1'
+gtPrefix = 'train3'
+trainPrefix = 'train3'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 imagesDir = gtDir + 'images/'
 experimentDir = 'experiments/' + trainPrefix + '/'
@@ -230,13 +230,14 @@ dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
 
-loadFromHdf5 = True
-if loadFromHdf5:
-    images = readImages(imagesDir, dataIds, loadFromHdf5)
+loadFromHdf5 = False
+
+images = readImages(imagesDir, dataIds, loadFromHdf5)
 
 print("Backprojecting and fitting estimates.")
 
-testSet = np.load(experimentDir + 'test.npy')[:20]
+# testSet = np.load(experimentDir + 'test.npy')[:20]
+testSet = np.arange(len(images))
 
 testAzsGT = dataAzsGT[testSet]
 testObjAzsGT = dataObjAzsGT[testSet]
@@ -332,8 +333,7 @@ testSamples = 1
 if recognitionType == 2:
     testSamples  = numSamples
 
-# for test_i in range(len(testAzsRel)):
-for test_i in [7]:
+for test_i in range(len(testAzsRel)):
 
     bestPredAz = chAz.r
     bestPredEl = chEl.r
@@ -348,16 +348,16 @@ for test_i in [7]:
 
     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '_id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR))
 
-    chObjAz[:] = testObjAzsGT[test_i]
+    chObjAz[:] = 0
 
     for sample in range(testSamples):
         from numpy.random import choice
         if recognitionType == 0:
             #Prediction from (near) ground truth.
             color = testVColorGT[test_i] + nearGTOffsetVColor
-            az = chObjAz.r[:] + testAzsRel[test_i] + nearGTOffsetRelAz
+            az = testAzsRel[test_i] + nearGTOffsetRelAz
             el = testElevsGT[test_i] + nearGTOffsetEl
-            SHcomponents = testComponentsGT[test_i] + nearGTOffsetSHComponent
+            SHcomponents = testComponentsGTRel[test_i]
         elif recognitionType == 1:
             #Point (mean) estimate:
             az = azsPredRF[test_i][test_i]
@@ -380,7 +380,6 @@ for test_i in [7]:
         # chVColors[:] = testPredVColors[test_i]
         chComponent[:] = SHcomponents
 
-        ipdb.set_trace()
         cv2.imwrite(resultDir + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
 
         ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
