@@ -444,6 +444,10 @@ spherical_harmonics = {
 def sphericalHarmonicsZRotation(angle):
     return np.array([[1,0,0,0,0,0,0,0,0],[0, np.cos(angle), 0, np.sin(angle), 0,0,0,0,0],[0,0,1,0,0,0,0,0,0],[0, -np.sin(angle), 0, np.cos(angle), 0,0,0,0,0],[0,0,0,0,np.cos(2*angle),0,0,0,np.sin(2*angle)],[0,0,0,0,0,np.cos(angle), 0, np.sin(angle),0],[0,0,0,0,0,0,1,0,0],[0,0,0,0,0, -np.sin(angle),0, np.cos(angle),0],[0,0,0,0,-np.sin(2*angle),0,0,0,np.cos(2*angle)]])
 
+import chumpy as ch
+def chSphericalHarmonicsZRotation(angle):
+    return ch.array([[1,0,0,0,0,0,0,0,0],[0, ch.cos(angle), 0, ch.sin(angle), 0,0,0,0,0],[0,0,1,0,0,0,0,0,0],[0, -ch.sin(angle), 0, ch.cos(angle), 0,0,0,0,0],[0,0,0,0,ch.cos(2*angle),0,0,0,ch.sin(2*angle)],[0,0,0,0,0,ch.cos(angle), 0, ch.sin(angle),0],[0,0,0,0,0,0,1,0,0],[0,0,0,0,0, -ch.sin(angle),0, ch.cos(angle),0],[0,0,0,0,-ch.sin(2*angle),0,0,0,ch.cos(2*angle)]])
+
 spherical_harmonics_coeffs = np.array([
     0.282095,
     0.488603 ,
@@ -459,7 +463,7 @@ def getEnvironmentMapCoefficients(envMap, normalize, phiOffset, type):
     """ returns the RGB spherical harmonic coefficients for a given
     l and m """
     if type == 'equirectangular':
-        phis = 2*np.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
+        phis = 2*ch.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
         thetas = np.pi*np.tile((np.arange(envMap.shape[0])/envMap.shape[0]).reshape([envMap.shape[0],1,1]), [1,envMap.shape[1],3])
     elif type == 'spherical':
         vcoords = (-envMap.shape[0]/2 + np.tile(np.arange(envMap.shape[0]).reshape([envMap.shape[0], 1,1]), [1,envMap.shape[1],3]))/(envMap.shape[0]/2)
@@ -474,7 +478,7 @@ def getEnvironmentMapCoefficients(envMap, normalize, phiOffset, type):
 
     L = np.zeros([9,3])
     # ipdb.set_trace()
-    L[0] = np.sum(envMap * spherical_harmonics_coeffs[0], axis=(0,1)) / (envMap.shape[0] * envMap.shape[1] * normalize)
+    L[0] = np.sum(envMap * spherical_harmonics_coeffs[0] * np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1] * normalize)
     L[1] = np.sum(envMap *spherical_harmonics_coeffs[1]*np.sin(thetas) * np.cos(phis)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1] * normalize)
     L[2] = np.sum(envMap *spherical_harmonics_coeffs[2]*np.cos(thetas)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1] * normalize)
     L[3] = np.sum(envMap *spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(phis)* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1] * normalize)
@@ -485,6 +489,7 @@ def getEnvironmentMapCoefficients(envMap, normalize, phiOffset, type):
     L[8] = np.sum(envMap *spherical_harmonics_coeffs[8]*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2))* np.sin(thetas), axis=(0,1)) / (envMap.shape[0] * envMap.shape[1] * normalize)
 
     return L
+
 
 def sample_icosphere_color(ob, lightmap, theta, phi):
     """ takes a theta and phi and casts a ray out from the center of an

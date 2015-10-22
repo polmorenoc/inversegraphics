@@ -31,8 +31,8 @@ useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
-demoMode = False
-showSubplots = False
+demoMode = True
+showSubplots = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -44,7 +44,7 @@ glMode = glModes[0]
 sphericalMap = False
 
 np.random.seed(1)
-width, height = (100, 100)
+width, height = (300, 300)
 win = -1
 
 if glMode == 'glfw':
@@ -121,29 +121,19 @@ chCosAz = ch.Ch([np.cos(azimuth)])
 chSinAz = ch.Ch([np.sin(azimuth)])
 
 chAz = 2*ch.arctan(chSinAz/(ch.sqrt(chCosAz**2 + chSinAz**2) + chCosAz))
-chAz = ch.Ch([np.pi/4])
-chObjAz = ch.Ch([np.pi/4])
-chAzRel = chAz - chObjAz
 
 elevation = 0
 chLogCosEl = ch.Ch(np.log(np.cos(elevation)))
 chLogSinEl = ch.Ch(np.log(np.sin(elevation)))
 chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(chLogSinEl)**2) + ch.exp(chLogCosEl)))
-chEl =  ch.Ch([0.95993109])
+
 chDist = ch.Ch([camDistance])
 
-chObjAzGT = ch.Ch([np.pi*3/2])
-chAzGT = ch.Ch([np.pi*3/2])
-chAzRelGT = chAzGT - chObjAzGT
-chElGT = ch.Ch(chEl.r[0])
-chDistGT = ch.Ch([camDistance])
-chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
-chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
-chPointLightIntensity = ch.Ch([1])
-chPointLightIntensityGT = ch.Ch([1])
+chPointLightIntensity = ch.Ch([10])
+chPointLightIntensityGT = ch.Ch([10])
 chLightAz = ch.Ch([0.0])
-chLightEl = ch.Ch([np.pi/2])
+chLightEl = ch.Ch([0])
 chLightDist = ch.Ch([0.5])
 chLightDistGT = ch.Ch([0.5])
 chLightAzGT = ch.Ch([0.0])
@@ -160,64 +150,85 @@ chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
+
 chVColors = ch.Ch([0.4,0.4,0.4])
 chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([2])
+
 clampedCosCoeffs = clampedCosineCoefficients()
-chAmbientSHGT = ch.zeros([9])
 
 envMapFilename = 'data/hdr/dataset/studio_land.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
 
-phiOffset = 0
-totalOffset = phiOffset + chObjAzGT.r
-
 if sphericalMap:
     envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  totalOffset, 'spherical')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  0, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
-    envMapCoeffsRel = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, totalOffset, 'equirectangular')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, 0, 'equirectangular')
+
+rotation = ch.Ch([0.0])
+phiOffsetGT = rotation
+phiOffset = ch.Ch([0])
+
+chObjAzGT = rotation
+chAzGT = ch.Ch([0])
+chAzRelGT = chAzGT - chObjAzGT
+chElGT = ch.Ch(np.pi/4)
+chDistGT = ch.Ch([camDistance])
+
+totalOffsetGT = phiOffsetGT + chObjAzGT
+totalOffset = phiOffset
+
+chAmbientIntensityGT = ch.Ch([0.0])
+
+shCoeffsRGBGT = ch.Ch(np.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(-totalOffsetGT)).T[:])
+shCoeffsRGBGTRel = ch.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(phiOffsetGT)).T
+
+chShCoeffsGT = 0.3*shCoeffsRGBGT[:,0] + 0.59*shCoeffsRGBGT[:,1] + 0.11*shCoeffsRGBGT[:,2]
+chShCoeffsGTRel = 0.3*shCoeffsRGBGTRel[:,0] + 0.59*shCoeffsRGBGTRel[:,1] + 0.11*shCoeffsRGBGTRel[:,2]
+chAmbientSHGT = chShCoeffsGT.ravel() * chAmbientIntensityGT * clampedCosCoeffs
+chAmbientSHGTRel = chShCoeffsGTRel.ravel() * chAmbientIntensityGT * clampedCosCoeffs
+
+chLightRadGT = ch.Ch([0.1])
+chLightDistGT = ch.Ch([0.5])
+chLightIntensityGT = ch.Ch([5])
+chLightAzGT = ch.Ch([0])
+chLightElGT = ch.Ch([0])
+angleGT = ch.arcsin(chLightRadGT/chLightDistGT)
+zGT = chZonalHarmonics(angleGT)
+shDirLightGTOriginal = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2)
+shDirLightGT = ch.Ch(shDirLightGTOriginal.r[:].copy())
+chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs
+
+chAz = ch.Ch([0])
+chObjAz = ch.Ch([0])
+chEl =  ch.Ch([np.pi/4])
+chAzRel = chAz - chObjAz
+
+chAmbientIntensity = ch.Ch([0.5])
+shCoeffsRGB = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(totalOffset)).T
+shCoeffsRGBRel = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(phiOffset)).T
+chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
+chAmbientSH = chShCoeffs.ravel() * chAmbientIntensity * clampedCosCoeffs
+
+chLightRad = ch.Ch([0.1])
+chLightDist = ch.Ch([0.5])
+chLightIntensity = ch.Ch([0])
+chLightAz = ch.Ch([np.pi/2])
+chLightEl = ch.Ch([0])
+angle = ch.arcsin(chLightRad/chLightDist)
+z = chZonalHarmonics(angle)
+shDirLight = chZonalToSphericalHarmonics(z, np.pi/2 - chLightEl, chLightAz - np.pi/2) * clampedCosCoeffs
+chComponent = chAmbientSH + shDirLight*chLightIntensity
 
 if useBlender:
     addEnvironmentMapWorld(envMapFilename, scene)
     setEnviornmentMapStrength(0.3/envMapMean, scene)
     rotateEnviornmentMap(-totalOffset, scene)
-
-shCoeffsRGB = ch.Ch(envMapCoeffs)
-shCoeffsRGBRel = ch.Ch(envMapCoeffsRel)
-chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
-chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
-chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
-chAmbientSHGTRel = chShCoeffsRel.ravel() * chAmbientIntensityGT * clampedCosCoeffs
-
-# if loadSavedSH:
-#     if os.path.isfile(shCoefficientsFile):
-#         with open(shCoefficientsFile, 'rb') as pfile:
-#             shCoeffsDic = pickle.load(pfile)
-#             shCoeffs = shCoeffsDic['shCoeffs']
-#             chAmbientSHGT = shCoeffs.ravel()* chAmbientIntensityGT * clampedCosCoeffs
-
-chLightRadGT = ch.Ch([0.1])
-chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([0])
-chLightAzGT = ch.Ch([np.pi*3/2])
-chLightElGT = ch.Ch([np.pi/4])
-angle = ch.arcsin(chLightRadGT/chLightDistGT)
-zGT = chZonalHarmonics(angle)
-shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
-chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT
-# chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
-
-chLightAzGT = ch.Ch([np.pi/2])
-chLightElGT = ch.Ch([np.pi/4])
-shDirLight = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
-chComponentStuff = chAmbientSHGT + shDirLight*chLightIntensityGT
-chComponent[:] = chComponentStuff.r[:]
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
@@ -226,8 +237,6 @@ chScaleGT = ch.Ch([1, 1.,1.])
 
 # vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
 renderer_teapots = []
-
-
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -748,6 +757,7 @@ def readKeys(window, key, scancode, action, mods):
     global refresh
     global chAz
     global chEl
+    global phiOffsetGT
     global chComponent
     global changedGT
     refresh = False
@@ -789,10 +799,16 @@ def readKeys(window, key, scancode, action, mods):
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
         print("Left modifier!")
         refresh = True
-        chAz[0] = chAz[0].r - radians(1)
+        chAzGT[0] = chAzGT[0].r - radians(1)
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
         refresh = True
-        chAz[0] = chAz[0].r + radians(1)
+        # chAz[0] = chAz[0].r + radians(1)
+        rotation[:] = rotation.r[0] + 0.1
+        shCoeffsRGBGT[:] = np.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(-totalOffsetGT.r[:])).T[:]
+        chAzGT[:] = rotation.r[:]
+        shDirLightGT[:] = np.dot(shDirLightGTOriginal.T,light_probes.sphericalHarmonicsZRotation(rotation)).T[:]
+        print(str(shCoeffsRGBGT.r))
+        print(str(shDirLightGT.r))
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r - radians(1)

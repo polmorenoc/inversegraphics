@@ -3,6 +3,7 @@ __author__ = 'pol'
 import opendr
 import chumpy as ch
 import geometry
+import bpy
 import mathutils
 import numpy as np
 from math import radians
@@ -85,7 +86,7 @@ def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_l
     scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
     chRotAzMat = geometry.RotateZ(a=-chObjAz)[0:3,0:3]
     transformation = ch.dot(chRotAzMat, scaleMat)
-    invTranspModel = ch.transpose(ch.inv(transformation))
+    invTranspModel = np.transpose(np.linalg.inv(transformation))
 
     vch = [ch.dot(ch.array(vflat[mesh]),transformation) + targetPosition for mesh in rangeMeshes]
 
@@ -97,8 +98,8 @@ def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_l
     camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
     vnflat = [item for sublist in vn for item in sublist]
 
+    vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
     vnch = [ch.dot(ch.array(vnflat[mesh]),invTranspModel) for mesh in rangeMeshes]
-    # vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
     vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcflat = [item for sublist in vc for item in sublist]
     vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]

@@ -7,36 +7,6 @@ import ipdb
 
 # conf.cellSize = cellSize;
 # conf.numOrientations = 9;
-
-def computeHoGFeatures(images):
-    hogs = []
-
-    for image in images:
-        hogs = hogs + computeHoG(image)
-
-    hogfeats = np.vstack(hogs.reshape[1,:])
-    return hogfeats
-
-def computeIllumFeatures(images):
-    illum = []
-    win = 40
-    for image in images:
-        illum = illum + featuresIlluminationDirection(image, win)
-
-    illumfeats = np.vstack(illum.reshape[1,:])
-    return illumfeats
-
-
-def featuresIlluminationDirection(image,win):
-    # ipdb.set_trace()
-    image = color.rgb2gray(image)
-    coeffs = np.fft.fft2(image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win])
-    magnitudes =  np.sqrt(coeffs.real**2 + coeffs.imag**2)
-
-    phases = np.angle(coeffs)
-
-    return np.concatenate([magnitudes.ravel(), phases.ravel()])
-
 def computeHoG(image):
 
     image = color.rgb2gray(image)
@@ -58,3 +28,34 @@ def computeHoG(image):
     # plt.show()
 
     return hog_descr
+
+def computeHoGFeatures(images):
+    hogs = []
+
+    for image in images:
+        features = computeHoG(image)
+        hogs = hogs + [features[None,:] ]
+
+    hogfeats = np.vstack(hogs)
+    return hogfeats
+
+def computeIllumFeatures(images, numFreq):
+    illum = []
+    win = 40
+    for image in images:
+        features = featuresIlluminationDirection(image, win)[:numFreq,:].ravel()
+        illum = illum + [features[None,:]]
+
+    illumfeats = np.vstack(illum)
+    return illumfeats
+
+
+def featuresIlluminationDirection(image,win):
+    image = color.rgb2gray(image)
+    coeffs = np.fft.fft2(image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win])
+    magnitudes =  np.sqrt(coeffs.real**2 + coeffs.imag**2)
+
+    phases = np.angle(coeffs)
+
+    return np.hstack([magnitudes.ravel()[:,None], phases.ravel()[:,None]])
+

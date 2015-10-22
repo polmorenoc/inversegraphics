@@ -26,38 +26,47 @@ seed = 1
 np.random.seed(seed)
 
 gtPrefix = 'test'
-trainPrefix = gtPrefix + '_' + '1/'
+trainPrefix = 'train1'
 gtDir = 'groundtruth/' + gtPrefix + '/'
+experimentDir = 'experiments/' + trainPrefix + '/'
+testPrefix = 'test1'
+resultDir = 'results/' + trainPrefix + '_' + testPrefix + '/'
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 groundTruth = gtDataFile[gtPrefix]
-print("Training recognition models.")
+print("Reading experiment.")
 
-trainAzsGT = groundTruth['trainAzsGT']
-trainObjAzsGT = groundTruth['trainObjAzsGT']
-trainElevsGT = groundTruth['trainElevsGT']
-trainLightAzsGT = groundTruth['trainLightAzsGT']
-trainLightElevsGT = groundTruth['trainLightElevsGT']
-trainLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
-trainVColorGT = groundTruth['trainVColorGT']
-trainScenes = groundTruth['trainScenes']
-trainTeapotIds = groundTruth['trainTeapotIds']
-trainEnvMaps = groundTruth['trainEnvMaps']
-trainOcclusions = groundTruth['trainOcclusions']
-trainTargetIndices = groundTruth['trainTargetIndices']
-trainComponentsGT = groundTruth['trainComponentsGT']
-trainComponentsGTRel = groundTruth['trainComponentsGTRel']
-trainIds = groundTruth['trainIds']
-gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,))]
+dataAzsGT = groundTruth['trainAzsGT']
+dataObjAzsGT = groundTruth['trainObjAzsGT']
+dataElevsGT = groundTruth['trainElevsGT']
+dataLightAzsGT = groundTruth['trainLightAzsGT']
+dataLightElevsGT = groundTruth['trainLightElevsGT']
+dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
+dataVColorGT = groundTruth['trainVColorGT']
+dataScenes = groundTruth['trainScenes']
+dataTeapotIds = groundTruth['trainTeapotIds']
+dataEnvMaps = groundTruth['trainEnvMaps']
+dataOcclusions = groundTruth['trainOcclusions']
+dataTargetIndices = groundTruth['trainTargetIndices']
+dataComponentsGT = groundTruth['trainComponentsGT']
+dataComponentsGTRel = groundTruth['trainComponentsGTRel']
+dataIds = groundTruth['trainIds']
 
-trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
+gtDtype = groundTruth.dtype
+# gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,))]
+
 # Create experiment simple sepratation.
 #
-if not os.path.isfile('experiments/' + trainPrefix + 'train.npy'):
-    generateExperiment(len(trainIds), 'experiments/' + trainPrefix, 0.8, 1)
 
-trainSet = np.load('experiments/' + trainPrefix + 'train.npy')
+if not os.path.isfile(experimentDir + 'train.npy'):
+    generateExperiment(len(dataIds), experimentDir, 0.8, 1)
+
+trainSet = np.load(experimentDir + 'train.npy')
+
+trainAzsRel = np.mod(dataAzsGT - dataObjAzsGT, 2*np.pi)[trainSet]
+trainElevsGT = dataElevsGT[trainSet]
+trainComponentsGTRel = dataElevsGT[trainSet]
 
 imagesDir = gtDir + 'images/'
 
@@ -65,44 +74,51 @@ loadFromHdf5 = True
 writeHdf5 = False
 
 if writeHdf5:
-    writeImagesHdf5(imagesDir, trainIds)
+    writeImagesHdf5(imagesDir, dataIds)
 
-images = readImages(imagesDir, trainSet, loadFromHdf5)
+if loadFromHdf5:
+    images = readImages(imagesDir, dataIds, loadFromHdf5)
 
-#Check some images to make sure groundtruth was generated properly.
-
-#Perhaps save these on experiments dir to quickly train new models.
 loadHogFeatures = False
 loadIllumFeatures = False
-#
-# experimentPrefix = 'experiments/' + trainPrefix
-# if loadHogFeatures:
-#     hogfeatures = np.load(experimentPrefix + 'hog.npy')
-# else:
-#     hogfeatures = image_processing.computeHoGFeatures(images)
-#     np.save(experimentPrefix + 'hog.npy', hogfeatures)
-#
-#
-# if loadIllumFeatures:
-#     illumfeatures =  np.save(experimentPrefix  + 'illum.npy')
-# else:
-#     illumfeatures = image_processing.computeIllumFeatures(images)
-#     np.save(experimentPrefix  + 'illum.npy', illumfeatures)
 
-# # print("Training RFs")
-# randForestModelCosAzs = recognition_models.trainRandomForest(hogfeatures, np.cos(trainAzsRel))
-# randForestModelSinAzs = recognition_models.trainRandomForest(hogfeatures, np.sin(trainAzsRel))
-# randForestModelCosElevs = recognition_models.trainRandomForest(hogfeatures, np.cos(trainElevsGT))
-# randForestModelSinElevs = recognition_models.trainRandomForest(hogfeatures, np.sin(trainElevsGT))
+if loadHogFeatures:
+    hogfeatures = np.load(experimentDir + 'hog.npy')
+else:
+    print("Extracting Hog features .")
+    hogfeatures = image_processing.computeHoGFeatures(images)
+    np.save(experimentDir + 'hog.npy', hogfeatures)
+
+if loadIllumFeatures:
+    illumfeatures =  np.load(experimentDir  + 'illum.npy')
+else:
+    print("Extracting Illumination features (FFT.")
+    illumfeatures = image_processing.computeIllumFeatures(images, images[0].size/12)
+    np.save(experimentDir  + 'illum.npy', illumfeatures)
+
+trainHogfeatures = hogfeatures[trainSet]
+trainIllumfeatures = illumfeatures[trainSet]
+
+print("Training recognition models.")
+
+print("Training RFs Cos Azs")
+randForestModelCosAzs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainAzsRel))
+print("Training RFs Sin Azs")
+randForestModelSinAzs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainAzsRel))
+print("Training RFs Cos Elevs")
+randForestModelCosElevs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainElevsGT))
+print("Training RFs Sin Elevs")
+randForestModelSinElevs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainElevsGT))
 #
-# randForestModelRelSHComponents = recognition_models.trainRandomForest(illumfeatures, trainComponentsGTRel)
+print("Training RFs Components")
+randForestModelRelSHComponents = recognition_models.trainRandomForest(trainIllumfeatures, trainComponentsGTRel)
 #
 # imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
 # randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
 #
-# trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelRelSHComponents':randForestModelRelSHComponents}
-# with open('experiments/' + trainPrefix + 'models.pickle', 'wb') as pfile:
-#     pickle.dump(trainedModels, pfile)
+trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelRelSHComponents':randForestModelRelSHComponents}
+with open(experimentDir + 'recognition_models.pickle', 'wb') as pfile:
+    pickle.dump(trainedModels, pfile)
 #
 #
 # # # print("Training LR")
