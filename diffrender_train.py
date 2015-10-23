@@ -25,8 +25,8 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train3'
-trainPrefix = 'train3'
+gtPrefix = 'train1'
+trainPrefix = 'train1'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + trainPrefix + '/'
 

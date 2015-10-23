@@ -198,10 +198,10 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'train3'
+testPrefix = 'test1_savetxt'
 
-gtPrefix = 'train3'
-trainPrefix = 'train3'
+gtPrefix = 'train1'
+trainPrefix = 'train1'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 imagesDir = gtDir + 'images/'
 experimentDir = 'experiments/' + trainPrefix + '/'
@@ -236,8 +236,8 @@ images = readImages(imagesDir, dataIds, loadFromHdf5)
 
 print("Backprojecting and fitting estimates.")
 
-# testSet = np.load(experimentDir + 'test.npy')[:20]
-testSet = np.arange(len(images))
+testSet = np.load(experimentDir + 'test.npy')[:20]
+# testSet = np.arange(len(images))[0:10]
 
 testAzsGT = dataAzsGT[testSet]
 testObjAzsGT = dataObjAzsGT[testSet]
@@ -263,7 +263,7 @@ testIllumfeatures = illumfeatures[testSet]
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 0
 method = 1
-model = 0
+model = 1
 maxiter = 5
 numSamples = 10
 testRenderer = np.int(dataTeapotIds[testSet][0])
@@ -272,6 +272,7 @@ nearGTOffsetRelAz = 0
 nearGTOffsetEl = 0
 nearGTOffsetSHComponent = np.zeros(9)
 nearGTOffsetVColor = np.zeros(3)
+free_variables = [ chAz, chEl]
 
 with open(experimentDir + 'recognition_models.pickle', 'rb') as pfile:
     trainedModels = pickle.load(pfile)
@@ -317,14 +318,15 @@ pixelErrorFun = pixelModels[model]
 fittedAzsGaussian = np.array([])
 fittedElevsGaussian = np.array([])
 fittedRelSHComponentsGaussian = np.array([])
-free_variables = [chVColors, chComponent, chAz, chEl]
+
+predictedErrorFuns = np.array([])
+fittedErrorFuns = np.array([])
 
 if not os.path.exists(resultDir + 'imgs/'):
     os.makedirs(resultDir + 'imgs/')
 if not os.path.exists(resultDir +  'imgs/samples/'):
     os.makedirs(resultDir + 'imgs/samples/')
 
-model = 1
 print("Using " + modelsDescr[model])
 errorFun = models[model]
 pixelErrorFun = pixelModels[model]
@@ -332,6 +334,10 @@ pixelErrorFun = pixelModels[model]
 testSamples = 1
 if recognitionType == 2:
     testSamples  = numSamples
+
+chDisplacement[:] = np.array([0.0, 0.0,0.0])
+chScale[:] = np.array([1.0,1.0,1.0])
+chObjAz[:] = 0
 
 for test_i in range(len(testAzsRel)):
 
@@ -347,8 +353,6 @@ for test_i in range(len(testAzsRel)):
     rendererGT[:] = images[testSet[test_i]]
 
     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '_id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR))
-
-    chObjAz[:] = 0
 
     for sample in range(testSamples):
         from numpy.random import choice
@@ -374,6 +378,7 @@ for test_i in range(len(testAzsRel)):
             colorGMM = colorGMMs[test_i]
             color = colorGMM.sample(n_samples=1)[0]
 
+
         chAz[:] = az
         chEl[:] = el
         chVColors[:] = color.copy()
@@ -381,6 +386,8 @@ for test_i in range(len(testAzsRel)):
         chComponent[:] = SHcomponents
 
         cv2.imwrite(resultDir + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+
+        predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
         ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
 
@@ -394,9 +401,7 @@ for test_i in range(len(testAzsRel)):
 
         cv2.imwrite(resultDir + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
 
-    chDisplacement[:] = np.array([0.0, 0.0,0.0])
-    chScale[:] = np.array([1.0,1.0,1.0])
-
+    fittedErrorFuns = np.append(fittedErrorFuns, bestModelLik)
     fittedAzsGaussian = np.append(fittedAzsGaussian, bestPredAz)
     fittedElevsGaussian = np.append(fittedElevsGaussian, bestPredEl)
 
@@ -667,6 +672,8 @@ plt.ion()
 #Write statistics to file.
 with open(resultDir + 'performance.txt', 'w') as expfile:
     # expfile.write(str(z))
+    expfile.write("Avg NLL    :" +  str(np.mean(predictedErrorFuns))+ '\n')
+    expfile.write("Avg NLL    :" +  str(np.mean(fittedErrorFuns))+ '\n')
     expfile.write("Mean Azimuth Error (predicted) " +  str(meanAbsErrAzsRF) + '\n')
     expfile.write("Mean Elevation Error (predicted) " +  str(meanAbsErrElevsRF)+ '\n')
     expfile.write("Mean Azimuth Error (gaussian) " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
@@ -681,7 +688,20 @@ with open(resultDir + 'performance.txt', 'w') as expfile:
     # expfile.write("Mean Light Elevation Error (robust) " +  str(meanAbsErrLightElevsFittedRFRobust)+ '\n')
     # expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
     # expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
+#Write statistics to file.
 
-    expfile.write("Occlusions " +  str(testOcclusions)+ '\n')
+headerDesc = "Pred NLL    :" + "Fitt NLL    :" + "Err Pred Az :" + "Err Pred El :" + "Err Fitted Az :" + "Err Fitted El :" + "Occlusions  :"
+perfSamplesData = np.hstack([predictedErrorFuns.reshape([-1,1]),fittedErrorFuns.reshape([-1,1]),errorsRF[0].reshape([-1,1]),errorsRF[1].reshape([-1,1]),errorsFittedRFGaussian[0].reshape([-1,1]),errorsFittedRFGaussian[1].reshape([-1,1]),testOcclusions.reshape([-1,1])])
+
+np.savetxt(resultDir + 'performance_samples.txt', perfSamplesData, delimiter=',', fmt="%g", header=headerDesc)
+# with open(resultDir + 'performance_samples.txt', 'w') as expfile:
+#     # expfile.write(str(z))
+#     expfile.write("Pred NLL    :" +  str(predictedErrorFuns)+ '\n')
+#     expfile.write("Fitt NLL    :" +  str(fittedErrorFuns)+ '\n')
+#     expfile.write("Err Pred Az :" +  str(errorsRF[0])+ '\n')
+#     expfile.write("Err Pred El :" +  str(errorsRF[1])+ '\n')
+#     expfile.write("Err Fitted Az :" +  str(errorsFittedRFGaussian[0])+ '\n')
+#     expfile.write("Err Fitted El :" +  str(errorsFittedRFGaussian[1])+ '\n')
+#     expfile.write("Occlusions  :" +  str(testOcclusions)+ '\n')
 
 print("Finished backprojecting and fitting estimates.")
