@@ -338,6 +338,18 @@ if recognitionType == 2:
 chDisplacement[:] = np.array([0.0, 0.0,0.0])
 chScale[:] = np.array([1.0,1.0,1.0])
 chObjAz[:] = 0
+shapeIm = [height, width]
+
+#Update all error functions with the right renderers.
+negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
+negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
+pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
+pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
+models = [negLikModel, negLikModelRobust, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+pixelErrorFun = pixelModels[model]
+errorFun = models[model]
 
 for test_i in range(len(testAzsRel)):
 
@@ -385,7 +397,20 @@ for test_i in range(len(testAzsRel)):
         # chVColors[:] = testPredVColors[test_i]
         chComponent[:] = SHcomponents
 
+        #Update all error functions with the right renderers.
+        negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
+        negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
+        pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
+        pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+        post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
+        models = [negLikModel, negLikModelRobust, negLikModelRobust]
+        pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+        pixelErrorFun = pixelModels[model]
+        errorFun = models[model]
+
         cv2.imwrite(resultDir + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+        z = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '_id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
         predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
