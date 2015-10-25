@@ -198,7 +198,7 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_savetxt'
+testPrefix = 'test1_pred_100_simplex'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -236,7 +236,7 @@ images = readImages(imagesDir, dataIds, loadFromHdf5)
 
 print("Backprojecting and fitting estimates.")
 
-testSet = np.load(experimentDir + 'test.npy')[:20]
+testSet = np.load(experimentDir + 'test.npy')[:100]
 # testSet = np.arange(len(images))[0:10]
 
 testAzsGT = dataAzsGT[testSet]
@@ -261,10 +261,10 @@ testHogfeatures = hogfeatures[testSet]
 testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
-recognitionType = 0
-method = 1
+recognitionType = 1
+method = 4
 model = 1
-maxiter = 5
+maxiter = 200
 numSamples = 10
 testRenderer = np.int(dataTeapotIds[testSet][0])
 renderer = renderer_teapots[testRenderer]
@@ -303,8 +303,8 @@ if recognitionType == 2:
         testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPredRF[test_i], elevsPredRF[test_i])]
         colorGMMs = colorGMMs + [recognition_models.colorGMM(images[testSet][test_i], 40)]
 
-errorsRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, testAzsRel, testElevsGT)
-# errorsRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPredRF, elevsPredRF)
+# errorsRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, testAzsRel, testElevsGT)
+errorsRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPredRF, elevsPredRF)
 
 meanAbsErrAzsRF = np.mean(np.abs(errorsRF[0]))
 meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
@@ -312,9 +312,6 @@ meanAbsErrElevsRF = np.mean(np.abs(errorsRF[1]))
 #Fit:
 print("Fitting predictions")
 
-print("Using " + modelsDescr[model])
-errorFun = models[model]
-pixelErrorFun = pixelModels[model]
 fittedAzsGaussian = np.array([])
 fittedElevsGaussian = np.array([])
 fittedRelSHComponentsGaussian = np.array([])
@@ -341,6 +338,7 @@ chObjAz[:] = 0
 shapeIm = [height, width]
 
 #Update all error functions with the right renderers.
+print("Using " + modelsDescr[model])
 negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
 negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
 pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
@@ -376,10 +374,12 @@ for test_i in range(len(testAzsRel)):
             SHcomponents = testComponentsGTRel[test_i]
         elif recognitionType == 1:
             #Point (mean) estimate:
-            az = azsPredRF[test_i][test_i]
-            el = elevsPredRF[test_i] + nearGTOffsetEl
-            color = recognition_models.meanColor(rendererGT.r, win)
+            az = azsPredRF[test_i]
+            el = elevsPredRF[test_i]
+            color = recognition_models.meanColor(rendererGT.r, 40)
+            color = testVColorGT[test_i]
             SHcomponents = componentPreds[test_i].copy()
+            SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -389,7 +389,6 @@ for test_i in range(len(testAzsRel)):
             SHcomponents = componentPreds[test_i].copy()
             colorGMM = colorGMMs[test_i]
             color = colorGMM.sample(n_samples=1)[0]
-
 
         chAz[:] = az
         chEl[:] = el
@@ -697,8 +696,8 @@ plt.ion()
 #Write statistics to file.
 with open(resultDir + 'performance.txt', 'w') as expfile:
     # expfile.write(str(z))
-    expfile.write("Avg NLL    :" +  str(np.mean(predictedErrorFuns))+ '\n')
-    expfile.write("Avg NLL    :" +  str(np.mean(fittedErrorFuns))+ '\n')
+    expfile.write("Avg Pred NLL    :" +  str(np.mean(predictedErrorFuns))+ '\n')
+    expfile.write("Avg Fitt NLL    :" +  str(np.mean(fittedErrorFuns))+ '\n')
     expfile.write("Mean Azimuth Error (predicted) " +  str(meanAbsErrAzsRF) + '\n')
     expfile.write("Mean Elevation Error (predicted) " +  str(meanAbsErrElevsRF)+ '\n')
     expfile.write("Mean Azimuth Error (gaussian) " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
