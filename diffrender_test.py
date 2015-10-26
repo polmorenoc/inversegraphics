@@ -198,7 +198,7 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_100_simplex'
+testPrefix = 'test1_pred_100_nomsaa_simplex'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -376,9 +376,9 @@ for test_i in range(len(testAzsRel)):
             #Point (mean) estimate:
             az = azsPredRF[test_i]
             el = elevsPredRF[test_i]
-            color = recognition_models.meanColor(rendererGT.r, 40)
+            # color = recognition_models.meanColor(rendererGT.r, 40)
             color = testVColorGT[test_i]
-            SHcomponents = componentPreds[test_i].copy()
+            # SHcomponents = componentPreds[test_i].copy()
             SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling

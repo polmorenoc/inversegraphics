@@ -21,12 +21,19 @@ def trainRandomForest(xtrain, ytrain):
 def testRandomForest(randForest, xtest):
     return randForest.predict(xtest)
 
+def filteredMean(image, win):
+    pixels = image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:]
+    pixels = pixels.reshape([-1,3])
+    gray = 0.3*pixels[:,0] + 0.59*pixels[:,1] + 0.11*pixels[:,2]
+    stdM = 2
+    pixels[np.abs(gray - np.mean(gray)) < stdM * np.std(gray),:]
+    color = np.mean(image)
+    return color
 
 def meanColor(image, win):
     image = np.mean(image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:], axis=0)
     color = np.mean(image, axis=0)
     return color
-
 def colorGMM(image, win):
     np.random.seed(1)
     gmm = mixture.GMM(n_components=8, covariance_type='spherical')
