@@ -58,7 +58,8 @@ camDistance = 0.4
 
 teapots = [line.strip() for line in open('teapots.txt')]
 
-renderTeapotsList = np.arange(len(teapots))
+# renderTeapotsList = np.arange(len(teapots))
+renderTeapotsList = [0]
 
 targetModels = []
 
@@ -131,7 +132,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.075
+initialPixelStdev = 0.01
 reduceVariance = False
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
@@ -180,16 +181,6 @@ def cb(_):
 
     t = time.time()
 
-free_variables = [ chAz, chEl]
-
-mintime = time.time()
-boundEl = (0, np.pi/2.0)
-boundAz = (0, None)
-boundscomponents = (0,None)
-bounds = [boundAz,boundEl]
-bounds = [(None , None ) for sublist in free_variables for item in sublist]
-
-methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 
 #########################################
 # Generative model setup ends here.
@@ -198,7 +189,7 @@ methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_100_nomsaa_simplex'
+testPrefix = 'test1_pred_100_minimize_noov_std001_msaa_predSH'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -209,7 +200,17 @@ resultDir = 'results/' + testPrefix + '/'
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
-groundTruth = gtDataFile[gtPrefix]
+
+testSet = np.load(experimentDir + 'test.npy')[:100]
+
+shapeGT = gtDataFile[gtPrefix].shape
+boolTestSet = np.zeros(shapeGT).astype(np.bool)
+boolTestSet[testSet] = True
+testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
+groundTruth = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
+groundTruth[boolTestSet] = testGroundTruth
+groundTruth = groundTruth[testSet]
+
 print("Reading experiment.")
 
 dataAzsGT = groundTruth['trainAzsGT']
@@ -235,19 +236,17 @@ loadFromHdf5 = False
 images = readImages(imagesDir, dataIds, loadFromHdf5)
 
 print("Backprojecting and fitting estimates.")
-
-testSet = np.load(experimentDir + 'test.npy')[:100]
 # testSet = np.arange(len(images))[0:10]
 
-testAzsGT = dataAzsGT[testSet]
-testObjAzsGT = dataObjAzsGT[testSet]
-testElevsGT = dataElevsGT[testSet]
-testLightAzsGT = dataLightAzsGT[testSet]
-testLightElevsGT = dataLightElevsGT[testSet]
-testLightIntensitiesGT = dataLightIntensitiesGT[testSet]
-testVColorGT = dataVColorGT[testSet]
-testComponentsGT = dataComponentsGT[testSet]
-testComponentsGTRel = dataComponentsGTRel[testSet]
+testAzsGT = dataAzsGT
+testObjAzsGT = dataObjAzsGT
+testElevsGT = dataElevsGT
+testLightAzsGT = dataLightAzsGT
+testLightElevsGT = dataLightElevsGT
+testLightIntensitiesGT = dataLightIntensitiesGT
+testVColorGT = dataVColorGT
+testComponentsGT = dataComponentsGT
+testComponentsGTRel = dataComponentsGTRel
 
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
@@ -262,17 +261,31 @@ testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
-method = 4
+method = 1
 model = 1
-maxiter = 200
+maxiter = 500
 numSamples = 10
-testRenderer = np.int(dataTeapotIds[testSet][0])
+
+free_variables = [ chAz, chEl, chComponent]
+
+mintime = time.time()
+boundEl = (0, np.pi/2.0)
+boundAz = (0, None)
+boundscomponents = (0,None)
+bounds = [boundAz,boundEl]
+bounds = [(None , None ) for sublist in free_variables for item in sublist]
+
+methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom']
+
+options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.7, 'decay':0.99}
+# testRenderer = np.int(dataTeapotIds[testSet][0])
+testRenderer = np.int(dataTeapotIds[0])
 renderer = renderer_teapots[testRenderer]
 nearGTOffsetRelAz = 0
 nearGTOffsetEl = 0
 nearGTOffsetSHComponent = np.zeros(9)
 nearGTOffsetVColor = np.zeros(3)
-free_variables = [ chAz, chEl]
+
 
 with open(experimentDir + 'recognition_models.pickle', 'rb') as pfile:
     trainedModels = pickle.load(pfile)
@@ -301,7 +314,7 @@ colorGMMs = []
 if recognitionType == 2:
     for test_i in range(len(testAzsRel)):
         testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPredRF[test_i], elevsPredRF[test_i])]
-        colorGMMs = colorGMMs + [recognition_models.colorGMM(images[testSet][test_i], 40)]
+        colorGMMs = colorGMMs + [recognition_models.colorGMM(images[test_i], 40)]
 
 # errorsRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, testAzsRel, testElevsGT)
 errorsRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPredRF, elevsPredRF)
@@ -357,10 +370,10 @@ for test_i in range(len(testAzsRel)):
     bestVColors = chVColors.r
     bestComponent = chComponent.r
 
-    testId = dataIds[testSet[test_i]]
+    testId = dataIds[test_i]
     print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
-    rendererGT[:] = images[testSet[test_i]]
+    rendererGT[:] = images[test_i]
 
     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '_id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR))
 
@@ -376,10 +389,10 @@ for test_i in range(len(testAzsRel)):
             #Point (mean) estimate:
             az = azsPredRF[test_i]
             el = elevsPredRF[test_i]
-            # color = recognition_models.meanColor(rendererGT.r, 40)
+            color = recognition_models.meanColor(rendererGT.r, 40)
             color = testVColorGT[test_i]
-            # SHcomponents = componentPreds[test_i].copy()
-            SHcomponents = testComponentsGTRel[test_i]
+            SHcomponents = componentPreds[test_i].copy()
+            # SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -413,7 +426,10 @@ for test_i in range(len(testAzsRel)):
 
         predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
-        ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options={'disp':False, 'maxiter':maxiter})
+        global iterat
+        iterat = 0
+
+        ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
         if errorFun.r < bestModelLik:
             bestModelLik = errorFun.r.copy()
@@ -429,7 +445,7 @@ for test_i in range(len(testAzsRel)):
     fittedAzsGaussian = np.append(fittedAzsGaussian, bestPredAz)
     fittedElevsGaussian = np.append(fittedElevsGaussian, bestPredEl)
 
-testOcclusions = dataOcclusions[testSet]
+testOcclusions = dataOcclusions
 
 errorsFittedRFGaussian = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
 meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
