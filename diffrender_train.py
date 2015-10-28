@@ -17,6 +17,8 @@ import skimage
 import h5py
 import ipdb
 import pickle
+import lasagne_nn
+import theano
 
 #########################################
 # Initialization ends here
@@ -32,8 +34,32 @@ experimentDir = 'experiments/' + trainPrefix + '/'
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
-groundTruth = gtDataFile[gtPrefix]
-print("Reading experiment.")
+
+allDataIds = gtDataFile[gtPrefix]['trainIds']
+if not os.path.isfile(experimentDir + 'train.npy'):
+    generateExperiment(len(allDataIds), experimentDir, 0.8, 1)
+
+print("Reading images.")
+
+writeHdf5 = False
+imagesDir = gtDir + 'images/'
+if writeHdf5:
+    writeImagesHdf5(imagesDir, allDataIds)
+
+trainSet = np.load(experimentDir + 'train.npy')
+
+#Delete as soon as finished with prototyping:
+trainSet = trainSet[0:500]
+
+print("Reading experiment data.")
+
+shapeGT = gtDataFile[gtPrefix].shape
+boolTestSet = np.zeros(shapeGT).astype(np.bool)
+boolTestSet[trainSet] = True
+trainGroundTruth = gtDataFile[gtPrefix][boolTestSet]
+groundTruth = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
+groundTruth[boolTestSet] = trainGroundTruth
+groundTruth = groundTruth[trainSet]
 
 dataAzsGT = groundTruth['trainAzsGT']
 dataObjAzsGT = groundTruth['trainObjAzsGT']
@@ -56,29 +82,18 @@ gtDtype = groundTruth.dtype
 
 # Create experiment simple sepratation.
 #
-
-if not os.path.isfile(experimentDir + 'train.npy'):
-    generateExperiment(len(dataIds), experimentDir, 0.8, 1)
-
-trainSet = np.load(experimentDir + 'train.npy')
-
-trainAzsRel = np.mod(dataAzsGT - dataObjAzsGT, 2*np.pi)[trainSet]
-trainElevsGT = dataElevsGT[trainSet]
-trainComponentsGTRel = dataElevsGT[trainSet]
-
-imagesDir = gtDir + 'images/'
+trainAzsRel = np.mod(dataAzsGT - dataObjAzsGT, 2*np.pi)
+trainElevsGT = dataElevsGT
+trainComponentsGTRel = dataComponentsGTRel
+trainVColorGT = dataVColorGT
 
 loadFromHdf5 = True
-writeHdf5 = True
-
-if writeHdf5:
-    writeImagesHdf5(imagesDir, dataIds)
 
 if loadFromHdf5:
-    images = readImages(imagesDir, dataIds, loadFromHdf5)
+    images = readImages(imagesDir, allDataIds, loadFromHdf5)
 
-loadHogFeatures = False
-loadIllumFeatures = False
+loadHogFeatures = True
+loadIllumFeatures = True
 
 if loadHogFeatures:
     hogfeatures = np.load(experimentDir + 'hog.npy')
@@ -97,27 +112,67 @@ else:
 trainHogfeatures = hogfeatures[trainSet]
 trainIllumfeatures = illumfeatures[trainSet]
 
+parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF', 'spherical_harmonicsRF'])
+parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
+parameterTrainSet = set(['spherical_harmonicsNN'])
+
 print("Training recognition models.")
 
-print("Training RFs Cos Azs")
-randForestModelCosAzs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainAzsRel))
-print("Training RFs Sin Azs")
-randForestModelSinAzs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainAzsRel))
-print("Training RFs Cos Elevs")
-randForestModelCosElevs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainElevsGT))
-print("Training RFs Sin Elevs")
-randForestModelSinElevs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainElevsGT))
-#
-print("Training RFs Components")
-randForestModelRelSHComponents = recognition_models.trainRandomForest(trainIllumfeatures, trainComponentsGTRel)
+if 'azimuthsRF' in parameterTrainSet:
+    print("Training RFs Cos Azs")
+    randForestModelCosAzs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainAzsRel))
+    trainedModel = {'randForestModelCosAzs':randForestModelCosAzs}
+    with open(experimentDir + 'randForestModelCosAzs.pickle', 'wb') as pfile:
+        pickle.dump(trainedModel, pfile)
+
+    print("Training RFs Sin Azs")
+    randForestModelSinAzs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainAzsRel))
+    trainedModel = {'randForestModelSinAzs':randForestModelSinAzs}
+    with open(experimentDir + 'randForestModelSinAzs.pickle', 'wb') as pfile:
+        pickle.dump(trainedModel, pfile)
+
+if 'elevationsRF' in parameterTrainSet:
+    print("Training RFs Cos Elevs")
+    randForestModelCosElevs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainElevsGT))
+    trainedModel = {'randForestModelCosElevs':randForestModelCosElevs}
+    with open(experimentDir + 'randForestModelCosElevs.pickle', 'wb') as pfile:
+        pickle.dump(trainedModel, pfile)
+
+    print("Training RFs Sin Elevs")
+    randForestModelSinElevs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainElevsGT))
+    trainedModel = {'randForestModelSinElevs':randForestModelSinElevs}
+    with open(experimentDir + 'randForestModelSinElevs.pickle', 'wb') as pfile:
+        pickle.dump(trainedModel, pfile)
+
+if 'spherical_harmonicsRF' in parameterTrainSet:
+    print("Training RF SH Components")
+    randForestModelRelSHComponents = recognition_models.trainRandomForest(trainIllumfeatures, trainComponentsGTRel)
+    with open(experimentDir + 'randForestModelRelSHComponents.pickle', 'wb') as pfile:
+        pickle.dump(randForestModelRelSHComponents, pfile)
+
+elif 'spherical_harmonicsNN' in parameterTrainSet:
+    print("Training NN SH Components")
+    validRatio = 0.9
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    import sys
+    sys.exit("NN")
+    SHNNparams = lasagne_nn.train_nn(images[trainSet[trainValSet]], trainComponentsGTRel[trainValSet].astype(np.float32), images[trainSet[validSet]], trainComponentsGTRel[validSet].astype(np.float32), model='cnn', num_epochs=500)
+    np.savez(modelPath, *SHNNparams)
+
+if 'vcolorsRF' in parameterTrainSet:
+    print("Training Neural Net on Vertex Colors")
+    randForestModelVColor = recognition_models.trainRandomForest(images[trainSet], trainVColorGT)
+    with open(experimentDir + 'randForestModelVColor.pickle', 'wb') as pfile:
+        pickle.dump(randForestModelVColor, pfile)
+
 #
 # imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
 # randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)
 #
-trainedModels = {'randForestModelCosAzs':randForestModelCosAzs,'randForestModelSinAzs':randForestModelSinAzs,'randForestModelCosElevs':randForestModelCosElevs,'randForestModelSinElevs':randForestModelSinElevs,'randForestModelRelSHComponents':randForestModelRelSHComponents}
-with open(experimentDir + 'recognition_models.pickle', 'wb') as pfile:
-    pickle.dump(trainedModels, pfile)
-#
+
 #
 # # # print("Training LR")
 # # # linRegModelCosAzs = recognition_models.trainLinearRegression(hogfeatures, np.cos(trainAzsGT))

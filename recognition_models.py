@@ -34,6 +34,16 @@ def meanColor(image, win):
     image = np.mean(image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:], axis=0)
     color = np.mean(image, axis=0)
     return color
+
+def medianColor(image, win):
+    imageWin = image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win,:]
+    color = np.median(imageWin.reshape([-1,3]), axis=0)
+    return color
+
+def midColor(image):
+    color = image[image.shape[0]/2,image.shape[1]/2,:]
+    return color
+
 def colorGMM(image, win):
     np.random.seed(1)
     gmm = mixture.GMM(n_components=8, covariance_type='spherical')

@@ -18,8 +18,6 @@ from blender_utils import *
 import imageio
 
 
-
-
 def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
     import glob
     for hdridx, hdrFile in enumerate(glob.glob("data/hdr/dataset/*")):
