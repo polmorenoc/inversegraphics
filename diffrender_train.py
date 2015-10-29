@@ -49,7 +49,7 @@ if writeHdf5:
 trainSet = np.load(experimentDir + 'train.npy')
 
 #Delete as soon as finished with prototyping:
-trainSet = trainSet[0:500]
+trainSet = trainSet
 
 print("Reading experiment data.")
 
@@ -155,16 +155,27 @@ elif 'spherical_harmonicsNN' in parameterTrainSet:
     validRatio = 0.9
     trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
     validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
-    modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
 
-    import sys
-    sys.exit("NN")
-    SHNNparams = lasagne_nn.train_nn(images[trainSet[trainValSet]], trainComponentsGTRel[trainValSet].astype(np.float32), images[trainSet[validSet]], trainComponentsGTRel[validSet].astype(np.float32), model='cnn', num_epochs=500)
-    np.savez(modelPath, *SHNNparams)
+    grayTrainImages =  0.3*images[trainSet[trainValSet]][:,:,:,0] +  0.59*images[trainSet[trainValSet]][:,:,:,1] + 0.11*images[trainSet[trainValSet]][:,:,:,2]
+    grayValidImages =  0.3*images[trainSet[validSet]][:,:,:,0] +  0.59*images[trainSet[validSet]][:,:,:,1] + 0.11*images[trainSet[validSet]][:,:,:,2]
+    grayTrainImages = grayTrainImages[:,None, :,:]
+    grayValidImages = grayValidImages[:,None, :,:]
+    # import sys
+    # sys.exit("NN")
+    modelPath=experimentDir + 'neuralNetModelRelSHComponents.pickle'
+    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, trainComponentsGTRel[trainValSet].astype(np.float32), grayValidImages, trainComponentsGTRel[validSet].astype(np.float32), modelType='cnn', num_epochs=500, saveModelAtEpoch=True, modelPath=modelPath)
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(SHNNmodel, pfile)
 
 if 'vcolorsRF' in parameterTrainSet:
-    print("Training Neural Net on Vertex Colors")
-    randForestModelVColor = recognition_models.trainRandomForest(images[trainSet], trainVColorGT)
+    print("Training RF on Vertex Colors")
+    numTrainSet = images[trainSet].shape[0]
+    colorWindow = 30
+    image = images[0]
+    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
+    randForestModelVColor = recognition_models.trainRandomForest(croppedImages[trainSet].reshape([numTrainSet,-1]), trainVColorGT)
     with open(experimentDir + 'randForestModelVColor.pickle', 'wb') as pfile:
         pickle.dump(randForestModelVColor, pfile)
 

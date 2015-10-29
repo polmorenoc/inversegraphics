@@ -151,7 +151,7 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array(
 
 models = [negLikModel, negLikModelRobust, negLikModelRobust]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
-modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)"]
+modelsDescr = [" Model", "Outlier model", "Outler model (variance reduction)"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 model = 0
 pixelErrorFun = pixelModels[model]
@@ -181,7 +181,6 @@ def cb(_):
 
     t = time.time()
 
-
 #########################################
 # Generative model setup ends here.
 #########################################
@@ -189,7 +188,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_100_simplex_ov_std001_msaa'
+testPrefix = 'test1_pred_minimize_ov_std001_msaa_predSHNeuralNet_predVColor'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -261,13 +260,13 @@ testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
-method = 4
+method = 1
 model = 1
 maxiter = 500
 numSamples = 10
 
 free_variables = [ chAz, chEl, chComponent, chVColors]
-free_variables = [ chAz, chEl]
+# free_variables = [ chAz, chEl]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -289,7 +288,7 @@ nearGTOffsetVColor = np.zeros(3)
 
 #Load trained recognition models
 
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'randForestRelSHComponents'])
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'neuralNetRelSHComponents'])
 
 if 'randForestAzs' in parameterRecognitionModels:
     with open(experimentDir + 'randForestModelCosAzs.pickle', 'rb') as pfile:
@@ -311,19 +310,30 @@ if 'randForestElevs' in parameterRecognitionModels:
 if 'randForestVColors' in parameterRecognitionModels:
     with open(experimentDir + 'randForestModelVColor.pickle', 'rb') as pfile:
         randForestModelVColor = pickle.load(pfile)
-    vColorsPred = recognition_models.testRandomForest(randForestModelVColor, images)
+
+    colorWindow = 30
+    image = images[0]
+    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
+    vColorsPred = recognition_models.testRandomForest(randForestModelVColor, croppedImages.reshape([len(testSet),-1]))
 
 if 'randForestRelSHComponents' in parameterRecognitionModels:
     with open(experimentDir + 'randForestModelRelSHComponents.pickle', 'rb') as pfile:
         randForestModelRelSHComponents = pickle.load(pfile)
-    relSHComponentsPred = recognition_models.testRandomForest(randForestModelRelSHComponents, images)
+    relSHComponentsPred = recognition_models.testRandomForest(randForestModelRelSHComponents, testIllumfeatures)
 
-if 'neuralNetRelSHComponents' in parameterRecognitionModels:
-    modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
-    with np.load(modelPath) as f:
-        param_values = [f['arr_%d' % i] for i in range(len(f.files))]
+elif 'neuralNetRelSHComponents' in parameterRecognitionModels:
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+    # with np.load(modelPath) as f:
+    #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
+    with open(experimentDir + 'neuralNetModelRelSHComponents.pickle', 'rb') as pfile:
+        neuralNetModelRelSHComponents = pickle.load(pfile)
 
-    relSHComponentsPred = lasagne_nn.get_predictions(images, model='cnn', param_values=param_values)
+    meanImage = neuralNetModelRelSHComponents['mean']
+    modelType = neuralNetModelRelSHComponents['type']
+    param_values = neuralNetModelRelSHComponents['params']
+    grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+    grayTestImages = grayTestImages[:,None, :,:]
+    relSHComponentsPred = lasagne_nn.get_predictions(grayTestImages, model=modelType, param_values=param_values)
 
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
 azsPred = np.arctan2(sinAzsPred, cosAzsPred)
@@ -338,15 +348,22 @@ if recognitionType == 2:
 # errors = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, testAzsRel, testElevsGT)
 errors = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPred, elevsPred)
 
+errorsSHComponents = np.linalg.norm(testComponentsGTRel - relSHComponentsPred, axis=1)
+errorsVColors = np.linalg.norm(testVColorGT - vColorsPred, axis=1)
+
 meanAbsErrAzs = np.mean(np.abs(errors[0]))
 meanAbsErrElevs = np.mean(np.abs(errors[1]))
+
+meanErrorsSHComponents = np.mean(errorsSHComponents)
+meanErrorsVColors = np.mean(errorsVColors)
 
 #Fit:
 print("Fitting predictions")
 
-fittedAzsGaussian = np.array([])
-fittedElevsGaussian = np.array([])
-fittedRelSHComponentsGaussian = np.array([])
+fittedAzs = np.array([])
+fittedElevs = np.array([])
+fittedRelSHComponents = []
+fittedVColors = []
 
 predictedErrorFuns = np.array([])
 fittedErrorFuns = np.array([])
@@ -394,7 +411,10 @@ for test_i in range(len(testAzsRel)):
 
     rendererGT[:] = images[test_i]
 
-    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '_id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR))
+    if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/'):
+        os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/')
+
+    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR))
 
     for sample in range(testSamples):
         from numpy.random import choice
@@ -412,8 +432,9 @@ for test_i in range(len(testAzsRel)):
             # color = recognition_models.filteredMean(rendererGT.r, 40)
             color = recognition_models.midColor(rendererGT.r)
             color = testVColorGT[test_i]
+            color = vColorsPred[test_i]
             SHcomponents = relSHComponentsPred[test_i].copy()
-            SHcomponents = testComponentsGTRel[test_i]
+            # SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -441,9 +462,9 @@ for test_i in range(len(testAzsRel)):
         pixelErrorFun = pixelModels[model]
         errorFun = models[model]
 
-        cv2.imwrite(resultDir + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
         z = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-        plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '_id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
         predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
@@ -458,19 +479,28 @@ for test_i in range(len(testAzsRel)):
             bestPredEl = chEl.r.copy()
             bestVColors = chVColors.r.copy()
             bestComponent = chComponent.r.copy()
-            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '_best'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
 
-        cv2.imwrite(resultDir + 'imgs/samples/test'+ str(test_i) + '_sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
 
     fittedErrorFuns = np.append(fittedErrorFuns, bestModelLik)
-    fittedAzsGaussian = np.append(fittedAzsGaussian, bestPredAz)
-    fittedElevsGaussian = np.append(fittedElevsGaussian, bestPredEl)
+    fittedAzs = np.append(fittedAzs, bestPredAz)
+    fittedElevs = np.append(fittedElevs, bestPredEl)
+    fittedVColors = fittedVColors + [bestVColors]
+    fittedRelSHComponents = fittedRelSHComponents + [bestComponent]
 
+fittedVColors = np.vstack(fittedVColors)
+fittedRelSHComponents = np.vstack(fittedRelSHComponents)
 testOcclusions = dataOcclusions
 
-errorsFittedRFGaussian = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, fittedAzsGaussian, fittedElevsGaussian)
-meanAbsErrAzsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[0]))
-meanAbsErrElevsFittedRFGaussian = np.mean(np.abs(errorsFittedRFGaussian[1]))
+errorsFittedRF = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, fittedAzs, fittedElevs)
+meanAbsErrAzsFittedRF = np.mean(np.abs(errorsFittedRF[0]))
+meanAbsErrElevsFittedRF = np.mean(np.abs(errorsFittedRF[1]))
+
+errorsFittedSHComponents = np.linalg.norm(testComponentsGTRel - fittedRelSHComponents, axis=1)
+errorsFittedVColors = np.linalg.norm(testVColorGT - fittedVColors, axis=1)
+meanErrorsFittedSHComponents = np.mean(errorsFittedSHComponents)
+meanErrorsFittedVColors = np.mean(errorsFittedVColors)
 
 plt.ioff()
 
@@ -563,7 +593,7 @@ plt.close(fig)
 directory = resultDir + 'fitted-azimuth-error'
 
 fig = plt.figure()
-plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[0])
+plt.scatter(testElevsGT*180/np.pi, errorsFittedRF[0])
 plt.xlabel('Elevation (degrees)')
 plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
@@ -573,7 +603,7 @@ fig.savefig(directory + '_elev-performance-scatter.png')
 plt.close(fig)
 
 fig = plt.figure()
-plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[0])
+plt.scatter(testOcclusions*100.0,errorsFittedRF[0])
 plt.xlabel('Occlusion (%)')
 plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
@@ -583,7 +613,7 @@ fig.savefig(directory + '_occlusion-performance-scatter.png')
 plt.close(fig)
 
 fig = plt.figure()
-plt.scatter(testAzsRel*180/np.pi, errorsFittedRFGaussian[0])
+plt.scatter(testAzsRel*180/np.pi, errorsFittedRF[0])
 plt.xlabel('Azimuth (degrees)')
 plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
@@ -593,7 +623,7 @@ fig.savefig(directory  + '_azimuth-performance-scatter.png')
 plt.close(fig)
 
 fig = plt.figure()
-plt.hist(np.abs(errorsFittedRFGaussian[0]), bins=18)
+plt.hist(np.abs(errorsFittedRF[0]), bins=18)
 plt.xlabel('Angular error')
 plt.ylabel('Counts')
 x1,x2,y1,y2 = plt.axis()
@@ -605,7 +635,7 @@ plt.close(fig)
 directory = resultDir + 'fitted-elevation-error'
 
 fig = plt.figure()
-plt.scatter(testElevsGT*180/np.pi, errorsFittedRFGaussian[1])
+plt.scatter(testElevsGT*180/np.pi, errorsFittedRF[1])
 plt.xlabel('Elevation (degrees)')
 plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
@@ -615,7 +645,7 @@ fig.savefig(directory + '_elev-performance-scatter.png')
 plt.close(fig)
 
 fig = plt.figure()
-plt.scatter(testOcclusions*100.0,errorsFittedRFGaussian[1])
+plt.scatter(testOcclusions*100.0,errorsFittedRF[1])
 plt.xlabel('Occlusion (%)')
 plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
@@ -625,7 +655,7 @@ fig.savefig(directory + '_occlusion-performance-scatter.png')
 plt.close(fig)
 
 fig = plt.figure()
-plt.scatter(testAzsRel*180/np.pi, errorsFittedRFGaussian[1])
+plt.scatter(testAzsRel*180/np.pi, errorsFittedRF[1])
 plt.xlabel('Azimuth (degrees)')
 plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
@@ -635,7 +665,7 @@ fig.savefig(directory  + '_azimuth-performance-scatter.png')
 plt.close(fig)
 
 fig = plt.figure()
-plt.hist(np.abs(errorsFittedRFGaussian[1]), bins=18)
+plt.hist(np.abs(errorsFittedRF[1]), bins=18)
 plt.xlabel('Angular error')
 plt.ylabel('Counts')
 x1,x2,y1,y2 = plt.axis()
@@ -646,88 +676,6 @@ plt.close(fig)
 
 directory = resultDir + 'fitted-robust-azimuth-error'
 
-# fig = plt.figure()
-# plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[0])
-# plt.xlabel('Elevation (degrees)')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,90,-90,90))
-# plt.title('Performance scatter plot')
-# fig.savefig(directory + '_elev-performance-scatter.png')
-# plt.close(fig)
-#
-# fig = plt.figure()
-# plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[0])
-# plt.xlabel('Occlusion (%)')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,100,-180,180))
-# plt.title('Performance scatter plot')
-# fig.savefig(directory + '_occlusion-performance-scatter.png')
-# plt.close(fig)
-#
-# fig = plt.figure()
-# plt.scatter(testAzsRel*180/np.pi, errorsFittedRFRobust[0])
-# plt.xlabel('Azimuth (degrees)')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,360,-180,180))
-# plt.title('Performance scatter plot')
-# fig.savefig(directory  + '_azimuth-performance-scatter.png')
-# plt.close(fig)
-#
-# fig = plt.figure()
-# plt.hist(np.abs(errorsFittedRFRobust[0]), bins=18)
-# plt.xlabel('Angular error')
-# plt.ylabel('Counts')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((-180,180,y1, y2))
-# plt.title('Performance histogram')
-# fig.savefig(directory  + '_performance-histogram.png')
-# plt.close(fig)
-#
-# directory = resultDir + 'fitted-robust-elevation-error'
-#
-# fig = plt.figure()
-# plt.scatter(testElevsGT*180/np.pi, errorsFittedRFRobust[1])
-# plt.xlabel('Elevation (degrees)')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,90,-90,90))
-# plt.title('Performance scatter plot')
-# fig.savefig(directory + '_elev-performance-scatter.png')
-# plt.close(fig)
-#
-# fig = plt.figure()
-# plt.scatter(testOcclusions*100.0,errorsFittedRFRobust[1])
-# plt.xlabel('Occlusion (%)')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,100,-180,180))
-# plt.title('Performance scatter plot')
-# fig.savefig(directory + '_occlusion-performance-scatter.png')
-# plt.close(fig)
-#
-# fig = plt.figure()
-# plt.scatter(testAzsRel*180/np.pi, errorsFittedRFRobust[1])
-# plt.xlabel('Azimuth (degrees)')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,360,-180,180))
-# plt.title('Performance scatter plot')
-# fig.savefig(directory  + '_azimuth-performance-scatter.png')
-# plt.close(fig)
-#
-# fig = plt.figure()
-# plt.hist(np.abs(errorsFittedRFRobust[1]), bins=18)
-# plt.xlabel('Angular error')
-# plt.ylabel('Counts')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((-180,180,y1, y2))
-# plt.title('Performance histogram')
-# fig.savefig(directory  + '_performance-histogram.png')
-# plt.close(fig)
-
 plt.ion()
 
 #Write statistics to file.
@@ -737,32 +685,20 @@ with open(resultDir + 'performance.txt', 'w') as expfile:
     expfile.write("Avg Fitt NLL    :" +  str(np.mean(fittedErrorFuns))+ '\n')
     expfile.write("Mean Azimuth Error (predicted) " +  str(meanAbsErrAzs) + '\n')
     expfile.write("Mean Elevation Error (predicted) " +  str(meanAbsErrElevs)+ '\n')
-    expfile.write("Mean Azimuth Error (gaussian) " +  str(meanAbsErrAzsFittedRFGaussian)+ '\n')
-    expfile.write("Mean Elevation Error (gaussian) " +  str(meanAbsErrElevsFittedRFGaussian)+ '\n')
-    # expfile.write("Mean Azimuth Error (robust) " +  str(meanAbsErrAzsFittedRFRobust)+ '\n')
-    # expfile.write("Mean Elevation Error (robust) " +  str(meanAbsErrElevsFittedRFRobust)+ '\n\n')
-    # expfile.write("Mean Light Azimuth Error (predicted) " +  str(meanAbsErrLightAzsRF)+ '\n')
-    # expfile.write("Mean Light Elevation Error (predicted) " +  str(meanAbsErrLightElevsRF)+ '\n')
-    # expfile.write("Mean Light Azimuth Error (gaussian) " +  str(meanAbsErrLightAzsFittedRFGaussian)+ '\n')
-    # expfile.write("Mean Light Elevation Error (gaussian)" +  str(meanAbsErrLightElevsFittedRFGaussian)+ '\n')
-    # expfile.write("Mean Light Azimuth Error (robust)" +  str(meanAbsErrLightAzsFittedRFRobust)+ '\n')
-    # expfile.write("Mean Light Elevation Error (robust) " +  str(meanAbsErrLightElevsFittedRFRobust)+ '\n')
-    # expfile.write("meanAbsErrAzsFittedRFBoth " +  str(meanAbsErrAzsFittedRFBoth)+ '\n')
-    # expfile.write("meanAbsErrElevsFittedRFBoth " +  str(meanAbsErrElevsFittedRFBoth)+ '\n')
-#Write statistics to file.
+    expfile.write("Mean Azimuth Error (fitted) " +  str(meanAbsErrAzsFittedRF)+ '\n')
+    expfile.write("Mean Elevation Error (fitted) " +  str(meanAbsErrElevsFittedRF)+ '\n')
+    expfile.write("Mean SH Components Error (predicted) " +  str(meanErrorsSHComponents)+ '\n')
+    expfile.write("Mean Vertex Colors Error (predicted) " +  str(meanErrorsVColors)+ '\n')
+    expfile.write("Mean SH Components Error (fitted) " +  str(meanErrorsFittedSHComponents)+ '\n')
+    expfile.write("Mean Vertex Colors Error (fitted) " +  str(meanErrorsFittedVColors)+ '\n')
+
+
+
 
 headerDesc = "Pred NLL    :" + "Fitt NLL    :" + "Err Pred Az :" + "Err Pred El :" + "Err Fitted Az :" + "Err Fitted El :" + "Occlusions  :"
-perfSamplesData = np.hstack([predictedErrorFuns.reshape([-1,1]),fittedErrorFuns.reshape([-1,1]),errors[0].reshape([-1,1]),errors[1].reshape([-1,1]),errorsFittedRFGaussian[0].reshape([-1,1]),errorsFittedRFGaussian[1].reshape([-1,1]),testOcclusions.reshape([-1,1])])
+perfSamplesData = np.hstack([predictedErrorFuns.reshape([-1,1]),fittedErrorFuns.reshape([-1,1]),errors[0].reshape([-1,1]),errors[1].reshape([-1,1]),errorsFittedRF[0].reshape([-1,1]),errorsFittedRF[1].reshape([-1,1]),testOcclusions.reshape([-1,1])])
 
 np.savetxt(resultDir + 'performance_samples.txt', perfSamplesData, delimiter=',', fmt="%g", header=headerDesc)
-# with open(resultDir + 'performance_samples.txt', 'w') as expfile:
-#     # expfile.write(str(z))
-#     expfile.write("Pred NLL    :" +  str(predictedErrorFuns)+ '\n')
-#     expfile.write("Fitt NLL    :" +  str(fittedErrorFuns)+ '\n')
-#     expfile.write("Err Pred Az :" +  str(errors[0])+ '\n')
-#     expfile.write("Err Pred El :" +  str(errors[1])+ '\n')
-#     expfile.write("Err Fitted Az :" +  str(errorsFittedRFGaussian[0])+ '\n')
-#     expfile.write("Err Fitted El :" +  str(errorsFittedRFGaussian[1])+ '\n')
-#     expfile.write("Occlusions  :" +  str(testOcclusions)+ '\n')
+
 
 print("Finished backprojecting and fitting estimates.")
