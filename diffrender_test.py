@@ -188,7 +188,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_minimize_ov_std001_msaa_predSHNeuralNet_predVColor'
+testPrefix = 'test1_pred_minimize_ov_std001_msaa_predSHNeuralNet_predVColor_meanIm'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -333,6 +333,7 @@ elif 'neuralNetRelSHComponents' in parameterRecognitionModels:
     param_values = neuralNetModelRelSHComponents['params']
     grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
     grayTestImages = grayTestImages[:,None, :,:]
+    grayTestImages = grayTestImages - meanImage
     relSHComponentsPred = lasagne_nn.get_predictions(grayTestImages, model=modelType, param_values=param_values)
 
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
