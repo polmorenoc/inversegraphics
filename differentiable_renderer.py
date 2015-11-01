@@ -16,8 +16,18 @@ class DifferentiableRenderer(Ch):
         return self.renderer.r
 
     def compute_dr_wrt(self, wrt):
-        for param in params:
+        for param in self.params:
             if wrt is param:
-                #Perform occlusion differentiation.
+                jac = self.renderer.dr_wrt(wrt)
+                camJac = self.camera.dr_wrt(param)
+                boundary = self.renderer.boundaryid_image
+                bnd_bool = boundary != 4294967295
+                barycentric = self.renderer.barycentric_image
+                visibility = self.renderer.visibility_image
+                lidxs_out, ridxs_out, tidxs_out, bidxs_out, lidxs_int, ridxs_int, tidxs_int, bidxs_int = self.renderer.boundary_neighborhood(bnd_bool)
+
+
+
+
         else:
-            return renderer.dr_wrt(wrt)
+            return self.renderer.dr_wrt(wrt)
