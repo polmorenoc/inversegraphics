@@ -70,7 +70,7 @@ camDistance = 0.4
 
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))
+renderTeapotsList = np.arange(len(teapots))[0:1]
 sceneIdx = 0
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -272,6 +272,14 @@ if useGTasBackground:
 
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
+
+import differentiable_renderer
+paramsList = [chAz, chEl]
+
+diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
+
+ipdb.set_trace()
+
 # ipdb.set_trace()
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
