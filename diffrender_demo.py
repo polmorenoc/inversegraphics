@@ -44,7 +44,7 @@ glMode = glModes[0]
 sphericalMap = False
 
 np.random.seed(1)
-width, height = (300, 300)
+width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
@@ -70,7 +70,7 @@ camDistance = 0.4
 
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[0:1]
+renderTeapotsList = np.arange(len(teapots))
 sceneIdx = 0
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -182,7 +182,7 @@ chDistGT = ch.Ch([camDistance])
 totalOffsetGT = phiOffsetGT + chObjAzGT
 totalOffset = phiOffset
 
-chAmbientIntensityGT = ch.Ch([1.0])
+chAmbientIntensityGT = ch.Ch([0.3])
 shCoeffsRGBGT = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
 shCoeffsRGBGTRel = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
 
@@ -224,6 +224,7 @@ angle = ch.arcsin(chLightRad/chLightDist)
 z = chZonalHarmonics(angle)
 shDirLight = chZonalToSphericalHarmonics(z, np.pi/2 - chLightEl, chLightAz - np.pi/2) * clampedCosCoeffs
 chComponent = chAmbientSH + shDirLight*chLightIntensity
+chComponent = chComponentGT
 
 if useBlender:
     addEnvironmentMapWorld(envMapFilename, scene)
@@ -276,10 +277,8 @@ renderer = renderer_teapots[currentTeapotModel]
 import differentiable_renderer
 paramsList = [chAz, chEl]
 
-diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
-
-ipdb.set_trace()
-
+# diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
+diffRenderer = renderer
 # ipdb.set_trace()
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
@@ -355,10 +354,25 @@ pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobust
 modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
+negLikModel2 = -generative_models.modelLogLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)/numPixels
+
+negLikModelRobust2 = -generative_models.modelLogLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+
+pixelLikelihoodCh2 = generative_models.logPixelLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)
+
+pixelLikelihoodRobustCh2 = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances))
+
+post2 = generative_models.layerPosteriorsRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)[0]
+pixelModels2 = [pixelLikelihoodCh2, pixelLikelihoodRobustCh2, pixelLikelihoodRobustCh2]
+models2 = [negLikModel2, negLikModelRobust2, negLikModelRobust2]
+
 model = 0
 
 pixelErrorFun = pixelModels[model]
 errorFun = models[model]
+
+pixelErrorFun2 = pixelModels2[model]
+errorFun2 = models2[model]
 
 iterat = 0
 changedGT = False
@@ -444,7 +458,7 @@ if showSubplots:
     cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
     cb5.mappable = img5
 
-    ax6.set_title("Dr wrt. Elevation")
+    ax6.set_title("Dr wrt. Azimuth 2")
     drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
