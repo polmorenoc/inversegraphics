@@ -46,6 +46,8 @@ class DifferentiableRenderer(Ch):
         return self.renderer.r
 
     def compute_dr_wrt(self, wrt):
+        import ipdb
+
         for param in self.params_list:
             if wrt is param:
                 return self.gradient_pred(wrt)
@@ -56,7 +58,7 @@ class DifferentiableRenderer(Ch):
     def gradients(self):
         # self._call_on_changed()
 
-        observed = self.renderer.r
+        observed = self.renderer.color_image
         boundaryid_image = self.renderer.boundaryid_image
         barycentric = self.renderer.barycentric_image
         visibility = self.renderer.visibility_image
@@ -64,6 +66,8 @@ class DifferentiableRenderer(Ch):
         return self.dImage_wrt_2dVerts_bnd_gradient(observed, barycentric, observed.shape[0], observed.shape[1], boundaryid_image != 4294967295)
 
     def dImage_wrt_2dVerts_bnd_gradient(self, observed, barycentric, image_width, image_height, bnd_bool):
+
+        bnd_bool = np.logical_and(self.renderer.visibility_image != 4294967295, bnd_bool)
 
         n_channels = np.atleast_3d(observed).shape[2]
         shape = [image_height, image_width]
@@ -107,9 +111,9 @@ class DifferentiableRenderer(Ch):
         ydiff = ydiffnb
 
         dybt = -np.vstack([np.diff(observed, n=1, axis=0), np.zeros([1,observed.shape[1],3])])
-        dxrl = -np.hstack([np.diff(observed, n=1, axis=1), np.zeros([observed.shape[0],1,3])])
-
         dytb = np.vstack([np.zeros([1,observed.shape[1],3]), np.flipud(np.diff(np.flipud(observed), n=1, axis=0))])
+
+        dxrl = -np.hstack([np.diff(observed, n=1, axis=1), np.zeros([observed.shape[0],1,3])])
         dxlr = np.hstack([np.zeros([observed.shape[0],1,3]),np.fliplr(np.diff(np.fliplr(observed), n=1, axis=1))])
 
         bary_sl = np.roll(barycentric , shift=-1, axis=1)
@@ -120,7 +124,7 @@ class DifferentiableRenderer(Ch):
         return xdiff, ydiff, dybt, dxrl, dytb, dxlr, bary_sl, bary_sr, bary_st, bary_sb
 
     def gradient_pred(self, paramWrt):
-        observed = self.renderer.r
+        observed = self.renderer.color_image
         boundaryid_image = self.renderer.boundaryid_image
         barycentric = self.renderer.barycentric_image
         visibility = self.renderer.visibility_image
@@ -131,6 +135,7 @@ class DifferentiableRenderer(Ch):
     def boundary_neighborhood(self):
         boundary = self.renderer.boundaryid_image != 4294967295
         visibility = self.renderer.visibility_image != 4294967295
+
         boundary = np.logical_and(visibility, boundary)
         shape = boundary.shape
 
@@ -158,8 +163,6 @@ class DifferentiableRenderer(Ch):
         tidxs_int = np.where(pixt.ravel())[0] + shape[1]
         bidxs_int = np.where(pixb.ravel())[0]
 
-        # import ipdb
-        # ipdb.set_trace()
 
         return pixr, pixl, pixt, pixb, lidxs_out, ridxs_out, tidxs_out, bidxs_out, lidxs_int, ridxs_int, tidxs_int, bidxs_int
 
@@ -167,11 +170,23 @@ class DifferentiableRenderer(Ch):
         """Construct a sparse jacobian that relates 2D projected vertex positions
         (in the columns) to pixel values (in the rows). This can be done
         in two steps."""
+        bnd_bool = np.logical_and(bnd_bool, self.renderer.visibility_image != 4294967295)
 
         camJac = self.renderer.camera.dr_wrt(paramWrt)
 
         xdiff, ydiff, dybt, dxrl, dytb, dxlr, bary_sl, bary_sr, bary_st, bary_sb = self.gradients()
+
         pixr, pixl, pixt, pixb, lidxs_out, ridxs_out, tidxs_out, bidxs_out, lidxs_int, ridxs_int, tidxs_int, bidxs_int = self.boundary_neighborhood()
+
+        lidxs_out = np.where(bnd_bool.ravel())[0]-1
+        ridxs_out = np.where(bnd_bool.ravel())[0]+1
+        tidxs_out = np.where(bnd_bool.ravel())[0]-bnd_bool.shape[1]
+        bidxs_out = np.where(bnd_bool.ravel())[0]+bnd_bool.shape[1]
+
+        lidxs_int = np.where(bnd_bool.ravel())[0]
+        ridxs_int= np.where(bnd_bool.ravel())[0]
+        tidxs_int= np.where(bnd_bool.ravel())[0]
+        bidxs_int = np.where(bnd_bool.ravel())[0]
 
         #Where are triangles moving wrt to the image coordinates at the boundaries?
         lintGrad = camJac[f[visibility.ravel()[lidxs_int]]*2]
@@ -179,36 +194,37 @@ class DifferentiableRenderer(Ch):
         tintGrad = camJac[f[visibility.ravel()[tidxs_int]]*2+1]
         bintGrad = camJac[f[visibility.ravel()[bidxs_int]]*2+1]
 
-        # lintGrad[0] is a hack, should use barycentric at least.
-
-
-        lidx = lintGrad[:,0,0] < -0.001
-        xdiff.ravel()[lidxs_out[lidx]] = xdiff.ravel()[lidxs_int[lidx]]
+        lidx = lintGrad[:,0,0] < -0.0001
+        xdiff.reshape([-1,3])[lidxs_out[lidx]] = xdiff.reshape([-1,3])[lidxs_int[lidx]]
         barycentric.reshape([-1,3])[lidxs_out[lidx]] = barycentric.reshape([-1,3])[lidxs_int[lidx]]
         visibility.ravel()[lidxs_out[lidx]] = visibility.ravel()[lidxs_int[lidx]]
-        xdiff.ravel()[lidxs_int[lidx]] = dxrl.ravel()[lidxs_int[lidx]]
+        xdiff.reshape([-1,3])[lidxs_int[lidx]] = dxrl.reshape([-1,3])[lidxs_int[lidx]]
+
         # visible.ravel()[lidxs_out[lidx]] = True
 
-        ridx = rintGrad[:,0,0] > 0.001
-        xdiff.ravel()[ridxs_out[ridx]] = xdiff.ravel()[ridxs_int[ridx]]
+        ridx = rintGrad[:,0,0] > 0.0001
+        xdiff.reshape([-1,3])[ridxs_out[ridx]] = xdiff.reshape([-1,3])[ridxs_int[ridx]]
         barycentric.reshape([-1,3])[ridxs_out[ridx]] = barycentric.reshape([-1,3])[ridxs_int[ridx]]
         visibility.ravel()[ridxs_out[ridx]] = visibility.ravel()[ridxs_int[ridx]]
-        xdiff.ravel()[ridxs_int[ridx]] = dxlr.ravel()[ridxs_int[ridx]]
+        xdiff.reshape([-1,3])[ridxs_int[ridx]] = dxlr.reshape([-1,3])[ridxs_int[ridx]]
         # visible.ravel()[ridxs_out[ridx]] = True
 
-        tidx = tintGrad[:,0,0] > 0.001
-        ydiff.ravel()[tidxs_out[tidx]] = ydiff.ravel()[tidxs_int[tidx]]
+        tidx = tintGrad[:,0,0] > 0.0001
+        ydiff.reshape([-1,3])[tidxs_out[tidx]] = ydiff.reshape([-1,3])[tidxs_int[tidx]]
         barycentric.reshape([-1,3])[tidxs_out[tidx]] = barycentric.reshape([-1,3])[tidxs_int[tidx]]
         visibility.ravel()[tidxs_out[tidx]] = visibility.ravel()[tidxs_int[tidx]]
-        ydiff.ravel()[tidxs_int[tidx]] = dybt.ravel()[tidxs_int[tidx]]
+        ydiff.reshape([-1,3])[tidxs_int[tidx]] = dybt.reshape([-1,3])[tidxs_int[tidx]]
         # visible.ravel()[tidxs_out[tidx]] = True
 
-        bidx = bintGrad[:,0,0] < -0.001
-        ydiff.ravel()[bidxs_out[bidx]] = ydiff.ravel()[bidxs_int[bidx]]
+        bidx = bintGrad[:,0,0] < -0.0001
+        ydiff.reshape([-1,3])[bidxs_out[bidx]] = ydiff.reshape([-1,3])[bidxs_int[bidx]]
         barycentric.reshape([-1,3])[bidxs_out[bidx]] = barycentric.reshape([-1,3])[bidxs_int[bidx]]
         visibility.ravel()[bidxs_out[bidx]] = visibility.ravel()[bidxs_int[bidx]]
-        ydiff.ravel()[bidxs_int[bidx]] = dytb.ravel()[bidxs_int[bidx]]
+        ydiff.reshape([-1,3])[bidxs_int[bidx]] = dytb.reshape([-1,3])[bidxs_int[bidx]]
         # visible.ravel()[bidxs_out[bidx]] = True
+
+        # import ipdb
+        # ipdb.set_trace()
 
         visible = np.nonzero(visibility.ravel() != 4294967295)[0]
 

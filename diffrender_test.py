@@ -188,7 +188,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_minimize_ov_std001_msaa_predSHNeuralNet_predVColor_meanIm'
+testPrefix = 'test1_pred_minimize_ov_std001_noedgeoverdraw_msaa'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -265,7 +265,7 @@ model = 1
 maxiter = 500
 numSamples = 10
 
-free_variables = [ chAz, chEl, chComponent, chVColors]
+free_variables = [ chAz, chEl]
 # free_variables = [ chAz, chEl]
 
 mintime = time.time()
@@ -433,9 +433,9 @@ for test_i in range(len(testAzsRel)):
             # color = recognition_models.filteredMean(rendererGT.r, 40)
             color = recognition_models.midColor(rendererGT.r)
             color = testVColorGT[test_i]
-            color = vColorsPred[test_i]
+            # color = vColorsPred[test_i]
             SHcomponents = relSHComponentsPred[test_i].copy()
-            # SHcomponents = testComponentsGTRel[test_i]
+            SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]

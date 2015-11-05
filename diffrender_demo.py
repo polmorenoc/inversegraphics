@@ -70,7 +70,7 @@ camDistance = 0.4
 
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))
+renderTeapotsList = np.arange(len(teapots))[0:1]
 sceneIdx = 0
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -202,6 +202,7 @@ shDirLightGTOriginal = np.array(chZonalToSphericalHarmonics(zGT, np.pi/2 - chLig
 shDirLightGT = ch.Ch(shDirLightGTOriginal.copy())
 chComponentGTOriginal = ch.array(np.array(chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs).copy())
 chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs
+chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
 chAz = ch.Ch([0])
 chObjAz = ch.Ch([0])
@@ -271,15 +272,17 @@ if useGTasBackground:
         renderer = renderer_teapots[teapot_i]
         renderer.set(background_image=rendererGT.r)
 
+image_processing.diffHog(rendererGT)
+
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 
 import differentiable_renderer
 paramsList = [chAz, chEl]
 
-# diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
-diffRenderer = renderer
-# ipdb.set_trace()
+diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
+# diffRenderer = renderer
+
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -374,6 +377,8 @@ errorFun = models[model]
 pixelErrorFun2 = pixelModels2[model]
 errorFun2 = models2[model]
 
+
+
 iterat = 0
 changedGT = False
 refresh = True
@@ -453,13 +458,13 @@ if showSubplots:
     ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
     ax5.set_title("Dr wrt. Azimuth")
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = -pixelErrorFun2.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
     cb5.mappable = img5
 
     ax6.set_title("Dr wrt. Azimuth 2")
-    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
     cb6.mappable = img6
@@ -533,11 +538,11 @@ def refreshSubplots():
     cb3.mappable = pim3
     cb3.update_normal(pim3)
     ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = -pixelErrorFun2.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb5.mappable = img5
     cb5.update_normal(img5)
-    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb6.mappable = img6
     cb6.update_normal(img6)
@@ -790,14 +795,15 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
         chAz[:] = chAz.r[0] - radians(5)
         azimuth = chAz.r[0] - radians(5)
-        chCosAz[:] = np.cos(azimuth)
-        chSinAz[:] = np.sin(azimuth)
+        # chCosAz[:] = np.cos(azimuth)
+        # chSinAz[:] = np.sin(azimuth)
+
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
         refresh = True
         chAz[:]  = chAz.r[0] + radians(5)
         azimuth = chAz.r[0] + radians(5)
-        chCosAz[:] = np.cos(azimuth)
-        chSinAz[:] = np.sin(azimuth)
+        # chCosAz[:] = np.cos(azimuth)
+        # chSinAz[:] = np.sin(azimuth)
 
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
         refresh = True
@@ -818,29 +824,45 @@ def readKeys(window, key, scancode, action, mods):
             elevation = np.pi/2 - 0.0002
         chLogCosEl[:] = np.log(np.cos(elevation))
         chLogSinEl[:] = np.log(np.sin(elevation))
+
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
-        print("Left modifier!")
         refresh = True
-        chAzGT[0] = chAzGT[0].r - radians(1)
+        chAz[:] = chAz.r[0] - radians(1)
+        # azimuth = chAz.r[0] - radians(1)
+        # chCosAz[:] = np.cos(azimuth)
+        # chSinAz[:] = np.sin(azimuth)
+
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
         refresh = True
-        # chAz[0] = chAz[0].r + radians(1)
-        rotation[:] = rotation.r[0] + np.pi/4
-        # rotation[:] = np.pi/2
-        shCoeffsRGBGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-        chAzGT[:] = rotation.r[:]
-        # ipdb.set_trace()
-        shOriginal = chComponentGTOriginal[[0,3,2,1,4,5,6,7,8]]
-        shOriginalDir = shDirLightGTOriginal[[0,3,2,1,4,5,6,7,8]]
-        # chComponentGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(rotation), shOriginal)[[0,3,2,1,4,5,6,7,8]]
-        # shDirLightGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(rotation), shOriginalDir)[[0,3,2,1,4,5,6,7,8]]
-        # shDirLightGT[:] = np.dot(shDirLightGTOriginal.T, light_probes.sphericalHarmonicsZRotation(rotation)).T[:]
-        # shDirLightGT[:] = np.sum(np.array(light_probes.sphericalHarmonicsZRotation(rotation) * shDirLightGTOriginal[:,None]), axis=1)
-        # shDirLightGT[:] = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT + rotation[:] - np.pi/2).r[:]
-        print("Original: " + str(shDirLightGTOriginal))
-        print(str(shCoeffsRGBGT.r))
-        print(str(shDirLightGT.r))
-        print(str(rendererGT.tn[0]))
+        chAz[:]  = chAz.r[0] + radians(1)
+        # azimuth = chAz.r[0] + radians(1)
+        # chCosAz[:] = np.cos(azimuth)
+        # chSinAz[:] = np.sin(azimuth)
+
+    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
+    #     print("Left modifier!")
+    #     refresh = True
+    #     chAzGT[0] = chAzGT[0].r - radians(1)
+    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_RIGHT and action == glfw.RELEASE:
+    #     refresh = True
+    #     # chAz[0] = chAz[0].r + radians(1)
+    #     rotation[:] = rotation.r[0] + np.pi/4
+    #     # rotation[:] = np.pi/2
+    #     shCoeffsRGBGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    #     chAzGT[:] = rotation.r[:]
+    #     # ipdb.set_trace()
+    #     shOriginal = chComponentGTOriginal[[0,3,2,1,4,5,6,7,8]]
+    #     shOriginalDir = shDirLightGTOriginal[[0,3,2,1,4,5,6,7,8]]
+    #     # chComponentGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(rotation), shOriginal)[[0,3,2,1,4,5,6,7,8]]
+    #     # shDirLightGT[:] = np.dot(light_probes.sphericalHarmonicsZRotation(rotation), shOriginalDir)[[0,3,2,1,4,5,6,7,8]]
+    #     # shDirLightGT[:] = np.dot(shDirLightGTOriginal.T, light_probes.sphericalHarmonicsZRotation(rotation)).T[:]
+    #     # shDirLightGT[:] = np.sum(np.array(light_probes.sphericalHarmonicsZRotation(rotation) * shDirLightGTOriginal[:,None]), axis=1)
+    #     # shDirLightGT[:] = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT + rotation[:] - np.pi/2).r[:]
+    #     print("Original: " + str(shDirLightGTOriginal))
+    #     print(str(shCoeffsRGBGT.r))
+    #     print(str(shDirLightGT.r))
+    #     print(str(rendererGT.tn[0]))
+
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_DOWN and action == glfw.RELEASE:
         refresh = True
         chEl[0] = chEl[0].r - radians(1)
@@ -1027,6 +1049,10 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
 
     global pixelErrorFun
+    global pixelErrorFun2
+    global errorFun2
+    global models2
+    global pixelModels2
     global model
     global models
     global modelsDescr
@@ -1038,6 +1064,9 @@ def readKeys(window, key, scancode, action, mods):
         print("Using " + modelsDescr[model])
         errorFun = models[model]
         pixelErrorFun = pixelModels[model]
+
+        errorFun2 = models2[model]
+        pixelErrorFun2 = pixelModels2[model]
 
         if model == 2:
             reduceVariance = True
