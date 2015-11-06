@@ -59,38 +59,43 @@ def featuresIlluminationDirection(image,win):
 
     return np.hstack([magnitudes.ravel()[:,None], phases.ravel()[:,None]])
 
+from chumpy import depends_on, Ch
 import chumpy as ch
 from math import radians
 import cv2
 import scipy
-
-class convolve2D(ch.Ch):
+import matplotlib.pyplot as plt
+class convolve2D(Ch):
     terms = 'filter'
     dterms = 'x'
+
     def compute_r(self):
-        return scipy.signal.convolve2d(self.x, self.filter)
+        convolved = scipy.signal.convolve2d(self.x, self.filter)
+        return convolved[np.int((convolved.shape[0]-self.x.shape[0])/2):np.int((convolved.shape[0]-self.x.shape[0])/2) + self.x.shape[1], np.int((convolved.shape[1]-self.x.shape[1])/2):np.int((convolved.shape[1]-self.x.shape[1])/2) + self.x.shape[1]]
+
+    @depends_on(terms + dterms)
+    def dr_wrt_convolution(self):
+        widthRolls = self.x.shape[1]
+        heightRolls = self.x.shape[0]
+        tmpShape = [self.x.shape[0]+self.filter.shape[0], self.x.shape[1]+self.filter.shape[1]]
+        template = np.zeros(tmpShape)
+        template[0:self.filter.shape[0], 0:self.filter.shape[1]] = self.filter
+        jacs = []
+        for i in range(heightRolls):
+            for j in range(widthRolls):
+                templateRolled = np.roll(template, shift=i, axis=0)
+                templateRolled = np.roll(templateRolled, shift=j, axis=1)
+                templateGrad = templateRolled[tmpShape[0] - self.x.shape[0] - np.int(self.filter.shape[0]/2): tmpShape[0] - np.int(self.filter.shape[0]/2), tmpShape[1] - self.x.shape[1] - np.int(self.filter.shape[1]/2): tmpShape[1] - np.int(self.filter.shape[1]/2)]
+                jacs = jacs + [scipy.sparse.coo_matrix(templateGrad.ravel())]
+        return scipy.sparse.vstack(jacs).tocsc()
 
     def compute_dr_wrt(self, wrt):
         if wrt is self.x:
-            widthRolls = self.x.shape[1]
-            heightRolls = self.x.shape[0]
-            tmpShape = [self.x.shape[0]+self.filter.shape[0], self.x.shape[1]+self.x.shape[1]-self.filter.shape[1]]
-            template = np.zeros(tmpShape)
-            template[0:self.filter.shape[0], 0:self.filter.shape[1]] = self.filter
-            jacs = []
-            for i in range(heightRolls):
-                for j in range(widthRolls):
-                    templateRolled = np.roll(template, shift=i, axis=0)
-                    templateRolled = np.roll(templateRolled, shift=j, axis=1)
-                    jacs = jacs + [templateRolled[tmpShape[0] - self.x.shape[0] - np.int(self.filter.shape[0]/2): tmpShape[0] - np.int(self.filter.shape[0]/2)].ravel(), templateRolled[tmpShape[1] - self.x.shape[1] - np.int(self.filter.shape[1]/2): tmpShape[1] - np.int(self.filter.shape[1]/2)].ravel()]
-            jacs = np.vstack(jacs)
-            return jacs
+            return self.dr_wrt_convolution
         else:
             return None
 
-def diffHog(image, numOrient = 8, cwidth=5, cheight=5):
-
-
+def diffHog(image, numOrient = 8, cwidth=15, cheight=15):
     image = 0.3*image[:,:,0] +  0.59*image[:,:,1] + 0.11*image[:,:,2]
     gy = image[:-2,1:-1] - image[2:,1:-1] + 0.0001
     gx = image[1:-1,:-2] - image[1:-1, 2:] + 0.0001
@@ -108,12 +113,12 @@ def diffHog(image, numOrient = 8, cwidth=5, cheight=5):
     fb = 1./(1. + ch.exp(1 - ch.abs(ch.expand_dims(angles,2) - meanOrient.reshape([1,1,numOrient]))*numOrient/radians(180)))
 
     Fb = ch.expand_dims(magn,2)*fb
-    ipdb.set_trace()
-    Fs0 = convolve2D(x=Fb[:,:,0], filter=distFilter)
 
-
-    Fs_list = [convolve2D(x=Fb[:,:,Fbi], filter=distFilter) for Fbi in range(numOrient)]
+    Fs_list = [convolve2D(x=Fb[:,:,Fbi], filter=distFilter).reshape([Fb.shape[0], Fb.shape[1],1]) for Fbi in range(numOrient)]
     Fs = ch.concatenate(Fs_list, axis=2)
     epsilon = 0.00001
-    v = Fs/(ch.sum(Fs**2, axis=2) + epsilon)
+
+    v = Fs/(ch.sum(Fs**2, axis=2).reshape([Fb.shape[0], Fb.shape[1],1]) + epsilon)
+
+    ipdb.set_trace()
 
