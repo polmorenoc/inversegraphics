@@ -38,7 +38,7 @@ unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
 refreshWhileMinimizing = False
-computePerformance = False
+computePerformance = True
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
@@ -174,7 +174,7 @@ phiOffsetGT = 0
 phiOffset = ch.Ch([0])
 
 chObjAzGT = rotation
-chAzGT = ch.Ch([0])
+chAzGT = ch.Ch([np.pi/2])
 chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(np.pi/4)
 chDistGT = ch.Ch([camDistance])
@@ -202,9 +202,9 @@ shDirLightGTOriginal = np.array(chZonalToSphericalHarmonics(zGT, np.pi/2 - chLig
 shDirLightGT = ch.Ch(shDirLightGTOriginal.copy())
 chComponentGTOriginal = ch.array(np.array(chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs).copy())
 chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs
-chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
+# chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
-chAz = ch.Ch([0])
+chAz = ch.Ch([np.pi/2])
 chObjAz = ch.Ch([0])
 chEl =  ch.Ch([np.pi/4])
 chAzRel = chAz - chObjAz
@@ -271,8 +271,6 @@ if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
         renderer.set(background_image=rendererGT.r)
-
-image_processing.diffHog(rendererGT)
 
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
@@ -352,10 +350,19 @@ pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rende
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-models = [negLikModel, negLikModelRobust, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
-modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)"]
+hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+hogRenderer.dr_wrt(chAz)
+
+hogE_raw = hogGT - hogRenderer
+hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+hogError = ch.SumOfSquares(hogE_raw)
+
+models = [negLikModel, negLikModelRobust, negLikModelRobust, hogError]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh, hogCellErrors]
+modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)", "HOG"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
+
 
 negLikModel2 = -generative_models.modelLogLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)/numPixels
 
@@ -376,7 +383,6 @@ errorFun = models[model]
 
 pixelErrorFun2 = pixelModels2[model]
 errorFun2 = models2[model]
-
 
 
 iterat = 0
@@ -455,16 +461,17 @@ if showSubplots:
     cb3.mappable = pim3
 
     ax4.set_title("Posterior probabilities")
-    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    pim4 = ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    cb4 = plt.colorbar(pim4, ax=ax4,use_gridspec=True)
 
     ax5.set_title("Dr wrt. Azimuth")
-    drazsum = -pixelErrorFun2.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
     cb5.mappable = img5
 
-    ax6.set_title("Dr wrt. Azimuth 2")
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    ax6.set_title("Dr wrt. Elevation")
+    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
     cb6.mappable = img6
@@ -528,21 +535,40 @@ if computePerformance:
 
 def refreshSubplots():
     #Other subplots visualizing renders and its pixel derivatives
+
     edges = renderer.boundarybool_image
     imagegt = imageGT()
     gtoverlay = imagegt.copy()
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1.set_data(gtoverlay)
     pim2.set_data(renderer.r)
-    pim3 = ax3.imshow(-pixelErrorFun.r)
-    cb3.mappable = pim3
-    cb3.update_normal(pim3)
-    ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-    drazsum = -pixelErrorFun2.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    if model != 3:
+        ax3.set_title("Pixel negative log probabilities")
+        pim3 = ax3.imshow(-pixelErrorFun.r)
+        cb3.mappable = pim3
+        cb3.update_normal(pim3)
+    else:
+        ax3.set_title("HoG Image GT")
+        pim3 = ax3.imshow(hogImGT.r)
+        cb3.mappable = pim3
+        cb3.update_normal(pim3)
+
+    if model != 3:
+        ax4.set_title("Posterior probabilities")
+        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    else:
+        ax4.set_title("HoG image renderer")
+        ax4.set_title("HoG Image GT")
+        pim4 = ax4.imshow(hogImRenderer.r)
+        cb4.mappable = pim4
+        cb4.update_normal(pim4)
+
+    sdy, sdx = pixelErrorFun.shape
+    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(sdy,sdx,1).reshape(sdy,sdx,1)
     img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb5.mappable = img5
     cb5.update_normal(img5)
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(sdy, sdx,1).reshape(sdy,sdx,1)
     img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb6.mappable = img6
     cb6.update_normal(img6)
@@ -961,7 +987,7 @@ def readKeys(window, key, scancode, action, mods):
     #Compute in order to plot the surface neighouring the azimuth/el of the gradients and error function.
     global exploreSurfaceBool
     if key == glfw.KEY_E and action == glfw.RELEASE:
-        print("Key E pressed??")
+        print("Key E pressed?")
         exploreSurfaceBool = True
 
     if key == glfw.KEY_P and action == glfw.RELEASE:
@@ -1065,8 +1091,8 @@ def readKeys(window, key, scancode, action, mods):
         errorFun = models[model]
         pixelErrorFun = pixelModels[model]
 
-        errorFun2 = models2[model]
-        pixelErrorFun2 = pixelModels2[model]
+        # errorFun2 = models2[model]
+        # pixelErrorFun2 = pixelModels2[model]
 
         if model == 2:
             reduceVariance = True
@@ -1114,6 +1140,10 @@ def timeGradients(iterations):
     print("Per iteration time of " + str((time.time() - t)/iterations))
 
 def exploreSurface():
+    global drawSurf
+    global errorFun
+    global refresh
+
     if computePerformance:
         print("Estimating cost function surface and gradients...")
         drawSurf = True
@@ -1295,8 +1325,19 @@ if demoMode:
             pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
             pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
-            models = [negLikModel, negLikModelRobust, negLikModelRobust]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+
+            hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT, drconv)
+            hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+            hogRenderer.dr_wrt(chAz)
+
+            hogE_raw = hogGT - hogRenderer
+            hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+            hogError = ch.SumOfSquares(hogE_raw)
+
+
+            models = [negLikModel, negLikModelRobust, negLikModelRobust, hogError]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh, hogCellErrors]
+
             pixelErrorFun = pixelModels[model]
             errorFun = models[model]
 

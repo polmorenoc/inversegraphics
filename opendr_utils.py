@@ -371,7 +371,7 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
 
     haveTextures_listflat = [item for sublist in haveTextures_list for item in sublist]
 
-    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=True)
+    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=False)
     renderer.sharedWin = sharedWin
     # renderer.clear()
     renderer.initGL()
