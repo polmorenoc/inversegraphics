@@ -39,6 +39,7 @@ loadSavedSH = False
 useGTasBackground = False
 refreshWhileMinimizing = False
 computePerformance = True
+savePerformance = True
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
@@ -575,7 +576,7 @@ def refreshSubplots():
     f.canvas.draw()
     plt.pause(0.01)
 
-def plotSurface():
+def plotSurface(model):
     global figperf
     global axperf
     global surf
@@ -589,7 +590,6 @@ def plotSurface():
     global chAzGT
     global chElGT
     global chDistGT
-    global model
     global scene
     if not plotMinimization and not drawSurf:
         figperf.clear()
@@ -1143,6 +1143,7 @@ def exploreSurface():
     global drawSurf
     global errorFun
     global refresh
+    global model
 
     if computePerformance:
         print("Estimating cost function surface and gradients...")
@@ -1196,12 +1197,40 @@ def exploreSurface():
         chEl[:] = chElOld
 
         refresh = True
+
+        if savePerformance:
+            def writeStats(model):
+                with open('stats/statistics.txt') as statsFile:
+                    statsFile.write("**** Statistics for " + modelsDescr[model] + " ****" )
+                    if drawSurf:
+                        avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
+                        statsFile.write("** Approx gradients - finite differenes." )
+                        statsFile.write("Avg Eucl. distance :: " + str(avgError))
+                        norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+                        norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
+                        avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
+                        statsFile.write("Avg Angle.: " + str(np.mean(avgAngle)))
+                        statsFile.write("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
+                        idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
+                        azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+                        elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
+                        statsFile.write("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
+                        statsFile.write("Minimum Elevation difference of " + str(elDiff*180/np.pi))
+
+                    azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
+                    elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
+                    statsFile.write("Current Azimuth difference of " + str(azDiff*180/np.pi))
+                    statsFile.write("Current Elevation difference of " + str(elDiff*180/np.pi))
+
+            for model_i in models:
+                writeStats(model_i)
+                plotSurface(model_i)
+                plt.savefig('stats/surfaceModel' + modelsDescr[model_i])
         print("Finshed estimating.")
 
+
 if demoMode:
-
     glfw.set_key_callback(win, readKeys)
-
     while not exit:
         # Poll for and process events
 
@@ -1360,6 +1389,8 @@ if demoMode:
             if computePerformance and drawSurf:
                 plotSurface()
 
+
+
         # if demoMode or drawSurf:
         #     plt.pause(0.1)
         #     plt.draw()
@@ -1367,8 +1398,3 @@ if demoMode:
             refresh = False
 
     refreshSubplots()
-
-
-#
-# if glMode == 'glfw':
-#     glfw.terminate()
