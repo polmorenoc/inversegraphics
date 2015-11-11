@@ -188,7 +188,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_minimize_ov_std001_noedgeoverdraw_msaa'
+testPrefix = 'test1_pred_minimize_ov_msaa_ITERATIVE'
 
 gtPrefix = 'train1'
 trainPrefix = 'train1'
@@ -260,8 +260,12 @@ testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
+
+optimizationTypeDescr = ["normal", "joint"]
+optimizationType = 0
+
 method = 1
-model = 1
+model = 2
 maxiter = 500
 numSamples = 10
 
@@ -277,7 +281,8 @@ bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom']
 
-options={'disp':False, 'maxiter':maxiter, 'lr':0.001, 'momentum':0.7, 'decay':0.99}
+options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+# options={'disp':False, 'maxiter':maxiter}
 # testRenderer = np.int(dataTeapotIds[testSet][0])
 testRenderer = np.int(dataTeapotIds[0])
 renderer = renderer_teapots[testRenderer]
@@ -394,9 +399,21 @@ negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, re
 pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
 pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
-models = [negLikModel, negLikModelRobust, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
-pixelErrorFun = pixelModels[model]
+
+hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+
+hogE_raw = hogGT - hogRenderer
+hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+hogError = ch.SumOfSquares(hogE_raw)
+
+models = [negLikModel, negLikModelRobust, hogError]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
+
+# models = [negLikModel, negLikModelRobust, negLikModelRobust]
+# pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+# pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
 for test_i in range(len(testAzsRel)):
@@ -408,7 +425,7 @@ for test_i in range(len(testAzsRel)):
     bestComponent = chComponent.r
 
     testId = dataIds[test_i]
-    print("Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
+    print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
     rendererGT[:] = images[test_i]
 
@@ -432,10 +449,10 @@ for test_i in range(len(testAzsRel)):
             # color = recognition_models.meanColor(rendererGT.r, 40)
             # color = recognition_models.filteredMean(rendererGT.r, 40)
             color = recognition_models.midColor(rendererGT.r)
-            color = testVColorGT[test_i]
-            # color = vColorsPred[test_i]
+            # color = testVColorGT[test_i]
+            color = vColorsPred[test_i]
             SHcomponents = relSHComponentsPred[test_i].copy()
-            SHcomponents = testComponentsGTRel[test_i]
+            # SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -458,21 +475,85 @@ for test_i in range(len(testAzsRel)):
         pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
         pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
         post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
-        models = [negLikModel, negLikModelRobust, negLikModelRobust]
-        pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+
+        hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT,drconv)
+        hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+
+        hogE_raw = hogGT - hogRenderer
+        hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+        hogError = ch.SumOfSquares(hogE_raw)
+
+        models = [negLikModel, negLikModelRobust, hogError]
+        pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+        modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
+
         pixelErrorFun = pixelModels[model]
         errorFun = models[model]
 
         cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
-        z = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
-        plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
         predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
         global iterat
         iterat = 0
 
-        ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+        sys.stdout.flush()
+        if optimizationTypeDescr[optimizationType] == 'normal':
+            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+        elif optimizationTypeDescr[optimizationType] == 'joint':
+            currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
+            currSHError = np.linalg.norm(testComponentsGTRel[test_i] - chComponent.r)
+            currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
+            currErrorGaussian = models[0].r
+            currErrorRobust = models[1].r
+            currErrorHoG = models[2].r
+            print("Predicted errors:")
+            print("Az error: " + str(currPoseError[0]))
+            print("El error: " + str(currPoseError[1]))
+            print("VColor error: " + str(currVColorError))
+            print("SH error: " + str(currSHError))
+            print("Gaussian likelihood: " + str(currErrorGaussian))
+            print("Robust likelihood: " + str(currErrorRobust))
+            print("HoG error: " + str(currErrorHoG))
+
+            free_variables = [ chAz, chEl]
+            ch.minimize({'raw': models[2]}, bounds=None, method=methods[4], x0=free_variables, callback=cb, options=options)
+
+            sys.stdout.flush()
+            currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
+            currErrorGaussian = models[0].r
+            currErrorRobust = models[1].r
+            currErrorHoG = models[2].r
+            print("HoG fitted errors:")
+            print("Az error: " + str(currPoseError[0]))
+            print("El error: " + str(currPoseError[1]))
+            print("Gaussian likelihood: " + str(currErrorGaussian))
+            print("Robust likelihood: " + str(currErrorRobust))
+            print("HoG error: " + str(currErrorHoG))
+
+            free_variables = [ chAz, chEl, chVColors, chComponent]
+
+            ch.minimize({'raw': models[1]}, bounds=None, method=methods[1], x0=free_variables, callback=cb, options=options)
+
+            sys.stdout.flush()
+            currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
+            currSHError = np.linalg.norm(testComponentsGTRel[test_i] - chComponent.r)
+            currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
+            currErrorGaussian = models[0].r
+            currErrorRobust = models[1].r
+            currErrorHoG = models[2].r
+            print("Joint fitted errors:")
+            print("Az error: " + str(currPoseError[0]))
+            print("El error: " + str(currPoseError[1]))
+            print("VColor error: " + str(currVColorError))
+            print("SH error: " + str(currSHError))
+            print("Gaussian likelihood: " + str(currErrorGaussian))
+            print("Robust likelihood: " + str(currErrorRobust))
+            print("HoG error: " + str(currErrorHoG))
+
+            sys.stdout.flush()
 
         if errorFun.r < bestModelLik:
             bestModelLik = errorFun.r.copy()

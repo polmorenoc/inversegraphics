@@ -256,7 +256,8 @@ for teapot_i in range(len(renderTeapotsList)):
     centermod = center_teapots[teapot_i]
 
     renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
-
+    renderer.msaa = True
+    renderer.overdraw = True
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
 
@@ -267,7 +268,8 @@ addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapot
 
 center = center_teapots[currentTeapotModel]
 rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
-
+rendererGT.msaa = True
+rendererGT.overdraw = False
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
@@ -353,15 +355,14 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, '
 
 hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
 hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-hogRenderer.dr_wrt(chAz)
 
 hogE_raw = hogGT - hogRenderer
 hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
 hogError = ch.SumOfSquares(hogE_raw)
 
-models = [negLikModel, negLikModelRobust, negLikModelRobust, hogError]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh, hogCellErrors]
-modelsDescr = ["Gaussian Model", "Outlier model", "Outler model (variance reduction)", "HOG"]
+models = [negLikModel, negLikModelRobust, hogError]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
 
@@ -374,16 +375,16 @@ pixelLikelihoodCh2 = generative_models.logPixelLikelihoodCh(rendererGT, diffRend
 pixelLikelihoodRobustCh2 = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances))
 
 post2 = generative_models.layerPosteriorsRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)[0]
-pixelModels2 = [pixelLikelihoodCh2, pixelLikelihoodRobustCh2, pixelLikelihoodRobustCh2]
-models2 = [negLikModel2, negLikModelRobust2, negLikModelRobust2]
+pixelModels2 = [pixelLikelihoodCh2, pixelLikelihoodRobustCh2]
+models2 = [negLikModel2, negLikModelRobust2]
 
 model = 0
 
 pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
-pixelErrorFun2 = pixelModels2[model]
-errorFun2 = models2[model]
+# pixelErrorFun2 = pixelModels2[model]
+# errorFun2 = models2[model]
 
 
 iterat = 0
@@ -418,7 +419,7 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-method = 1
+method = 4
 exit = False
 minimize = False
 plotMinimization = False
@@ -456,14 +457,36 @@ if showSubplots:
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1 = ax1.imshow(gtoverlay)
 
-    ax3.set_title("Pixel negative log probabilities")
-    pim3 = ax3.imshow(-pixelErrorFun.r)
-    cb3 = plt.colorbar(pim3, ax=ax3,use_gridspec=True)
-    cb3.mappable = pim3
+    # ax3.set_title("Pixel negative log probabilities")
+    # pim3 = ax3.imshow(-pixelErrorFun.r)
+    # cb3 = plt.colorbar(pim3, ax=ax3,use_gridspec=True)
+    # cb3.mappable = pim3
+    #
+    # ax4.set_title("Posterior probabilities")
+    # pim4 = ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    # cb4 = plt.colorbar(pim4, ax=ax4,use_gridspec=True)
 
-    ax4.set_title("Posterior probabilities")
-    pim4 = ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-    cb4 = plt.colorbar(pim4, ax=ax4,use_gridspec=True)
+    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, chAz, 0.01745)
+    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, chEl, 0.01745)
+
+    ax3.set_title("Dr wrt. Azimuth Checkgrad")
+    drazsum = np.sign(-diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)
+
+    drazsumnobnd = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)*(1-renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+    drazsumbnd = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+
+    drazsumnobnddiff = diffAz.reshape(shapeIm[0],shapeIm[1],1)*(1-renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+    drazsumbnddiff = diffAz.reshape(shapeIm[0],shapeIm[1],1)*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+
+    img3 = ax3.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    cb3 = plt.colorbar(img3, ax=ax3,use_gridspec=True)
+    cb3.mappable = img3
+
+    ax4.set_title("Dr wrt. Elevation Checkgrad")
+    drazsum = np.sign(-diffEl.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1)
+    img4 = ax4.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+    cb4 = plt.colorbar(img4, ax=ax4,use_gridspec=True)
+    cb4.mappable = img4
 
     ax5.set_title("Dr wrt. Azimuth")
     drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
@@ -543,20 +566,33 @@ def refreshSubplots():
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1.set_data(gtoverlay)
     pim2.set_data(renderer.r)
-    if model != 3:
-        ax3.set_title("Pixel negative log probabilities")
-        pim3 = ax3.imshow(-pixelErrorFun.r)
-        cb3.mappable = pim3
-        cb3.update_normal(pim3)
+
+    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, chAz, 0.01745)
+    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, chEl, 0.01745)
+
+    if model != 2:
+        # ax3.set_title("Pixel negative log probabilities")
+        # pim3 = ax3.imshow(-pixelErrorFun.r)
+        # cb3.mappable = pim3
+        # cb3.update_normal(pim3)
+        ax3.set_title("Dr wrt. Azimuth Checkgrad")
+        drazsum = -np.sign(diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)
+        # drazsum = drazsum*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+        img3 = ax3.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb3.mappable = img3
     else:
         ax3.set_title("HoG Image GT")
         pim3 = ax3.imshow(hogImGT.r)
         cb3.mappable = pim3
         cb3.update_normal(pim3)
 
-    if model != 3:
-        ax4.set_title("Posterior probabilities")
-        ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+    if model != 2:
+        # ax4.set_title("Posterior probabilities")
+        # ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+        ax4.set_title("Dr wrt. Elevation Checkgrad")
+        drazsum = -np.sign(diffEl.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        img4 = ax4.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb4.mappable = img4
     else:
         ax4.set_title("HoG image renderer")
         ax4.set_title("HoG Image GT")
@@ -566,6 +602,7 @@ def refreshSubplots():
 
     sdy, sdx = pixelErrorFun.shape
     drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(sdy,sdx,1).reshape(sdy,sdx,1)
+    # drazsum = drazsum*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
     img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb5.mappable = img5
     cb5.update_normal(img5)
@@ -634,6 +671,8 @@ def plotSurface(model):
             axperf.add_artist(arrowGradDiff)
 
         axperf.plot([chAzGT.r[0]*180./np.pi, chAzGT.r[0]*180./np.pi], [chElGT.r[0]*180./np.pi,chElGT.r[0]*180./np.pi], [z2.min(), z2.max()], 'b--', linewidth=1)
+
+        errorFun = models[model]
 
         axperf.plot(chAz.r*180./np.pi, chEl.r*180./np.pi, errorFun.r[0], 'yD')
 
@@ -795,7 +834,7 @@ def cb2(_):
         gradAz[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradAz[(model, chAzGT.r[0], chElGT.r[0])], drAz)
         gradEl[(model, chAzGT.r[0], chElGT.r[0])] = numpy.append(gradEl[(model, chAzGT.r[0], chElGT.r[0])], drEl)
 
-        plotSurface()
+        plotSurface(model)
 
     if drawSurf and demoMode and refreshWhileMinimizing:
         # plt.pause(0.1)
@@ -943,10 +982,10 @@ def readKeys(window, key, scancode, action, mods):
 
     if key == glfw.KEY_D:
         refresh = True
-        chComponent[0] = chComponent[0].r + 0.1
+        # chComponent[0] = chComponent[0].r + 0.1
     if key == glfw.MOD_SHIFT and glfw.KEY_D:
         refresh = True
-        chComponent[0] = chComponent[0].r - 0.1
+        # chComponent[0] = chComponent[0].r - 0.1
     global drawSurf
     global model
     global models
@@ -998,7 +1037,7 @@ def readKeys(window, key, scancode, action, mods):
         print("Back to GT!")
         chAz[:] = chAzGT.r[:]
         chEl[:] = chElGT.r[:]
-        chComponent[:] = chComponentGT.r[:]
+        # chComponent[:] = chComponentGT.r[:]
         refresh = True
 
     global chAzSaved
@@ -1094,10 +1133,10 @@ def readKeys(window, key, scancode, action, mods):
         # errorFun2 = models2[model]
         # pixelErrorFun2 = pixelModels2[model]
 
-        if model == 2:
-            reduceVariance = True
-        else:
-            reduceVariance = False
+        # if model == 2:
+        #     reduceVariance = True
+        # else:
+        #     reduceVariance = False
 
         refresh = True
 
@@ -1162,8 +1201,8 @@ def exploreSurface():
             gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
             gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
-        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/8.,0), min(chAzGT.r[0] + np.pi/8., 2.*np.pi), num=10):
-            for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=10):
+        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/7.,0), min(chAzGT.r[0] + np.pi/7., 2.*np.pi), num=10):
+            for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=5):
                 for model_num, errorFun in enumerate(models):
                     chAz[:] = chAzi
                     chEl[:] = chEli
@@ -1200,32 +1239,33 @@ def exploreSurface():
 
         if savePerformance:
             def writeStats(model):
-                with open('stats/statistics.txt') as statsFile:
-                    statsFile.write("**** Statistics for " + modelsDescr[model] + " ****" )
+                with open('stats/statistics.txt', 'a') as statsFile:
+
+                    statsFile.write("**** Statistics for " + modelsDescr[model] + " ****"  + '\n')
                     if drawSurf:
                         avgError = np.mean(np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])] - gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2))
-                        statsFile.write("** Approx gradients - finite differenes." )
-                        statsFile.write("Avg Eucl. distance :: " + str(avgError))
+                        statsFile.write("** Approx gradients - finite differenes."  + '\n')
+                        statsFile.write("Avg Eucl. distance :: " + str(avgError) + '\n')
                         norm2Grad = np.sqrt((gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
                         norm2Diff = np.sqrt((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])])**2 + (gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])])**2)
                         avgAngle = np.arccos((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])])/(norm2Grad*norm2Diff))
-                        statsFile.write("Avg Angle.: " + str(np.mean(avgAngle)))
-                        statsFile.write("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)))
+                        statsFile.write("Avg Angle.: " + str(np.mean(avgAngle)) + '\n')
+                        statsFile.write("Num opposite (red) gradients: " + str(np.sum((gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])] + gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])]*gradElSurf[(model, chAzGT.r[0], chElGT.r[0])]) < 0)) + '\n')
                         idxmin = np.argmin(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])
                         azDiff = np.arctan2(np.arcsin(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chAzGT - azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
                         elDiff = np.arctan2(np.arcsin(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]), np.arccos(chElGT - elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][idxmin]))
-                        statsFile.write("Minimum Azimuth difference of " + str(azDiff*180/np.pi))
-                        statsFile.write("Minimum Elevation difference of " + str(elDiff*180/np.pi))
+                        statsFile.write("Minimum Azimuth difference of " + str(azDiff*180/np.pi) + '\n')
+                        statsFile.write("Minimum Elevation difference of " + str(elDiff*180/np.pi) + '\n')
 
                     azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
                     elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
-                    statsFile.write("Current Azimuth difference of " + str(azDiff*180/np.pi))
-                    statsFile.write("Current Elevation difference of " + str(elDiff*180/np.pi))
+                    statsFile.write("Current Azimuth difference of " + str(azDiff*180/np.pi) + '\n')
+                    statsFile.write("Current Elevation difference of " + str(elDiff*180/np.pi) + '\n\n')
 
-            for model_i in models:
-                writeStats(model_i)
-                plotSurface(model_i)
-                plt.savefig('stats/surfaceModel' + modelsDescr[model_i])
+            for model_idx, model_i in enumerate(models):
+                writeStats(model_idx)
+                plotSurface(model_idx)
+                plt.savefig('stats/surfaceModel' + modelsDescr[model_idx] + '.png')
         print("Finshed estimating.")
 
 
@@ -1364,8 +1404,8 @@ if demoMode:
             hogError = ch.SumOfSquares(hogE_raw)
 
 
-            models = [negLikModel, negLikModelRobust, negLikModelRobust, hogError]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh, hogCellErrors]
+            models = [negLikModel, negLikModelRobust, hogError]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
 
             pixelErrorFun = pixelModels[model]
             errorFun = models[model]
@@ -1387,7 +1427,7 @@ if demoMode:
                 refreshSubplots()
 
             if computePerformance and drawSurf:
-                plotSurface()
+                plotSurface(model)
 
 
 

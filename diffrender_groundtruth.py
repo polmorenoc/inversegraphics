@@ -153,12 +153,12 @@ chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-chVColors = ch.Ch([0.4,0.4,0.4])
-chVColorsGT = ch.Ch([0.4,0.4,0.4])
+chVColors = ch.Ch([0.8,0.8,0.8])
+chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([2])
+chAmbientIntensityGT = ch.Ch([3])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 
@@ -229,10 +229,10 @@ def imageGT():
 # Initialization ends here
 #########################################
 
-prefix = 'train1'
+prefix = 'train2'
 
 print("Creating Ground Truth")
-trainSize = 50000
+trainSize = 100000
 
 trainAzsGT = np.array([])
 trainObjAzsGT = np.array([])
@@ -281,7 +281,39 @@ renderTeapotsList = np.arange(len(teapots))[0:1]
 #     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':
 #         hdrtorenderi = hdrit
 
-hdrstorender = list(envMapDic.items())[:]
+ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
+
+hdritems = list(envMapDic.items())[:]
+hdrstorender = []
+phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+for hdrFile, hdrValues in hdritems:
+    hdridx = hdrValues[0]
+    envMapCoeffs = hdrValues[1]
+    if hdridx not in ignoreEnvMaps:
+        hdrstorender = hdrstorender + [(hdrFile,hdrValues)]
+
+    # if not os.path.exists('light_probes/envMap' + str(hdridx)):
+    #     os.makedirs('light_probes/envMap' + str(hdridx))
+    #
+    # for phiOffset in phiOffsets:
+    #
+    #     # phiOffset = np.random.uniform(0,2*np.pi, 1)
+    #     from numpy.random import choice
+    #     objAzGT = np.pi/2
+    #     chObjAzGT[:] = 0
+    #     totalOffset = phiOffset + chObjAzGT.r
+    #     envMapCoeffsRotated = np.dot(light_probes.sphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]].copy()
+    #     envMapCoeffsRotatedRel = np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]].copy()
+    #     shCoeffsRGB = envMapCoeffsRotated.copy()
+    #     shCoeffsRGBRel = envMapCoeffsRotatedRel.copy()
+    #     chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+    #     chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
+    #     chAmbientSHGT = chShCoeffs * chAmbientIntensityGT * clampedCosCoeffs
+    #     chAmbientSHGTRel = chShCoeffsRel * chAmbientIntensityGT * clampedCosCoeffs
+    #     chComponentGT[:] = chAmbientSHGT.r[:].copy()
+    #     chComponentGTRel[:] = chAmbientSHGTRel.r[:].copy()
+    #     cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+# sys.exit("")
 
 gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,)), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype)]
 
@@ -345,11 +377,11 @@ for sceneIdx in scenesToRender:
             addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
             rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
-
+            print("Ground truth on new teapot" + str(teapot_i))
             for hdrFile, hdrValues in hdrstorender:
                 hdridx = hdrValues[0]
                 envMapCoeffs = hdrValues[1]
-                print("Ground truth on new teapot" + str(teapot_i))
+
 
                 for numTeapotTrain in range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList)))):
 
@@ -379,12 +411,12 @@ for sceneIdx in scenesToRender:
                     chLightIntensityGT[:] = 0
                     # chLightIntensityGT[:] = np.random.uniform(5,10, 1)
 
-                    chVColorsGT[:] =  np.random.uniform(0,0.7, [1, 3])
+                    chVColorsGT[:] =  np.random.uniform(0.3,0.7, [1, 3])
 
                     image = rendererGT.r.copy()
 
                     occlusion = getOcclusionFraction(rendererGT)
-                    if occlusion < 0.9:
+                    if occlusion < 0.1:
                         # hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
                         # illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
 

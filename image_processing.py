@@ -119,10 +119,10 @@ class HogImage(Ch):
             for y in range(n_cellsy):
                 for o, dx, dy in zip(orientations_arr, dx_arr, dy_arr):
                     centre = tuple([y * cr2 // 2, x * cc2 // 2])
-                    rr, cc = draw.line(int(centre[0] - dx),
-                                       int(centre[1] + dy),
-                                       int(centre[0] + dx),
-                                       int(centre[1] - dy))
+                    rr, cc = draw.line(int(centre[0] + dy),
+                                       int(centre[1] + dx),
+                                       int(centre[0] - dy),
+                                       int(centre[1] - dx))
                     hog_image[rr, cc] += self.hog[y, x, o]
         return hog_image
 
@@ -130,7 +130,7 @@ class HogImage(Ch):
         return None
 
 import skimage
-def diffHog(image, drconv=None, numOrient = 9, cwidth=16, cheight=16):
+def diffHog(image, drconv=None, numOrient = 9, cwidth=8, cheight=8):
     imagegray = 0.3*image[:,:,0] +  0.59*image[:,:,1] + 0.11*image[:,:,2]
     sy,sx = imagegray.shape
 
@@ -154,9 +154,26 @@ def diffHog(image, drconv=None, numOrient = 9, cwidth=16, cheight=16):
 
     angles = ch.arctan(gy/gx)*180/np.pi + 90
 
-    meanOrient = np.linspace(0, 180, numOrient)
+    # meanOrient = np.linspace(0, 180, numOrient)
 
-    fb = (1 - ch.abs(ch.expand_dims(angles,2) - meanOrient.reshape([1,1,numOrient]))/180)
+    orientations_arr = np.arange(numOrient)
+
+    meanOrient = orientations_arr / numOrient * 180
+
+    fb_resttmp = 1 - ch.abs(ch.expand_dims(angles[:,:],2) - meanOrient[1:].reshape([1,1,numOrient-1]))*numOrient/180
+    zeros_rest = np.zeros([sy,sx, numOrient-1, 1])
+    fb_rest = ch.max(ch.concatenate([fb_resttmp[:,:,:,None], zeros_rest],axis=3), axis=3)
+
+    chMinOrient0 = ch.min(ch.concatenate([ch.abs(ch.expand_dims(angles[:,:],2) - meanOrient[0].reshape([1,1,1]))[:,:,:,None], ch.abs(180 - ch.expand_dims(angles[:,:],2) - meanOrient[0].reshape([1,1,1]))[:,:,:,None]], axis=3), axis=3)
+
+    zeros_fb0 = np.zeros([sy,sx, 1])
+    fb0_tmp =  ch.concatenate([1 - chMinOrient0[:,:]*numOrient/180, zeros_fb0],axis=2)
+    fb_0 = ch.max(fb0_tmp,axis=2)
+
+    fb = ch.concatenate([fb_0[:,:,None], fb_rest],axis=2)
+
+    # fb[:,:,0] = ch.max(1 - ch.abs(ch.expand_dims(angles,2) - meanOrient.reshape([1,1,numOrient]))*numOrient/180,0)
+
     # fb = 1./(1. + ch.exp(1 - ch.abs(ch.expand_dims(angles,2) - meanOrient.reshape([1,1,numOrient]))*numOrient/180))
 
     Fb = ch.expand_dims(magn,2)*fb
@@ -177,7 +194,8 @@ def diffHog(image, drconv=None, numOrient = 9, cwidth=16, cheight=16):
 
     epsilon = 1e-5
 
-    v = Fcells/ch.sqrt(ch.sum(Fcells**2, axis=2).reshape([Fcells.shape[0], Fcells.shape[1],1]) + epsilon)
+    v = Fcells/ch.sqrt(ch.sum(Fcells**2) + epsilon)
+    # v = Fcells
 
     # hog, hogim = skimage.feature.hog(imagegray,  orientations=numOrient, pixels_per_cell=(cheight, cwidth), visualise=True)
     hog_image = HogImage(image=image, hog=Fcells, numOrient=numOrient, cwidth=cwidth, cheight=cheight)

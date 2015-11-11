@@ -27,8 +27,8 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train1'
-trainPrefix = 'train1'
+gtPrefix = 'train2'
+trainPrefix = 'train2'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + trainPrefix + '/'
 
@@ -37,7 +37,7 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 allDataIds = gtDataFile[gtPrefix]['trainIds']
 if not os.path.isfile(experimentDir + 'train.npy'):
-    generateExperiment(len(allDataIds), experimentDir, 0.8, 1)
+    generateExperiment(len(allDataIds), experimentDir, 0.9, 1)
 
 print("Reading images.")
 
@@ -92,28 +92,28 @@ loadFromHdf5 = True
 if loadFromHdf5:
     images = readImages(imagesDir, allDataIds, loadFromHdf5)
 
-loadHogFeatures = True
-loadIllumFeatures = True
+loadHogFeatures = False
+loadIllumFeatures = False
 
-if loadHogFeatures:
-    hogfeatures = np.load(experimentDir + 'hog.npy')
-else:
-    print("Extracting Hog features .")
-    hogfeatures = image_processing.computeHoGFeatures(images)
-    np.save(experimentDir + 'hog.npy', hogfeatures)
+# if loadHogFeatures:
+#     hogfeatures = np.load(experimentDir + 'hog.npy')
+# else:
+#     print("Extracting Hog features .")
+#     hogfeatures = image_processing.computeHoGFeatures(images)
+#     np.save(experimentDir + 'hog.npy', hogfeatures)
+#
+# if loadIllumFeatures:
+#     illumfeatures =  np.load(experimentDir  + 'illum.npy')
+# else:
+#     print("Extracting Illumination features (FFT.")
+#     illumfeatures = image_processing.computeIllumFeatures(images, images[0].size/12)
+#     np.save(experimentDir  + 'illum.npy', illumfeatures)
+#
+# trainHogfeatures = hogfeatures[trainSet]
+# trainIllumfeatures = illumfeatures[trainSet]
 
-if loadIllumFeatures:
-    illumfeatures =  np.load(experimentDir  + 'illum.npy')
-else:
-    print("Extracting Illumination features (FFT.")
-    illumfeatures = image_processing.computeIllumFeatures(images, images[0].size/12)
-    np.save(experimentDir  + 'illum.npy', illumfeatures)
-
-trainHogfeatures = hogfeatures[trainSet]
-trainIllumfeatures = illumfeatures[trainSet]
-
-parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF', 'spherical_harmonicsRF'])
-parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
+parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF', 'spherical_harmonicsNN'])
+# parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
 parameterTrainSet = set(['spherical_harmonicsNN'])
 
 print("Training recognition models.")

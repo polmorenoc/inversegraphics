@@ -16,6 +16,23 @@ import light_probes
 import scene_io_utils
 from blender_utils import *
 import imageio
+import chumpy as ch
+from chumpy import depends_on, Ch
+import scipy.sparse as sp
+
+class TheanoFunOnOpenDR(Ch):
+    terms = 'theano_fun', 'theano_grad_fun'
+    dterms = 'opendr_x'
+
+    def compute_r(self):
+
+        x = self.opendr_x.r
+        return self.theano_fun(x)
+
+    def compute_dr_wrt(self,wrt):
+        if self.opendr_x is wrt:
+            jac = self.theano_grad_fun(self.opendr_x)
+            return sp.csc_matrix(jac)
 
 
 def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
@@ -46,6 +63,7 @@ def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, renderer
             scene.render.filepath = 'light_probes/envMap' + str(hdridx) + '/blender_' + str(np.int(180*phiOffset/np.pi)) + '.png'
             bpy.ops.render.render(write_still=True)
             cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
+
 
 def exportEnvMapSHLightCoefficients():
     import glob
