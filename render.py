@@ -294,7 +294,7 @@ for sceneNum in sceneLineNums[0:1]:
             scene.render.layers[1].use = False
             scene.render.layers[2].use = False
 
-            scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
+            # scene.render.image_settings.file_format = 'OPEN_EXR_MULTILAYER'
             #scene.render.image_settings.file_format = 'PNG'
             scene.render.filepath = director  + 'render' + prefix + '_obj' + str(teapotNum) + '_' + 'scene' + str(sceneNumber) + '_target' + str(targetIndex) + '_'
             scene.update()

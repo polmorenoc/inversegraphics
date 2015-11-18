@@ -27,7 +27,7 @@ plt.ion()
 #__GL_THREADED_OPTIMIZATIONS
 
 #Main script options:
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -69,7 +69,6 @@ clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
 
-
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
 sceneIdx = 0
@@ -85,7 +84,6 @@ if useBlender and not loadBlenderSceneFile:
     scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
     scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, False)
     scene.update()
-    scene.render.filepath = 'opendr_blender.png'
     targetPosition = np.array(targetPosition)
     #Save barebones scene.
 
@@ -102,6 +100,13 @@ if unpackSceneFromBlender:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.unpackBlenderScene(scene, sceneDicFile, True)
 else:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile)
+    textures_listflat = [item for sublist in textures_list for item in sublist]
+    for texture_list in textures_listflat:
+        if texture_list != None:
+            for texture in texture_list:
+                if texture != None:
+                    srgb2lin(texture)
+    # [srgb2lin(item) for sublist in vc for item in sublist]
 
 removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
@@ -153,25 +158,21 @@ light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
 
 chVColors = ch.Ch([0.4,0.4,0.4])
-chVColorsGT = ch.Ch([0.4,0.4,0.4])
+chVColorsGT = ch.Ch([0.9882349967956543,0.9882349967956543,0.9882349967956543])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-<<<<<<< HEAD
-=======
-
->>>>>>> db1126c63c803bf4417236518d69fb07a7000730
 clampedCosCoeffs = clampedCosineCoefficients()
 
-envMapFilename = 'data/hdr/dataset/studio_land.hdr'
+envMapFilename = 'data/hdr/dataset/TropicalRuins_3k.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
 
 if sphericalMap:
     envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean,  0, 'spherical')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 2*envMapMean,  0, 'spherical')
 else:
     envMapMean = envMapTexture.mean()
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, 0, 'equirectangular')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 2*envMapMean, 0, 'equirectangular')
 
 rotation = ch.Ch([0.0])
 phiOffsetGT = 0
@@ -186,7 +187,7 @@ chDistGT = ch.Ch([camDistance])
 totalOffsetGT = phiOffsetGT + chObjAzGT
 totalOffset = phiOffset
 
-chAmbientIntensityGT = ch.Ch([0.3])
+chAmbientIntensityGT = ch.Ch([1/np.pi**2])
 shCoeffsRGBGT = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
 shCoeffsRGBGTRel = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
 
@@ -213,7 +214,7 @@ chObjAz = ch.Ch([0])
 chEl =  ch.Ch([np.pi/4])
 chAzRel = chAz - chObjAz
 
-chAmbientIntensity = ch.Ch([0.5])
+chAmbientIntensity = ch.Ch([1])
 shCoeffsRGB = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(totalOffset)).T
 shCoeffsRGBRel = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(phiOffset)).T
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
@@ -232,8 +233,10 @@ chComponent = chAmbientSH + shDirLight*chLightIntensity
 chComponent = chComponentGT
 
 if useBlender:
+    scene.sequencer_colorspace_settings.name = 'Linear'
+    scene.display_settings.display_device = 'None'
     addEnvironmentMapWorld(envMapFilename, scene)
-    setEnviornmentMapStrength(0.3/envMapMean, scene)
+    setEnviornmentMapStrength(1, scene)
     rotateEnviornmentMap(-totalOffset, scene)
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
@@ -284,8 +287,8 @@ renderer = renderer_teapots[currentTeapotModel]
 import differentiable_renderer
 paramsList = [chAz, chEl]
 
-diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
-# diffRenderer = renderer
+# diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
+diffRenderer = renderer
 
 
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
@@ -302,19 +305,26 @@ shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
 if useBlender:
     center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
-    addLamp(scene, center, chLightAzGT.r, chLightElGT.r, chLightDistGT, chLightIntensityGT.r)
+    # addLamp(scene, center, chLightAzGT.r, chLightElGT.r, chLightDistGT, chLightIntensityGT.r)
     #Add ambient lighting to scene (rectangular lights at even intervals).
     # addAmbientLightingScene(scene, useCycles)
 
     teapot = blender_teapots[currentTeapotModel]
     teapotGT = blender_teapots[currentTeapotModel]
     placeNewTarget(scene, teapot, targetPosition)
+    teapot.layers[1]=True
+    scene.layers[0] = False
+    scene.layers[1] = True
+    scene.objects.unlink(scene.objects[str(targetIndex)])
 
     placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
     scene.update()
+
+    scene.render.image_settings.file_format = 'OPEN_EXR'
+    scene.render.filepath = 'opendr_blender.exr'
     # bpy.ops.file.pack_all()
     # bpy.ops.wm.save_as_mainfile(filepath='data/scene' + str(sceneIdx) + '_complete.blend')
-    scene.render.filepath = 'blender_envmap_render.png'
+    # scene.render.filepath = 'blender_envmap_render.exr'
 
 def imageGT():
     global groundTruthBlender
@@ -356,15 +366,19 @@ pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rende
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+#
+# hogE_raw = hogGT - hogRenderer
+# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+# hogError = ch.SumOfSquares(hogE_raw)
+# hogError = ch.SumOfSquares(hogE_raw)
 
-hogE_raw = hogGT - hogRenderer
-hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-hogError = ch.SumOfSquares(hogE_raw)
+hogError = negLikModelRobust
+hogCellErrors = pixelLikelihoodRobustCh
 
-models = [negLikModel, negLikModelRobust, hogError]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
@@ -1366,9 +1380,14 @@ if demoMode:
 
         if groundTruthBlender and pendingCyclesRender:
             scene.update()
+            scene.layers[0] = False
+            scene.layers[1] = True
             bpy.ops.render.render( write_still=True )
-            image = cv2.imread(scene.render.filepath)
-            image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+
+            # image = cv2.imread(scene.render.filepath)
+            # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+            image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
+            image[image>1]=1
             blenderRender = image
             pendingCyclesRender = False
 
@@ -1398,17 +1417,20 @@ if demoMode:
             pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-            hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT, drconv)
-            hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-            hogRenderer.dr_wrt(chAz)
+            # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT, drconv)
+            # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+            # hogRenderer.dr_wrt(chAz)
+            #
+            # hogE_raw = hogGT - hogRenderer
+            # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+            # hogError = ch.SumOfSquares(hogE_raw)
 
-            hogE_raw = hogGT - hogRenderer
-            hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-            hogError = ch.SumOfSquares(hogE_raw)
+            hogError = negLikModelRobust
+            hogCellErrors = pixelLikelihoodRobustCh
 
-
-            models = [negLikModel, negLikModelRobust, hogError]
+            models = [negLikModel, negLikModelRobust]
             pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 
             pixelErrorFun = pixelModels[model]
             errorFun = models[model]

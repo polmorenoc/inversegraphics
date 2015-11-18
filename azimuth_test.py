@@ -126,7 +126,7 @@ for teapotTest in experimentTeapots:
 
         bpy.utils.collada_import(fullTeapot + '.dae')
 
-        modifySpecular(scene, 0.3)
+        # modifySpecular(scene, 0.3)
 
         # ipdb.set_trace()
 

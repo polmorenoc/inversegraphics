@@ -34,7 +34,6 @@ class TheanoFunOnOpenDR(Ch):
             jac = self.theano_grad_fun(self.opendr_x)
             return sp.csc_matrix(jac)
 
-<<<<<<< HEAD
 def SHProjection(envMap, shCoefficients):
 
 
@@ -54,7 +53,7 @@ def SHProjection(envMap, shCoefficients):
     pEnvMap[:,:,:,3] = shCoefficients[3].reshape([1,1,3]) * spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(phis) * normalize
     pEnvMap[:,:,:,4] = shCoefficients[4].reshape([1,1,3]) * spherical_harmonics_coeffs[4]*np.sin(thetas) * np.cos(phis) * np.sin(phis)* np.sin(thetas)  * normalize
     pEnvMap[:,:,:,5] = shCoefficients[5].reshape([1,1,3]) * spherical_harmonics_coeffs[5]*np.sin(thetas) * np.sin(phis) * np.cos(thetas)  * normalize
-    pEnvMap[:,:,:,6] = shCoefficients[6].reshape([1,1,3]) * spherical_harmonics_coeffs[6]*(3 * np.cos(thetas)**2 - 1) * noxrmalize
+    pEnvMap[:,:,:,6] = shCoefficients[6].reshape([1,1,3]) * spherical_harmonics_coeffs[6]*(3 * np.cos(thetas)**2 - 1) * normalize
     pEnvMap[:,:,:,7] = shCoefficients[7].reshape([1,1,3]) * spherical_harmonics_coeffs[7]*np.sin(thetas) * np.cos(phis) * np.cos(thetas) * normalize
     pEnvMap[:,:,:,8] = shCoefficients[8].reshape([1,1,3]) * spherical_harmonics_coeffs[8]*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2)) * normalize
 
@@ -140,8 +139,6 @@ def SHSpherePlot():
 
     return explainedVar
 
-=======
->>>>>>> db1126c63c803bf4417236518d69fb07a7000730
 
 def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
     import glob

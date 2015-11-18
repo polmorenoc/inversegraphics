@@ -316,6 +316,7 @@ def addEnvironmentMapWorld(envMapFilename, scene):
     scene.world.use_nodes = True
     treeNodes=scene.world.node_tree
     envTextureNode = treeNodes.nodes.new('ShaderNodeTexEnvironment')
+
     mappingNode = treeNodes.nodes.new('ShaderNodeMapping')
     links = treeNodes.links
     links.new(mappingNode.outputs[0],envTextureNode.inputs[0])
@@ -333,6 +334,7 @@ def addEnvironmentMapWorld(envMapFilename, scene):
     # mathNode.inputs[1].default_value = 1
     image = bpy.data.images.load(envMapFilename)
     envTextureNode.image = image
+    envTextureNode.color_space="NONE"
 
 
 def setEnviornmentMapStrength(strength, scene):
@@ -390,6 +392,18 @@ def getRelativeLocation(azimuth, elevation, distance, center):
     originalLoc = mathutils.Vector((0,-distance, 0))
     location = center + azimuthRot * elevationRot * originalLoc
     return location
+
+def srgb2lin(im):
+    cond1 = im <= 0.04045
+    im[cond1] = im[cond1]/12.92
+    im[~cond1] = ((im[~cond1]+0.055)/1.055)** 2.4
+    return im
+
+def lin2srgb(im):
+    cond1 = im <= 0.0031308
+    im[cond1] = im[cond1]*12.92
+    im[~cond1] = (im[~cond1]**(1/2.4)*1.055) - 0.055
+    return im
 
 def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples, useCycles, useGPU):
 
@@ -478,7 +492,8 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
     # world.exposure = 1.1
     # world.light_settings.use_indirect_light = True
 
-    scene.sequencer_colorspace_settings.name = 'Raw'
+    scene.sequencer_colorspace_settings.name = 'Linear'
+    scene.display_settings.display_device = 'None'
     scene.update()
 
     bpy.ops.scene.render_layer_add()

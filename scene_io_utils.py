@@ -491,6 +491,7 @@ def buildData (msh):
                     # print("Tile x: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_x))
                     # print("Tile y: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_y))
                     texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
+                    texture = srgb2lin(texture)
                     if np.any(np.isnan(texture)) or np.any(texture<0) or np.any(texture>1) or texture.size == 0:
                         print("Problem with texture from Blender")
                         texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
