@@ -157,6 +157,10 @@ chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> db1126c63c803bf4417236518d69fb07a7000730
 clampedCosCoeffs = clampedCosineCoefficients()
 
 envMapFilename = 'data/hdr/dataset/studio_land.hdr'

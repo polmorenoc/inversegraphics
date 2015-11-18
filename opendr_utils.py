@@ -34,6 +34,7 @@ class TheanoFunOnOpenDR(Ch):
             jac = self.theano_grad_fun(self.opendr_x)
             return sp.csc_matrix(jac)
 
+<<<<<<< HEAD
 def SHProjection(envMap, shCoefficients):
 
 
@@ -139,6 +140,8 @@ def SHSpherePlot():
 
     return explainedVar
 
+=======
+>>>>>>> db1126c63c803bf4417236518d69fb07a7000730
 
 def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
     import glob
