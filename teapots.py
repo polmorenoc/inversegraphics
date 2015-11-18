@@ -1,6 +1,6 @@
 #!/usr/bin/env python3.4m
  
-from utils import *
+from blender_utils import *
 
 baseDir = '../databaseFull/models/'
 

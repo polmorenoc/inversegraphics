@@ -3,7 +3,8 @@ __author__ = 'pol'
 
 import bpy
 import bmesh
-from utils import *
+from blender_utils import *
+import blender_utils
 
 def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, apply_modifiers=False):
     """
@@ -42,15 +43,15 @@ def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, app
 
     return bm
 
-def aabb_intersect(instance1, instance2):
-    minX1, maxX1 = modelWidth(instance1.dupli_group.objects, instance1.matrix_world)
-    minY1, maxY1 = modelDepth(instance1.dupli_group.objects, instance1.matrix_world)
-    minZ1, maxZ1 = modelHeighaja00
-    t(instance1.dupli_group.objects, instance1.matrix_world)
+def aabb_intersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
 
-    minX2, maxX2 = modelWidth(instance2.dupli_group.objects, instance2.matrix_world)
-    minY2, maxY2 = modelDepth(instance2.dupli_group.objects, instance2.matrix_world)
-    minZ2, maxZ2 = modelHeight(instance2.dupli_group.objects, instance2.matrix_world)
+    minX1, maxX1 = blender_utils.modelWidth(instanceObjs1, matrix_world1)
+    minY1, maxY1 = blender_utils.modelDepth(instanceObjs1, matrix_world1)
+    minZ1, maxZ1 = blender_utils.modelHeight(instanceObjs1, matrix_world1)
+
+    minX2, maxX2 = blender_utils.modelWidth(instanceObjs2, matrix_world2)
+    minY2, maxY2 = blender_utils.modelDepth(instanceObjs2, matrix_world2)
+    minZ2, maxZ2 = blender_utils.modelHeight(instanceObjs2, matrix_world2)
 
     return ((maxX1 > minX2) and (minX1 < maxX2) and (maxY1 > minY2) and (minY1 < maxY2) and (maxZ1 > minZ2) and (minZ1 < maxZ2))
 
@@ -112,15 +113,17 @@ def bmesh_check_intersect_objects(obj, objTransf,  obj2, obj2Transf):
 
     return intersect
 
-def instancesIntersect(instance1, instance2):
-    if aabb_intersect(instance1, instance2):
-        print ("There's an AABB intersection!")
-        for mesh1 in instance1.dupli_group.objects:
-            for mesh2 in instance2.dupli_group.objects:
-                if bmesh_check_intersect_objects(mesh1, instance1.matrix_world,  mesh2, instance2.matrix_world):
+def instancesIntersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
+
+    if aabb_intersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
+        print ("AABB intersection!")
+        for mesh1 in instanceObjs1:
+            for mesh2 in instanceObjs2:
+                if bmesh_check_intersect_objects(mesh1, matrix_world1,  mesh2, matrix_world2):
+                    print ("There's a MESH intersection!")
                     return True
-    else:
-        print ("There's NOT an AABB intersection!")
+    # else:
+    #     print ("There's NO intersection!")
 
     return False
 

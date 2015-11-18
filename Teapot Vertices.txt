@@ -1,5 +1,0 @@
-Teapot Vertices
-teapots/fa1fa0818738e932924ed4f13e49b59d/Teapot N300912_cleaned
-Spout: -0.61921 -0.01568 0.62589
-Handle: 0.6 0.02 0.56735
-Tip: 0 0  0.8

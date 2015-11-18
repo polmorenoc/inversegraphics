@@ -37,7 +37,6 @@ import time
 
 pixel_center_offset = 0.5
 
-
 class BaseRenderer(Ch):
     terms = ['f', 'frustum','overdraw', 'win', 'f_list', 'v_list', 'vn_list', 'vc_list']
     dterms = ['camera', 'v']
@@ -57,15 +56,57 @@ class BaseRenderer(Ch):
             return
 
         if self.win:
+
+            print ("Clearing base renderer.")
             self.makeCurrentContext()
+            self.vbo_indices.set_array(np.array([]))
+            self.vbo_indices.bind()
+            self.vbo_indices.unbind()
+            self.vbo_indices.delete()
+            self.vbo_indices_range.set_array(np.array([]))
+            self.vbo_indices_range.bind()
+            self.vbo_indices_range.unbind()
+            self.vbo_indices_range.delete()
+            self.vbo_indices_dyn.set_array(np.array([]))
+            self.vbo_indices_dyn.bind()
+            self.vbo_indices_dyn.unbind()
+            self.vbo_indices_dyn.delete()
+            self.vbo_verts.set_array(np.array([]))
+            self.vbo_verts.bind()
+            self.vbo_verts.unbind()
+            self.vbo_verts.delete()
+            self.vbo_verts_face.set_array(np.array([]))
+            self.vbo_verts_face.bind()
+            self.vbo_verts_face.unbind()
+            self.vbo_verts_face.delete()
+            self.vbo_verts_dyn.set_array(np.array([]))
+            self.vbo_verts_dyn.bind()
+            self.vbo_verts_dyn.unbind()
+            self.vbo_verts_dyn.delete()
+            self.vbo_colors.set_array(np.array([]))
+            self.vbo_colors.bind()
+            self.vbo_colors.unbind()
+            self.vbo_colors.delete()
+            self.vbo_colors_face.set_array(np.array([]))
+            self.vbo_colors_face.bind()
+            self.vbo_colors_face.unbind()
+            self.vbo_colors_face.delete()
+
+            GL.glDeleteVertexArrays(1, [self.vao_static])
+            GL.glDeleteVertexArrays(1, [self.vao_static_face])
+            GL.glDeleteVertexArrays(1, [self.vao_dyn])
+            GL.glDeleteVertexArrays(1, [self.vao_dyn_ub])
+
+            GL.glDeleteRenderbuffers(1, [int(self.render_buf)])
+            GL.glDeleteRenderbuffers(1, [int(self.z_buf)])
+            GL.glDeleteRenderbuffers(1, [int(self.render_buf_ms)])
+            GL.glDeleteRenderbuffers(1, [int(self.z_buf_ms)])
+
+            GL.glDeleteFramebuffers(1, [int(self.fbo)])
+            GL.glDeleteFramebuffers(1, [int(self.fbo_ms)])
+            GL.glDeleteFramebuffers(1, [int(self.fbo_noms)])
 
             GL.glDeleteProgram(self.colorProgram)
-            # glfw.terminate()
-            self.win = 0
-            #Maybe delete all those buffers?
-
-    # def __del__(self):
-    #     self.clear()
 
     def initGL(self):
         try:
@@ -79,7 +120,6 @@ class BaseRenderer(Ch):
             return
 
         if self.glMode == 'glfw':
-
             glfw.init()
             print("Initializing GLFW.")
 
@@ -113,15 +153,15 @@ class BaseRenderer(Ch):
 
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo )
 
-        render_buf = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER,render_buf)
+        self.render_buf = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER,self.render_buf)
         GL.glRenderbufferStorage(GL.GL_RENDERBUFFER, GL.GL_RGB8, self.frustum['width'], self.frustum['height'])
-        GL.glFramebufferRenderbuffer(GL.GL_DRAW_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_RENDERBUFFER, render_buf)
+        GL.glFramebufferRenderbuffer(GL.GL_DRAW_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_RENDERBUFFER, self.render_buf)
 
-        z_buf = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, z_buf)
+        self.z_buf = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, self.z_buf)
         GL.glRenderbufferStorage(GL.GL_RENDERBUFFER,  GL.GL_DEPTH_COMPONENT, self.frustum['width'], self.frustum['height'])
-        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT, GL.GL_RENDERBUFFER, z_buf)
+        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT, GL.GL_RENDERBUFFER, self.z_buf)
 
 
         #FBO_f
@@ -131,16 +171,16 @@ class BaseRenderer(Ch):
 
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo_ms )
 
-        render_buf = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER,render_buf)
+        self.render_buf_ms = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER,self.render_buf_ms)
 
-        GL.glRenderbufferStorageMultisample(GL.GL_RENDERBUFFER,1, GL.GL_RGB8, self.frustum['width'], self.frustum['height'])
-        GL.glFramebufferRenderbuffer(GL.GL_DRAW_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_RENDERBUFFER, render_buf)
+        GL.glRenderbufferStorageMultisample(GL.GL_RENDERBUFFER,8, GL.GL_RGB8, self.frustum['width'], self.frustum['height'])
+        GL.glFramebufferRenderbuffer(GL.GL_DRAW_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_RENDERBUFFER, self.render_buf_ms)
 
-        z_buf = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, z_buf)
-        GL.glRenderbufferStorageMultisample(GL.GL_RENDERBUFFER,1 , GL.GL_DEPTH_COMPONENT, self.frustum['width'], self.frustum['height'])
-        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT, GL.GL_RENDERBUFFER, z_buf)
+        self.z_buf_ms = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, self.z_buf_ms)
+        GL.glRenderbufferStorageMultisample(GL.GL_RENDERBUFFER,8 , GL.GL_DEPTH_COMPONENT, self.frustum['width'], self.frustum['height'])
+        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT, GL.GL_RENDERBUFFER, self.z_buf_ms)
 
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
@@ -154,6 +194,34 @@ class BaseRenderer(Ch):
 
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0)
 
+        self.fbo_noms = GL.glGenFramebuffers(1)
+
+        GL.glDepthMask(GL.GL_TRUE)
+
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo_noms )
+
+        self.render_buf_noms = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER,self.render_buf_noms)
+
+        GL.glRenderbufferStorageMultisample(GL.GL_RENDERBUFFER,0, GL.GL_RGB8, self.frustum['width'], self.frustum['height'])
+        GL.glFramebufferRenderbuffer(GL.GL_DRAW_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_RENDERBUFFER, self.render_buf_noms)
+
+        self.z_buf_noms = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, self.z_buf_noms)
+        GL.glRenderbufferStorageMultisample(GL.GL_RENDERBUFFER,0 , GL.GL_DEPTH_COMPONENT, self.frustum['width'], self.frustum['height'])
+        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT, GL.GL_RENDERBUFFER, self.z_buf_noms)
+
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
+        GL.glDisable(GL.GL_CULL_FACE)
+
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+        GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
+
+        print ("FRAMEBUFFER ERR: " + str(GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER)))
+        assert (GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) == GL.GL_FRAMEBUFFER_COMPLETE)
+
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER,0)
         # GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         # GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
 
@@ -221,7 +289,6 @@ class BaseRenderer(Ch):
 
         GL.glGenVertexArrays(1, self.vao_static)
         GL.glBindVertexArray(self.vao_static)
-
 
         self.vbo_indices.bind()
 
@@ -356,6 +423,11 @@ class BaseRenderer(Ch):
     def fpe(self):
         return self.primitives_per_edge[0]
 
+    @depends_on(terms+dterms)
+    def boundary_neighborhood(self):
+        return common.boundary_neighborhood(self.boundarybool_image)
+
+
     def _setup_camera(self, cx, cy, fx, fy, w, h, near, far, view_matrix, k):
         k = np.asarray(k)
         #Make Projection matrix.
@@ -390,7 +462,11 @@ class BaseRenderer(Ch):
 
 
     def draw_noncolored_verts(self, v, f):
-        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_ms)
+        if self.msaa:
+            GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_ms)
+        else:
+            GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_noms)
+
         # GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
         shaders.glUseProgram(self.colorProgram)
         GL.glBindVertexArray(self.vao_static)
@@ -403,7 +479,6 @@ class BaseRenderer(Ch):
         """Assumes camera is set up correctly in gl context."""
         shaders.glUseProgram(self.colorProgram)
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo)
-
 
         GL.glDepthMask(GL.GL_TRUE)
         GL.glEnable(GL.GL_DEPTH_TEST)
@@ -605,6 +680,9 @@ class BaseRenderer(Ch):
         if boundarybool_image is None:
             return result
 
+        #Pol, remove all the rest as seems unnecessary?
+        return result
+
         rr = result.ravel()
         faces_to_draw = np.unique(rr[rr != 4294967295])
         if len(faces_to_draw)==0:
@@ -666,8 +744,9 @@ class BaseRenderer(Ch):
 
         without_overdraw = self.draw_barycentric_image_internal()
         if boundarybool_image is None:
-            plt.imsave("barycentric_image_without_overdraw.png", without_overdraw)
             return without_overdraw
+
+        return without_overdraw
 
         GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
         overdraw = self.draw_barycentric_image_internal()
@@ -684,12 +763,11 @@ class BaseRenderer(Ch):
         view_mtx = self.camera.openglMat.dot(np.asarray(np.vstack((self.camera.view_matrix, np.array([0, 0, 0, 1]))),np.float32))
         GL.glUniformMatrix4fv(self.MVP_location, 1, GL.GL_TRUE, np.dot(self.projectionMatrix, view_mtx))
 
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-
         GL.glBindVertexArray(self.vao_static_face)
 
-
         GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo)
+
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         GL.glDrawElements(GL.GL_TRIANGLES if self.f.shape[1]==3 else GL.GL_LINES, len(self.vbo_indices_range), GL.GL_UNSIGNED_INT, None)
 
@@ -752,6 +830,10 @@ class ColoredRenderer(BaseRenderer):
             return self.vc.shape[1]
         return 3
 
+    def clear(self):
+        print ("Clearing color renderer.")
+        super(ColoredRenderer, self).clear()
+
     @property
     def shape(self):
         if not hasattr(self, 'num_channels'):
@@ -780,7 +862,9 @@ class ColoredRenderer(BaseRenderer):
 
         if wrt is self.camera:
             if self.overdraw:
+                # return common.dImage_wrt_2dVerts_bnd(color, visible, visibility, barycentric, self.frustum['width'], self.frustum['height'], self.v.r.size/3, self.f, self.boundaryid_image != 4294967295)
                 return common.dImage_wrt_2dVerts_bnd(color, visible, visibility, barycentric, self.frustum['width'], self.frustum['height'], self.v.r.size/3, self.f, self.boundaryid_image != 4294967295)
+
             else:
                 return common.dImage_wrt_2dVerts(color, visible, visibility, barycentric, self.frustum['width'], self.frustum['height'], self.v.r.size/3, self.f)
 
@@ -811,7 +895,7 @@ class ColoredRenderer(BaseRenderer):
 
         if 'v' or 'f' in which:
             self.vbo_verts_face.set_array(np.array(self.verts_by_face).astype(np.float32))
-            self.vbo_verts.bind()
+            self.vbo_verts_face.bind()
             self.vbo_colors_face.set_array(np.array(self.vc_by_face).astype(np.float32))
             self.vbo_colors_face.bind()
 
@@ -864,12 +948,18 @@ class ColoredRenderer(BaseRenderer):
             # FIXME: this won't work for 2 channels
             GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo)
             GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-            GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_ms)
+            if self.msaa:
+                GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_ms)
+            else:
+                GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_noms)
             GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
 
             self.draw_colored_verts(self.vc.r)
-            GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.fbo_ms)
+            if self.msaa:
+                GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.fbo_ms)
+            else:
+                GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.fbo_noms)
             GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo)
             GL.glBlitFramebuffer(0, 0, self.frustum['width'], self.frustum['height'], 0, 0, self.frustum['width'], self.frustum['height'], GL.GL_COLOR_BUFFER_BIT, GL.GL_LINEAR)
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo)
@@ -900,7 +990,7 @@ class ColoredRenderer(BaseRenderer):
         no_overdraw = self.draw_color_image()
 
         #Pol: why do we add the lines edges in the final render?
-        return no_overdraw
+        # return no_overdraw
 
         if not self.overdraw:
             return no_overdraw
@@ -946,13 +1036,35 @@ class TexturedRenderer(ColoredRenderer):
 
     def clear(self):
         try:
+            print ("Clearing textured renderer.")
+            [vbo.set_array([]) for sublist in self.vbo_indices_mesh_list for vbo in sublist]
+            [vbo.bind() for sublist in self.vbo_indices_mesh_list for vbo in sublist]
+            [vbo.unbind() for sublist in self.vbo_indices_mesh_list for vbo in sublist]
+            [vbo.delete() for sublist in self.vbo_indices_mesh_list for vbo in sublist]
+            [vbo.set_array([]) for vbo in self.vbo_colors_mesh]
+            [vbo.bind() for vbo in self.vbo_colors_mesh]
+            [vbo.delete() for vbo in self.vbo_colors_mesh]
+            [vbo.unbind() for vbo in self.vbo_colors_mesh]
+            [vbo.delete() for vbo in self.vbo_verts_mesh]
+            [vbo.set_array([]) for vbo in self.vbo_uvs_mesh]
+            [vbo.bind() for vbo in self.vbo_uvs_mesh]
+            [vbo.unbind() for vbo in self.vbo_uvs_mesh]
+            [vbo.delete() for vbo in self.vbo_uvs_mesh]
+            [GL.glDeleteVertexArrays(1, [vao.value]) for sublist in self.vao_tex_mesh_list for vao in sublist]
+
+            self.release_textures()
+
             if self.glMode == 'glfw':
                 glfw.make_context_current(self.win)
+
             GL.glDeleteProgram(self.colorTextureProgram)
+
+            super(TexturedRenderer, self).clear()
+            GL.glFlush()
+            GL.glFinish()
         except:
             print("Program had not been initialized")
 
-        super(TexturedRenderer, self).clear()
 
     # def __del__(self):
     #     self.clear()
@@ -1013,7 +1125,6 @@ class TexturedRenderer(ColoredRenderer):
             vbo_verts = vbo.VBO(np.array(self.v_list[mesh]).astype(np.float32))
             vbo_colors = vbo.VBO(np.array(self.vc_list[mesh]).astype(np.float32))
             vbo_uvs = vbo.VBO(np.array(self.ft_list[mesh]).astype(np.float32))
-
 
             self.vbo_colors_mesh = self.vbo_colors_mesh + [vbo_colors]
             self.vbo_verts_mesh = self.vbo_verts_mesh + [vbo_verts]
@@ -1077,8 +1188,9 @@ class TexturedRenderer(ColoredRenderer):
         self.textureID  = GL.glGetUniformLocation(self.colorTextureProgram, "myTextureSampler")
 
 
-    def __del__(self):
-        self.release_textures()
+    # def __del__(self):
+    #     pass
+    #     # self.release_textures()
 
     @property
     def shape(self):
@@ -1092,9 +1204,10 @@ class TexturedRenderer(ColoredRenderer):
         if hasattr(self, 'textureID_mesh_list'):
             if self.textureID_mesh_list != []:
                 for texture_mesh in self.textureID_mesh_list:
-                    if texture_mesh != None and texture_mesh != []:
+                    if texture_mesh != []:
                         for texture in texture_mesh:
-                            GL.glDeleteTextures(1, texture)
+                            if texture != None:
+                                GL.glDeleteTextures(1, [texture.value])
 
         self.textureID_mesh_list = []
 
@@ -1109,8 +1222,22 @@ class TexturedRenderer(ColoredRenderer):
 
         no_overdraw = self.draw_color_image(with_vertex_colors=True, with_texture_on=True)
 
-        #Pol: why do we add the lines edges in the final render?
+        if not self.overdraw:
+            return no_overdraw
+
         return no_overdraw
+
+        GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+        overdraw = self.draw_color_image()
+        GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
+
+        # return overdraw * np.atleast_3d(self.boundarybool_image)
+
+        boundarybool_image = self.boundarybool_image
+        if self.num_channels > 1:
+            boundarybool_image = np.atleast_3d(boundarybool_image)
+
+        return np.asarray((overdraw*boundarybool_image + no_overdraw*(1-boundarybool_image)), order='C')
 
     def image_mesh_bool(self, meshes):
         self.makeCurrentContext()
@@ -1218,10 +1345,10 @@ class TexturedRenderer(ColoredRenderer):
         self.draw_colored_primitives(self.vao_dyn, v, f, colors)
 
         #Pol: Why do we need this?
-        if boundarybool_image is not None:
-            GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
-            self.draw_colored_primitives(self.vao_dyn, v, f, colors)
-            GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
+        # if boundarybool_image is not None:
+        #     GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_LINE)
+        #     self.draw_colored_primitives(self.vao_dyn, v, f, colors)
+        #     GL.glPolygonMode(GL.GL_FRONT_AND_BACK, GL.GL_FILL)
 
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo)
 
@@ -1240,7 +1367,7 @@ class TexturedRenderer(ColoredRenderer):
             cim = sp.spdiags(row(cim), [0], cim.size, cim.size)
             result = cim.dot(result)
         elif wrt is self.texture_stack:
-            ipdb.set_trace()
+
             IS = np.nonzero(self.visibility_image.ravel() != 4294967295)[0]
             texcoords, texidx = self.texcoord_image_quantized
             vis_texidx = texidx.ravel()[IS]
@@ -1332,8 +1459,6 @@ class TexturedRenderer(ColoredRenderer):
             # #gl.Hint(GL_GENERATE_MIPMAP_HINT, GL_NICEST) # must be GL_FASTEST, GL_NICEST or GL_DONT_CARE
             # gl.GenerateMipmap(GL.GL_TEXTURE_2D)
 
-
-
     @depends_on('ft', 'textures')
     def mesh_tex_coords(self):
         ftidxs = self.ft.ravel()
@@ -1384,7 +1509,10 @@ class TexturedRenderer(ColoredRenderer):
         # FIXME: this won't work for 2 channels
         GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_ms)
+        if self.msaa:
+            GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_ms)
+        else:
+            GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo_noms)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
         view_mtx = self.camera.openglMat.dot(np.asarray(np.vstack((self.camera.view_matrix, np.array([0, 0, 0, 1]))),np.float32))
         MVP = np.dot(self.projectionMatrix, view_mtx)
@@ -1434,7 +1562,11 @@ class TexturedRenderer(ColoredRenderer):
                 # ipdb.set_trace()
                 GL.glDrawElements(primtype, len(vbo_f)*vbo_f.data.shape[1], GL.GL_UNSIGNED_INT, None)
 
-        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.fbo_ms)
+        if self.msaa:
+            GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.fbo_ms)
+        else:
+            GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.fbo_noms)
+
         GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.fbo)
         GL.glBlitFramebuffer(0, 0, self.frustum['width'], self.frustum['height'], 0, 0, self.frustum['width'], self.frustum['height'], GL.GL_COLOR_BUFFER_BIT, GL.GL_LINEAR)
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.fbo)
@@ -1466,6 +1598,7 @@ class TexturedRenderer(ColoredRenderer):
 
     def checkBufferNum(self):
        GL.glGenBuffers(1)
+
     @depends_on('ft', 'f', 'frustum', 'camera')
     def texcoord_image(self):
         return self.draw_texcoord_image(self.v.r, self.f, self.ft, self.boundarybool_image if self.overdraw else None)
