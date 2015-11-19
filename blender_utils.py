@@ -347,6 +347,7 @@ def updateEnviornmentMap(envMapFilename, scene):
     bpy.data.images.remove(envTextureNode.image)
     image = bpy.data.images.load(envMapFilename)
     envTextureNode.image = image
+    envTextureNode.color_space="NONE"
 
 def rotateEnviornmentMap(angle, scene):
     mappingNode = scene.world.node_tree.nodes['Mapping']
@@ -850,3 +851,10 @@ class Arrow3D(FancyArrowPatch):
         xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
         self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
         FancyArrowPatch.draw(self, renderer)
+
+
+def setObjectDiffuseColor(object, color):
+    for mesh in object.dupli_group.objects:
+        if mesh.type == 'MESH':
+            for mat in mesh.data.materials:
+                mat.diffuse_color = color

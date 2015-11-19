@@ -96,17 +96,11 @@ elif useBlender and loadBlenderSceneFile:
     scene.render.tile_y = width/2
     bpy.context.screen.scene = scene
 
+tex_srgb2lin =  True
 if unpackSceneFromBlender:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.unpackBlenderScene(scene, sceneDicFile, True)
 else:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile)
-    textures_listflat = [item for sublist in textures_list for item in sublist]
-    for texture_list in textures_listflat:
-        if texture_list != None:
-            for texture in texture_list:
-                if texture != None:
-                    srgb2lin(texture)
-    # [srgb2lin(item) for sublist in vc for item in sublist]
+    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
 
 removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
@@ -165,14 +159,24 @@ shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 clampedCosCoeffs = clampedCosineCoefficients()
 
 envMapFilename = 'data/hdr/dataset/TropicalRuins_3k.hdr'
+envMapFilename = 'data/hdr/dataset/studio019.hdr'
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
 
 if sphericalMap:
     envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 2*envMapMean,  0, 'spherical')
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1,  0, 'spherical')
 else:
-    envMapMean = envMapTexture.mean()
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 2*envMapMean, 0, 'equirectangular')
+    envMapMean = np.mean(envMapTexture,axis=(0,1))[None,None,:]
+    envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
+    envMapGrayMean = np.mean(envMapGray, axis=(0,1))
+    envMapTexture = envMapTexture/envMapGrayMean
+
+    # envMapTexture = 4*np.pi*envMapTexture/np.sum(envMapTexture, axis=(0,1))
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1, 0, 'equirectangular')
+    pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
+    approxProjection = np.sum(pEnvMap, axis=3)
+
+    # imageio.imwrite("tmp.exr", approxProjection)
 
 rotation = ch.Ch([0.0])
 phiOffsetGT = 0
@@ -187,9 +191,10 @@ chDistGT = ch.Ch([camDistance])
 totalOffsetGT = phiOffsetGT + chObjAzGT
 totalOffset = phiOffset
 
-chAmbientIntensityGT = ch.Ch([1/np.pi**2])
-shCoeffsRGBGT = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(totalOffsetGT.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
-shCoeffsRGBGTRel = ch.Ch(np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset.r[:]), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
+chAmbientIntensityGT = ch.Ch([0.025])
+chAmbientIntensityGT = ch.Ch([0.125])
+shCoeffsRGBGT = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffsetGT), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+shCoeffsRGBGTRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
 chShCoeffsGT = 0.3*shCoeffsRGBGT[:,0] + 0.59*shCoeffsRGBGT[:,1] + 0.11*shCoeffsRGBGT[:,2]
 chShCoeffsGTRel = 0.3*shCoeffsRGBGTRel[:,0] + 0.59*shCoeffsRGBGTRel[:,1] + 0.11*shCoeffsRGBGTRel[:,2]
@@ -214,7 +219,7 @@ chObjAz = ch.Ch([0])
 chEl =  ch.Ch([np.pi/4])
 chAzRel = chAz - chObjAz
 
-chAmbientIntensity = ch.Ch([1])
+chAmbientIntensity = ch.Ch([0.01])
 shCoeffsRGB = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(totalOffset)).T
 shCoeffsRGBRel = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(phiOffset)).T
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
@@ -236,7 +241,7 @@ if useBlender:
     scene.sequencer_colorspace_settings.name = 'Linear'
     scene.display_settings.display_device = 'None'
     addEnvironmentMapWorld(envMapFilename, scene)
-    setEnviornmentMapStrength(1, scene)
+    setEnviornmentMapStrength(1./envMapGrayMean, scene)
     rotateEnviornmentMap(-totalOffset, scene)
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
@@ -290,7 +295,6 @@ paramsList = [chAz, chEl]
 # diffRenderer = differentiable_renderer.DifferentiableRenderer(renderer=renderer, params_list=paramsList, params=ch.concatenate(paramsList))
 diffRenderer = renderer
 
-
 vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
 vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
 vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
@@ -313,8 +317,8 @@ if useBlender:
     teapotGT = blender_teapots[currentTeapotModel]
     placeNewTarget(scene, teapot, targetPosition)
     teapot.layers[1]=True
-    scene.layers[0] = False
-    scene.layers[1] = True
+    # scene.layers[0] = False
+    # scene.layers[1] = True
     scene.objects.unlink(scene.objects[str(targetIndex)])
 
     placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
@@ -467,10 +471,13 @@ if showSubplots:
     ax1.set_title("Ground Truth")
 
     ax2.set_title("Backprojection")
-    pim2 = ax2.imshow(renderer.r)
+    rendererIm = lin2srgb(renderer.r.copy())
+    pim2 = ax2.imshow(rendererIm)
+
 
     edges = renderer.boundarybool_image
     gtoverlay = imageGT().copy()
+    gtoverlay = lin2srgb(gtoverlay)
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1 = ax1.imshow(gtoverlay)
 
@@ -579,13 +586,16 @@ def refreshSubplots():
 
     edges = renderer.boundarybool_image
     imagegt = imageGT()
-    gtoverlay = imagegt.copy()
+    gtoverlay = imageGT().copy()
+    gtoverlay = lin2srgb(gtoverlay)
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1.set_data(gtoverlay)
-    pim2.set_data(renderer.r)
+    rendererIm = lin2srgb(renderer.r.copy())
+    pim2.set_data(rendererIm)
 
     diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, chAz, 0.01745)
     diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, chEl, 0.01745)
+
 
     if model != 2:
         # ax3.set_title("Pixel negative log probabilities")
@@ -874,6 +884,7 @@ def readKeys(window, key, scancode, action, mods):
         glfw.set_window_should_close(window, True)
         exit = True
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
+        rotation[:] = rotation.r[0] - radians(5)
         refresh = True
         chAz[:] = chAz.r[0] - radians(5)
         azimuth = chAz.r[0] - radians(5)
@@ -1380,8 +1391,8 @@ if demoMode:
 
         if groundTruthBlender and pendingCyclesRender:
             scene.update()
-            scene.layers[0] = False
-            scene.layers[1] = True
+            # scene.layers[0] = False
+            # scene.layers[1] = True
             bpy.ops.render.render( write_still=True )
 
             # image = cv2.imread(scene.render.filepath)
@@ -1389,6 +1400,11 @@ if demoMode:
             image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
             image[image>1]=1
             blenderRender = image
+
+            blenderRenderGray = 0.3*blenderRender[:,:,0] + 0.59*blenderRender[:,:,1] + 0.11*blenderRender[:,:,2]
+            rendererGTGray = 0.3*rendererGT[:,:,0] + 0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+            chAmbientIntensityGT[:] = chAmbientIntensityGT.r*(np.mean(blenderRenderGray,axis=(0,1))/np.mean(rendererGTGray.r,axis=(0,1)))
+
             pendingCyclesRender = False
 
         if changeRenderer:
@@ -1446,6 +1462,7 @@ if demoMode:
             minimize = False
 
         if refresh:
+            chAzGT[:] = rotation.r[:]
             print("Model Log Likelihood: " + str(errorFun.r))
 
             if showSubplots:

@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 
 #Main script options:
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -73,39 +73,19 @@ targetIndex = targetIndices[targetParentIdx]
 targetParentPosition = targetPositions[targetParentIdx]
 targetPosition = targetParentPosition
 
-if useBlender and not loadBlenderSceneFile:
-    scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
-    scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, False)
-    scene.update()
-    scene.render.filepath = 'opendr_blender.png'
-    targetPosition = np.array(targetPosition)
-    #Save barebones scene.
+tex_srgb2lin =  True
 
-elif useBlender and loadBlenderSceneFile:
-    scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
-    scene = bpy.data.scenes['Main Scene']
-    scene.render.resolution_x = width #perhaps set resolution in code
-    scene.render.resolution_y = height
-    scene.render.tile_x = height/2
-    scene.render.tile_y = width/2
-    bpy.context.screen.scene = scene
-
-if unpackSceneFromBlender:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.unpackBlenderScene(scene, sceneDicFile, True)
-else:
-    v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile)
+v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
 
 removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
 targetModels = []
-if useBlender and not loadBlenderSceneFile:
-    [targetScenes, targetModels, transformations] = scene_io_utils.loadTargetModels(renderTeapotsList)
-elif useBlender:
-    teapots = [line.strip() for line in open('teapots.txt')]
-    selection = [ teapots[i] for i in renderTeapotsList]
-    scene_io_utils.loadTargetsBlendData()
-    for teapotIdx, teapotName in enumerate(selection):
-        targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
+
+teapots = [line.strip() for line in open('teapots.txt')]
+selection = [ teapots[i] for i in renderTeapotsList]
+scene_io_utils.loadTargetsBlendData()
+for teapotIdx, teapotName in enumerate(selection):
+    targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
@@ -158,7 +138,7 @@ chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([3])
+chAmbientIntensityGT = ch.Ch([0.025])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 
@@ -168,14 +148,15 @@ SHFilename = 'data/LightSHCoefficients.pickle'
 with open(SHFilename, 'rb') as pfile:
     envMapDic = pickle.load(pfile)
 
-phiOffset = 0
-totalOffset = phiOffset + chObjAzGT.r
-envMapCoeffs = list(envMapDic.items())[0][1][1]
-envMapCoeffsRotated = np.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(totalOffset)).T
-envMapCoeffsRotatedRel = np.dot(envMapCoeffs.T,light_probes.sphericalHarmonicsZRotation(phiOffset)).T
+phiOffset = ch.Ch([0])
+totalOffset = phiOffset + chObjAzGT
+envMapCoeffs = ch.Ch(list(envMapDic.items())[0][1][1])
 
-shCoeffsRGB = ch.Ch(envMapCoeffs.copy())
-shCoeffsRGBRel = ch.Ch(envMapCoeffs.copy())
+envMapCoeffsRotated = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+envMapCoeffsRotatedRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+
+shCoeffsRGB = envMapCoeffsRotated
+shCoeffsRGBRel = envMapCoeffsRotatedRel
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
 chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
 chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
@@ -190,11 +171,12 @@ angle = ch.arcsin(chLightRadGT/chLightDistGT)
 zGT = chZonalHarmonics(angle)
 shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT + chObjAzGT - np.pi/2) * clampedCosCoeffs
 shDirLightGTRel = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
-chComponentGT = ch.Ch(chAmbientSHGT.r[:].copy())
+chComponentGT = chAmbientSHGT
+# chComponentGT = ch.Ch(chAmbientSHGT.r[:].copy())
  # + shDirLightGT*chLightIntensityGT
-chComponentGTRel = ch.Ch(chAmbientSHGTRel.r[:].copy())
+chComponentGTRel = chAmbientSHGTRel
+# chComponentGTRel = ch.Ch(chAmbientSHGTRel.r[:].copy())
 # chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
-
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
@@ -224,15 +206,21 @@ def imageGT():
     else:
         return np.copy(np.array(rendererGT.r)).astype(np.float64)
 
+import multiprocessing
+numTileAxis = np.ceil(np.sqrt(multiprocessing.cpu_count())/2)
+
+
+
+
 
 #########################################
 # Initialization ends here
 #########################################
 
-prefix = 'train2'
+prefix = 'train3'
 
 print("Creating Ground Truth")
-trainSize = 100000
+trainSize = 5000
 
 trainAzsGT = np.array([])
 trainObjAzsGT = np.array([])
@@ -250,17 +238,23 @@ trainIds = np.array([], dtype=np.uint32)
 #zeros
 trainComponentsGT = np.array([]).reshape([0,9])
 trainComponentsGTRel = np.array([]).reshape([0,9])
+trainLightCoefficientsGT = np.array([]).reshape([0,9])
+trainLightCoefficientsGTRel = np.array([]).reshape([0,9])
+trainAmbientIntensityGT = np.array([])
 trainEnvMapPhiOffsets = np.array([])
 
 gtDir = 'groundtruth/' + prefix + '/'
 if not os.path.exists(gtDir + 'images/'):
     os.makedirs(gtDir + 'images/')
 
+if not os.path.exists(gtDir + 'images_opendr/'):
+    os.makedirs(gtDir + 'images_opendr/')
+
 print("Generating renders")
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-scenesToRender = range(len(sceneLines))[:]
+scenesToRender = range(len(sceneLines))[0:3]
 lenScenes = 0
 for sceneIdx in scenesToRender:
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -275,7 +269,7 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-renderTeapotsList = np.arange(len(teapots))[0:1]
+renderTeapotsList = np.arange(len(teapots))[0:3]
 
 # for hdrit, hdri in enumerate(list(envMapDic.items())):
 #     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':
@@ -283,7 +277,7 @@ renderTeapotsList = np.arange(len(teapots))[0:1]
 
 ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
 
-hdritems = list(envMapDic.items())[:]
+hdritems = list(envMapDic.items())[0:3]
 hdrstorender = []
 phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
 for hdrFile, hdrValues in hdritems:
@@ -315,7 +309,7 @@ for hdrFile, hdrValues in hdritems:
     #     cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
 # sys.exit("")
 
-gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,)), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype)]
+gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,)), ('trainLightCoefficientsGT',trainLightCoefficientsGT.dtype, (9,)), ('trainLightCoefficientsGTRel', trainLightCoefficientsGTRel.dtype, (9,)), ('trainAmbientIntensityGT', trainAmbientIntensityGT.dtype), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype)]
 
 groundTruth = np.array([], dtype = gtDtype)
 groundTruthFilename = gtDir + 'groundTruth.h5'
@@ -334,6 +328,7 @@ train_i = nextId
 #Re-producible groundtruth generation.
 if train_i == 0:
     np.random.seed(1)
+unlinkedObj = None
 
 for sceneIdx in scenesToRender:
 
@@ -343,11 +338,34 @@ for sceneIdx in scenesToRender:
     sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
     # v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.loadSavedScene(sceneDicFile)
     import copy
-    v2, f_list2, vc2, vn2, uv2, haveTextures_list2, textures_list2 = scene_io_utils.loadSavedScene(sceneDicFile)
+    v2, f_list2, vc2, vn2, uv2, haveTextures_list2, textures_list2 = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
 
     collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
     with open(collisionSceneFile, 'rb') as pfile:
         collisions = pickle.load(pfile)
+
+    if useBlender and not loadBlenderSceneFile:
+        bpy.ops.wm.read_factory_settings()
+        scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
+        scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, False)
+        scene.update()
+        #Save barebones scene.
+
+    elif useBlender and loadBlenderSceneFile:
+        scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
+        scene = bpy.data.scenes['Main Scene']
+        scene.render.resolution_x = width #perhaps set resolution in code
+        scene.render.resolution_y = height
+        scene.render.tile_x = height/numTileAxis
+        scene.render.tile_y = width/numTileAxis
+        scene.cycles.samples = 512
+        bpy.context.screen.scene = scene
+        scene.render.image_settings.file_format = 'OPEN_EXR'
+        scene.render.filepath = 'opendr_blender.exr'
+        scene.sequencer_colorspace_settings.name = 'Linear'
+        scene.display_settings.display_device = 'None'
+
+    unlinkedObj = None
 
     for targetidx, targetIndex in enumerate(targetIndices):
         targetPosition = targetPositions[targetidx]
@@ -363,6 +381,15 @@ for sceneIdx in scenesToRender:
             collisionProbs[intervalIdx] = collisions[targetIndex][1][intervalIdx][1] - collisions[targetIndex][1][intervalIdx][0]
 
         collisionsProbs = collisionProbs / np.sum(collisionProbs)
+
+        if useBlender:
+            if unlinkedObj != None:
+                scene.objects.link(unlinkedObj)
+            unlinkedObj = scene.objects[str(targetIndex)]
+            scene.objects.unlink(unlinkedObj)
+
+        teapot = None
+
         for teapot_i in renderTeapotsList:
 
             rendererGT.makeCurrentContext()
@@ -378,30 +405,58 @@ for sceneIdx in scenesToRender:
 
             rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
             print("Ground truth on new teapot" + str(teapot_i))
+
+            if useBlender:
+                if teapot != None:
+                    scene.objects.unlink(teapot)
+
+                teapot = blender_teapots[currentTeapotModel]
+                teapotGT = blender_teapots[currentTeapotModel]
+                # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+                placeNewTarget(scene, teapot, targetPosition)
+                teapot.layers[1]=True
+                original_matrix_world = teapot.matrix_world.copy()
+
+            envMapFilename = None
             for hdrFile, hdrValues in hdrstorender:
                 hdridx = hdrValues[0]
-                envMapCoeffs = hdrValues[1]
+                envMapCoeffs[:] = hdrValues[1]
 
+                if useBlender:
+                    if envMapFilename == None:
+                        envMapFilename = hdrFile
+                        addEnvironmentMapWorld(envMapFilename, scene)
+                    else:
+                        envMapFilename = hdrFile
+                        updateEnviornmentMap(envMapFilename, scene)
+
+                    envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+                    envMapMean = np.mean(envMapTexture,axis=(0,1))[None,None,:]
+                    envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
+                    envMapGrayMean = np.mean(envMapGray, axis=(0,1))
+                    envMapTexture = envMapTexture/envMapGrayMean
+                    setEnviornmentMapStrength(1.5/envMapGrayMean, scene)
 
                 for numTeapotTrain in range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList)))):
 
-                    phiOffset = np.random.uniform(0,2*np.pi, 1)
+                    phiOffset[:] = np.random.uniform(0,2*np.pi, 1)
+                    # phiOffset[:] = 0
                     from numpy.random import choice
                     objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
                     objAzGT = np.random.uniform(0,1)*(collisions[targetIndex][1][objAzInterval][1] - collisions[targetIndex][1][objAzInterval][0]) + collisions[targetIndex][1][objAzInterval][0]
                     objAzGT = objAzGT*np.pi/180
                     chObjAzGT[:] = objAzGT.copy()
-                    totalOffset = phiOffset + chObjAzGT.r
-                    envMapCoeffsRotated = np.dot(light_probes.sphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]].copy()
-                    envMapCoeffsRotatedRel = np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]].copy()
-                    shCoeffsRGB = envMapCoeffsRotated.copy()
-                    shCoeffsRGBRel = envMapCoeffsRotatedRel.copy()
-                    chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
-                    chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
-                    chAmbientSHGT = chShCoeffs * chAmbientIntensityGT * clampedCosCoeffs
-                    chAmbientSHGTRel = chShCoeffsRel * chAmbientIntensityGT * clampedCosCoeffs
-                    chComponentGT[:] = chAmbientSHGT.r[:].copy()
-                    chComponentGTRel[:] = chAmbientSHGTRel.r[:].copy()
+
+                    # envMapCoeffsRotated = np.dot(light_probes.sphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]].copy()
+                    # envMapCoeffsRotatedRel = np.dot(light_probes.sphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]].copy()
+                    # shCoeffsRGB = envMapCoeffsRotated.copy()
+                    # shCoeffsRGBRel = envMapCoeffsRotatedRel.copy()
+                    # chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+                    # chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
+                    # chAmbientSHGT = chShCoeffs * chAmbientIntensityGT * clampedCosCoeffs
+                    # chAmbientSHGTRel = chShCoeffsRel * chAmbientIntensityGT * clampedCosCoeffs
+                    # chComponentGT[:] = chAmbientSHGT.r[:].copy()
+                    # chComponentGTRel[:] = chAmbientSHGTRel.r[:].copy()
 
                     chAzGT[:] = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
                     chElGT[:] = np.random.uniform(0,np.pi/2, 1)
@@ -411,16 +466,50 @@ for sceneIdx in scenesToRender:
                     chLightIntensityGT[:] = 0
                     # chLightIntensityGT[:] = np.random.uniform(5,10, 1)
 
-                    chVColorsGT[:] =  np.random.uniform(0.3,0.7, [1, 3])
+                    chVColorsGT[:] =  np.random.uniform(0.2,0.8, [1, 3])
+
+                    if useBlender:
+                        ipdb.set_trace()
+                        rotateEnviornmentMap(-totalOffset, scene)
+                        rotateEnviornmentMap(-totalOffset, scene)
+                        #Pol: Change ObjAz here
+                        azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r, 4, 'Z')
+
+                        teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+                        placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center + targetPosition)
+
+                        setObjectDiffuseColor(teapot, chVColorsGT.r)
+
+                        scene.update()
+
+                        # scene.layers[0] = False
+                        # scene.layers[1] = True
+                        bpy.ops.render.render( write_still=True )
+
+                        # image = cv2.imread(scene.render.filepath)
+                        # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+                        image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
+                        image[image>1]=1
+                        blenderRender = image
+
+                        blenderRenderGray = 0.3*blenderRender[:,:,0] + 0.59*blenderRender[:,:,1] + 0.11*blenderRender[:,:,2]
+                        rendererGTGray = 0.3*rendererGT[:,:,0] + 0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+
+                        chAmbientIntensityGT[:] = chAmbientIntensityGT.r*(np.mean(blenderRenderGray,axis=(0,1))/np.mean(rendererGTGray.r,axis=(0,1)))
+                        lin2srgb(blenderRender)
 
                     image = rendererGT.r.copy()
+                    lin2srgb(image)
 
                     occlusion = getOcclusionFraction(rendererGT)
+
                     if occlusion < 0.1:
                         # hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
                         # illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
+                        if useBlender:
+                            cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-                        cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                        cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
                         #Add groundtruth to arrays
                         trainAzsGT = chAzGT.r
@@ -432,6 +521,13 @@ for sceneIdx in scenesToRender:
                         trainVColorGT = chVColorsGT.r
                         trainComponentsGT = chComponentGT.r[None, :].copy()
                         trainComponentsGTRel = chComponentGTRel.r[None, :].copy()
+                        lightCoeffs = envMapCoeffsRotated.r[None, :].copy().squeeze()
+                        lightCoeffs = 0.3*lightCoeffs[:,0] + 0.59*lightCoeffs[:,1] + 0.11*lightCoeffs[:,2]
+                        trainLightCoefficientsGT = lightCoeffs
+                        lightCoeffsRel = envMapCoeffsRotatedRel.r[None, :].copy().squeeze()
+                        lightCoeffsRel = 0.3*lightCoeffsRel[:,0] + 0.59*lightCoeffsRel[:,1] + 0.11*lightCoeffsRel[:,2]
+                        trainLightCoefficientsGTRel = lightCoeffsRel
+                        trainAmbientIntensityGT = chAmbientIntensityGT.r
                         trainEnvMapPhiOffsets = phiOffset
                         trainScenes = sceneNumber
                         trainTeapotIds = teapot_i
@@ -441,7 +537,7 @@ for sceneIdx in scenesToRender:
                         trainTargetIndices = targetIndex
 
                         gtDataset.resize(gtDataset.shape[0]+1, axis=0)
-                        gtDataset[-1] = np.array([(trainIds, trainAzsGT,trainObjAzsGT,trainElevsGT,trainLightAzsGT,trainLightElevsGT,trainLightIntensitiesGT,trainVColorGT,trainScenes,trainTeapotIds,trainEnvMaps,trainOcclusions,trainTargetIndices, trainComponentsGT,trainComponentsGTRel, phiOffset)],dtype=gtDtype)
+                        gtDataset[-1] = np.array([(trainIds, trainAzsGT,trainObjAzsGT,trainElevsGT,trainLightAzsGT,trainLightElevsGT,trainLightIntensitiesGT,trainVColorGT,trainScenes,trainTeapotIds,trainEnvMaps,trainOcclusions,trainTargetIndices, trainComponentsGT,trainComponentsGTRel, trainLightCoefficientsGT, trainLightCoefficientsGTRel, trainAmbientIntensityGT, phiOffset)],dtype=gtDtype)
                         train_i = train_i + 1
 
             removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)

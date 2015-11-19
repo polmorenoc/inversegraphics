@@ -348,7 +348,7 @@ def loadBlenderScene(sceneIdx, replaceableScenesFile):
 
     return scene
 
-def loadSavedScene(sceneDicFile):
+def loadSavedScene(sceneDicFile, tex_srgb2lin):
     with open(sceneDicFile, 'rb') as pfile:
         sceneDic = pickle.load(pfile)
         v = sceneDic['v']
@@ -358,6 +358,13 @@ def loadSavedScene(sceneDicFile):
         haveTextures_list = sceneDic['haveTextures_list']
         vn = sceneDic['vn']
         textures_list = sceneDic['textures_list']
+        if tex_srgb2lin:
+            textures_listflat = [item for sublist in textures_list for item in sublist]
+            for texture_list in textures_listflat:
+                if texture_list != None:
+                    for texture in texture_list:
+                        if texture != None:
+                            srgb2lin(texture)
 
         print("Loaded serialized scene!")
 

@@ -171,11 +171,12 @@ def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, renderer
 
 
 def exportEnvMapSHLightCoefficients():
+
     import glob
     envMapDic = {}
     hdrs = glob.glob("data/hdr/dataset/*")
     hdrstorender = hdrs
-
+    sphericalMap = False
     for hdridx, hdrFile in enumerate(hdrstorender):
         print("Processing env map" + str(hdridx))
         envMapFilename = hdrFile
@@ -187,9 +188,20 @@ def exportEnvMapSHLightCoefficients():
 
         # cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
 
-        envMapMean = envMapTexture.mean()
+        if sphericalMap:
+            envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
+            envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1,  0, 'spherical')
+        else:
+            envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
+            envMapGrayMean = np.mean(envMapGray, axis=(0,1))
+            envMapTexture = envMapTexture/envMapGrayMean
 
-        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
+            # envMapTexture = 4*np.pi*envMapTexture/np.sum(envMapTexture, axis=(0,1))
+            envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1, 0, 'equirectangular')
+            pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
+            approxProjection = np.sum(pEnvMap, axis=3)
+
+        # envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
 
         envMapDic[hdrFile] = [hdridx, envMapCoeffs]
 
