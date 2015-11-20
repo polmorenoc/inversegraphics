@@ -220,7 +220,7 @@ numTileAxis = np.ceil(np.sqrt(multiprocessing.cpu_count())/2)
 prefix = 'train3'
 
 print("Creating Ground Truth")
-trainSize = 5000
+trainSize = 100000
 
 trainAzsGT = np.array([])
 trainObjAzsGT = np.array([])
@@ -254,7 +254,7 @@ print("Generating renders")
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-scenesToRender = range(len(sceneLines))[0:3]
+scenesToRender = range(len(sceneLines))
 lenScenes = 0
 for sceneIdx in scenesToRender:
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -269,7 +269,7 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-renderTeapotsList = np.arange(len(teapots))[0:3]
+renderTeapotsList = np.arange(len(teapots))[0:1]
 
 # for hdrit, hdri in enumerate(list(envMapDic.items())):
 #     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':
@@ -277,7 +277,7 @@ renderTeapotsList = np.arange(len(teapots))[0:3]
 
 ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
 
-hdritems = list(envMapDic.items())[0:3]
+hdritems = list(envMapDic.items())
 hdrstorender = []
 phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
 for hdrFile, hdrValues in hdritems:
@@ -358,7 +358,7 @@ for sceneIdx in scenesToRender:
         scene.render.resolution_y = height
         scene.render.tile_x = height/numTileAxis
         scene.render.tile_y = width/numTileAxis
-        scene.cycles.samples = 512
+        scene.cycles.samples = 2048
         bpy.context.screen.scene = scene
         scene.render.image_settings.file_format = 'OPEN_EXR'
         scene.render.filepath = 'opendr_blender.exr'
@@ -469,8 +469,7 @@ for sceneIdx in scenesToRender:
                     chVColorsGT[:] =  np.random.uniform(0.2,0.8, [1, 3])
 
                     if useBlender:
-                        ipdb.set_trace()
-                        rotateEnviornmentMap(-totalOffset, scene)
+
                         rotateEnviornmentMap(-totalOffset, scene)
                         #Pol: Change ObjAz here
                         azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r, 4, 'Z')
