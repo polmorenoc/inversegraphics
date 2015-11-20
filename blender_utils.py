@@ -414,7 +414,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
         if useGPU:
             bpy.context.scene.cycles.device = 'GPU'
             bpy.context.user_preferences.system.compute_device_type = 'CUDA'
-            bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_0'
+            bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
 
         scene.use_nodes = True
 

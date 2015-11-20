@@ -149,6 +149,45 @@ def pixelLikelihoodRobustCh(image, template, testMask, backgroundModel, layerPri
     foregroundProbs = (probs[:,:,0] * probs[:,:,1] * probs[:,:,2]) * layerPrior + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 
+
+import chumpy as ch
+from chumpy import depends_on, Ch
+
+class LogRobustModel(Ch):
+    dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        visibility = self.renderer.visibility_image
+        visible = np.nonzero(visibility.ravel() != 4294967295)[0]
+
+        return ch.log(pixelLikelihoodRobustCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
+
+
+class LogGaussianModel(Ch):
+    dterms = ['renderer', 'groundtruth', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            ipdb.set_trace()
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        visibility = self.renderer.visibility_image
+        visible = np.nonzero(visibility.ravel() != 4294967295)[0]
+
+        return logPixelLikelihoodCh(self.groundtruth, self.renderer, visible, 'MASK', self.variances)
+
+
 def pixelLikelihood(image, template, testMask, backgroundModel, variances):
     sigma = np.sqrt(variances)
     # sum = np.sum(np.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=np.sqrt(variances) ) + (1 - repPriors)))

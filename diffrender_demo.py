@@ -152,7 +152,7 @@ light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
 
 chVColors = ch.Ch([0.4,0.4,0.4])
-chVColorsGT = ch.Ch([0.9882349967956543,0.9882349967956543,0.9882349967956543])
+chVColorsGT = ch.Ch([0.4,0.4,0.4])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
@@ -192,7 +192,7 @@ totalOffsetGT = phiOffsetGT + chObjAzGT
 totalOffset = phiOffset
 
 chAmbientIntensityGT = ch.Ch([0.025])
-chAmbientIntensityGT = ch.Ch([0.125])
+# chAmbientIntensityGT = ch.Ch([0.125])
 shCoeffsRGBGT = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffsetGT), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 shCoeffsRGBGTRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
@@ -360,13 +360,14 @@ stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
 globalPrior = ch.Ch([0.8])
 
-negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)/numPixels
 
-negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
 
-pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, vis_im, 'FULL', variances)
+negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
 
-pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances))
+pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
+
+pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
@@ -387,17 +388,17 @@ modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
 
-negLikModel2 = -generative_models.modelLogLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)/numPixels
-
-negLikModelRobust2 = -generative_models.modelLogLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)/numPixels
-
-pixelLikelihoodCh2 = generative_models.logPixelLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)
-
-pixelLikelihoodRobustCh2 = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances))
-
-post2 = generative_models.layerPosteriorsRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)[0]
-pixelModels2 = [pixelLikelihoodCh2, pixelLikelihoodRobustCh2]
-models2 = [negLikModel2, negLikModelRobust2]
+# negLikModel2 = -generative_models.modelLogLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)/numPixels
+#
+# negLikModelRobust2 = -generative_models.modelLogLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)/numPixels
+#
+# pixelLikelihoodCh2 = generative_models.logPixelLikelihoodCh(rendererGT, diffRenderer, vis_im, 'FULL', variances)
+#
+# pixelLikelihoodRobustCh2 = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances))
+#
+# post2 = generative_models.layerPosteriorsRobustCh(rendererGT, diffRenderer, vis_im, 'FULL', globalPrior, variances)[0]
+# pixelModels2 = [pixelLikelihoodCh2, pixelLikelihoodRobustCh2]
+# models2 = [negLikModel2, negLikModelRobust2]
 
 model = 0
 
@@ -1427,10 +1428,12 @@ if demoMode:
                 # image = cv2.imread(scene.render.filepath)
                 # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
                 # currentGT = image
-            negLikModel = -generative_models.modelLogLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)/numPixels
-            negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)/numPixels
-            pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(currentGT, renderer, vis_im, 'FULL', variances)
-            pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances))
+
+            negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+            negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+            pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
+            pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
             # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT, drconv)

@@ -205,5 +205,4 @@ def diffHog(image, drconv=None, numOrient = 9, cwidth=8, cheight=8):
     # plt.imshow(hogim)
     # ipdb.set_trace()
 
-
     return v, hog_image, drconv
