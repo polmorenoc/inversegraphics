@@ -34,6 +34,111 @@ class TheanoFunOnOpenDR(Ch):
             jac = self.theano_grad_fun(self.opendr_x)
             return sp.csc_matrix(jac)
 
+def SHProjection(envMap, shCoefficients):
+
+
+    #Backprojected.
+    phis = 2*ch.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
+    thetas = np.pi*np.tile((np.arange(envMap.shape[0])/envMap.shape[0]).reshape([envMap.shape[0],1,1]), [1,envMap.shape[1],3])
+
+    phis = np.mod(phis, 2*np.pi)
+
+    normalize = 1
+    spherical_harmonics_coeffs = light_probes.spherical_harmonics_coeffs
+
+    pEnvMap = np.zeros([envMap.shape[0],envMap.shape[1], 3, 9] )
+    pEnvMap[:,:,:,0] = shCoefficients[0].reshape([1,1,3]) *  spherical_harmonics_coeffs[0]  * normalize
+    pEnvMap[:,:,:,1] = shCoefficients[1].reshape([1,1,3]) * spherical_harmonics_coeffs[1]*np.sin(thetas) * np.cos(phis) * normalize
+    pEnvMap[:,:,:,2] = shCoefficients[2].reshape([1,1,3]) * spherical_harmonics_coeffs[2]*np.cos(thetas) * normalize
+    pEnvMap[:,:,:,3] = shCoefficients[3].reshape([1,1,3]) * spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(phis) * normalize
+    pEnvMap[:,:,:,4] = shCoefficients[4].reshape([1,1,3]) * spherical_harmonics_coeffs[4]*np.sin(thetas) * np.cos(phis) * np.sin(phis)* np.sin(thetas)  * normalize
+    pEnvMap[:,:,:,5] = shCoefficients[5].reshape([1,1,3]) * spherical_harmonics_coeffs[5]*np.sin(thetas) * np.sin(phis) * np.cos(thetas)  * normalize
+    pEnvMap[:,:,:,6] = shCoefficients[6].reshape([1,1,3]) * spherical_harmonics_coeffs[6]*(3 * np.cos(thetas)**2 - 1) * normalize
+    pEnvMap[:,:,:,7] = shCoefficients[7].reshape([1,1,3]) * spherical_harmonics_coeffs[7]*np.sin(thetas) * np.cos(phis) * np.cos(thetas) * normalize
+    pEnvMap[:,:,:,8] = shCoefficients[8].reshape([1,1,3]) * spherical_harmonics_coeffs[8]*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2)) * normalize
+
+    return pEnvMap
+
+def SHSpherePlot():
+    #Visualize plots
+    ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
+    envMapDic = {}
+    SHFilename = 'data/LightSHCoefficients.pickle'
+
+    with open(SHFilename, 'rb') as pfile:
+        envMapDic = pickle.load(pfile)
+
+    hdritems = list(envMapDic.items())[0:10]
+
+    pEnvMapsList = []
+    envMapsList = []
+    width = 600
+    height = 300
+    for hdrFile, hdrValues in hdritems:
+
+        hdridx = hdrValues[0]
+        if hdridx not in ignoreEnvMaps:
+            if not os.path.exists('light_probes/envMap' + str(hdridx)):
+                os.makedirs('light_probes/envMap' + str(hdridx))
+
+            envMapCoeffs = hdrValues[1]
+            envMap = np.array(imageio.imread(hdrFile))[:,:,0:3]
+            # normalize = envMap.mean()*envMap.shape[0]*envMap.shape[1]
+            # envMap = 0.3*envMap[:,:,0] + 0.59*envMap[:,:,1] + 0.11*envMap[:,:,2]
+            # if envMap.shape[0] != height or envMap.shape[1] != width:
+            envMap = cv2.resize(src=envMap, dsize=(width,height))
+
+            print("Processing hdridx" + str(hdridx))
+            # envMapCoeffs = 0.3*envMapCoeffs[:,0] + 0.59*envMapCoeffs[:,1] + 0.11*envMapCoeffs[:,2]
+            # envMapCoeffs *= normalize
+            # pEnvMap = SHProjection(envMap, envMapCoeffs)
+            envMapMean = envMap.mean()
+
+            envMapCoeffs2 = light_probes.getEnvironmentMapCoefficients(envMap, 1, 0, 'equirectangular')
+            # envMapCoeffs2 = 0.3*envMapCoeffs2[:,0] + 0.59*envMapCoeffs2[:,1] + 0.11*envMapCoeffs2[:,2]
+            pEnvMap = SHProjection(envMap, envMapCoeffs2)
+
+            tm = cv2.createTonemapDrago(gamma=2.2)
+            tmEnvMap = tm.process(envMap)
+            cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.jpeg' , 255*tmEnvMap[:,:,[2,1,0]])
+            approxProjections = []
+            for coeffApprox in np.arange(9) + 1:
+                approxProjection = np.sum(pEnvMap[:,:,:,0:coeffApprox], axis=3)
+                approxProjectionPos =  approxProjection.copy()
+                approxProjectionPos[approxProjection<0] = 0
+                # tm = cv2.createTonemapDrago(gamma=2.2)
+                # tmApproxProjection = tm.process(approxProjection)
+                approxProjections = approxProjections + [approxProjection[None, :,:,:,None]]
+                cv2.imwrite('light_probes/envMap' + str(hdridx) + '/approx' + str(coeffApprox-1) + '.jpeg', 255 * approxProjectionPos[:,:,[2,1,0]])
+            approxProjections = np.concatenate(approxProjections, axis=4)
+            pEnvMapsList = pEnvMapsList + [approxProjections]
+
+            envMapsList = envMapsList + [envMap[None,:,:,:]]
+
+    pEnvMaps = np.concatenate(pEnvMapsList, axis=0)
+    envMaps = np.concatenate(envMapsList, axis=0)
+
+    #Total sum of squares
+    envMapsMean = np.mean(envMaps, axis=0)
+    pEnvMapsMean = np.mean(pEnvMaps, axis=0)
+
+    tsq = np.sum((envMaps - envMapsMean)**2)/(envMapsMean.shape[0]*envMapsMean.shape[1])
+
+    ess = np.sum((pEnvMaps - envMapsMean[None,:,:,:,None])**2, axis=(0,1,2,3))/(envMapsMean.shape[0]*envMapsMean.shape[1])
+
+    uess = np.sum((pEnvMaps - envMaps[:,:,:,:,None])**2, axis=(0,1,2,3))/(envMapsMean.shape[0]*envMapsMean.shape[1])
+
+    explainedVar = ess/tsq
+
+    tsq2 = uess + ess
+
+    ipdb.set_trace()
+
+    #Do something with standardized residuals.
+    stdres = (pEnvMaps - pEnvMapsMean)/np.sqrt(np.sum((pEnvMaps - pEnvMapsMean)**2,axis=0))
+
+    return explainedVar
+
 
 def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, rendererGT):
     import glob
@@ -66,11 +171,12 @@ def exportEnvMapSHImages(shCoeffsRGB, useBlender, scene, width, height, renderer
 
 
 def exportEnvMapSHLightCoefficients():
+
     import glob
     envMapDic = {}
     hdrs = glob.glob("data/hdr/dataset/*")
     hdrstorender = hdrs
-
+    sphericalMap = False
     for hdridx, hdrFile in enumerate(hdrstorender):
         print("Processing env map" + str(hdridx))
         envMapFilename = hdrFile
@@ -82,9 +188,20 @@ def exportEnvMapSHLightCoefficients():
 
         # cv2.imwrite('light_probes/envMap' + str(hdridx) + '/texture.png' , 255*envMapTexture[:,:,[2,1,0]])
 
-        envMapMean = envMapTexture.mean()
+        if sphericalMap:
+            envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
+            envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1,  0, 'spherical')
+        else:
+            envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
+            envMapGrayMean = np.mean(envMapGray, axis=(0,1))
+            envMapTexture = envMapTexture/envMapGrayMean
 
-        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
+            # envMapTexture = 4*np.pi*envMapTexture/np.sum(envMapTexture, axis=(0,1))
+            envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1, 0, 'equirectangular')
+            pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
+            approxProjection = np.sum(pEnvMap, axis=3)
+
+        # envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, envMapMean, phiOffset, 'equirectangular')
 
         envMapDic[hdrFile] = [hdridx, envMapCoeffs]
 

@@ -188,10 +188,10 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test1_pred_minimize_ov_msaa_ITERATIVE'
+testPrefix = 'test2_all_minimize_gaussian'
 
-gtPrefix = 'train1'
-trainPrefix = 'train1'
+gtPrefix = 'train2'
+trainPrefix = 'train2'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 imagesDir = gtDir + 'images/'
 experimentDir = 'experiments/' + trainPrefix + '/'
@@ -265,11 +265,12 @@ optimizationTypeDescr = ["normal", "joint"]
 optimizationType = 0
 
 method = 1
-model = 2
+model = 0
 maxiter = 500
 numSamples = 10
 
 free_variables = [ chAz, chEl]
+free_variables = [ chAz, chEl, chVColors, chComponent]
 # free_variables = [ chAz, chEl]
 
 mintime = time.time()
@@ -297,20 +298,20 @@ parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randFores
 
 if 'randForestAzs' in parameterRecognitionModels:
     with open(experimentDir + 'randForestModelCosAzs.pickle', 'rb') as pfile:
-        randForestModelCosAzs = pickle.load(pfile)
+        randForestModelCosAzs = pickle.load(pfile)['randForestModelCosAzs']
     cosAzsPred = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeatures)
 
     with open(experimentDir + 'randForestModelSinAzs.pickle', 'rb') as pfile:
-        randForestModelSinAzs = pickle.load(pfile)
+        randForestModelSinAzs = pickle.load(pfile)['randForestModelSinAzs']
     sinAzsPred = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeatures)
 
 if 'randForestElevs' in parameterRecognitionModels:
     with open(experimentDir + 'randForestModelCosElevs.pickle', 'rb') as pfile:
-        randForestModelCosElevs = pickle.load(pfile)
+        randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
     cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
 
     with open(experimentDir + 'randForestModelSinElevs.pickle', 'rb') as pfile:
-        randForestModelSinElevs = pickle.load(pfile)
+        randForestModelSinElevs = pickle.load(pfile)['randForestModelSinElevs']
     sinElevsPred = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeatures)
 if 'randForestVColors' in parameterRecognitionModels:
     with open(experimentDir + 'randForestModelVColor.pickle', 'rb') as pfile:
@@ -448,11 +449,11 @@ for test_i in range(len(testAzsRel)):
             el = elevsPred[test_i]
             # color = recognition_models.meanColor(rendererGT.r, 40)
             # color = recognition_models.filteredMean(rendererGT.r, 40)
-            color = recognition_models.midColor(rendererGT.r)
-            # color = testVColorGT[test_i]
-            color = vColorsPred[test_i]
-            SHcomponents = relSHComponentsPred[test_i].copy()
-            # SHcomponents = testComponentsGTRel[test_i]
+            # color = recognition_models.midColor(rendererGT.r)
+            color = testVColorGT[test_i]
+            # color = vColorsPred[test_i]
+            # SHcomponents = relSHComponentsPred[test_i].copy()
+            SHcomponents = testComponentsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -500,6 +501,7 @@ for test_i in range(len(testAzsRel)):
 
         sys.stdout.flush()
         if optimizationTypeDescr[optimizationType] == 'normal':
+
             ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
         elif optimizationTypeDescr[optimizationType] == 'joint':
@@ -773,9 +775,6 @@ with open(resultDir + 'performance.txt', 'w') as expfile:
     expfile.write("Mean Vertex Colors Error (predicted) " +  str(meanErrorsVColors)+ '\n')
     expfile.write("Mean SH Components Error (fitted) " +  str(meanErrorsFittedSHComponents)+ '\n')
     expfile.write("Mean Vertex Colors Error (fitted) " +  str(meanErrorsFittedVColors)+ '\n')
-
-
-
 
 headerDesc = "Pred NLL    :" + "Fitt NLL    :" + "Err Pred Az :" + "Err Pred El :" + "Err Fitted Az :" + "Err Fitted El :" + "Occlusions  :"
 perfSamplesData = np.hstack([predictedErrorFuns.reshape([-1,1]),fittedErrorFuns.reshape([-1,1]),errors[0].reshape([-1,1]),errors[1].reshape([-1,1]),errorsFittedRF[0].reshape([-1,1]),errorsFittedRF[1].reshape([-1,1]),testOcclusions.reshape([-1,1])])

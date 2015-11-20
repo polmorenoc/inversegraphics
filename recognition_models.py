@@ -86,3 +86,51 @@ def trainLinearRegression(xtrain, ytrain):
 def testLinearRegression(lrmodel, xtest):
 
     return lrmodel.predict(xtest)
+
+class sphericalHarmonicsModel():
+
+    def __init__(self, image=None, barycentric=None, visibility=None, SHComponents=None, f=None, vc=None, vn=None):
+
+        self.SHComponents = SHComponents
+        self.vn = vn
+        self.visibility = visibility
+        self.f = f
+        self.vc = vc
+        self.vn = vn
+        self.barycentric = None
+        visible = np.nonzero(visibility.ravel() != 4294967295)[0]
+        vertexpix = np.where(self.barycentric[visible].ravel() <= 0.01)
+        fvis = f[visibility.ravel()[visible]].ravel()[vertexpix]
+        vcvis = vc[fvis]
+        vnvis = vn[fvis]
+
+        imvis = image[visible]
+
+        evis = imvis/(vcvis+1e-5)
+
+        self.X = vnvis
+        self.y = evis
+
+    # def fit(self, X, y):
+    #
+    #
+    #
+    # def score(self, X, y):
+    #
+    # def predict(self, X):
+
+def solveSHCoefficients(groundtruth, visibility, f, vn, vc):
+
+    #RANSAC solution.
+
+
+    #1 Select nine vertices.
+
+    #2 Get E by dividing by vc.
+
+    #3 We know the normalizing constant and transfer function. What is A_l? Probably wrt vertex normals.
+
+    #4 Solve the coefficients.
+    bestVertices = None
+    return bestVertices
+

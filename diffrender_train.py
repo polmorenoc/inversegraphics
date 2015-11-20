@@ -114,7 +114,7 @@ loadIllumFeatures = False
 
 parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF', 'spherical_harmonicsNN'])
 # parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
-parameterTrainSet = set(['spherical_harmonicsNN'])
+parameterTrainSet = set(['vcolorsRF'])
 
 print("Training recognition models.")
 

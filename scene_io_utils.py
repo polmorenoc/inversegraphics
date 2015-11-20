@@ -348,7 +348,7 @@ def loadBlenderScene(sceneIdx, replaceableScenesFile):
 
     return scene
 
-def loadSavedScene(sceneDicFile):
+def loadSavedScene(sceneDicFile, tex_srgb2lin):
     with open(sceneDicFile, 'rb') as pfile:
         sceneDic = pickle.load(pfile)
         v = sceneDic['v']
@@ -358,6 +358,13 @@ def loadSavedScene(sceneDicFile):
         haveTextures_list = sceneDic['haveTextures_list']
         vn = sceneDic['vn']
         textures_list = sceneDic['textures_list']
+        if tex_srgb2lin:
+            textures_listflat = [item for sublist in textures_list for item in sublist]
+            for texture_list in textures_listflat:
+                if texture_list != None:
+                    for texture in texture_list:
+                        if texture != None:
+                            srgb2lin(texture)
 
         print("Loaded serialized scene!")
 
@@ -491,6 +498,7 @@ def buildData (msh):
                     # print("Tile x: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_x))
                     # print("Tile y: " + str(msh.tessface_uv_textures.active.data[i].image.tiles_y))
                     texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
+                    texture = srgb2lin(texture)
                     if np.any(np.isnan(texture)) or np.any(texture<0) or np.any(texture>1) or texture.size == 0:
                         print("Problem with texture from Blender")
                         texture = np.flipud(np.array(msh.tessface_uv_textures.active.data[i].image.pixels).reshape([msh.tessface_uv_textures.active.data[i].image.size[1],msh.tessface_uv_textures.active.data[i].image.size[0],4])[:,:,:3])
