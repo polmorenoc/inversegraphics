@@ -342,7 +342,6 @@ def generateSceneImages(width, height, envMapFilename, envMapMean, phiOffset, ch
             bpy.ops.render.render(write_still=True)
 
 
-
 def getOcclusionFraction(renderer):
     vis_occluded = np.array(renderer.indices_image==1).copy().astype(np.bool)
     vis_im = np.array(renderer.image_mesh_bool([0])).copy().astype(np.bool)
@@ -435,7 +434,6 @@ def computeHemisphereTransformation(chAz, chEl, chDist, objCenter):
     return chCamModelWorld
 
 def computeSphericalHarmonics(vn, vc, light_color, components):
-
     # vnflat = [item for sublist in vn for item in sublist]
     # vcflat = [item for sublist in vc for item in sublist]
     rangeMeshes = range(len(vn))

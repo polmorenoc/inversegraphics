@@ -46,3 +46,19 @@ def generateExperiment(size, experimentDir, ratio, seed):
 
     np.save(experimentDir + 'train.npy', train)
     np.save(experimentDir + 'test.npy', test)
+
+# saveScatter(xaxis*180/np.pi, yaxis[1], 'Azimuth error (ground-truth)', Azimuth (predicted), filename)
+
+import matplotlib.pyplot as plt
+def saveScatter(xaxis, yaxis, xlabel, ylabel, filename):
+    plt.ioff()
+    fig = plt.figure()
+    plt.scatter(xaxis, yaxis)
+    plt.xlabel('Elevation (degrees)')
+    plt.ylabel('Angular error')
+    x1,x2,y1,y2 = plt.axis()
+    plt.axis((0,90,-90,90))
+    plt.title('Performance scatter plot')
+    fig.savefig(filename)
+    plt.close(fig)
+

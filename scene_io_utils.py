@@ -36,7 +36,7 @@ def loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender
         varray = np.vstack(vflat)
         center_teapots = center_teapots + [np.sum(varray, axis=0)/len(varray)]
 
-    return v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots
+    return v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots
 
 def getSceneInstancesInfo(sceneFile):
     sceneLines = [line.strip() for line in open(sceneFile)]

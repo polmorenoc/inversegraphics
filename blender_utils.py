@@ -312,7 +312,7 @@ def cleanBPYScene(scene):
                 bpy.data.scenes.remove(blenderScene)
 
 
-def addEnvironmentMapWorld(envMapFilename, scene):
+def addEnvironmentMapWorld(scene):
     scene.world.use_nodes = True
     treeNodes=scene.world.node_tree
     envTextureNode = treeNodes.nodes.new('ShaderNodeTexEnvironment')
@@ -330,10 +330,8 @@ def addEnvironmentMapWorld(envMapFilename, scene):
     # links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
     links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
     links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
-
     # mathNode.inputs[1].default_value = 1
-    image = bpy.data.images.load(envMapFilename)
-    envTextureNode.image = image
+
     envTextureNode.color_space="NONE"
 
 
@@ -343,8 +341,10 @@ def setEnviornmentMapStrength(strength, scene):
 
 def updateEnviornmentMap(envMapFilename, scene):
     envTextureNode = scene.world.node_tree.nodes['Environment Texture']
-    envTextureNode.image.user_clear()
-    bpy.data.images.remove(envTextureNode.image)
+    if envTextureNode.image != None:
+        envTextureNode.image.user_clear()
+        bpy.data.images.remove(envTextureNode.image)
+
     image = bpy.data.images.load(envMapFilename)
     envTextureNode.image = image
     envTextureNode.color_space="NONE"

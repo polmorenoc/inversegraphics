@@ -206,3 +206,47 @@ def diffHog(image, drconv=None, numOrient = 9, cwidth=8, cheight=8):
     # ipdb.set_trace()
 
     return v, hog_image, drconv
+
+import zernike
+def zernikeProjection(images, zpolys):
+    coeffs = images*zpolys.reshape([zpolys.shape[0], zpolys.shape[1], 1, -1])
+    return coeffs
+
+def zernikePolynomials(image=None, numCoeffs=20):
+
+    if image == None:
+        image = np.ones([100,100])
+
+    sy,sx = image.shape
+
+    # distFilter = np.ones([sy,sx], dtype=np.uint8)
+    # distFilter[np.int(sy/2), np.int(sx/2)] = 0
+    # distFilter = cv2.distanceTransform(distFilter, cv2.DIST_L2, 3)
+    # distFilter /= np.max(distFilter)
+    # np.arange()
+
+    ones = np.ones([sy,sx], dtype=np.bool)
+    imgind = np.where(ones)
+
+    dy = imgind[0] - int(image.shape[0]/2)
+    dx = imgind[1] - int(image.shape[1]/2)
+
+    pixaz = np.arctan2(dy,dx)
+    pixrad = np.sqrt(dy**2 + dx**2)
+
+    imaz = np.zeros([sy,sx])
+    imrad = np.zeros([sy,sx])
+    imaz[imgind] = pixaz
+    imrad[imgind] = pixrad
+
+    outcircle = imrad>=sy/2
+    imrad[outcircle] = 0
+    imaz[outcircle] = 0
+
+    imrad/=np.max(imrad)
+
+    zpolys = [zernike.zernikel(j, imrad, imaz)[:,:,None] for j in range(numCoeffs)]
+
+    zpolys.concatenate(zpolys, axis=2)
+
+    return zpolys

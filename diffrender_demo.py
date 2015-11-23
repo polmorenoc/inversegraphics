@@ -69,6 +69,33 @@ clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
 
+gtPrefix = 'train3'
+gtDir = 'groundtruth/' + gtPrefix + '/'
+groundTruthFilename = gtDir + 'groundTruth.h5'
+gtDataFile = h5py.File(groundTruthFilename, 'r')
+groundTruth = gtDataFile[gtPrefix]
+dataAzsGT = groundTruth['trainAzsGT']
+dataObjAzsGT = groundTruth['trainObjAzsGT']
+dataElevsGT = groundTruth['trainElevsGT']
+# dataLightAzsGT = groundTruth['trainLightAzsGT']
+# dataLightElevsGT = groundTruth['trainLightElevsGT']
+# dataLightIntensitiesGT = groundTruth['trainLightIntensities']
+dataVColorGT = groundTruth['trainVColorGT']
+dataScenes = groundTruth['trainScenes']
+dataTeapotIds = groundTruth['trainTeapotIds']
+dataEnvMaps = groundTruth['trainEnvMaps']
+dataOcclusions = groundTruth['trainOcclusions']
+dataTargetIndices = groundTruth['trainTargetIndices']
+dataComponentsGT = groundTruth['trainComponentsGT']
+dataComponentsGTRel = groundTruth['trainComponentsGTRel']
+dataIds = groundTruth['trainIds']
+dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
+dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
+
+readDataId = -1
+
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
 sceneIdx = 0
@@ -114,7 +141,7 @@ elif useBlender:
     for teapotIdx, teapotName in enumerate(selection):
         targetModels = targetModels + [bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]]
 
-v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
+v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
@@ -129,9 +156,8 @@ chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(ch
 
 chDist = ch.Ch([camDistance])
 
-
-chPointLightIntensity = ch.Ch([10])
-chPointLightIntensityGT = ch.Ch([10])
+chPointLightIntensity = ch.Ch([1])
+chPointLightIntensityGT = ch.Ch([1])
 chLightAz = ch.Ch([0.0])
 chLightEl = ch.Ch([0])
 chLightDist = ch.Ch([0.5])
@@ -158,43 +184,59 @@ shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
 clampedCosCoeffs = clampedCosineCoefficients()
 
-envMapFilename = 'data/hdr/dataset/TropicalRuins_3k.hdr'
-envMapFilename = 'data/hdr/dataset/studio019.hdr'
+# envMapFilename = 'data/hdr/dataset/TropicalRuins_3k.hdr'
+
+SHFilename = 'data/LightSHCoefficients.pickle'
+with open(SHFilename, 'rb') as pfile:
+    envMapDic = pickle.load(pfile)
+hdritems = list(envMapDic.items())
+hdrstorender = []
+phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+for hdrFile, hdrValues in hdritems:
+    hdridx = hdrValues[0]
+    envMapCoeffs = hdrValues[1]
+    if hdridx == dataEnvMaps[readDataId]:
+        break
+envMapFilename = hdrFile
+
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
+envMapGrayMean = np.mean(envMapGray, axis=(0,1))
 
-if sphericalMap:
-    envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1,  0, 'spherical')
-else:
-    envMapMean = np.mean(envMapTexture,axis=(0,1))[None,None,:]
-    envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
-    envMapGrayMean = np.mean(envMapGray, axis=(0,1))
-    envMapTexture = envMapTexture/envMapGrayMean
-
-    # envMapTexture = 4*np.pi*envMapTexture/np.sum(envMapTexture, axis=(0,1))
-    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1, 0, 'equirectangular')
-    pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
-    approxProjection = np.sum(pEnvMap, axis=3)
+# if sphericalMap:
+#     envMapTexture, envMapMean = light_probes.processSphericalEnvironmentMap(envMapTexture)
+#     envMapCoeffsGT = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1,  0, 'spherical')
+# else:
+#     envMapMean = np.mean(envMapTexture,axis=(0,1))[None,None,:]
+#     envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
+#     envMapGrayMean = np.mean(envMapGray, axis=(0,1))
+#     envMapTexture = envMapTexture/envMapGrayMean
+#
+#     # envMapTexture = 4*np.pi*envMapTexture/np.sum(envMapTexture, axis=(0,1))
+#     envMapCoeffsGT = light_probes.getEnvironmentMapCoefficients(envMapTexture, 1, 0, 'equirectangular')
+#     pEnvMap = SHProjection(envMapTexture, envMapCoeffsGT)
+#     approxProjection = np.sum(pEnvMap, axis=3)
 
     # imageio.imwrite("tmp.exr", approxProjection)
 
-rotation = ch.Ch([0.0])
-phiOffsetGT = 0
-phiOffset = ch.Ch([0])
+envMapCoeffsGT = ch.Ch(envMapCoeffs)
 
-chObjAzGT = rotation
-chAzGT = ch.Ch([np.pi/2])
+# rotation = ch.Ch([0.0])
+phiOffsetGT = ch.Ch(dataEnvMapPhiOffsets[readDataId])
+phiOffset = ch.Ch(dataEnvMapPhiOffsets[readDataId])
+
+chObjAzGT = ch.Ch(dataObjAzsGT[readDataId])
+chAzGT = ch.Ch(dataAzsGT[readDataId])
 chAzRelGT = chAzGT - chObjAzGT
-chElGT = ch.Ch(np.pi/4)
+chElGT = ch.Ch(dataElevsGT[readDataId])
 chDistGT = ch.Ch([camDistance])
 
 totalOffsetGT = phiOffsetGT + chObjAzGT
-totalOffset = phiOffset
 
-chAmbientIntensityGT = ch.Ch([0.025])
+chAmbientIntensityGT = ch.Ch(dataAmbientIntensityGT[readDataId])
 # chAmbientIntensityGT = ch.Ch([0.125])
-shCoeffsRGBGT = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffsetGT), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-shCoeffsRGBGTRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+shCoeffsRGBGT = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffsetGT), envMapCoeffsGT[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+shCoeffsRGBGTRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffsetGT), envMapCoeffsGT[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
 chShCoeffsGT = 0.3*shCoeffsRGBGT[:,0] + 0.59*shCoeffsRGBGT[:,1] + 0.11*shCoeffsRGBGT[:,2]
 chShCoeffsGTRel = 0.3*shCoeffsRGBGTRel[:,0] + 0.59*shCoeffsRGBGTRel[:,1] + 0.11*shCoeffsRGBGTRel[:,2]
@@ -211,17 +253,23 @@ zGT = chZonalHarmonics(angleGT)
 shDirLightGTOriginal = np.array(chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2).r[:]).copy()
 shDirLightGT = ch.Ch(shDirLightGTOriginal.copy())
 chComponentGTOriginal = ch.array(np.array(chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs).copy())
-chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs
+# chComponentGT = chAmbientSHGT + shDirLightGT*chLightIntensityGT * clampedCosCoeffs
+chComponentGT = chAmbientSHGT
 # chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
-chAz = ch.Ch([np.pi/2])
-chObjAz = ch.Ch([0])
-chEl =  ch.Ch([np.pi/4])
+
+chAz = ch.Ch(dataAzsGT[readDataId])
+chObjAz = ch.Ch(dataObjAzsGT[readDataId])
+chEl =  ch.Ch(dataElevsGT[readDataId])
 chAzRel = chAz - chObjAz
 
-chAmbientIntensity = ch.Ch([0.01])
-shCoeffsRGB = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(totalOffset)).T
-shCoeffsRGBRel = ch.dot(envMapCoeffs.T,light_probes.chSphericalHarmonicsZRotation(phiOffset)).T
+totalOffset = phiOffset + chObjAz
+
+chAmbientIntensity = ch.Ch(dataAmbientIntensityGT[readDataId])
+shCoeffsRGB = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+shCoeffsRGBRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+
+
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
 chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
 chAmbientSH = chShCoeffs.ravel() * chAmbientIntensity * clampedCosCoeffs
@@ -235,12 +283,13 @@ angle = ch.arcsin(chLightRad/chLightDist)
 z = chZonalHarmonics(angle)
 shDirLight = chZonalToSphericalHarmonics(z, np.pi/2 - chLightEl, chLightAz - np.pi/2) * clampedCosCoeffs
 chComponent = chAmbientSH + shDirLight*chLightIntensity
-chComponent = chComponentGT
+# chComponent = chComponentGT
 
 if useBlender:
     scene.sequencer_colorspace_settings.name = 'Linear'
     scene.display_settings.display_device = 'None'
-    addEnvironmentMapWorld(envMapFilename, scene)
+    addEnvironmentMapWorld(scene)
+    updateEnviornmentMap(envMapFilename, scene)
     setEnviornmentMapStrength(1./envMapGrayMean, scene)
     rotateEnviornmentMap(-totalOffset, scene)
 
@@ -251,6 +300,16 @@ chScaleGT = ch.Ch([1, 1.,1.])
 
 # vcch[0] = np.ones_like(vcflat[0])*chVColorsGT.reshape([1,3])
 renderer_teapots = []
+blender_teapots = []
+teapots = [line.strip() for line in open('teapots.txt')]
+selection = [ teapots[i] for i in renderTeapotsList]
+scene_io_utils.loadTargetsBlendData()
+for teapotIdx, teapotName in enumerate(selection):
+    teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
+    teapot.layers[1] = True
+    teapot.layers[2] = True
+    targetModels = targetModels + [teapot]
+    blender_teapots = blender_teapots + [teapot]
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -280,7 +339,7 @@ addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapot
 center = center_teapots[currentTeapotModel]
 rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 rendererGT.msaa = True
-rendererGT.overdraw = False
+rendererGT.overdraw = True
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
@@ -371,13 +430,15 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-#
-# hogE_raw = hogGT - hogRenderer
-# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-# hogError = ch.SumOfSquares(hogE_raw)
-# hogError = ch.SumOfSquares(hogE_raw)
+hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+
+hogE_raw = hogGT - hogRenderer
+hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+hogError = ch.SumOfSquares(hogE_raw)
+hogError = ch.SumOfSquares(hogE_raw)
+
+ipdb.set_trace()
 
 hogError = negLikModelRobust
 hogCellErrors = pixelLikelihoodRobustCh
@@ -495,6 +556,8 @@ if showSubplots:
     diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, chEl, 0.01745)
 
     ax3.set_title("Dr wrt. Azimuth Checkgrad")
+
+
     drazsum = np.sign(-diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)
 
     drazsumnobnd = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)*(1-renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
@@ -885,7 +948,6 @@ def readKeys(window, key, scancode, action, mods):
         glfw.set_window_should_close(window, True)
         exit = True
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_LEFT and action == glfw.RELEASE:
-        rotation[:] = rotation.r[0] - radians(5)
         refresh = True
         chAz[:] = chAz.r[0] - radians(5)
         azimuth = chAz.r[0] - radians(5)
@@ -1402,9 +1464,9 @@ if demoMode:
             image[image>1]=1
             blenderRender = image
 
-            blenderRenderGray = 0.3*blenderRender[:,:,0] + 0.59*blenderRender[:,:,1] + 0.11*blenderRender[:,:,2]
-            rendererGTGray = 0.3*rendererGT[:,:,0] + 0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
-            chAmbientIntensityGT[:] = chAmbientIntensityGT.r*(np.mean(blenderRenderGray,axis=(0,1))/np.mean(rendererGTGray.r,axis=(0,1)))
+            # blenderRenderGray = 0.3*blenderRender[:,:,0] + 0.59*blenderRender[:,:,1] + 0.11*blenderRender[:,:,2]
+            # rendererGTGray = 0.3*rendererGT[:,:,0] + 0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+            # chAmbientIntensityGT[:] = chAmbientIntensityGT.r*(np.mean(blenderRenderGray,axis=(0,1))/np.mean(rendererGTGray.r,axis=(0,1)))
 
             pendingCyclesRender = False
 
@@ -1465,7 +1527,7 @@ if demoMode:
             minimize = False
 
         if refresh:
-            chAzGT[:] = rotation.r[:]
+
             print("Model Log Likelihood: " + str(errorFun.r))
 
             if showSubplots:

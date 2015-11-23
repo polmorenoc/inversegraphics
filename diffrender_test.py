@@ -63,7 +63,7 @@ renderTeapotsList = [0]
 
 targetModels = []
 
-v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots, blender_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, False, False, targetModels)
+v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, False, False, targetModels)
 
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
@@ -132,7 +132,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.01
+initialPixelStdev = 0.1
 reduceVariance = False
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
@@ -188,9 +188,9 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test2_all_minimize_gaussian'
+testPrefix = 'test3_cycles_minimize_gaussian_pose_mask_srgb2lin_simplex'
 
-gtPrefix = 'train2'
+gtPrefix = 'train3'
 trainPrefix = 'train2'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 imagesDir = gtDir + 'images/'
@@ -200,7 +200,8 @@ resultDir = 'results/' + testPrefix + '/'
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-testSet = np.load(experimentDir + 'test.npy')[:100]
+# testSet = np.load(experimentDir + 'test.npy')[:10]
+testSet = np.arange(20)
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -226,9 +227,13 @@ dataOcclusions = groundTruth['trainOcclusions']
 dataTargetIndices = groundTruth['trainTargetIndices']
 dataComponentsGT = groundTruth['trainComponentsGT']
 dataComponentsGTRel = groundTruth['trainComponentsGTRel']
+trainLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+trainLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
+
+ipdb.set_trace()
 
 loadFromHdf5 = False
 
@@ -264,13 +269,13 @@ recognitionType = 1
 optimizationTypeDescr = ["normal", "joint"]
 optimizationType = 0
 
-method = 1
+method = 4
 model = 0
 maxiter = 500
 numSamples = 10
 
 free_variables = [ chAz, chEl]
-free_variables = [ chAz, chEl, chVColors, chComponent]
+# free_variables = [ chAz, chEl, chVColors, chComponent]
 # free_variables = [ chAz, chEl]
 
 mintime = time.time()
@@ -395,10 +400,16 @@ shapeIm = [height, width]
 
 #Update all error functions with the right renderers.
 print("Using " + modelsDescr[model])
-negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
-negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
-pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
-pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+
+negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
+pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+# negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
+# negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
+# pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
+# pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 
 hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
@@ -428,12 +439,14 @@ for test_i in range(len(testAzsRel)):
     testId = dataIds[test_i]
     print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
-    rendererGT[:] = images[test_i]
+    rendererGT[:] = srgb2lin(images[test_i])
+
+
 
     if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/'):
         os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/')
 
-    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(rendererGT.r*255), cv2.COLOR_RGB2BGR))
+    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
 
     for sample in range(testSamples):
         from numpy.random import choice
@@ -470,11 +483,18 @@ for test_i in range(len(testAzsRel)):
         # chVColors[:] = testPredVColors[test_i]
         chComponent[:] = SHcomponents
 
+
         #Update all error functions with the right renderers.
-        negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
-        negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
-        pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
-        pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+        negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+        negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+        pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
+        pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+
+        # negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
+        # negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
+        # pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
+        # pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+
         post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 
         hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT,drconv)
@@ -491,7 +511,7 @@ for test_i in range(len(testAzsRel)):
         pixelErrorFun = pixelModels[model]
         errorFun = models[model]
 
-        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
         # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
         predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
@@ -563,9 +583,9 @@ for test_i in range(len(testAzsRel)):
             bestPredEl = chEl.r.copy()
             bestVColors = chVColors.r.copy()
             bestComponent = chComponent.r.copy()
-            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(renderer.r*255), cv2.COLOR_RGB2BGR))
+        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
     fittedErrorFuns = np.append(fittedErrorFuns, bestModelLik)
     fittedAzs = np.append(fittedAzs, bestPredAz)
