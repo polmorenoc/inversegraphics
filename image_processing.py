@@ -79,8 +79,10 @@ def dr_wrt_convolution(x, filter):
         for j in range(widthRolls):
             templateRolled = np.roll(template, shift=i, axis=0)
             templateRolled = np.roll(templateRolled, shift=j, axis=1)
+
             templateGrad = templateRolled[tmpShape[0] - x.shape[0] - np.int(filter.shape[0]/2): tmpShape[0] - np.int(filter.shape[0]/2), tmpShape[1] - x.shape[1] - np.int(filter.shape[1]/2): tmpShape[1] - np.int(filter.shape[1]/2)]
             jacs = jacs + [scipy.sparse.coo_matrix(templateGrad.ravel())]
+
     return scipy.sparse.vstack(jacs).tocsc()
 
 
@@ -90,7 +92,8 @@ class convolve2D(Ch):
     dterms = 'x'
 
     def compute_r(self):
-        convolved = scipy.signal.convolve2d(self.x, self.filter, mode='same')
+        # convolved = scipy.signal.convolve2d(self.x, self.filter, mode='same')
+        convolved = scipy.ndimage.convolve(self.x, self.filter, mode='reflect')
         # return convolved[np.int((convolved.shape[0]-self.x.shape[0])/2):np.int((convolved.shape[0]-self.x.shape[0])/2) + self.x.shape[1], np.int((convolved.shape[1]-self.x.shape[1])/2):np.int((convolved.shape[1]-self.x.shape[1])/2) + self.x.shape[1]]
         return convolved
 

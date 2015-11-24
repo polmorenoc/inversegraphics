@@ -215,8 +215,6 @@ import multiprocessing
 numTileAxis = np.ceil(np.sqrt(multiprocessing.cpu_count())/2)
 numTileAxis = 3
 
-
-
 #########################################
 # Initialization ends here
 #########################################
@@ -260,7 +258,7 @@ print("Generating renders")
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-scenesToRender = range(len(sceneLines))
+scenesToRender = range(len(sceneLines))[1::]
 lenScenes = 0
 for sceneIdx in scenesToRender:
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -275,7 +273,7 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-trainSize = 100000
+trainSize = 10000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -331,7 +329,6 @@ try:
 except:
     gtDataset = gtDataFile.create_dataset(prefix, data=groundTruth, maxshape=(None,))
 
-ipdb.set_trace()
 
 train_i = nextId
 

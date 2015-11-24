@@ -132,7 +132,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.1
+initialPixelStdev = 0.075
 reduceVariance = False
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
@@ -188,7 +188,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test3_cycles_minimize_gaussian_pose_mask_srgb2lin_simplex'
+testPrefix = 'test3_cycles_minimize_joint_pose_mask_srgb2lin_std0075'
 
 gtPrefix = 'train3'
 trainPrefix = 'train2'
@@ -201,7 +201,7 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 # testSet = np.load(experimentDir + 'test.npy')[:10]
-testSet = np.arange(20)
+testSet = np.arange(50)
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -232,8 +232,6 @@ trainLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
-
-ipdb.set_trace()
 
 loadFromHdf5 = False
 
@@ -267,10 +265,10 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["normal", "joint"]
-optimizationType = 0
+optimizationType = 1
 
 method = 4
-model = 0
+model = 1
 maxiter = 500
 numSamples = 10
 
@@ -440,7 +438,6 @@ for test_i in range(len(testAzsRel)):
     print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
     rendererGT[:] = srgb2lin(images[test_i])
-
 
 
     if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/'):

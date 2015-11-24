@@ -94,16 +94,27 @@ dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 
-readDataId = -1
+readDataId = 1
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
-sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables.txt'
+
+sceneNumber = dataScenes[readDataId]
+
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+
+sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
 targetIndex = targetIndices[targetParentIdx]
+targetIndex = dataTargetIndices[readDataId]
+
+for targetParentIdx, targetParentIndex in enumerate(targetIndices):
+    if targetParentIndex == targetIndex:
+        #Now targetParentIdx has the right idx of the list of parent indices.
+        break
+
 targetParentPosition = targetPositions[targetParentIdx]
 targetPosition = targetParentPosition
 
@@ -121,6 +132,9 @@ elif useBlender and loadBlenderSceneFile:
     scene.render.resolution_y = height
     scene.render.tile_x = height/2
     scene.render.tile_y = width/2
+    scene.cycles.samples = 1024
+    scene.sequencer_colorspace_settings.name = 'Linear'
+    scene.display_settings.display_device = 'None'
     bpy.context.screen.scene = scene
 
 tex_srgb2lin =  True
@@ -129,7 +143,7 @@ if unpackSceneFromBlender:
 else:
     v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
 
-removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
 targetModels = []
 if useBlender and not loadBlenderSceneFile:
@@ -177,8 +191,8 @@ chGlobalConstantGT = ch.Ch([0.5])
 light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
 
-chVColors = ch.Ch([0.4,0.4,0.4])
-chVColorsGT = ch.Ch([0.4,0.4,0.4])
+chVColors = ch.Ch(dataVColorGT[readDataId])
+chVColorsGT = ch.Ch(dataVColorGT[readDataId])
  
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
@@ -271,6 +285,7 @@ shCoeffsRGBRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), e
 
 
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
+chShCoeffs = ch.Ch(0.3*shCoeffsRGB.r[:,0] + 0.59*shCoeffsRGB.r[:,1] + 0.11*shCoeffsRGB.r[:,2])
 chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
 chAmbientSH = chShCoeffs.ravel() * chAmbientIntensity * clampedCosCoeffs
 
@@ -286,12 +301,11 @@ chComponent = chAmbientSH + shDirLight*chLightIntensity
 # chComponent = chComponentGT
 
 if useBlender:
-    scene.sequencer_colorspace_settings.name = 'Linear'
-    scene.display_settings.display_device = 'None'
     addEnvironmentMapWorld(scene)
     updateEnviornmentMap(envMapFilename, scene)
     setEnviornmentMapStrength(1./envMapGrayMean, scene)
     rotateEnviornmentMap(-totalOffset, scene)
+
 
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
@@ -310,6 +324,7 @@ for teapotIdx, teapotName in enumerate(selection):
     teapot.layers[2] = True
     targetModels = targetModels + [teapot]
     blender_teapots = blender_teapots + [teapot]
+    setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
 
 for teapot_i in range(len(renderTeapotsList)):
     if useBlender:
@@ -367,6 +382,7 @@ numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
 if useBlender:
+
     center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
     # addLamp(scene, center, chLightAzGT.r, chLightElGT.r, chLightDistGT, chLightIntensityGT.r)
     #Add ambient lighting to scene (rectangular lights at even intervals).
@@ -380,7 +396,11 @@ if useBlender:
     # scene.layers[1] = True
     scene.objects.unlink(scene.objects[str(targetIndex)])
 
-    placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+    placeCamera(scene.camera, -chAzGT.r[:].copy()*180/np.pi, chElGT.r[:].copy()*180/np.pi, chDistGT, center)
+    azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
+    original_matrix_world = teapot.matrix_world.copy()
+    teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+
     scene.update()
 
     scene.render.image_settings.file_format = 'OPEN_EXR'
@@ -436,15 +456,13 @@ hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
 hogE_raw = hogGT - hogRenderer
 hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
 hogError = ch.SumOfSquares(hogE_raw)
-hogError = ch.SumOfSquares(hogE_raw)
+# hogError = ch.SumOfSquares(hogE_raw)
 
-ipdb.set_trace()
+# hogError = negLikModelRobust
+# hogCellErrors = pixelLikelihoodRobustCh
 
-hogError = negLikModelRobust
-hogCellErrors = pixelLikelihoodRobustCh
-
-models = [negLikModel, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+models = [negLikModel, negLikModelRobust, hogError]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
 modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
@@ -492,7 +510,7 @@ gradFinAzSurf = {}
 ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
-free_variables = [chAz, chEl]
+free_variables = [chShCoeffs]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -502,7 +520,7 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-method = 4
+method = 1
 exit = False
 minimize = False
 plotMinimization = False
@@ -685,6 +703,7 @@ def refreshSubplots():
         img4 = ax4.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
         cb4.mappable = img4
     else:
+
         ax4.set_title("HoG image renderer")
         ax4.set_title("HoG Image GT")
         pim4 = ax4.imshow(hogImRenderer.r)
@@ -1250,9 +1269,13 @@ def readKeys(window, key, scancode, action, mods):
         print("Changed to minimizer: " + methods[method])
 
     global minimize
-    if key == glfw.KEY_M and action == glfw.RELEASE:
+    global free_variables
+    if mods==glfw.MOD_SHIFT and key == glfw.KEY_M and action == glfw.RELEASE:
+        free_variables = [chShCoeffs]
         minimize = True
-
+    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_M and action == glfw.RELEASE:
+        free_variables = [chAz, chEl]
+        minimize = True
 
 def timeRendering(iterations):
     t = time.time()
@@ -1390,7 +1413,7 @@ if demoMode:
                 teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
                 teapotGT = blender_teapots[currentTeapotModel]
                 placeNewTarget(scene, teapotGT, targetPosition)
-                placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+                placeCamera(scene.camera, -chAzGT.r[:].copy()*180/np.pi, chElGT.r[:].copy()*180/np.pi, chDistGT, center)
                 scene.update()
 
             newTeapotAsGT = False
@@ -1433,7 +1456,7 @@ if demoMode:
                 print("Updating Ground Truth blender camera!")
                 scene.update()
                 center = centerOfGeometry(teapotGT.dupli_group.objects, teapotGT.matrix_world)
-                placeCamera(scene.camera, -chAzGT[0].r*180/np.pi, chElGT[0].r*180/np.pi, chDistGT, center)
+                placeCamera(scene.camera, -chAzGT.r[:].copy()*180/np.pi, chElGT.r[:].copy()*180/np.pi, chDistGT, center)
                 scene.update()
 
             if useBlender:
@@ -1484,34 +1507,32 @@ if demoMode:
         if updateErrorFunctions:
             currentGT = rendererGT
             if useBlender and groundTruthBlender:
+                image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
+                image[image>1]=1
+                blenderRender = image
                 currentGT = blenderRender
-                # scene.update()
-                # bpy.ops.render.render( write_still=True )
-                # image = cv2.imread(scene.render.filepath)
-                # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
-                # currentGT = image
 
-            negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-            negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-            pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
-            pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+            negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=currentGT, variances=variances))/numPixels
+            negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+            pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=currentGT, variances=variances)
+            pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances)
 
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-            # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT, drconv)
-            # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-            # hogRenderer.dr_wrt(chAz)
-            #
-            # hogE_raw = hogGT - hogRenderer
-            # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-            # hogError = ch.SumOfSquares(hogE_raw)
+            hogGT, hogImGT, drconv = image_processing.diffHog(currentGT, drconv)
+            hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+            hogRenderer.dr_wrt(chAz)
 
-            hogError = negLikModelRobust
-            hogCellErrors = pixelLikelihoodRobustCh
+            hogE_raw = hogGT - hogRenderer
+            hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+            hogError = ch.SumOfSquares(hogE_raw)
 
-            models = [negLikModel, negLikModelRobust]
+            # hogError = negLikModelRobust
+            # hogCellErrors = pixelLikelihoodRobustCh
+
+            models = [negLikModel, negLikModelRobust, hogError]
             pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+            # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 
             pixelErrorFun = pixelModels[model]
             errorFun = models[model]

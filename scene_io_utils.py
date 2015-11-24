@@ -328,6 +328,20 @@ def getSceneInformation(sceneIdx, scenesFile):
 
     return sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions
 
+def getSceneIdx(sceneNumber, scenesFile):
+    replaceableScenesFile = scenesFile
+    sceneLines = [line.strip() for line in open(replaceableScenesFile)]
+    sceneLineNums = numpy.arange(len(sceneLines))
+    for sceneNum in sceneLineNums:
+        sceneLine = sceneLines[sceneNum]
+        sceneParts = sceneLine.split(' ')
+        sceneFile = sceneParts[0]
+        sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+        if sceneNumber == sceneNumber:
+            return sceneNum
+
+    return -2
+
 def loadBlenderScene(sceneIdx, replaceableScenesFile):
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = getSceneInformation(sceneIdx, replaceableScenesFile)
     # targetParentPosition = instances[targetIndex][2]
