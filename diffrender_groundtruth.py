@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 
 #Main script options:
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -219,7 +219,7 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train3'
+prefix = 'train4'
 
 print("Creating Ground Truth")
 
@@ -258,7 +258,7 @@ print("Generating renders")
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-scenesToRender = range(len(sceneLines))[1::]
+scenesToRender = range(len(sceneLines))[:]
 lenScenes = 0
 for sceneIdx in scenesToRender:
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -273,7 +273,7 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-trainSize = 10000
+trainSize = 100000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -285,6 +285,7 @@ ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
 
 hdritems = list(envMapDic.items())
 hdrstorender = []
+maxhdridx = -1
 phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
 for hdrFile, hdrValues in hdritems:
     hdridx = hdrValues[0]
@@ -314,6 +315,8 @@ for hdrFile, hdrValues in hdritems:
     #     chComponentGTRel[:] = chAmbientSHGTRel.r[:].copy()
     #     cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
 # sys.exit("")
+    if hdridx > maxhdridx:
+        maxhdridx = hdridx
 
 gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,)), ('trainLightCoefficientsGT',trainLightCoefficientsGT.dtype, (9,)), ('trainLightCoefficientsGTRel', trainLightCoefficientsGTRel.dtype, (9,)), ('trainAmbientIntensityGT', trainAmbientIntensityGT.dtype), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype)]
 
@@ -328,7 +331,6 @@ try:
         nextId = gtDataset['trainIds'][-1] + 1
 except:
     gtDataset = gtDataFile.create_dataset(prefix, data=groundTruth, maxshape=(None,))
-
 
 train_i = nextId
 
@@ -488,7 +490,7 @@ for sceneIdx in scenesToRender:
 
                 for numTeapotTrain in range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList)))):
                     ignore = False
-                    chAmbientIntensityGT[:] = 0.025
+                    chAmbientIntensityGT[:] = 0.75/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
                     phiOffset[:] = np.random.uniform(0,2*np.pi, 1)
 
                     # phiOffset[:] = 0
@@ -514,8 +516,11 @@ for sceneIdx in scenesToRender:
                     # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
                     # approxProjection = np.sum(pEnvMap, axis=3)
                     # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
+                    occlusion = getOcclusionFraction(rendererGT)
+                    if occlusion >= 0.1:
+                        ignore = True
 
-                    if useBlender:
+                    if useBlender and not ignore:
 
                         rotateEnviornmentMap(-totalOffset.r.copy(), scene)
 
@@ -549,9 +554,6 @@ for sceneIdx in scenesToRender:
                     image = rendererGT.r[:].copy()
                     lin2srgb(image)
 
-                    occlusion = getOcclusionFraction(rendererGT)
-                    if occlusion >= 0.1:
-                        ignore = True
                     if useBlender and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
                         ignore = True
 

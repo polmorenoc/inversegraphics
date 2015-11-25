@@ -34,6 +34,31 @@ class TheanoFunOnOpenDR(Ch):
             jac = self.theano_grad_fun(self.opendr_x)
             return sp.csc_matrix(jac)
 
+
+def recoverAmbientIntensities(hdritems, gtDataset, clampedCosCoeffs):
+    hdrscoeffs = np.zeros([100, 9,3])
+    for hdrFile, hdrValues in hdritems:
+        hdridx = hdrValues[0]
+        hdrscoeffs[hdridx] = hdrValues[1]
+
+    trainEnvMapCoeffs = hdrscoeffs[gtDataset['trainEnvMaps']]
+
+
+    trainTotaloffsets = gtDataset['trainEnvMapPhiOffsets'] + gtDataset['trainObjAzsGT']
+
+    rotations = np.vstack([light_probes.sphericalHarmonicsZRotation(trainTotaloffset)[None,:] for trainTotaloffset in trainTotaloffsets])
+    rotationsRel = np.vstack([light_probes.sphericalHarmonicsZRotation(trainEnvMapPhiOffsets)[None,:] for trainEnvMapPhiOffsets in gtDataset['trainEnvMapPhiOffsets']])
+
+    envMapCoeffsRotated = np.vstack([np.dot(rotations[i], trainEnvMapCoeffs[i,[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]][None,:] for i in range(len(rotations))])
+    envMapCoeffsRotatedRel = np.vstack([np.dot(rotationsRel[i], trainEnvMapCoeffs[i,[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]][None,:] for i in range(len(rotations))])
+
+    trainAmbientIntensityGT = gtDataset['trainComponentsGT'][:,0]/((0.3*envMapCoeffsRotated[:,0,0] + 0.59*envMapCoeffsRotated[:,0,1] + 0.11*envMapCoeffsRotated[:,0,2])*clampedCosCoeffs[0])
+    trainAmbientIntensityGT1 = gtDataset['trainComponentsGT'][:,1]/((0.3*envMapCoeffsRotated[:,1,0] + 0.59*envMapCoeffsRotated[:,1,1] + 0.11*envMapCoeffsRotated[:,1,2])*clampedCosCoeffs[1])
+    if np.any(trainAmbientIntensityGT != trainAmbientIntensityGT1):
+        print("Problem with recovery of intensities")
+    return trainAmbientIntensityGT
+
+
 def SHProjection(envMap, shCoefficients):
 
 

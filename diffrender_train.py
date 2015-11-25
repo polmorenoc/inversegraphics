@@ -75,6 +75,9 @@ dataOcclusions = groundTruth['trainOcclusions']
 dataTargetIndices = groundTruth['trainTargetIndices']
 dataComponentsGT = groundTruth['trainComponentsGT']
 dataComponentsGTRel = groundTruth['trainComponentsGTRel']
+dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
@@ -114,7 +117,7 @@ loadIllumFeatures = False
 
 parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF', 'spherical_harmonicsNN'])
 # parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
-parameterTrainSet = set(['vcolorsRF'])
+parameterTrainSet = set(['spherical_harmonicsNN'])
 
 print("Training recognition models.")
 
@@ -163,8 +166,9 @@ elif 'spherical_harmonicsNN' in parameterTrainSet:
     grayValidImages = grayValidImages[:,None, :,:]
     # import sys
     # sys.exit("NN")
-    modelPath=experimentDir + 'neuralNetModelRelSHComponents.pickle'
-    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, trainComponentsGTRel[trainValSet].astype(np.float32), grayValidImages, trainComponentsGTRel[validSet].astype(np.float32), modelType='cnn', num_epochs=500, saveModelAtEpoch=True, modelPath=modelPath)
+    modelPath=experimentDir + 'neuralNetModelRelSHLight.pickle'
+
+    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, dataLightCoefficientsGTRel[trainValSet] * dataAmbientIntensityGT[trainValSet].astype(np.float32), grayValidImages, dataLightCoefficientsGTRel[validSet] * dataAmbientIntensityGT[validSet].astype(np.float32), modelType='cnn', num_epochs=500, saveModelAtEpoch=True, modelPath=modelPath)
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(SHNNmodel, pfile)
