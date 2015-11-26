@@ -81,7 +81,10 @@ chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(ch
 chEl =  ch.Ch([0.95993109])
 chDist = ch.Ch([camDistance])
 
-chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
+chLightSHCoeffs = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
+
+clampedCosCoeffs = clampedCosineCoefficients()
+chComponent = chLightSHCoeffs * clampedCosCoeffs
 
 chPointLightIntensity = ch.Ch([1])
 
@@ -191,17 +194,19 @@ np.random.seed(seed)
 testPrefix = 'test3_cycles_minimize_joint_pose_mask_srgb2lin_std0075'
 
 gtPrefix = 'train3'
-trainPrefix = 'train2'
+trainPrefix = 'train4'
+trainPrefixPose = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 imagesDir = gtDir + 'images/'
 experimentDir = 'experiments/' + trainPrefix + '/'
+experimentDirPose = 'experiments/' + trainPrefixPose + '/'
 resultDir = 'results/' + testPrefix + '/'
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 # testSet = np.load(experimentDir + 'test.npy')[:10]
-testSet = np.arange(50)
+testSet = np.arange(20)
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -227,8 +232,9 @@ dataOcclusions = groundTruth['trainOcclusions']
 dataTargetIndices = groundTruth['trainTargetIndices']
 dataComponentsGT = groundTruth['trainComponentsGT']
 dataComponentsGTRel = groundTruth['trainComponentsGTRel']
-trainLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
-trainLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
@@ -250,13 +256,22 @@ testVColorGT = dataVColorGT
 testComponentsGT = dataComponentsGT
 testComponentsGTRel = dataComponentsGTRel
 
+testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
+
+
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 loadHogFeatures = True
 loadIllumFeatures = True
+loadZernikeFeatures = True
 
-hogfeatures = np.load(experimentDir + 'hog.npy')
-illumfeatures =  np.load(experimentDir  + 'illum.npy')
+hogfeatures = np.load(experimentDirPose + 'hog.npy')
+if not loadZernikeFeatures:
+    illumfeatures =  np.load(experimentDirPose  + 'illum.npy')
+else:
+    numCoeffs=100
+    win=40
+    zernikefeatures = np.load(experimentDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy')
 
 testHogfeatures = hogfeatures[testSet]
 testIllumfeatures = illumfeatures[testSet]
@@ -297,6 +312,7 @@ nearGTOffsetVColor = np.zeros(3)
 
 #Load trained recognition models
 
+parameterRecognitionModels = set(['randForestAzs05', 'randForestElevs05', 'randForestVColors05', 'neuralNetRelSHComponents05'])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'neuralNetRelSHComponents'])
 
 if 'randForestAzs' in parameterRecognitionModels:
@@ -335,15 +351,15 @@ elif 'neuralNetRelSHComponents' in parameterRecognitionModels:
     # with np.load(modelPath) as f:
     #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
     with open(experimentDir + 'neuralNetModelRelSHComponents.pickle', 'rb') as pfile:
-        neuralNetModelRelSHComponents = pickle.load(pfile)
+        neuralNetModelRelSHLight = pickle.load(pfile)
 
-    meanImage = neuralNetModelRelSHComponents['mean']
-    modelType = neuralNetModelRelSHComponents['type']
-    param_values = neuralNetModelRelSHComponents['params']
+    meanImage = neuralNetModelRelSHLight['mean']
+    modelType = neuralNetModelRelSHLight['type']
+    param_values = neuralNetModelRelSHLight['params']
     grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
     grayTestImages = grayTestImages[:,None, :,:]
     grayTestImages = grayTestImages - meanImage
-    relSHComponentsPred = lasagne_nn.get_predictions(grayTestImages, model=modelType, param_values=param_values)
+    relLightCoefficientsGTPred = lasagne_nn.get_predictions(grayTestImages, model=modelType, param_values=param_values)
 
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
 azsPred = np.arctan2(sinAzsPred, cosAzsPred)
@@ -358,7 +374,7 @@ if recognitionType == 2:
 # errors = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, testAzsRel, testElevsGT)
 errors = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPred, elevsPred)
 
-errorsSHComponents = np.linalg.norm(testComponentsGTRel - relSHComponentsPred, axis=1)
+errorsSHComponents = np.linalg.norm(testLightCoefficientsGTRel - relLightCoefficientsGTPred, axis=1)
 errorsVColors = np.linalg.norm(testVColorGT - vColorsPred, axis=1)
 
 meanAbsErrAzs = np.mean(np.abs(errors[0]))
@@ -552,13 +568,13 @@ for test_i in range(len(testAzsRel)):
             print("Robust likelihood: " + str(currErrorRobust))
             print("HoG error: " + str(currErrorHoG))
 
-            free_variables = [ chAz, chEl, chVColors, chComponent]
+            free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
 
             ch.minimize({'raw': models[1]}, bounds=None, method=methods[1], x0=free_variables, callback=cb, options=options)
 
             sys.stdout.flush()
             currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
-            currSHError = np.linalg.norm(testComponentsGTRel[test_i] - chComponent.r)
+            currSHError = np.linalg.norm(testComponentsGTRel[test_i] - chLightSHCoeffs.r)
             currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
             currErrorGaussian = models[0].r
             currErrorRobust = models[1].r

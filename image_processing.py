@@ -211,16 +211,36 @@ def diffHog(image, drconv=None, numOrient = 9, cwidth=8, cheight=8):
     return v, hog_image, drconv
 
 import zernike
-def zernikeProjection(images, zpolys):
-    coeffs = images*zpolys.reshape([zpolys.shape[0], zpolys.shape[1], 1, -1])
+def zernikeProjection(images, numCoeffs, win=50):
+
+    croppedImages = images[:,images.shape[1]/2-win:images.shape[1]/2+win,images.shape[2]/2-win:images.shape[2]/2+win, :]
+
+    zpolys = zernikePolynomials(imageSize=(croppedImages.shape[1],croppedImages.shape[2]), numCoeffs=numCoeffs)
+
+    coeffs = np.sum(np.sum(croppedImages[:,:,:,:,None]*zpolys.reshape([1,zpolys.shape[0], zpolys.shape[1], 1, -1]), axis=2), axis=1)
     return coeffs
 
-def zernikePolynomials(image=None, numCoeffs=20):
+def zernikeProjectionGray(images, numCoeffs, win=50):
 
-    if image == None:
-        image = np.ones([100,100])
+    if images.shape[3] == 3:
+        images = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+    croppedImages = images[:,images.shape[1]/2-win:images.shape[1]/2+win,images.shape[2]/2-win:images.shape[2]/2+win]
 
-    sy,sx = image.shape
+    zpolys = zernikePolynomials(imageSize=(croppedImages.shape[1],croppedImages.shape[2]), numCoeffs=numCoeffs)
+
+    coeffs = np.sum(np.sum(croppedImages[:,:,:,None]*zpolys.reshape([1,zpolys.shape[0], zpolys.shape[1],  -1]), axis=2), axis=1)
+    return coeffs
+
+def chZernikeProjection(image, numCoeffs=20, win=50):
+    croppedImage = image[image.shape[0]/2-win:image.shape[0]/2+win,image.shape[1]/2-win:image.shape[1]/2+win, :]
+    zpolys = zernikePolynomials(imageSize=(croppedImage.shape[0],croppedImage.shape[1]), numCoeffs=numCoeffs)
+    imageProjections = croppedImage[:,:,:,None]*zpolys.reshape([zpolys.shape[0], zpolys.shape[1], 1, -1])
+    coeffs = ch.sum(ch.sum(imageProjections, axis=0), axis=0)
+    return coeffs, imageProjections
+
+def zernikePolynomials(imageSize=(100,100), numCoeffs=20):
+
+    sy,sx = imageSize
 
     # distFilter = np.ones([sy,sx], dtype=np.uint8)
     # distFilter[np.int(sy/2), np.int(sx/2)] = 0
@@ -231,8 +251,8 @@ def zernikePolynomials(image=None, numCoeffs=20):
     ones = np.ones([sy,sx], dtype=np.bool)
     imgind = np.where(ones)
 
-    dy = imgind[0] - int(image.shape[0]/2)
-    dx = imgind[1] - int(image.shape[1]/2)
+    dy = imgind[0] - int(sy/2)
+    dx = imgind[1] - int(sx/2)
 
     pixaz = np.arctan2(dy,dx)
     pixrad = np.sqrt(dy**2 + dx**2)
@@ -250,6 +270,6 @@ def zernikePolynomials(image=None, numCoeffs=20):
 
     zpolys = [zernike.zernikel(j, imrad, imaz)[:,:,None] for j in range(numCoeffs)]
 
-    zpolys.concatenate(zpolys, axis=2)
+    zpolys = np.concatenate(zpolys, axis=2)
 
     return zpolys

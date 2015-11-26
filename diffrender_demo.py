@@ -439,7 +439,6 @@ stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
 globalPrior = ch.Ch([0.8])
 
-
 negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
 
 negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
@@ -487,6 +486,7 @@ errorFun = models[model]
 # pixelErrorFun2 = pixelModels2[model]
 # errorFun2 = models2[model]
 
+# zpolys = image_processing.zernikePolynomials(image=rendererGT.r.copy(), numCoeffs=20)
 
 iterat = 0
 changedGT = False
