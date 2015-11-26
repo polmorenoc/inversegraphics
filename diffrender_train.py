@@ -27,8 +27,8 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train2'
-trainPrefix = 'train2'
+gtPrefix = 'train4'
+trainPrefix = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + trainPrefix + '/'
 
@@ -39,17 +39,23 @@ allDataIds = gtDataFile[gtPrefix]['trainIds']
 if not os.path.isfile(experimentDir + 'train.npy'):
     generateExperiment(len(allDataIds), experimentDir, 0.9, 1)
 
+onlySynthetic = True
+
 print("Reading images.")
 
 writeHdf5 = False
-imagesDir = gtDir + 'images/'
+if onlySynthetic:
+    imagesDir = gtDir + 'images_opendr/'
+else:
+    imagesDir = gtDir + 'images/'
+
 if writeHdf5:
     writeImagesHdf5(imagesDir, allDataIds)
 
 trainSet = np.load(experimentDir + 'train.npy')
 
 #Delete as soon as finished with prototyping:
-trainSet = trainSet
+# trainSet = trainSet[0:int(len(trainSet)/2)]
 
 print("Reading experiment data.")
 
@@ -95,7 +101,7 @@ loadFromHdf5 = True
 if loadFromHdf5:
     images = readImages(imagesDir, allDataIds, loadFromHdf5)
 
-loadHogFeatures = False
+loadHogFeatures = True
 loadIllumFeatures = False
 
 # if loadHogFeatures:
@@ -115,7 +121,7 @@ loadIllumFeatures = False
 # trainHogfeatures = hogfeatures[trainSet]
 # trainIllumfeatures = illumfeatures[trainSet]
 
-parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF', 'spherical_harmonicsNN'])
+parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF'])
 # parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
 parameterTrainSet = set(['spherical_harmonicsNN'])
 
@@ -125,26 +131,26 @@ if 'azimuthsRF' in parameterTrainSet:
     print("Training RFs Cos Azs")
     randForestModelCosAzs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainAzsRel))
     trainedModel = {'randForestModelCosAzs':randForestModelCosAzs}
-    with open(experimentDir + 'randForestModelCosAzs.pickle', 'wb') as pfile:
+    with open(experimentDir + 'randForestModelCosAzs05.pickle', 'wb') as pfile:
         pickle.dump(trainedModel, pfile)
 
     print("Training RFs Sin Azs")
     randForestModelSinAzs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainAzsRel))
     trainedModel = {'randForestModelSinAzs':randForestModelSinAzs}
-    with open(experimentDir + 'randForestModelSinAzs.pickle', 'wb') as pfile:
+    with open(experimentDir + 'randForestModelSinAzs05.pickle', 'wb') as pfile:
         pickle.dump(trainedModel, pfile)
 
 if 'elevationsRF' in parameterTrainSet:
     print("Training RFs Cos Elevs")
     randForestModelCosElevs = recognition_models.trainRandomForest(trainHogfeatures, np.cos(trainElevsGT))
     trainedModel = {'randForestModelCosElevs':randForestModelCosElevs}
-    with open(experimentDir + 'randForestModelCosElevs.pickle', 'wb') as pfile:
+    with open(experimentDir + 'randForestModelCosElevs05.pickle', 'wb') as pfile:
         pickle.dump(trainedModel, pfile)
 
     print("Training RFs Sin Elevs")
     randForestModelSinElevs = recognition_models.trainRandomForest(trainHogfeatures, np.sin(trainElevsGT))
     trainedModel = {'randForestModelSinElevs':randForestModelSinElevs}
-    with open(experimentDir + 'randForestModelSinElevs.pickle', 'wb') as pfile:
+    with open(experimentDir + 'randForestModelSinElevs05.pickle', 'wb') as pfile:
         pickle.dump(trainedModel, pfile)
 
 if 'spherical_harmonicsRF' in parameterTrainSet:
@@ -168,7 +174,7 @@ elif 'spherical_harmonicsNN' in parameterTrainSet:
     # sys.exit("NN")
     modelPath=experimentDir + 'neuralNetModelRelSHLight.pickle'
 
-    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, dataLightCoefficientsGTRel[trainValSet] * dataAmbientIntensityGT[trainValSet].astype(np.float32), grayValidImages, dataLightCoefficientsGTRel[validSet] * dataAmbientIntensityGT[validSet].astype(np.float32), modelType='cnn', num_epochs=500, saveModelAtEpoch=True, modelPath=modelPath)
+    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, dataLightCoefficientsGTRel[trainValSet].astype(np.float32) * dataAmbientIntensityGT[trainValSet][:,None].astype(np.float32), grayValidImages, dataLightCoefficientsGTRel[validSet].astype(np.float32) * dataAmbientIntensityGT[validSet][:,None].astype(np.float32), modelType='cnn', num_epochs=200, saveModelAtEpoch=True, modelPath=modelPath)
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(SHNNmodel, pfile)
@@ -180,7 +186,7 @@ if 'vcolorsRF' in parameterTrainSet:
     image = images[0]
     croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
     randForestModelVColor = recognition_models.trainRandomForest(croppedImages[trainSet].reshape([numTrainSet,-1]), trainVColorGT)
-    with open(experimentDir + 'randForestModelVColor.pickle', 'wb') as pfile:
+    with open(experimentDir + 'randForestModelVColor05.pickle', 'wb') as pfile:
         pickle.dump(randForestModelVColor, pfile)
 
 #
