@@ -17,8 +17,8 @@ import skimage
 import h5py
 import ipdb
 import pickle
-import lasagne_nn
-import theano
+# import lasagne_nn
+# import theano
 
 #########################################
 # Initialization ends here
@@ -55,7 +55,7 @@ if writeHdf5:
 trainSet = np.load(experimentDir + 'train.npy')
 
 #Delete as soon as finished with prototyping:
-trainSet = trainSet[0:int(len(trainSet)/2)]
+# trainSet = trainSet[0:int(len(trainSet)/2)]
 
 print("Reading experiment data.")
 
@@ -104,7 +104,7 @@ if loadFromHdf5:
     images = readImages(imagesDir, trainSet, loadFromHdf5)
     # images = readImages(imagesDir, trainSet, loadFromHdf5)
 
-loadHogFeatures = True
+loadHogFeatures = False
 loadFourierFeatures = False
 loadZernikeFeatures = False
 
@@ -114,7 +114,7 @@ loadZernikeFeatures = False
 #     print("Extracting Hog features .")
 #     hogfeatures = image_processing.computeHoGFeatures(images)
 #     np.save(experimentDir + 'hog.npy', hogfeatures)
-#
+
 # if loadIllumFeatures:
 #     illumfeatures =  np.load(experimentDir  + 'illum.npy')
 # else:
@@ -122,9 +122,8 @@ loadZernikeFeatures = False
 #     illumfeatures = image_processing.computeIllumFeatures(images, images[0].size/12)
 #     np.save(experimentDir  + 'illum.npy', illumfeatures)
 
-
-print("Extracting Zernike features.")
-
+# print("Extracting Zernike features.")
+#
 # numCoeffs=100
 # win=40
 # if loadZernikeFeatures:
@@ -145,7 +144,7 @@ parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF'])
 # parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
 parameterTrainSet = set(['spherical_harmonicsNN'])
 # parameterTrainSet = set(['spherical_harmonicsZernike'])
-# parameterTrainSet = set(['vcolorsRF'])
+parameterTrainSet = set(['vcolorsLR'])
 
 print("Training recognition models.")
 
@@ -214,23 +213,24 @@ if 'spherical_harmonicsZernike' in parameterTrainSet:
 
 if 'vcolorsRF' in parameterTrainSet:
     print("Training RF on Vertex Colors")
-    numTrainSet = images[trainSet].shape[0]
+    numTrainSet = images.shape[0]
     colorWindow = 30
     image = images[0]
-    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
+    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:]
     randForestModelVColor = recognition_models.trainRandomForest(croppedImages.reshape([numTrainSet,-1]), trainVColorGT)
     with open(experimentDir + 'randForestModelVColor05.pickle', 'wb') as pfile:
         pickle.dump(randForestModelVColor, pfile)
 
-if 'vcolorsRF' in parameterTrainSet:
-    print("Training RF on Vertex Colors")
-    numTrainSet = images[trainSet].shape[0]
+
+if  'vcolorsLR' in parameterTrainSet:
+    print("Training LR on Vertex Colors")
+    numTrainSet = images.shape[0]
     colorWindow = 30
     image = images[0]
-    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
-    randForestModelVColor = recognition_models.trainRandomForest(croppedImages.reshape([numTrainSet,-1]), trainVColorGT)
-    with open(experimentDir + 'randForestModelVColor05.pickle', 'wb') as pfile:
-        pickle.dump(randForestModelVColor, pfile)
+    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:]
+    linRegModelVColor = recognition_models.trainLinearRegression(croppedImages.reshape([numTrainSet,-1]), trainVColorGT)
+    with open(experimentDir + 'linearRegressionModelVColor.pickle', 'wb') as pfile:
+        pickle.dump(linRegModelVColor, pfile)
 #
 # imagesStack = np.vstack([image.reshape([1,-1]) for image in images])
 # randForestModelLightIntensity = recognition_models.trainRandomForest(imagesStack, trainLightIntensitiesGT)

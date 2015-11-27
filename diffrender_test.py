@@ -196,10 +196,14 @@ testPrefix = 'test3_cycles_minimize_joint_pose_mask_srgb2lin_std0075'
 gtPrefix = 'train3'
 trainPrefix = 'train4'
 trainPrefixPose = 'train4'
+trainPrefixVColor = 'train4'
+trainPrefixLightCoeffs = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 imagesDir = gtDir + 'images/'
 experimentDir = 'experiments/' + trainPrefix + '/'
 experimentDirPose = 'experiments/' + trainPrefixPose + '/'
+experimentDirVColor = 'experiments/' + trainPrefixVColor + '/'
+experimentDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
 resultDir = 'results/' + testPrefix + '/'
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
@@ -258,7 +262,6 @@ testComponentsGTRel = dataComponentsGTRel
 
 testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
 
-
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 loadHogFeatures = True
@@ -279,8 +282,8 @@ testIllumfeatures = illumfeatures[testSet]
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
-optimizationTypeDescr = ["normal", "joint"]
-optimizationType = 1
+optimizationTypeDescr = ["predict", "optimize", "joint"]
+optimizationType = 0
 
 method = 4
 model = 1
@@ -313,27 +316,31 @@ nearGTOffsetVColor = np.zeros(3)
 #Load trained recognition models
 
 parameterRecognitionModels = set(['randForestAzs05', 'randForestElevs05', 'randForestVColors05', 'neuralNetRelSHComponents05'])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'neuralNetRelSHComponents'])
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetRelSHComponents'])
+
+experimentDirPose
+experimentDirVColor
+experimentDirLightCoeffs
 
 if 'randForestAzs' in parameterRecognitionModels:
-    with open(experimentDir + 'randForestModelCosAzs.pickle', 'rb') as pfile:
+    with open(experimentDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
         randForestModelCosAzs = pickle.load(pfile)['randForestModelCosAzs']
     cosAzsPred = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeatures)
 
-    with open(experimentDir + 'randForestModelSinAzs.pickle', 'rb') as pfile:
+    with open(experimentDirPose + 'randForestModelSinAzs.pickle', 'rb') as pfile:
         randForestModelSinAzs = pickle.load(pfile)['randForestModelSinAzs']
     sinAzsPred = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeatures)
 
 if 'randForestElevs' in parameterRecognitionModels:
-    with open(experimentDir + 'randForestModelCosElevs.pickle', 'rb') as pfile:
+    with open(experimentDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
         randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
     cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
 
-    with open(experimentDir + 'randForestModelSinElevs.pickle', 'rb') as pfile:
+    with open(experimentDirPose + 'randForestModelSinElevs.pickle', 'rb') as pfile:
         randForestModelSinElevs = pickle.load(pfile)['randForestModelSinElevs']
     sinElevsPred = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeatures)
 if 'randForestVColors' in parameterRecognitionModels:
-    with open(experimentDir + 'randForestModelVColor.pickle', 'rb') as pfile:
+    with open(experimentDirVColor + 'randForestModelVColor.pickle', 'rb') as pfile:
         randForestModelVColor = pickle.load(pfile)
 
     colorWindow = 30
@@ -341,8 +348,17 @@ if 'randForestVColors' in parameterRecognitionModels:
     croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
     vColorsPred = recognition_models.testRandomForest(randForestModelVColor, croppedImages.reshape([len(testSet),-1]))
 
+if 'linearRegressionVColors' in parameterRecognitionModels:
+    with open(experimentDirVColor + 'linearRegressionModelVColor.pickle', 'rb') as pfile:
+        linearRegressionModelVColor = pickle.load(pfile)
+
+    colorWindow = 30
+    image = images[0]
+    croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:][:,3]
+    vColorsPred = recognition_models.testLinearRegression(linearRegressionModelVColor, croppedImages.reshape([len(testSet),-1]))
+
 if 'randForestRelSHComponents' in parameterRecognitionModels:
-    with open(experimentDir + 'randForestModelRelSHComponents.pickle', 'rb') as pfile:
+    with open(experimentDirLightCoeffs + 'randForestModelRelSHComponents.pickle', 'rb') as pfile:
         randForestModelRelSHComponents = pickle.load(pfile)
     relSHComponentsPred = recognition_models.testRandomForest(randForestModelRelSHComponents, testIllumfeatures)
 
@@ -350,7 +366,7 @@ elif 'neuralNetRelSHComponents' in parameterRecognitionModels:
     # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
     # with np.load(modelPath) as f:
     #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
-    with open(experimentDir + 'neuralNetModelRelSHComponents.pickle', 'rb') as pfile:
+    with open(experimentDirLightCoeffs + 'neuralNetModelRelSHComponents.pickle', 'rb') as pfile:
         neuralNetModelRelSHLight = pickle.load(pfile)
 
     meanImage = neuralNetModelRelSHLight['mean']
