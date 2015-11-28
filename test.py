@@ -595,7 +595,7 @@ for teapotIdx, teapotTest in enumerate(experimentTeapots):
             performanceTable = tabulate(table, tablefmt="latex", floatfmt=".1f")
 
             with open(directory + 'performance.tex', 'w') as expfile:
-                expfile.imsaveperformanceTable)
+                expfile.write(performanceTable)
 
     experiment = {'distanceTypes':distanceTypes, 'backgroundModels':backgroundModels, 'rendersDir':rendersDir,'teapot':teapotTest,'testResults':testResults,'testAzimuths':testAzimuths, 'bestAzimuths':bestAzimuths, 'performance': performance, 'elevations':elevations, 'groundTruthAzimuths': groundTruthRelAzimuths, 'occlusions': occlusions}
     with open(baseTestDir  + 'teapot' + str(teapotTest)  + '/' + 'experiment.pickle', 'wb') as pfile:

@@ -29,7 +29,11 @@ def readImages(imagesDir, imageSet, loadFromHdf5):
         height = image.shape[0]
         images = np.zeros([len(imageSet), height, width, 3], dtype=np.float32)
         for imageit, imageid  in enumerate(imageSet):
-            image = skimage.io.imread(imagesDir + 'im' + str(imageid) + '.jpeg')
+            if os.path.isfile(imagesDir + 'im' + str(imageid) + '.jpeg'):
+                image = skimage.io.imread(imagesDir + 'im' + str(imageid) + '.jpeg')
+            else:
+                print("Image " + str(imageid) + " does not exist!")
+                image = np.zeros_like(image)
             images[imageit, :, :, :] = image/255.0
 
         return images

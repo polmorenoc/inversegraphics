@@ -27,8 +27,8 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4'
-trainPrefix = 'train4'
+gtPrefix = 'train3'
+trainPrefix = 'train3'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + trainPrefix + '/'
 
@@ -96,24 +96,24 @@ trainElevsGT = dataElevsGT
 trainComponentsGTRel = dataComponentsGTRel
 trainVColorGT = dataVColorGT
 
-loadFromHdf5 = True
+loadFromHdf5 = False
 
 print("Reading images.")
 
-if loadFromHdf5:
-    images = readImages(imagesDir, trainSet, loadFromHdf5)
+# if loadFromHdf5:
+images = readImages(imagesDir, allDataIds, loadFromHdf5)
     # images = readImages(imagesDir, trainSet, loadFromHdf5)
 
 loadHogFeatures = False
 loadFourierFeatures = False
 loadZernikeFeatures = False
 
-# if loadHogFeatures:
-#     hogfeatures = np.load(experimentDir + 'hog.npy')
-# else:
-#     print("Extracting Hog features .")
-#     hogfeatures = image_processing.computeHoGFeatures(images)
-#     np.save(experimentDir + 'hog.npy', hogfeatures)
+if loadHogFeatures:
+    hogfeatures = np.load(experimentDir + 'hog.npy')
+else:
+    print("Extracting Hog features .")
+    hogfeatures = image_processing.computeHoGFeatures(images)
+    np.save(experimentDir + 'hog.npy', hogfeatures)
 
 # if loadIllumFeatures:
 #     illumfeatures =  np.load(experimentDir  + 'illum.npy')
@@ -124,17 +124,19 @@ loadZernikeFeatures = False
 
 # print("Extracting Zernike features.")
 #
-# numCoeffs=100
-# win=40
-# if loadZernikeFeatures:
-#     trainZernikeCoeffs =  np.load(experimentDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy')
-# else:
-#     print("Extracting Zernike features.")
-#     batchSize = 1000
-#     trainZernikeCoeffs = np.empty([images.shape[0], numCoeffs])
-#     for batch in range(int(images.shape[0]/batchSize)):
-#         trainZernikeCoeffs[batchSize*batch:batchSize*batch + batchSize] = image_processing.zernikeProjectionGray(images[batchSize*batch:batchSize*batch + batchSize], numCoeffs=numCoeffs, win=win)
-#     np.save(experimentDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy', trainZernikeCoeffs)
+numCoeffs=100
+win=40
+if loadZernikeFeatures:
+    trainZernikeCoeffs =  np.load(experimentDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy')
+else:
+    print("Extracting Zernike features.")
+    batchSize = 1000
+    trainZernikeCoeffs = np.empty([images.shape[0], numCoeffs])
+    for batch in range(int(images.shape[0]/batchSize)):
+        trainZernikeCoeffs[batchSize*batch:batchSize*batch + batchSize] = image_processing.zernikeProjectionGray(images[batchSize*batch:batchSize*batch + batchSize], numCoeffs=numCoeffs, win=win)
+    np.save(experimentDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy', trainZernikeCoeffs)
+
+ipdb.set_trace()
 
 #
 # trainHogfeatures = hogfeatures[trainSet]
