@@ -14,7 +14,7 @@ def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
     return errazs, errelevs
 
 def trainRandomForest(xtrain, ytrain):
-    randForest = RandomForestRegressor(n_estimators=200, n_jobs=-1)
+    randForest = RandomForestRegressor(n_estimators=400, n_jobs=-1)
     rf = randForest.fit(xtrain, ytrain)
     return rf
 

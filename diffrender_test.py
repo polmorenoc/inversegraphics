@@ -188,23 +188,37 @@ def cb(_):
 # Generative model setup ends here.
 #########################################
 
+
+#########################################
+# Test code starts here:
+#########################################
+
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test3_cycles_pred'
+testPrefix = 'test3_cycles_pred_linearRegressionVColors_linRegModelSHZernike'
+
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','randomForestSHZernike' ])
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','linRegModelSHZernike' ])
+
+
+# parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
 gtPrefix = 'train3'
+experimentPrefix = 'train3'
 trainPrefix = 'train4'
 trainPrefixPose = 'train2'
 trainPrefixVColor = 'train4'
 trainPrefixLightCoeffs = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
-featuresDir = 'experiments/' + gtPrefix + '/'
+featuresDir = gtDir
 
-experimentDir = 'experiments/' + trainPrefix + '/'
-experimentDirPose = 'experiments/' + trainPrefixPose + '/'
-experimentDirVColor = 'experiments/' + trainPrefixVColor + '/'
-experimentDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
+experimentDir = 'experiments/' + experimentPrefix + '/'
+trainModelsDirPose = 'experiments/' + trainPrefixPose + '/'
+trainModelsDirVColor = 'experiments/' + trainPrefixVColor + '/'
+trainModelsDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
 resultDir = 'results/' + testPrefix + '/'
 
 ignoreGT = True
@@ -214,7 +228,7 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-testSet = np.load(featuresDir + 'test.npy')[:100]
+testSet = np.load(experimentDir + 'test.npy')[:1000]
 
 # testSet = np.arange(500)
 
@@ -250,9 +264,13 @@ dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
 
-loadFromHdf5 = False
+loadFromHdf5 = True
 
-syntheticGroundtruth = True
+syntheticGroundtruth = False
+
+synthPrefix = '_cycles'
+if syntheticGroundtruth:
+    synthPrefix = ''
 
 if syntheticGroundtruth:
     imagesDir = gtDir + 'images_opendr/'
@@ -278,16 +296,15 @@ testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 loadHogFeatures = True
-loadIllumFeatures = False
 loadZernikeFeatures = True
 
-hogfeatures = np.load(featuresDir  +  'hog.npy')
-if not loadZernikeFeatures:
-    illumfeatures =  np.load(featuresDir  + 'illum.npy')
-else:
+if loadHogFeatures:
+    hogfeatures = np.load(featuresDir  +  'hog' + synthPrefix + '.npy')
+
+if loadZernikeFeatures:
     numCoeffs=100
     win=40
-    zernikefeatures = np.load(featuresDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy')
+    zernikefeatures = np.load(featuresDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + synthPrefix + '.npy')
 
 testHogfeatures = hogfeatures[testSet]
 testZernikefeatures = zernikefeatures[testSet]
@@ -300,7 +317,7 @@ optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 0
 
 method = 4
-model = 1
+model = 0
 maxiter = 500
 numSamples = 10
 
@@ -329,30 +346,26 @@ nearGTOffsetVColor = np.zeros(3)
 
 #Load trained recognition models
 
-parameterRecognitionModels = set(['randForestAzs05', 'randForestElevs05', 'randForestVColors05', 'neuralNetRelSHComponents05'])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelRelSHLight', ])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelZernike' ])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','randomForestSHZernike' ])
 
 if 'randForestAzs' in parameterRecognitionModels:
-    with open(experimentDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
         randForestModelCosAzs = pickle.load(pfile)['randForestModelCosAzs']
     cosAzsPred = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeatures)
 
-    with open(experimentDirPose + 'randForestModelSinAzs.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'randForestModelSinAzs.pickle', 'rb') as pfile:
         randForestModelSinAzs = pickle.load(pfile)['randForestModelSinAzs']
     sinAzsPred = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeatures)
 
 if 'randForestElevs' in parameterRecognitionModels:
-    with open(experimentDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
         randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
     cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
 
-    with open(experimentDirPose + 'randForestModelSinElevs.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'randForestModelSinElevs.pickle', 'rb') as pfile:
         randForestModelSinElevs = pickle.load(pfile)['randForestModelSinElevs']
     sinElevsPred = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeatures)
 if 'randForestVColors' in parameterRecognitionModels:
-    with open(experimentDirVColor + 'randForestModelVColor.pickle', 'rb') as pfile:
+    with open(trainModelsDirVColor + 'randForestModelVColor.pickle', 'rb') as pfile:
         randForestModelVColor = pickle.load(pfile)
 
     colorWindow = 30
@@ -361,7 +374,7 @@ if 'randForestVColors' in parameterRecognitionModels:
     vColorsPred = recognition_models.testRandomForest(randForestModelVColor, croppedImages.reshape([len(testSet),-1]))
 
 if 'linearRegressionVColors' in parameterRecognitionModels:
-    with open(experimentDirVColor + 'linearRegressionModelVColor.pickle', 'rb') as pfile:
+    with open(trainModelsDirVColor + 'linearRegressionModelVColor.pickle', 'rb') as pfile:
         linearRegressionModelVColor = pickle.load(pfile)
 
     colorWindow = 30
@@ -369,21 +382,23 @@ if 'linearRegressionVColors' in parameterRecognitionModels:
     croppedImages = images[:,image.shape[0]/2-colorWindow:image.shape[0]/2+colorWindow,image.shape[1]/2-colorWindow:image.shape[1]/2+colorWindow,:]
     vColorsPred = recognition_models.testLinearRegression(linearRegressionModelVColor, croppedImages.reshape([len(testSet),-1]))
 
-# if 'randForestRelLightCoeffs' in parameterRecognitionModels:
-#     with open(experimentDirLightCoeffs + 'randForestModelRelSHComponents.pickle', 'rb') as pfile:
-#         randForestModelRelSHComponents = pickle.load(pfile)
-#     relSHComponentsPred = recognition_models.testRandomForest(randForestModelRelSHComponents, testIllumfeatures)
+if 'medianVColors' in parameterRecognitionModels:
+    # recognition_models.medianColor(image, win)
+    colorWindow = 30
+    imagesWin = images[:,images.shape[1]/2-colorWindow:images.shape[1]/2+colorWindow,images.shape[2]/2-colorWindow:images.shape[2]/2+colorWindow,:]
+    vColorsPred = np.median(imagesWin.reshape([images.shape[0],-1,3]), axis=1)/1.4
+    # return color
 
-elif 'neuralNetModelRelSHLight' in parameterRecognitionModels:
+if 'neuralNetModelSHLight' in parameterRecognitionModels:
     # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
     # with np.load(modelPath) as f:
     #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
-    with open(experimentDirLightCoeffs + 'neuralNetModelRelSHLight.pickle', 'rb') as pfile:
-        neuralNetModelRelSHLight = pickle.load(pfile)
+    with open(trainModelsDirLightCoeffs + 'neuralNetModelRelSHLight2.pickle', 'rb') as pfile:
+        neuralNetModelSHLight = pickle.load(pfile)
 
-    meanImage = neuralNetModelRelSHLight['mean']
-    modelType = neuralNetModelRelSHLight['type']
-    param_values = neuralNetModelRelSHLight['params']
+    meanImage = neuralNetModelSHLight['mean']
+    modelType = neuralNetModelSHLight['type']
+    param_values = neuralNetModelSHLight['params']
     grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
     grayTestImages = grayTestImages[:,None, :,:]
     grayTestImages = grayTestImages - meanImage
@@ -391,13 +406,13 @@ elif 'neuralNetModelRelSHLight' in parameterRecognitionModels:
     relLightCoefficientsGTPred = lasagne_nn.get_predictions(grayTestImages, model=modelType, param_values=param_values)
 
 if 'randomForestSHZernike' in parameterRecognitionModels:
-    with open(experimentDirLightCoeffs  + 'randomForestModelZernike' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'rb') as pfile:
+    with open(trainModelsDirLightCoeffs  + 'randomForestModelZernike' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'rb') as pfile:
         randForestModelLightCoeffs = pickle.load(pfile)
 
     relLightCoefficientsGTPred = recognition_models.testRandomForest(randForestModelLightCoeffs, testZernikefeatures)
 
 if 'linRegModelSHZernike' in parameterRecognitionModels:
-    with open(experimentDirLightCoeffs  + 'linRegModelZernike' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'rb') as pfile:
+    with open(trainModelsDirLightCoeffs  + 'linRegModelZernike' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'rb') as pfile:
         linearRegressionModelLightCoeffs = pickle.load(pfile)
 
     relLightCoefficientsGTPred = recognition_models.testLinearRegression(linearRegressionModelLightCoeffs, testZernikefeatures)
@@ -520,10 +535,10 @@ for test_i in range(len(testAzsRel)):
             # color = recognition_models.meanColor(rendererGT.r, 40)
             # color = recognition_models.filteredMean(rendererGT.r, 40)
             # color = recognition_models.midColor(rendererGT.r)
-            color = testVColorGT[test_i]
+            color = vColorsPred[test_i]
             # color = vColorsPred[test_i]
             # SHcomponents = relSHComponentsPred[test_i].copy()
-            lightCoefficientsGTRel = testLightCoefficientsGTRel[test_i]
+            lightCoefficientsGTRel = relLightCoefficientsGTPred[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -542,9 +557,9 @@ for test_i in range(len(testAzsRel)):
 
         cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_reconstructed'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-        chAz[:] = az
-        chEl[:] = el
-        chVColors[:] = color.copy()
+        chAz[:] = testAzsRel[test_i]
+        chEl[:] = testElevsGT[test_i]
+        chVColors[:] = testVColorGT[test_i]
         # chVColors[:] = testPredVColors[test_i]
         chLightSHCoeffs[:] = lightCoefficientsGTRel
 
@@ -882,10 +897,19 @@ np.savetxt(resultDir + 'performance_samples.txt', perfSamplesData, delimiter='\t
 np.savez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errors[0], predErrorElevs=errors[1], errorsLightCoeffs=errorsLightCoeffs, errorsVColors=errorsVColors, errorsFittedAzs=errorsFittedRF[0], errorsFittedElevs=errorsFittedRF[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedVColors=errorsFittedVColors,testOcclusions=testOcclusions )
 
 import tabulate
-headers=["Best global fit", ""]
-table = [["Mean angular error", np.mean(predictedErrorFuns)] ,["Median angualar error", np.median(predictedErrorFuns)]]
-performanceTable = tabulate.tabulate(table, tablefmt="latex", floatfmt=".1f")
+headers=["Errors", "Pred (mean)", "Stdv", "Fitted (mean)", "Stdv"]
+
+table = [["NLL", np.mean(predictedErrorFuns), 0, np.mean(fittedErrorFuns), 0],
+         ["Azimuth", np.mean(np.abs(errors[0])), np.std(np.abs(errors[0])), np.mean(np.abs(errorsFittedRF[0])), np.std(np.abs(errorsFittedRF[0]))],
+         ["Elevation", np.mean(np.abs(errors[1])), np.std(np.abs(errors[1])), np.mean(np.abs(errorsFittedRF[1])), np.std(np.abs(errorsFittedRF[1]))],
+         ["VColor", np.mean(errorsVColors), np.std(errorsVColors), np.mean(errorsFittedVColors), np.std(errorsFittedVColors)],
+         ["SH Light", np.mean(errorsLightCoeffs), np.std(errorsLightCoeffs), np.mean(errorsFittedLightCoeffs), np.std(np.abs(errorsFittedLightCoeffs))],
+         ]
+performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
 with open(resultDir + 'performance.tex', 'w') as expfile:
     expfile.write(performanceTable)
 
 print("Finished backprojecting and fitting estimates.")
+
+
+np.mean(errorsVColors)
