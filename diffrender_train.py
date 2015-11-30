@@ -27,8 +27,8 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4'
-experimentPrefix = 'train4'
+gtPrefix = 'train3'
+experimentPrefix = 'train3'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -96,7 +96,7 @@ trainElevsGT = dataElevsGT
 trainComponentsGTRel = dataComponentsGTRel
 trainVColorGT = dataVColorGT
 
-loadFromHdf5 = True
+loadFromHdf5 = False
 
 print("Reading images.")
 
@@ -106,7 +106,7 @@ images = readImages(imagesDir, allDataIds, loadFromHdf5)
 
 loadHogFeatures = False
 loadFourierFeatures = False
-loadZernikeFeatures = True
+loadZernikeFeatures = False
 
 synthPrefix = '_cycles'
 if onlySynthetic:
@@ -142,6 +142,8 @@ else:
         trainZernikeCoeffs[batchSize*batch:batchSize*batch + batchSize] = image_processing.zernikeProjectionGray(images[batchSize*batch:batchSize*batch + batchSize], numCoeffs=numCoeffs, win=win)
     np.save(gtDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + synthPrefix + '.npy', trainZernikeCoeffs)
     trainZernikeCoeffs = trainZernikeCoeffs[trainSet]
+
+ipdb.set_trace()
 
 #
 # trainHogfeatures = hogfeatures[trainSet]

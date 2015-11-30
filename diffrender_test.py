@@ -22,7 +22,7 @@ from utils import *
 import OpenGL.GL as GL
 import light_probes
 from OpenGL import contextdata
-import lasagne_nn
+# import lasagne_nn
 
 plt.ion()
 
@@ -135,27 +135,37 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.075
+initialPixelStdev = 0.01
 reduceVariance = False
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
 globalPrior = ch.Ch([0.9])
 
-negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
-
-negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
-
-pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
-
-pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
+negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
+pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+# negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
+# negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
+# pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
+# pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 
+# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+#
+# hogE_raw = hogGT - hogRenderer
+# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+# hogError = ch.SumOfSquares(hogE_raw)
+
+# models = [negLikModel, negLikModelRobust, hogError]
 models = [negLikModel, negLikModelRobust, negLikModelRobust]
+# pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
-modelsDescr = [" Model", "Outlier model", "Outler model (variance reduction)"]
-# , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
+modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
+
 model = 0
 pixelErrorFun = pixelModels[model]
 errorFun = models[model]
@@ -196,13 +206,12 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test3_cycles_pred_linearRegressionVColors_linRegModelSHZernike'
+testPrefix = 'test3_cycles_minimize_optimAll_linearRegressionVColors_randomForestSHZernike_robust_std001_100samples'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','randomForestSHZernike' ])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','linRegModelSHZernike' ])
-
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','randomForestSHZernike' ])
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
@@ -228,7 +237,7 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-testSet = np.load(experimentDir + 'test.npy')[:1000]
+testSet = np.load(experimentDir + 'test.npy')[:100]
 
 # testSet = np.arange(500)
 
@@ -239,7 +248,6 @@ testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
 groundTruth = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
 groundTruth[boolTestSet] = testGroundTruth
 groundTruth = groundTruth[testSet]
-
 
 print("Reading experiment.")
 
@@ -264,7 +272,7 @@ dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
 
-loadFromHdf5 = True
+loadFromHdf5 = False
 
 syntheticGroundtruth = False
 
@@ -314,20 +322,20 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 0
+optimizationType = 1
 
-method = 4
-model = 0
+method = 1
+model = 1
 maxiter = 500
 numSamples = 10
 
-free_variables = [ chAz, chEl]
-# free_variables = [ chAz, chEl, chVColors, chComponent]
+# free_variables = [ chAz, chEl]
+free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
 # free_variables = [ chAz, chEl]
 
 mintime = time.time()
-boundEl = (0, np.pi/2.0)
-boundAz = (0, None)
+boundEl = (-np.pi, np.pi)
+boundAz = (-3*np.pi, 3*np.pi)
 boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
@@ -335,6 +343,7 @@ bounds = [(None , None ) for sublist in free_variables for item in sublist]
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom']
 
 options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+options={'disp':False, 'maxiter':maxiter}
 # options={'disp':False, 'maxiter':maxiter}
 # testRenderer = np.int(dataTeapotIds[testSet][0])
 testRenderer = np.int(dataTeapotIds[0])
@@ -345,7 +354,6 @@ nearGTOffsetLighCoeffs = np.zeros(9)
 nearGTOffsetVColor = np.zeros(3)
 
 #Load trained recognition models
-
 
 if 'randForestAzs' in parameterRecognitionModels:
     with open(trainModelsDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
@@ -393,7 +401,7 @@ if 'neuralNetModelSHLight' in parameterRecognitionModels:
     # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
     # with np.load(modelPath) as f:
     #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
-    with open(trainModelsDirLightCoeffs + 'neuralNetModelRelSHLight2.pickle', 'rb') as pfile:
+    with open(trainModelsDirLightCoeffs + 'neuralNetModelRelSHLight05.pickle', 'rb') as pfile:
         neuralNetModelSHLight = pickle.load(pfile)
 
     meanImage = neuralNetModelSHLight['mean']
@@ -501,13 +509,14 @@ modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 errorFun = models[model]
 
 # if optimizationTypeDescr[optimizationType] != 'predict':
+startTime = time.time()
 for test_i in range(len(testAzsRel)):
 
     bestPredAz = chAz.r
     bestPredEl = chEl.r
     bestModelLik = np.finfo('f').max
     bestVColors = chVColors.r
-    bestComponent = chComponent.r
+    bestLightSHCoeffs = chLightSHCoeffs.r
 
     testId = dataIds[test_i]
     print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
@@ -532,13 +541,11 @@ for test_i in range(len(testAzsRel)):
             #Point (mean) estimate:
             az = azsPred[test_i]
             el = elevsPred[test_i]
-            # color = recognition_models.meanColor(rendererGT.r, 40)
-            # color = recognition_models.filteredMean(rendererGT.r, 40)
-            # color = recognition_models.midColor(rendererGT.r)
+
             color = vColorsPred[test_i]
-            # color = vColorsPred[test_i]
-            # SHcomponents = relSHComponentsPred[test_i].copy()
             lightCoefficientsGTRel = relLightCoefficientsGTPred[test_i]
+            # color = testVColorGT[test_i]
+            # lightCoefficientsGTRel = testLightCoefficientsGTRel[test_i]
         else:
             #Sampling
             poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
@@ -549,33 +556,34 @@ for test_i in range(len(testAzsRel)):
             colorGMM = colorGMMs[test_i]
             color = colorGMM.sample(n_samples=1)[0]
 
-        chAz[:] = testAzsRel[test_i]
-        chEl[:] = testElevsGT[test_i]
-        chVColors[:] =  testVColorGT[test_i]
-        # chVColors[:] = testPredVColors[test_i]
-        chLightSHCoeffs[:] =testLightCoefficientsGTRel[test_i]
+        # chAz[:] = testAzsRel[test_i]
+        # chEl[:] = testElevsGT[test_i]
+        # chVColors[:] =  testVColorGT[test_i]
+        # # chVColors[:] = testPredVColors[test_i]
+        #
+        # chLightSHCoeffs[:] =testLightCoefficientsGTRel[test_i]
+        #
+        # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_reconstructed'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_reconstructed'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-
-        chAz[:] = testAzsRel[test_i]
-        chEl[:] = testElevsGT[test_i]
-        chVColors[:] = testVColorGT[test_i]
-        # chVColors[:] = testPredVColors[test_i]
-        chLightSHCoeffs[:] = lightCoefficientsGTRel
-
+        chAz[:] = az.copy()
+        chEl[:] = el.copy()
+        chVColors[:] = color.copy()
+        chLightSHCoeffs[:] = lightCoefficientsGTRel.copy()
 
         #Update all error functions with the right renderers.
-        negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-        negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-        pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
-        pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+        # negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+        # negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+        # negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
+        # negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
+        # pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
+        # pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
         # negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
         # negLikModelRobust = -generative_models.modelLogLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)/numPixels
         # pixelLikelihoodCh = generative_models.logPixelLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)
         # pixelLikelihoodRobustCh = ch.log(generative_models.pixelLikelihoodRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances))
 
-        post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
+        # post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
         #
         # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT,drconv)
         # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
@@ -585,7 +593,7 @@ for test_i in range(len(testAzsRel)):
         # hogError = ch.SumOfSquares(hogE_raw)
 
         models = [negLikModel, negLikModelRobust, negLikModelRobust]
-        pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
+        # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
         modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 
         pixelErrorFun = pixelModels[model]
@@ -601,11 +609,17 @@ for test_i in range(len(testAzsRel)):
 
         sys.stdout.flush()
         if optimizationTypeDescr[optimizationType] == 'optimize':
+            stds[:] = 0.01
+            free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
             ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+            # stds[:] = 0.01
+            # free_variables = [chAz, chEl]
+            # method=1
+            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
         elif optimizationTypeDescr[optimizationType] == 'joint':
             currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
-            currSHError = np.linalg.norm(testComponentsGTRel[test_i] - chComponent.r)
+            currSHError = np.linalg.norm(testLightCoefficientsGTRel[test_i] - chLightSHCoeffs.r)
             currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
             currErrorGaussian = models[0].r
             currErrorRobust = models[1].r
@@ -640,7 +654,7 @@ for test_i in range(len(testAzsRel)):
 
             sys.stdout.flush()
             currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
-            currSHError = np.linalg.norm(testComponentsGTRel[test_i] - chLightSHCoeffs.r)
+            currSHError = np.linalg.norm(testLightCoefficientsGTRel[test_i] - chLightSHCoeffs.r)
             currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
             currErrorGaussian = models[0].r
             currErrorRobust = models[1].r
@@ -661,7 +675,7 @@ for test_i in range(len(testAzsRel)):
             bestPredAz = chAz.r.copy()
             bestPredEl = chEl.r.copy()
             bestVColors = chVColors.r.copy()
-            bestComponent = chComponent.r.copy()
+            bestLightSHCoeffs = chLightSHCoeffs.r.copy()
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
         cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
@@ -671,7 +685,10 @@ for test_i in range(len(testAzsRel)):
         fittedAzs = np.append(fittedAzs, bestPredAz)
         fittedElevs = np.append(fittedElevs, bestPredEl)
         fittedVColors = fittedVColors + [bestVColors]
-        fittedRelLightCoeffs = fittedRelLightCoeffs + [bestComponent]
+        fittedRelLightCoeffs = fittedRelLightCoeffs + [bestLightSHCoeffs]
+
+totalTime = time.time() - startTime
+print("Took " + str(totalTime/len(testSet)) + " time per instance.")
 
 if optimizationTypeDescr[optimizationType] != 'predict':
     fittedVColors = np.vstack(fittedVColors)
@@ -687,8 +704,8 @@ if optimizationTypeDescr[optimizationType] != 'predict':
 
 errorsFittedLightCoeffs = np.array([])
 errorsFittedVColors = np.array([])
-if not optimizationTypeDescr[optimizationType] == 'predict':
-    errorsFittedLightCoeffs = np.linalg.norm(testComponentsGTRel - fittedRelLightCoeffs, axis=1)
+if optimizationTypeDescr[optimizationType] != 'predict':
+    errorsFittedLightCoeffs = np.linalg.norm(testLightCoefficientsGTRel - fittedRelLightCoeffs, axis=1)
     errorsFittedVColors = np.linalg.norm(testVColorGT - fittedVColors, axis=1)
     meanErrorsFittedLightCoeffs = np.mean(errorsFittedLightCoeffs)
     meanErrorsFittedVColors = np.mean(errorsFittedVColors)
