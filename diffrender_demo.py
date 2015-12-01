@@ -360,6 +360,7 @@ param_values = neuralNetModelSHLight['params']
 rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
 input_var = T.tensor4('inputs')
 network = lasagne_nn.build_cnn(input_var)
+network_small = lasagne_nn.build_cnn_small(input_var)
 lasagne.layers.set_all_param_values(network, param_values)
 prediction = lasagne.layers.get_output(network)
 prediction_fn = theano.function([input_var], prediction)
