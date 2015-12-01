@@ -206,7 +206,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'test3_cycles_minimize_optimAll_linearRegressionVColors_randomForestSHZernike_robust_std001_100samples'
+testPrefix = 'test3_cycles_minimize_optimAll_linearRegressionVColors_randomForestSHZernike_threestephogto01to001_1000samples'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -585,14 +585,14 @@ for test_i in range(len(testAzsRel)):
 
         # post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
         #
-        # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT,drconv)
-        # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-        #
-        # hogE_raw = hogGT - hogRenderer
-        # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-        # hogError = ch.SumOfSquares(hogE_raw)
+        hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT,drconv)
+        hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
 
-        models = [negLikModel, negLikModelRobust, negLikModelRobust]
+        hogE_raw = hogGT - hogRenderer
+        hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+        hogError = ch.SumOfSquares(hogE_raw)
+
+        models = [negLikModel, negLikModelRobust, hogError]
         # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
         modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 
@@ -609,13 +609,19 @@ for test_i in range(len(testAzsRel)):
 
         sys.stdout.flush()
         if optimizationTypeDescr[optimizationType] == 'optimize':
-            stds[:] = 0.01
+            method=1
+            model=2
+            free_variables = [ chAz, chEl]
+            errorFun = models[model]
+            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+            model=1
+            errorFun = models[model]
+            stds[:] = 0.1
             free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
             ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-            # stds[:] = 0.01
+            stds[:] = 0.01
             # free_variables = [chAz, chEl]
-            # method=1
-            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
         elif optimizationTypeDescr[optimizationType] == 'joint':
             currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
