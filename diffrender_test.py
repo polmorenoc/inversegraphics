@@ -206,7 +206,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'correct_test3_cycles_minimize_optimAll_linearRegressionVColors_constantSHLight_robustStd01_1000samples'
+testPrefix = 'correct_test3_cycles_minimize_optimAll_linearRegressionVColors_constantSHLight_hog_1000samples'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -283,7 +283,7 @@ gtDtype = groundTruth.dtype
 
 loadFromHdf5 = False
 
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -653,10 +653,10 @@ for test_i in range(len(testAzsRel)):
             # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
             # model=1
             # errorFun = models[model]
-            model=1
+            model=2
             method=1
             stds[:] = 0.1
-            free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+            free_variables = [ chAz, chEl]
             ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
             # stds[:] = 0.01
             # # free_variables = [chAz, chEl]
