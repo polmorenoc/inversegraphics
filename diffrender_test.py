@@ -206,7 +206,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'correct_test3_cycles_minimize_optimAll_linearRegressionVColors_constantSHLight_hog_1000samples'
+testPrefix = 'correct_test3_cycles_minimize_optimAll_linearRegressionVColors_constantSHLight_gausspred_robust_gmmPose50_fancy_100samples'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -239,7 +239,7 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')[:1000]
 
-# testSet = np.array([ 3235, 10711,  9775, 11230, 10255,  5060, 12784,  5410,  1341,14448, 12935, 13196,  6728,  9002,  7946,  1119,  5827,  4842,12435,  8152,  4745,  9512,  9641,  7165, 13950,  3567,   860,4105, 10330,  7218, 10176,  2310,  5325])[0:5]
+# testSet = np.array([ 11230, 3235, 10711,  9775, 11230, 10255,  5060, 12784,  5410,  1341,14448, 12935, 13196,  6728,  9002,  7946,  1119,  5827,  4842,12435,  8152,  4745,  9512,  9641,  7165, 13950,  3567,   860,4105, 10330,  7218, 10176,  2310,  5325])
 testSetFixed = testSet
 whereBad = []
 for test_it, test_id in enumerate(testSet):
@@ -248,7 +248,7 @@ for test_it, test_id in enumerate(testSet):
         testSetFixed = np.delete(testSetFixed, bad)
         whereBad = whereBad + [bad]
 
-testSet = testSetFixed
+testSet = testSetFixed[:100]
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -328,7 +328,7 @@ testZernikefeatures = zernikefeatures[testSet]
 # testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
-recognitionType = 1
+recognitionType = 2
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 1
@@ -336,7 +336,7 @@ optimizationType = 1
 method = 1
 model = 1
 maxiter = 500
-numSamples = 10
+numSamples = 1
 
 # free_variables = [ chAz, chEl]
 free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
@@ -368,19 +368,25 @@ if 'randForestAzs' in parameterRecognitionModels:
     with open(trainModelsDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
         randForestModelCosAzs = pickle.load(pfile)['randForestModelCosAzs']
     cosAzsPred = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeatures)
+    cosAzsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelCosAzs.estimators_])
 
     with open(trainModelsDirPose + 'randForestModelSinAzs.pickle', 'rb') as pfile:
         randForestModelSinAzs = pickle.load(pfile)['randForestModelSinAzs']
     sinAzsPred = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeatures)
+    sinAzsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelSinAzs.estimators_])
 
 if 'randForestElevs' in parameterRecognitionModels:
     with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
         randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
     cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
 
+    cosElevsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelCosElevs.estimators_])
+
     with open(trainModelsDirPose + 'randForestModelSinElevs.pickle', 'rb') as pfile:
         randForestModelSinElevs = pickle.load(pfile)['randForestModelSinElevs']
     sinElevsPred = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeatures)
+    sinElevsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelSinElevs.estimators_])
+
 if 'randForestVColors' in parameterRecognitionModels:
     with open(trainModelsDirVColor + 'randForestModelVColor.pickle', 'rb') as pfile:
         randForestModelVColor = pickle.load(pfile)
@@ -442,15 +448,86 @@ if 'linRegModelSHZernike' in parameterRecognitionModels:
 
     relLightCoefficientsGTPred = recognition_models.testLinearRegression(linearRegressionModelLightCoeffs, testZernikefeatures)
 
+if not os.path.exists(resultDir + 'imgs/'):
+    os.makedirs(resultDir + 'imgs/')
+if not os.path.exists(resultDir +  'imgs/samples/'):
+    os.makedirs(resultDir + 'imgs/samples/')
+
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
 azsPred = np.arctan2(sinAzsPred, cosAzsPred)
 
-testPredPoseGMMs = []
-colorGMMs = []
+azsGmms = []
+elevsGmms = []
 if recognitionType == 2:
-    for test_i in range(len(testAzsRel)):
-        testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPred[test_i], elevsPred[test_i])]
-        colorGMMs = colorGMMs + [recognition_models.colorGMM(images[test_i], 40)]
+    azsPredictions = np.arctan2(sinAzsPredictions, cosAzsPredictions)
+    directory = resultDir
+    plt.ioff()
+    fig = plt.figure()
+    for sample_i, sampleAzsPredictions in enumerate(azsPredictions.T):
+        sample = (sample_i + 1)*2
+        plt.scatter(np.ones_like(sampleAzsPredictions)*sample, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
+
+        from sklearn import mixture
+        gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
+
+        gmm.fit(np.hstack([sinAzsPredictions[:,sample_i][:,None], cosAzsPredictions[:,sample_i][:,None]]))
+        azsGmms = azsGmms + [gmm]
+        for comp_i, weight in enumerate(gmm.weights_):
+            meanSin = gmm.means_[comp_i][0]
+            meanCos = gmm.means_[comp_i][1]
+            azCompMean = np.arctan2(meanSin, meanCos)
+            plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
+
+        plt.plot(sample,testAzsRel[sample_i]*180/np.pi, marker='o', ms=20, c='g')
+        plt.plot(sample, np.mod(azsPred[sample_i]*180/np.pi, 360), marker='o', ms=20, c='r')
+
+    plt.xlabel('Sample')
+    plt.ylabel('Angular error')
+    x1,x2,y1,y2 = plt.axis()
+    plt.axis((0,len(testSet+1)*2,0,360))
+    plt.title('Random forest multiple predictions')
+    fig.savefig(directory + 'randomForest_Az_scatter.png', bbox_inches='tight')
+    plt.close(fig)
+    # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
+
+if recognitionType == 2:
+    elevsPredictions = np.arctan2(sinElevsPredictions, cosElevsPredictions)
+    directory = resultDir
+    plt.ioff()
+    fig = plt.figure()
+    for sample_i, sampleElevsPredictions in enumerate(elevsPredictions.T):
+        sample = (sample_i + 1)*2
+        plt.scatter(np.ones_like(sampleElevsPredictions)*sample, np.mod(sampleElevsPredictions*180/np.pi, 90), c='b')
+
+        from sklearn import mixture
+        gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
+
+        gmm.fit(np.hstack([sinElevsPredictions[:,sample_i][:,None], cosElevsPredictions[:,sample_i][:,None]]))
+        elevsGmms = elevsGmms + [gmm]
+        for comp_i, weight in enumerate(gmm.weights_):
+            meanSin = gmm.means_[comp_i][0]
+            meanCos = gmm.means_[comp_i][1]
+            elCompMean = np.arctan2(meanSin, meanCos)
+            plt.plot(sample-0.4, np.mod(elCompMean*180/np.pi, 90), marker='o', ms=weight*50, c='y')
+
+        plt.plot(sample, testElevsGT[sample_i]*180/np.pi, marker='o', ms=20, c='g')
+        plt.plot(sample, np.mod(elevsPred[sample_i]*180/np.pi, 90), marker='o', ms=20, c='r')
+
+    plt.xlabel('Sample')
+    plt.ylabel('Angular error')
+    x1,x2,y1,y2 = plt.axis()
+    plt.axis((0,len(testSet+1)*2,0,90))
+    plt.title('Random forest multiple predictions')
+    fig.savefig(directory + 'randomForest_Elev_scatter.png', bbox_inches='tight')
+    plt.close(fig)
+    # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
+
+# testPredPoseGMMs = []
+# colorGMMs = []
+# if recognitionType == 2:
+#     for test_i in range(len(testAzsRel)):
+#         testPredPoseGMMs = testPredPoseGMMs + [recognition_models.poseGMM(azsPred[test_i], elevsPred[test_i])]
+#         colorGMMs = colorGMMs + [recognition_models.colorGMM(images[test_i], 40)]
 
 # errors = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, testAzsRel, testElevsGT)
 errors = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPred, elevsPred)
@@ -475,11 +552,6 @@ fittedVColors = []
 predictedErrorFuns = np.array([])
 fittedErrorFuns = np.array([])
 
-if not os.path.exists(resultDir + 'imgs/'):
-    os.makedirs(resultDir + 'imgs/')
-if not os.path.exists(resultDir +  'imgs/samples/'):
-    os.makedirs(resultDir + 'imgs/samples/')
-
 print("Using " + modelsDescr[model])
 errorFun = models[model]
 pixelErrorFun = pixelModels[model]
@@ -487,7 +559,7 @@ pixelErrorFun = pixelModels[model]
 testSamples = 1
 if recognitionType == 2:
     testSamples  = numSamples
-predSamples = 10
+predSamples = 50
 
 chDisplacement[:] = np.array([0.0, 0.0,0.0])
 chScale[:] = np.array([1.0,1.0,1.0])
@@ -554,25 +626,27 @@ for test_i in range(len(testAzsRel)):
             color = testVColorGT[test_i] + nearGTOffsetVColor
             az = testAzsRel[test_i] + nearGTOffsetRelAz
             el = testElevsGT[test_i] + nearGTOffsetEl
-            lightCoefficientsGTRel = testLightCoefficientsGTRel[test_i]
-        elif recognitionType == 1:
+            lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+        elif recognitionType == 1 or recognitionType == 2:
             #Point (mean) estimate:
             az = azsPred[test_i]
-            el = elevsPred[test_i]
+            el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
 
             color = vColorsPred[test_i]
-            lightCoefficientsGTRel = relLightCoefficientsGTPred[test_i]
+            lightCoefficientsRel = relLightCoefficientsGTPred[test_i]
             # color = testVColorGT[test_i]
             # lightCoefficientsGTRel = testLightCoefficientsGTRel[test_i]
-        else:
-            #Sampling
-            poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
-            sampleComp = choice(len(poseComps), size=1, p=poseComps)
-            az = np.random.vonmises(vmAzParams[sampleComp][0],vmAzParams[sampleComp][1],1)
-            el = np.random.vonmises(vmElParams[sampleComp][0],vmElParams[sampleComp][1],1)
-            lightCoefficientsGTRel = relLightCoefficientsGTPred[test_i].copy()
-            colorGMM = colorGMMs[test_i]
-            color = colorGMM.sample(n_samples=1)[0]
+        # else:
+        #     #Sampling
+        #     # poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
+        #     sampleComp = choice(len(poseComps), size=1, p=poseComps)
+        #     # az = np.random.vonmises(vmAzParams[sampleComp][0],vmAzParams[sampleComp][1],1)
+        #     # el = np.random.vonmises(vmElParams[sampleComp][0],vmElParams[sampleComp][1],1)
+        #     az = azsPred[test_i]
+        #     el = elevsPred[test_i]
+        #
+        #     color = vColorsPred[test_i]
+        #     lightCoefficientsGTRel = relLightCoefficientsGTPred[test_i]
 
         # chAz[:] = testAzsRel[test_i]
         # chEl[:] = testElevsGT[test_i]
@@ -583,12 +657,10 @@ for test_i in range(len(testAzsRel)):
         #
         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_reconstructed'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-
         chAz[:] = az.copy()
         chEl[:] = el.copy()
         chVColors[:] = color.copy()
-        chLightSHCoeffs[:] = lightCoefficientsGTRel.copy()
-
+        chLightSHCoeffs[:] = lightCoefficientsRel.copy()
 
         #Update all error functions with the right renderers.
         # negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
@@ -612,31 +684,94 @@ for test_i in range(len(testAzsRel)):
         # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
         # hogError = ch.SumOfSquares(hogE_raw)
 
-        models = [negLikModel, negLikModelRobust, negLikModelRobust]
-        # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustCh]
-        modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 
-        pixelErrorFun = pixelModels[model]
+        stds[:] = 0.1
+
+        model = 1
         errorFun = models[model]
 
-        # bestPredAz = chAz.r
-        # bestPredEl = chEl.r
-        # bestPredModelLik = errorFun.r
-        #
-        # for predSample in range(predSamples):
-        #     azsample = np.random.uniform(az-radians(40),az+radians(40), 1)
-        #     elsample = np.random.uniform(np.max([el-radians(20),0.01]),np.min([el+radians(20),np.pi/2-0.01]), 1)
-        #     chAz[:] = azsample.copy()
-        #     chEl[:] = elsample.copy()
-        #     if errorFun.r < bestPredModelLik:
-        #         bestPredModelLik = errorFun.r.copy()
-        #         bestPredAz = chAz.r.copy()
-        #         bestPredEl = chEl.r.copy()
-        #
-        # chAz[:] = bestPredAz
-        # chEl[:] = bestPredEl
+        bestPredAz = chAz.r
+        bestPredEl = chEl.r
+        bestPredModelLik = errorFun.r
 
         cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+
+        if recognitionType == 2:
+            continueSampling = True
+            numPredSamples = 0
+            previousAngles = np.array([[az, el]])
+            numGoodPreviousAngles = 0
+            numberSkipped = 0
+            while continueSampling:
+                if numPredSamples >= predSamples:
+                    continueSampling = False
+                    print("Last sample!")
+                print("Sample " + str(numPredSamples))
+                azGmm = azsGmms[test_i]
+                elGmm = elevsGmms[test_i]
+                (sinAzSample, cosAzSample) = azGmm.sample()[0]
+                azsample = np.arctan2(sinAzSample, cosAzSample)
+                (sinElevSample, cosElevSample) = elGmm.sample()[0]
+                elsample = min(max(np.arctan2(sinElevSample, cosElevSample),radians(1)), np.pi/2-radians(1))
+                skipSample = False
+
+                for previousAngle in previousAngles:
+                    diffAngles = recognition_models.evaluatePrediction(previousAngle[0], previousAngle[1], azsample, elsample)
+                    if abs(diffAngles[0] < 5) and abs(diffAngles[1] < 5):
+                        skipSample = True
+                        print("Seen this angle before!")
+                        break
+
+                if skipSample:
+                    numberSkipped += 1
+                    if numberSkipped > 100:
+                        continueSampling = False
+                    continue
+
+                numberSkipped = 0
+                numPredSamples += 1
+
+                chAz[:] = azsample
+                chEl[:] = elsample
+                print("Minimizing first step")
+                model = 1
+                errorFun = models[model]
+                method=2
+                stds[:] = 0.1
+                free_variables = [chVColors, chLightSHCoeffs[1:4]]
+                options={'disp':False, 'maxiter':5}
+                ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                # print("Minimizing second step")
+                # method=2
+                # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+                # options={'disp':False, 'maxiter':5}
+                # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                if errorFun.r < bestPredModelLik:
+                    diffAngles = recognition_models.evaluatePrediction(chAz.r, chEl.r, bestPredAz, bestPredEl)
+                    if abs(diffAngles[0] < 5) and abs(diffAngles[1] < 5):
+                        numGoodPreviousAngles += 1
+                        if numGoodPreviousAngles >= 3:
+                            continueSampling = False
+                            print("Enough good samples!")
+                    print("Found best angle!")
+                    bestPredModelLik = errorFun.r.copy()
+                    bestPredAz = chAz.r.copy()
+                    bestPredEl = chEl.r.copy()
+                    bestPredVColors = chVColors.r.copy()
+                    bestPredLightSHCoeffs = chLightSHCoeffs.r.copy()
+                    bestModelLik = errorFun.r.copy()
+                    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_predSample' + str(numPredSamples) + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+
+
+                previousAngles = np.vstack([previousAngles, np.array([[azsample, elsample],[chAz.r.copy(), chEl.r.copy()]])])
+
+        chAz[:] = az.copy()
+        chEl[:] = el.copy()
+        chVColors[:] = color.copy()
+        chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+
+        # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
         # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
         predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
@@ -646,75 +781,14 @@ for test_i in range(len(testAzsRel)):
 
         sys.stdout.flush()
         if optimizationTypeDescr[optimizationType] == 'optimize':
-            # method=1
-            # model=2
-            # free_variables = [ chAz, chEl]
-            # errorFun = models[model]
-            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-            # model=1
-            # errorFun = models[model]
-            model=2
-            method=1
+            print("** Minimizing intial predicted parameters. **")
+            model=1
+            errorFun = models[model]
+            method=2
             stds[:] = 0.1
-            free_variables = [ chAz, chEl]
-            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-            # stds[:] = 0.01
-            # # free_variables = [chAz, chEl]
-            # method=4
-            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-
-        elif optimizationTypeDescr[optimizationType] == 'joint':
-            currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
-            currSHError = np.linalg.norm(testLightCoefficientsGTRel[test_i] - chLightSHCoeffs.r)
-            currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
-            currErrorGaussian = models[0].r
-            currErrorRobust = models[1].r
-            currErrorHoG = models[2].r
-            print("Predicted errors:")
-            print("Az error: " + str(currPoseError[0]))
-            print("El error: " + str(currPoseError[1]))
-            print("VColor error: " + str(currVColorError))
-            print("SH error: " + str(currSHError))
-            print("Gaussian likelihood: " + str(currErrorGaussian))
-            print("Robust likelihood: " + str(currErrorRobust))
-            print("HoG error: " + str(currErrorHoG))
-
-            free_variables = [ chAz, chEl]
-            ch.minimize({'raw': models[2]}, bounds=None, method=methods[4], x0=free_variables, callback=cb, options=options)
-
-            sys.stdout.flush()
-            currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
-            currErrorGaussian = models[0].r
-            currErrorRobust = models[1].r
-            currErrorHoG = models[2].r
-            print("HoG fitted errors:")
-            print("Az error: " + str(currPoseError[0]))
-            print("El error: " + str(currPoseError[1]))
-            print("Gaussian likelihood: " + str(currErrorGaussian))
-            print("Robust likelihood: " + str(currErrorRobust))
-            print("HoG error: " + str(currErrorHoG))
-
+            options={'disp':False, 'maxiter':20}
             free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
-
-            ch.minimize({'raw': models[1]}, bounds=None, method=methods[1], x0=free_variables, callback=cb, options=options)
-
-            sys.stdout.flush()
-            currPoseError = recognition_models.evaluatePrediction(testAzsRel[test_i], testElevsGT[test_i], chAz.r, chEl.r)
-            currSHError = np.linalg.norm(testLightCoefficientsGTRel[test_i] - chLightSHCoeffs.r)
-            currVColorError = np.linalg.norm(testVColorGT[test_i] - chVColors.r)
-            currErrorGaussian = models[0].r
-            currErrorRobust = models[1].r
-            currErrorHoG = models[2].r
-            print("Joint fitted errors:")
-            print("Az error: " + str(currPoseError[0]))
-            print("El error: " + str(currPoseError[1]))
-            print("VColor error: " + str(currVColorError))
-            print("SH error: " + str(currSHError))
-            print("Gaussian likelihood: " + str(currErrorGaussian))
-            print("Robust likelihood: " + str(currErrorRobust))
-            print("HoG error: " + str(currErrorHoG))
-
-            sys.stdout.flush()
+            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
         if errorFun.r < bestModelLik:
             bestModelLik = errorFun.r.copy()
@@ -723,8 +797,27 @@ for test_i in range(len(testAzsRel)):
             bestVColors = chVColors.r.copy()
             bestLightSHCoeffs = chLightSHCoeffs.r.copy()
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+        else:
+            bestFittedAz = bestPredAz.copy()
+            bestFittedEl = bestPredEl.copy()
+            bestVColors = bestPredVColors.copy()
+            bestLightSHCoeffs = bestPredLightSHCoeffs.copy()
 
-        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+
+        chAz[:] = bestFittedAz
+        chEl[:] = bestFittedEl
+        chVColors[:] = bestVColors
+        chLightSHCoeffs[:] = bestLightSHCoeffs
+
+        model=1
+        errorFun = models[model]
+        method=1
+        stds[:] = 0.1
+        options={'disp':False, 'maxiter':5}
+        free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+        ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
     if not optimizationTypeDescr[optimizationType] == 'predict':
         fittedErrorFuns = np.append(fittedErrorFuns, bestModelLik)
@@ -757,6 +850,8 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     meanErrorsFittedVColors = np.mean(errorsFittedVColors)
 
 plt.ioff()
+import seaborn
+
 
 directory = resultDir + 'predicted-azimuth-error'
 
@@ -767,7 +862,7 @@ plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((0,90,-90,90))
 plt.title('Performance scatter plot')
-fig.savefig(directory + '_elev-performance-scatter.png')
+fig.savefig(directory + '_elev-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
 fig = plt.figure()
@@ -777,7 +872,7 @@ plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((0,100,-180,180))
 plt.title('Performance scatter plot')
-fig.savefig(directory + '_occlusion-performance-scatter.png')
+fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
 fig = plt.figure()
@@ -787,18 +882,56 @@ plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((0,360,-180,180))
 plt.title('Performance scatter plot')
-fig.savefig(directory  + '_azimuth-performance-scatter.png')
+fig.savefig(directory  + '_azimuth-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
 fig = plt.figure()
-plt.hist(np.abs(errors[0]), bins=18)
+plt.hist(errors[0], bins=18)
 plt.xlabel('Angular error')
 plt.ylabel('Counts')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((-180,180,y1, y2))
 plt.title('Performance histogram')
-fig.savefig(directory  + '_performance-histogram.png')
+fig.savefig(directory  + '_performance-histogram.png', bbox_inches='tight')
 plt.close(fig)
+
+
+
+fig = plt.figure()
+plt.hist(predErrorAzs, bins=30)
+plt.xlabel('Angular error')
+plt.ylabel('Counts')
+x1,x2,y1,y2 = plt.axis()
+plt.axis((-180,180,y1, 700))
+plt.title('Predicted Azimuth')
+fig.savefig('histaz1.eps', bbox_inches='tight')
+
+fig = plt.figure()
+plt.hist(predErrorElevs, bins=30)
+plt.xlabel('Angular error')
+plt.ylabel('Counts')
+x1,x2,y1,y2 = plt.axis()
+plt.axis((-90,90,y1, 700))
+plt.title('Predicted Elevation')
+fig.savefig('histel1.eps', bbox_inches='tight')
+
+fig = plt.figure()
+plt.hist(errorsFittedAzs, bins=30)
+plt.xlabel('Angular error')
+plt.ylabel('Counts')
+x1,x2,y1,y2 = plt.axis()
+plt.axis((-180,180,y1, 700))
+plt.title('Fitted azimuth')
+fig.savefig('histaz2.eps', bbox_inches='tight')
+
+fig = plt.figure()
+plt.hist(errorsFittedElevs, bins=30)
+plt.xlabel('Angular error')
+plt.ylabel('Counts')
+x1,x2,y1,y2 = plt.axis()
+plt.axis((-90,90,y1, 700))
+plt.title('Fitted Elevation')
+fig.savefig('histel2.eps', bbox_inches='tight')
 
 directory = resultDir + 'predicted-elevation-error'
 
@@ -809,7 +942,7 @@ plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((0,90,-90,90))
 plt.title('Performance scatter plot')
-fig.savefig(directory + '_elev-performance-scatter.png')
+fig.savefig(directory + '_elev-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
 fig = plt.figure()
@@ -819,7 +952,7 @@ plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((0,100,-180,180))
 plt.title('Performance scatter plot')
-fig.savefig(directory + '_occlusion-performance-scatter.png')
+fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
 fig = plt.figure()
@@ -829,17 +962,17 @@ plt.ylabel('Angular error')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((0,360,-180,180))
 plt.title('Performance scatter plot')
-fig.savefig(directory  + '_azimuth-performance-scatter.png')
+fig.savefig(directory  + '_azimuth-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
 fig = plt.figure()
-plt.hist(np.abs(errors[1]), bins=18)
+plt.hist(errors[1], bins=18)
 plt.xlabel('Angular error')
 plt.ylabel('Counts')
 x1,x2,y1,y2 = plt.axis()
 plt.axis((-180,180,y1, y2))
 plt.title('Performance histogram')
-fig.savefig(directory  + '_performance-histogram.png')
+fig.savefig(directory  + '_performance-histogram.png', bbox_inches='tight')
 plt.close(fig)
 
 #Fitted predictions plots:
@@ -853,7 +986,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     x1,x2,y1,y2 = plt.axis()
     plt.axis((0,90,-90,90))
     plt.title('Performance scatter plot')
-    fig.savefig(directory + '_elev-performance-scatter.png')
+    fig.savefig(directory + '_elev-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
     fig = plt.figure()
@@ -863,7 +996,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     x1,x2,y1,y2 = plt.axis()
     plt.axis((0,100,-180,180))
     plt.title('Performance scatter plot')
-    fig.savefig(directory + '_occlusion-performance-scatter.png')
+    fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
     fig = plt.figure()
@@ -873,17 +1006,17 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     x1,x2,y1,y2 = plt.axis()
     plt.axis((0,360,-180,180))
     plt.title('Performance scatter plot')
-    fig.savefig(directory  + '_azimuth-performance-scatter.png')
+    fig.savefig(directory  + '_azimuth-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
     fig = plt.figure()
-    plt.hist(np.abs(errorsFittedRF[0]), bins=18)
+    plt.hist(errorsFittedRF[0], bins=18)
     plt.xlabel('Angular error')
     plt.ylabel('Counts')
     x1,x2,y1,y2 = plt.axis()
     plt.axis((-180,180,y1, y2))
     plt.title('Performance histogram')
-    fig.savefig(directory  + '_performance-histogram.png')
+    fig.savefig(directory  + '_performance-histogram.png', bbox_inches='tight')
     plt.close(fig)
 
     directory = resultDir + 'fitted-elevation-error'
@@ -895,7 +1028,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     x1,x2,y1,y2 = plt.axis()
     plt.axis((0,90,-90,90))
     plt.title('Performance scatter plot')
-    fig.savefig(directory + '_elev-performance-scatter.png')
+    fig.savefig(directory + '_elev-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
     fig = plt.figure()
@@ -905,7 +1038,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     x1,x2,y1,y2 = plt.axis()
     plt.axis((0,100,-180,180))
     plt.title('Performance scatter plot')
-    fig.savefig(directory + '_occlusion-performance-scatter.png')
+    fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
     fig = plt.figure()
@@ -915,17 +1048,17 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     x1,x2,y1,y2 = plt.axis()
     plt.axis((0,360,-180,180))
     plt.title('Performance scatter plot')
-    fig.savefig(directory  + '_azimuth-performance-scatter.png')
+    fig.savefig(directory  + '_azimuth-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
     fig = plt.figure()
-    plt.hist(np.abs(errorsFittedRF[1]), bins=18)
+    plt.hist(errorsFittedRF[1], bins=18)
     plt.xlabel('Angular error')
     plt.ylabel('Counts')
     x1,x2,y1,y2 = plt.axis()
     plt.axis((-180,180,y1, y2))
     plt.title('Performance histogram')
-    fig.savefig(directory  + '_performance-histogram.png')
+    fig.savefig(directory  + '_performance-histogram.png', bbox_inches='tight')
     plt.close(fig)
 
     directory = resultDir + 'fitted-robust-azimuth-error'
