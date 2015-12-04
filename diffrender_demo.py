@@ -27,7 +27,7 @@ plt.ion()
 #__GL_THREADED_OPTIMIZATIONS
 
 #Main script options:
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -241,8 +241,10 @@ phiOffset = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 
 chObjAzGT = ch.Ch(dataObjAzsGT[readDataId])
 chAzGT = ch.Ch(dataAzsGT[readDataId])
+chAzGT = ch.Ch([np.pi])
 chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(dataElevsGT[readDataId])
+chElGT = ch.Ch([np.pi/4])
 chDistGT = ch.Ch([camDistance])
 
 totalOffsetGT = phiOffsetGT + chObjAzGT
@@ -347,27 +349,27 @@ for teapot_i in range(len(renderTeapotsList)):
     renderer_teapots = renderer_teapots + [renderer]
 
 
-# Funky theano stuff
-import lasagne_nn
-import lasagne
-import theano
-import theano.tensor as T
-with open('experiments/train4/neuralNetModelRelSHLight.pickle', 'rb') as pfile:
-    neuralNetModelSHLight = pickle.load(pfile)
-meanImage = neuralNetModelSHLight['mean']
-modelType = neuralNetModelSHLight['type']
-param_values = neuralNetModelSHLight['params']
-rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-input_var = T.tensor4('inputs')
-network = lasagne_nn.build_cnn(input_var)
-network_small = lasagne_nn.build_cnn_small(input_var)
-lasagne.layers.set_all_param_values(network, param_values)
-prediction = lasagne.layers.get_output(network)
-prediction_fn = theano.function([input_var], prediction)
-ipdb.set_trace()
-jacobian = theano.gradient.jacobian(prediction, input_var)
-
-theanoFeat = TheanoFunOnOpenDR(theano_fun=prediction_fn, theano_grad_fun=jacobian, opendr_x=rendererGray)
+# # Funky theano stuff
+# import lasagne_nn
+# import lasagne
+# import theano
+# import theano.tensor as T
+# with open('experiments/train4/neuralNetModelRelSHLight.pickle', 'rb') as pfile:
+#     neuralNetModelSHLight = pickle.load(pfile)
+# meanImage = neuralNetModelSHLight['mean']
+# modelType = neuralNetModelSHLight['type']
+# param_values = neuralNetModelSHLight['params']
+# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+# input_var = T.tensor4('inputs')
+# network = lasagne_nn.build_cnn(input_var)
+# network_small = lasagne_nn.build_cnn_small(input_var)
+# lasagne.layers.set_all_param_values(network, param_values)
+# prediction = lasagne.layers.get_output(network)
+# prediction_fn = theano.function([input_var], prediction)
+# ipdb.set_trace()
+# jacobian = theano.gradient.jacobian(prediction, input_var)
+#
+# theanoFeat = TheanoFunOnOpenDR(theano_fun=prediction_fn, theano_grad_fun=jacobian, opendr_x=rendererGray)
 
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
@@ -783,58 +785,58 @@ def plotSurface(model):
         surf = axperf.plot_surface(x2, y2, z2, rstride=3, cstride=3, cmap=cm.coolwarm, linewidth=0.1, alpha=0.85)
 
         # scaleSurfGrads = 5./avgSurfGradMagnitudes
-        for point in range(len(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])):
-            perfi = performanceSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            azi = azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            eli = elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            gradAzi = -gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            gradEli = -gradElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            scaleGrad = np.sqrt(gradAzi**2+gradEli**2) / 5
-
-            arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi/scaleGrad], [eli*180./np.pi, eli*180./np.pi + gradEli/scaleGrad], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
-            axperf.add_artist(arrowGrad)
-
-            diffAzi = -gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            diffEli = -gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-            scaleDiff = np.sqrt(diffAzi**2+diffEli**2) / 5
-            colorArrow = 'g'
-            if diffAzi * gradAzi + diffEli * gradEli < 0:
-                colorArrow = 'r'
-            arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi/scaleDiff], [eli*180./np.pi, eli*180./np.pi + diffEli/scaleDiff], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
-            axperf.add_artist(arrowGradDiff)
+        # for point in range(len(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])):
+        #     perfi = performanceSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     azi = azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     eli = elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     gradAzi = -gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     gradEli = -gradElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     scaleGrad = np.sqrt(gradAzi**2+gradEli**2) / 5
+        #
+        #     arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi/scaleGrad], [eli*180./np.pi, eli*180./np.pi + gradEli/scaleGrad], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+        #     axperf.add_artist(arrowGrad)
+        #
+        #     diffAzi = -gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     diffEli = -gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+        #     scaleDiff = np.sqrt(diffAzi**2+diffEli**2) / 5
+        #     colorArrow = 'g'
+        #     if diffAzi * gradAzi + diffEli * gradEli < 0:
+        #         colorArrow = 'r'
+        #     arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi/scaleDiff], [eli*180./np.pi, eli*180./np.pi + diffEli/scaleDiff], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+        #     axperf.add_artist(arrowGradDiff)
 
         axperf.plot([chAzGT.r[0]*180./np.pi, chAzGT.r[0]*180./np.pi], [chElGT.r[0]*180./np.pi,chElGT.r[0]*180./np.pi], [z2.min(), z2.max()], 'b--', linewidth=1)
 
         errorFun = models[model]
 
-        axperf.plot(chAz.r*180./np.pi, chEl.r*180./np.pi, errorFun.r[0], 'yD')
-
-        import scipy.sparse as sp
-        if sp.issparse(errorFun.dr_wrt(chAz)):
-            drAz = -errorFun.dr_wrt(chAz).toarray()[0][0]
-        else:
-            drAz = -errorFun.dr_wrt(chAz)[0][0]
-        if sp.issparse(errorFun.dr_wrt(chEl)):
-            drEl = -errorFun.dr_wrt(chEl).toarray()[0][0]
-        else:
-            drEl = -errorFun.dr_wrt(chEl)[0][0]
-        scaleDr = np.sqrt(drAz**2+drEl**2) / 5
-        chAzOldi = chAz.r[0]
-        chElOldi = chEl.r[0]
-        diffAz = -ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
-        diffEl = -ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
-        scaleDiff = np.sqrt(diffAz**2+diffEl**2) / 5
-        chAz[0] = chAzOldi
-        chEl[0] = chElOldi
-
-        arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz/scaleDr], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl/scaleDr], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
-        axperf.add_artist(arrowGrad)
-        colorArrow = 'g'
-        if diffAz * drAz + diffEl * drEl < 0:
-            colorArrow = 'r'
-
-        arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz/scaleDiff], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl/scaleDiff], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
-        axperf.add_artist(arrowGradDiff)
+        # axperf.plot(chAz.r*180./np.pi, chEl.r*180./np.pi, errorFun.r[0], 'yD')
+        #
+        # import scipy.sparse as sp
+        # if sp.issparse(errorFun.dr_wrt(chAz)):
+        #     drAz = -errorFun.dr_wrt(chAz).toarray()[0][0]
+        # else:
+        #     drAz = -errorFun.dr_wrt(chAz)[0][0]
+        # if sp.issparse(errorFun.dr_wrt(chEl)):
+        #     drEl = -errorFun.dr_wrt(chEl).toarray()[0][0]
+        # else:
+        #     drEl = -errorFun.dr_wrt(chEl)[0][0]
+        # scaleDr = np.sqrt(drAz**2+drEl**2) / 5
+        # chAzOldi = chAz.r[0]
+        # chElOldi = chEl.r[0]
+        # diffAz = -ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+        # diffEl = -ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+        # scaleDiff = np.sqrt(diffAz**2+diffEl**2) / 5
+        # chAz[0] = chAzOldi
+        # chEl[0] = chElOldi
+        #
+        # arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz/scaleDr], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl/scaleDr], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+        # axperf.add_artist(arrowGrad)
+        # colorArrow = 'g'
+        # if diffAz * drAz + diffEl * drEl < 0:
+        #     colorArrow = 'r'
+        #
+        # arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz/scaleDiff], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl/scaleDiff], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+        # axperf.add_artist(arrowGradDiff)
 
     if plotMinimization:
         if azimuths.get((model, chAzGT.r[0], chElGT.r[0])) != None:
@@ -843,8 +845,9 @@ def plotSurface(model):
 
     axperf.set_xlabel('Azimuth (degrees)')
     axperf.set_ylabel('Elevation (degrees)')
-    axperf.set_zlabel('Negative Log Likelihood')
-    plt.title('Model type: ' + str(model))
+    if model == 2:
+        axperf.set_zlabel('Squared Error')
+    plt.title('Model: ' + modelsDescr[model])
 
     plt.pause(0.01)
     plt.draw()
@@ -1338,8 +1341,8 @@ def exploreSurface():
             gradFinAzSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
             gradFinElSurf[(model_num, chAzGT.r[0], chElGT.r[0])] = np.array([])
 
-        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/7.,0), min(chAzGT.r[0] + np.pi/7., 2.*np.pi), num=10):
-            for chEli in np.linspace(max(chElGT.r[0]-np.pi/8,0), min(chElGT.r[0]+np.pi/8, np.pi/2), num=5):
+        for chAzi in np.linspace(max(chAzGT.r[0]-np.pi/3.,0), min(chAzGT.r[0] + np.pi/3., 2.*np.pi), num=20):
+            for chEli in np.linspace(max(chElGT.r[0]-np.pi/2,0), min(chElGT.r[0]+np.pi/2, np.pi/2), num=10):
                 for model_num, errorFun in enumerate(models):
                     chAz[:] = chAzi
                     chEl[:] = chEli
