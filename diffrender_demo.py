@@ -350,25 +350,24 @@ for teapot_i in range(len(renderTeapotsList)):
 
 
 # # Funky theano stuff
-# import lasagne_nn
-# import lasagne
-# import theano
-# import theano.tensor as T
-# with open('experiments/train4/neuralNetModelRelSHLight.pickle', 'rb') as pfile:
-#     neuralNetModelSHLight = pickle.load(pfile)
-# meanImage = neuralNetModelSHLight['mean']
-# modelType = neuralNetModelSHLight['type']
-# param_values = neuralNetModelSHLight['params']
-# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-# input_var = T.tensor4('inputs')
-# network = lasagne_nn.build_cnn(input_var)
-# network_small = lasagne_nn.build_cnn_small(input_var)
-# lasagne.layers.set_all_param_values(network, param_values)
-# prediction = lasagne.layers.get_output(network)
-# prediction_fn = theano.function([input_var], prediction)
-# ipdb.set_trace()
-# jacobian = theano.gradient.jacobian(prediction, input_var)
-#
+import lasagne_nn
+import lasagne
+import theano
+import theano.tensor as T
+with open('experiments/train4/neuralNetModelRelSHLight.pickle', 'rb') as pfile:
+    neuralNetModelSHLight = pickle.load(pfile)
+meanImage = neuralNetModelSHLight['mean']
+modelType = neuralNetModelSHLight['type']
+param_values = neuralNetModelSHLight['params']
+rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+input = rendererGray.r[None,None, :,:]
+input_var = T.tensor4('inputs')
+network = lasagne_nn.build_cnn(input_var)
+network_small = lasagne_nn.build_cnn_small(input_var)
+lasagne.layers.set_all_param_values(network, param_values)
+prediction = lasagne.layers.get_output(network)
+chThFun = TheanoFunOnOpenDR(theano_input=input_var, theano_output=prediction, opendr_input=renderer, dim_output = 9)
+sys.exit(0)
 # theanoFeat = TheanoFunOnOpenDR(theano_fun=prediction_fn, theano_grad_fun=jacobian, opendr_x=rendererGray)
 
 currentTeapotModel = 0

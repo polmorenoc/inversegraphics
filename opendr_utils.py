@@ -21,19 +21,38 @@ from chumpy import depends_on, Ch
 import scipy.sparse as sp
 
 class TheanoFunOnOpenDR(Ch):
-    terms = 'theano_fun', 'theano_grad_fun'
-    dterms = 'opendr_x'
+    terms = 'theano_output', 'theano_input', 'dim_output'
+    dterms = 'opendr_input'
+
+    initialized = False
+
+    def compileFunctions(self):
+        import theano
+        self.prediction_fn = theano.function([self.theano_input], self.theano_output)
+        self.grad_fns = [theano.function([self.theano_input], theano.gradient.grad(self.theano_output.flatten()[grad_i], self.theano_input)) for grad_i in range(self.dim_output)]
+
+        self.initialized = True
 
     def compute_r(self):
+        if not self.initialized:
+            self.compileFunctions()
 
-        x = self.opendr_x.r
-        return self.theano_fun(x)
+        x = self.opendr_input.r
+        x_gray =  0.3*x[:,:,0] +  0.59*x[:,:,1] + 0.11*x[:,:,2]
+        output = self.prediction_fn(x_gray[None,None, :,:].astype(np.float32))
+
+        return output
 
     def compute_dr_wrt(self,wrt):
-        if self.opendr_x is wrt:
-            jac = self.theano_grad_fun(self.opendr_x)
-            return sp.csc_matrix(jac)
+        if self.opendr_input is wrt:
+            if not self.initialized:
+                self.compileFunctions()
+            x = self.opendr_input.r
+            x_gray =  0.3*x[:,:,0] +  0.59*x[:,:,1] + 0.11*x[:,:,2]
+            jac = [sp.lil_matrix(np.array(grad_fun(x_gray[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
+            return sp.vstack(jac).tocsr()
 
+        return None
 
 def recoverAmbientIntensities(hdritems, gtDataset, clampedCosCoeffs):
     hdrscoeffs = np.zeros([100, 9,3])
