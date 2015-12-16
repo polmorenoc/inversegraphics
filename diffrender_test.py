@@ -22,7 +22,8 @@ from utils import *
 import OpenGL.GL as GL
 import light_probes
 from OpenGL import contextdata
-# import lasagne_nn
+import lasagne
+import lasagne_nn
 
 plt.ion()
 
@@ -206,8 +207,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'correct_test3_cycles_minimize_optimAll_linearRegressionVColors_constantSHLight_gausspred_robust_gmmPose50_fancy_100samples'
-testPrefix = 'correct_test3_cycles_minimize_linearRegressionVColors_constantSHLight_100samples'
+testPrefix = 'tmp_nnoptimization_sh'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -216,8 +216,8 @@ parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegr
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
-gtPrefix = 'train3'
-experimentPrefix = 'train3'
+gtPrefix = 'train4'
+experimentPrefix = 'train4'
 trainPrefix = 'train4'
 trainPrefixPose = 'train2'
 trainPrefixVColor = 'train4'
@@ -285,7 +285,7 @@ gtDtype = groundTruth.dtype
 
 loadFromHdf5 = False
 
-syntheticGroundtruth = False
+syntheticGroundtruth = True
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -416,6 +416,24 @@ if 'medianVColors' in parameterRecognitionModels:
     # return color
 
 SHModel = ""
+
+with open(trainModelsDirLightCoeffs + 'neuralNetModelRelSHLight.pickle', 'rb') as pfile:
+    neuralNetModelSHLight = pickle.load(pfile)
+
+meanImage = neuralNetModelSHLight['mean'].reshape([150,150,1])
+# ipdb.set_trace()
+modelType = neuralNetModelSHLight['type']
+param_values = neuralNetModelSHLight['params']
+networkSH = lasagne_nn.load_network(model=modelType, param_values=param_values)
+lastHiddenLayer = lasagne.layers.get_all_layers(networkSH)[-2]
+inputLayer = lasagne.layers.get_all_layers(networkSH)[0]
+
+chThSHFun = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=lasagne.layers.get_output(lastHiddenLayer), opendr_input=renderer - meanImage, dim_output = 9)
+chThSHFunGT = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=lasagne.layers.get_output(lastHiddenLayer), opendr_input=rendererGT - meanImage, dim_output = 9)
+
+nnSHError = ch.sum((chThSHFun - chThSHFunGT)**2)
+ipdb.set_trace()
+
 if 'neuralNetModelSHLight' in parameterRecognitionModels:
     SHModel = 'neuralNetModelSHLight'
     # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
@@ -462,6 +480,9 @@ if not os.path.exists(resultDir + 'imgs/'):
     os.makedirs(resultDir + 'imgs/')
 if not os.path.exists(resultDir +  'imgs/samples/'):
     os.makedirs(resultDir + 'imgs/samples/')
+
+
+
 
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
 azsPred = np.arctan2(sinAzsPred, cosAzsPred)
@@ -624,7 +645,6 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
         rendererGT[:] = srgb2lin(images[test_i])
 
-
         if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/'):
             os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/')
 
@@ -644,6 +664,10 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
 
                 color = vColorsPred[test_i]
+
+                color = testVColorGT[test_i] + nearGTOffsetVColor
+                az = testAzsRel[test_i] + nearGTOffsetRelAz
+                el = testElevsGT[test_i] + nearGTOffsetEl
                 lightCoefficientsRel = relLightCoefficientsGTPred[test_i]
                 # color = testVColorGT[test_i]
                 # lightCoefficientsGTRel = testLightCoefficientsGTRel[test_i]
@@ -798,7 +822,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 method=1
                 stds[:] = 0.1
                 options={'disp':False, 'maxiter':50}
-                free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+
+                free_variables = [ nnSHError]
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
             if errorFun.r < bestModelLik:

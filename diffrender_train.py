@@ -17,8 +17,8 @@ import skimage
 import h5py
 import ipdb
 import pickle
-# import lasagne_nn
-# import theano
+import lasagne_nn
+import theano
 
 #########################################
 # Initialization ends here
@@ -27,8 +27,8 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train3'
-experimentPrefix = 'train3'
+gtPrefix = 'train4'
+experimentPrefix = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -96,12 +96,12 @@ trainElevsGT = dataElevsGT
 trainComponentsGTRel = dataComponentsGTRel
 trainVColorGT = dataVColorGT
 
-loadFromHdf5 = False
+loadFromHdf5 = True
 
 print("Reading images.")
 
 # if loadFromHdf5:
-images = readImages(imagesDir, allDataIds, loadFromHdf5)
+images = readImages(imagesDir, trainSet, loadFromHdf5)
 # images = readImages(imagesDir, trainSet, loadFromHdf5)
 
 loadHogFeatures = False
@@ -128,22 +128,20 @@ if onlySynthetic:
 
 # print("Extracting Zernike features.")
 #
-numCoeffs=200
-# numTrees = 400
-win=40
-if loadZernikeFeatures:
-    trainZernikeCoeffs =  np.load(gtDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy')[trainSet]
-else:
-    print("Extracting Zernike features.")
-    batchSize = 1000
-
-    trainZernikeCoeffs = np.empty([images.shape[0], numCoeffs])
-    for batch in range(int(images.shape[0]/batchSize)):
-        trainZernikeCoeffs[batchSize*batch:batchSize*batch + batchSize] = image_processing.zernikeProjectionGray(images[batchSize*batch:batchSize*batch + batchSize], numCoeffs=numCoeffs, win=win)
-    np.save(gtDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + synthPrefix + '.npy', trainZernikeCoeffs)
-    trainZernikeCoeffs = trainZernikeCoeffs[trainSet]
-
-ipdb.set_trace()
+# numCoeffs=200
+# # numTrees = 400
+# win=40
+# if loadZernikeFeatures:
+#     trainZernikeCoeffs =  np.load(gtDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + '.npy')[trainSet]
+# else:
+#     print("Extracting Zernike features.")
+#     batchSize = 1000
+#
+#     trainZernikeCoeffs = np.empty([images.shape[0], numCoeffs])
+#     for batch in range(int(images.shape[0]/batchSize)):
+#         trainZernikeCoeffs[batchSize*batch:batchSize*batch + batchSize] = image_processing.zernikeProjectionGray(images[batchSize*batch:batchSize*batch + batchSize], numCoeffs=numCoeffs, win=win)
+#     np.save(gtDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + synthPrefix + '.npy', trainZernikeCoeffs)
+#     trainZernikeCoeffs = trainZernikeCoeffs[trainSet]
 
 #
 # trainHogfeatures = hogfeatures[trainSet]
@@ -152,11 +150,37 @@ ipdb.set_trace()
 parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF'])
 # parameterTrainSet = set(['vcolorsRF', 'spherical_harmonicsRF'])
 # parameterTrainSet = set(['spherical_harmonicsZernike'])
-parameterTrainSet = set(['spherical_harmonicsZernike'])
+# parameterTrainSet = set(['spherical_harmonicsZernike'])
 # parameterTrainSet = set(['spherical_harmonicsNN'])
-# parameterTrainSet = set(['spherical_harmonicsNN2'])
+parameterTrainSet = set(['poseNN'])
 
 print("Training recognition models.")
+
+if 'poseNN' in parameterTrainSet:
+    print("Training NN SH Components")
+    validRatio = 0.9
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    grayTrainImages =  0.3*images[trainValSet][:,:,:,0] + 0.59*images[trainValSet][:,:,:,1] + 0.11*images[trainValSet][:,:,:,2]
+    grayValidImages =  0.3*images[validSet][:,:,:,0] + 0.59*images[validSet][:,:,:,1] + 0.11*images[validSet][:,:,:,2]
+    grayTrainImages = grayTrainImages[:,None, :,:]
+    grayValidImages = grayValidImages[:,None, :,:]
+    # import sys
+    # sys.exit("NN")
+
+    modelPath=experimentDir + 'neuralNetModelPose.pickle'
+
+    poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
+
+    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), modelType='cnn_pose', num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath)
+
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(SHNNmodel, pfile)
+
+
 
 if 'azimuthsRF' in parameterTrainSet:
     print("Training RFs Cos Azs")
