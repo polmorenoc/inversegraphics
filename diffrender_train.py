@@ -174,11 +174,11 @@ if 'poseNN' in parameterTrainSet:
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 
-    SHNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), modelType='cnn_pose', num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath)
+    poseNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), modelType='cnn_pose', num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath)
 
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
-        pickle.dump(SHNNmodel, pfile)
+        pickle.dump(poseNNmodel, pfile)
 
 
 

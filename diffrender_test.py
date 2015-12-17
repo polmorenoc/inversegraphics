@@ -22,6 +22,8 @@ from utils import *
 import OpenGL.GL as GL
 import light_probes
 from OpenGL import contextdata
+import theano
+# theano.sandbox.cuda.use('cpu')
 import lasagne
 import lasagne_nn
 
@@ -207,19 +209,19 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'tmp_nnoptimization_sh'
+testPrefix = 'train4_opt_rfpred_nnpose_deterministic'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','randomForestSHZernike' ])
-parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','constantSHLight' ])
+parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','neuralNetModelSHLight' ])
+parameterRecognitionModels = set(['neuralNetPose', 'linearRegressionVColors','neuralNetModelSHLight' ])
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
 gtPrefix = 'train4'
 experimentPrefix = 'train4'
 trainPrefix = 'train4'
-trainPrefixPose = 'train2'
+trainPrefixPose = 'train4'
 trainPrefixVColor = 'train4'
 trainPrefixLightCoeffs = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
@@ -314,8 +316,8 @@ testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT
 
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
-loadHogFeatures = True
-loadZernikeFeatures = True
+loadHogFeatures = False
+loadZernikeFeatures = False
 
 if loadHogFeatures:
     hogfeatures = np.load(featuresDir  +  'hog' + synthPrefix + '.npy')
@@ -325,8 +327,8 @@ if loadZernikeFeatures:
     win=40
     zernikefeatures = np.load(featuresDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + synthPrefix + '.npy')
 
-testHogfeatures = hogfeatures[testSet]
-testZernikefeatures = zernikefeatures[testSet]
+# testHogfeatures = hogfeatures[testSet]
+# testZernikefeatures = zernikefeatures[testSet]
 # testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
@@ -366,6 +368,26 @@ nearGTOffsetLighCoeffs = np.zeros(9)
 nearGTOffsetVColor = np.zeros(3)
 
 #Load trained recognition models
+
+if 'neuralNetPose' in parameterRecognitionModels:
+    SHModel = ""
+
+    with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+        neuralNetModelSHLight = pickle.load(pfile)
+
+    meanImage = neuralNetModelSHLight['mean']
+    # ipdb.set_trace()
+    modelType = neuralNetModelSHLight['type']
+    param_values = neuralNetModelSHLight['params']
+    grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+    grayTestImages = grayTestImages[:,None, :,:]
+    grayTestImages = grayTestImages - meanImage
+
+    posePredictions = lasagne_nn.get_predictions(grayTestImages, model=modelType, param_values=param_values)
+    cosAzsPred = posePredictions[:,0]
+    sinAzsPred = posePredictions[:,1]
+    cosElevsPred = posePredictions[:,2]
+    sinElevsPred = posePredictions[:,3]
 
 if 'randForestAzs' in parameterRecognitionModels:
     with open(trainModelsDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
@@ -415,24 +437,38 @@ if 'medianVColors' in parameterRecognitionModels:
     vColorsPred = np.median(imagesWin.reshape([images.shape[0],-1,3]), axis=1)/1.4
     # return color
 
+import theano
+import theano.tensor as T
 SHModel = ""
 
-with open(trainModelsDirLightCoeffs + 'neuralNetModelRelSHLight.pickle', 'rb') as pfile:
-    neuralNetModelSHLight = pickle.load(pfile)
+with open(trainModelsDirLightCoeffs + 'neuralNetModelPose.pickle', 'rb') as pfile:
+    neuralNetModelPose = pickle.load(pfile)
 
-meanImage = neuralNetModelSHLight['mean'].reshape([150,150,1])
+meanImage = neuralNetModelPose['mean'].reshape([150,150])
 # ipdb.set_trace()
-modelType = neuralNetModelSHLight['type']
-param_values = neuralNetModelSHLight['params']
-networkSH = lasagne_nn.load_network(model=modelType, param_values=param_values)
-lastHiddenLayer = lasagne.layers.get_all_layers(networkSH)[-2]
-inputLayer = lasagne.layers.get_all_layers(networkSH)[0]
+modelType = neuralNetModelPose['type']
+param_values = neuralNetModelPose['params']
+network = lasagne_nn.load_network(model=modelType, param_values=param_values)
+layer = lasagne.layers.get_all_layers(network)[8]
+inputLayer = lasagne.layers.get_all_layers(network)[0]
+layer_output = lasagne.layers.get_output(layer, deterministic=True)
+dim_output= layer.output_shape[1]
 
-chThSHFun = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=lasagne.layers.get_output(lastHiddenLayer), opendr_input=renderer - meanImage, dim_output = 9)
-chThSHFunGT = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=lasagne.layers.get_output(lastHiddenLayer), opendr_input=rendererGT - meanImage, dim_output = 9)
+rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+chThFun = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output)
+chThFunGT = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGrayGT - meanImage, dim_output = dim_output)
 
-nnSHError = ch.sum((chThSHFun - chThSHFunGT)**2)
-ipdb.set_trace()
+chThFun.dr_wrt(chThFun.opendr_input)
+# chThFun.old_grads()
+
+# chNNAz = 2*ch.arctan(chThSHFun[1]/(ch.sqrt(chThSHFun[0]**2 + chThSHFun[1]**2) + chThSHFun[0]))
+# chNNEl = 2*ch.arctan(chThSHFun[3]/(ch.sqrt(chThSHFun[2]**2 + chThSHFun[3]**2) + chThSHFun[2]))
+#
+# chNNAzGT = 2*ch.arctan(chThSHFunGT[1]/(ch.sqrt(chThSHFunGT[0]**2 + chThSHFunGT[1]**2) + chThSHFunGT[0]))
+# chNNElGT = 2*ch.arctan(chThSHFunGT[3]/(ch.sqrt(chThSHFunGT[2]**2 + chThSHFunGT[3]**2) + chThSHFunGT[2]))
+
+nnPoseError = ch.sum((chThFun - chThFunGT)**2)
 
 if 'neuralNetModelSHLight' in parameterRecognitionModels:
     SHModel = 'neuralNetModelSHLight'
@@ -480,8 +516,6 @@ if not os.path.exists(resultDir + 'imgs/'):
     os.makedirs(resultDir + 'imgs/')
 if not os.path.exists(resultDir +  'imgs/samples/'):
     os.makedirs(resultDir + 'imgs/samples/')
-
-
 
 
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
@@ -663,11 +697,10 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 az = azsPred[test_i]
                 el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
 
-                color = vColorsPred[test_i]
+                # color = vColorsPred[test_i]
 
-                color = testVColorGT[test_i] + nearGTOffsetVColor
-                az = testAzsRel[test_i] + nearGTOffsetRelAz
-                el = testElevsGT[test_i] + nearGTOffsetEl
+                color = testVColorGT[test_i]
+
                 lightCoefficientsRel = relLightCoefficientsGTPred[test_i]
                 # color = testVColorGT[test_i]
                 # lightCoefficientsGTRel = testLightCoefficientsGTRel[test_i]
@@ -692,10 +725,10 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             #
             # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_reconstructed'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-            chAz[:] = az.copy()
-            chEl[:] = el.copy()
-            chVColors[:] = color.copy()
-            chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+            chAz[:] = az
+            chEl[:] = el
+            chVColors[:] = color
+            chLightSHCoeffs[:] = lightCoefficientsRel
 
             #Update all error functions with the right renderers.
             # negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
@@ -801,9 +834,9 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                     previousAngles = np.vstack([previousAngles, np.array([[azsample, elsample],[chAz.r.copy(), chEl.r.copy()]])])
 
-            chAz[:] = az.copy()
-            chEl[:] = el.copy()
-            chVColors[:] = color.copy()
+            chAz[:] = az
+            chEl[:] = el
+            chVColors[:] = color
             chLightSHCoeffs[:] = lightCoefficientsRel.copy()
 
             # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
@@ -818,12 +851,14 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             if optimizationTypeDescr[optimizationType] == 'optimize':
                 print("** Minimizing intial predicted parameters. **")
                 model=1
-                errorFun = models[model]
+                # errorFun = models[model]
+                errorFun = nnPoseError
                 method=1
                 stds[:] = 0.1
-                options={'disp':False, 'maxiter':50}
 
-                free_variables = [ nnSHError]
+                options={'disp':False, 'maxiter':10}
+                # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+                free_variables = [ chAz, chEl]
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
             if errorFun.r < bestModelLik:

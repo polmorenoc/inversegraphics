@@ -26,10 +26,18 @@ class TheanoFunOnOpenDR(Ch):
 
     initialized = False
 
+
     def compileFunctions(self):
         import theano
+        import theano.tensor as T
         self.prediction_fn = theano.function([self.theano_input], self.theano_output)
-        self.grad_fns = [theano.function([self.theano_input], theano.gradient.grad(self.theano_output.flatten()[grad_i], self.theano_input)) for grad_i in range(self.dim_output)]
+        y = theano.tensor.as_tensor_variable(self.theano_output.ravel())
+        x = self.theano_input
+        # self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
+        self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
+        from theano.compile.nanguardmode import NanGuardMode
+        self.grad = theano.function([x], self.J, updates=updates, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+        # self.grad = theano.function([x], self.J, updates=updates, mode='FAST_RUN')
 
         self.initialized = True
 
@@ -38,21 +46,32 @@ class TheanoFunOnOpenDR(Ch):
             self.compileFunctions()
 
         x = self.opendr_input.r
-        x_gray =  0.3*x[:,:,0] +  0.59*x[:,:,1] + 0.11*x[:,:,2]
-        output = self.prediction_fn(x_gray[None,None, :,:].astype(np.float32))
 
-        return output
+        output = self.prediction_fn(x[None,None, :,:].astype(np.float32))
+
+        return output.ravel()
 
     def compute_dr_wrt(self,wrt):
         if self.opendr_input is wrt:
             if not self.initialized:
                 self.compileFunctions()
             x = self.opendr_input.r
-            x_gray =  0.3*x[:,:,0] +  0.59*x[:,:,1] + 0.11*x[:,:,2]
-            jac = [sp.lil_matrix(np.array(grad_fun(x_gray[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
-            return sp.vstack(jac).tocsr()
+            jac = self.grad(x[None,None,:,:].astype(np.float32)).squeeze().reshape([self.dim_output,self.opendr_input.r.size])
 
+            return sp.csr.csr_matrix(jac)
         return None
+
+    def old_grads(self):
+        import theano
+        import theano.tensor as T
+        self.grad_fns = [theano.function([self.theano_input], theano.gradient.grad(self.theano_output.flatten()[grad_i], self.theano_input)) for grad_i in range(self.dim_output)]
+        x = self.opendr_input.r
+        jac = [sp.lil_matrix(np.array(grad_fun(x[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
+
+        return sp.vstack(jac).tocsr()
+
+
+
 
 def recoverAmbientIntensities(hdritems, gtDataset, clampedCosCoeffs):
     hdrscoeffs = np.zeros([100, 9,3])
