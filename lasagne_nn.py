@@ -293,7 +293,7 @@ def build_cnn_pose(input_var=None):
 
     return network
 
-def build_cnn_pose_pred(input_var=None):
+def build_cnn_pose(input_var=None):
     # As a third model, we'll create a CNN of two convolution + pooling stages
     # and a fully-connected hidden layer in front of the output layer.
 
@@ -384,7 +384,7 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
         yield inputs[excerpt], targets[excerpt]
 
 
-def load_network(model='cnn', param_values=[]):
+def load_network(modelType='cnn', param_values=[]):
     # Load the dataset
 
     # Prepare Theano variables for inputs and targets
@@ -392,65 +392,43 @@ def load_network(model='cnn', param_values=[]):
 
     # Create neural network model (depending on first command line parameter)
     print("Building model and compiling functions...")
-    if model == 'mlp':
+    if modelType == 'mlp':
         network = build_mlp(input_var)
-    elif model.startswith('custom_mlp:'):
-        depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
+    elif modelType.startswith('custom_mlp:'):
+        depth, width, drop_in, drop_hid = modelType.split(':', 1)[1].split(',')
         network = build_custom_mlp(input_var, int(depth), int(width),
                                    float(drop_in), float(drop_hid))
-    elif model == 'cnn':
+    elif modelType == 'cnn':
         network = build_cnn(input_var)
-    elif model == 'cnn2':
+    elif modelType == 'cnn2':
         network = build_cnn2(input_var)
-    elif model == 'cnn_pose':
-        network = build_cnn_pose_pred(input_var)
+    elif modelType == 'cnn_pose':
+        network = build_cnn_pose(input_var)
     else:
-        print("Unrecognized model type %r." % model)
+        print("Unrecognized model type %r." % modelType)
 
-
-    lasagne.layers.set_all_param_values(network, param_values)
+# parameters at each training step. Here, we'll use Stochastic Gradient
+    # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
+    if param_values == []:
+        params = lasagne.layers.get_all_params(network, trainable=True)
+    else:
+        lasagne.layers.set_all_param_values(network, param_values)
 
     return network
 
 
 
-def get_predictions(X_test, model='cnn', param_values=[]):
+def get_prediction_fun(network):
     # Load the dataset
 
     # Prepare Theano variables for inputs and targets
-    input_var = T.tensor4('inputs')
+    input_var = lasagne.layers.get_all_layers(network)[0].input_var
 
-    # Create neural network model (depending on first command line parameter)
-    print("Building model and compiling functions...")
-    if model == 'mlp':
-        network = build_mlp(input_var)
-    elif model.startswith('custom_mlp:'):
-        depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
-        network = build_custom_mlp(input_var, int(depth), int(width),
-                                   float(drop_in), float(drop_hid))
-    elif model == 'cnn':
-        network = build_cnn(input_var)
-    elif model == 'cnn2':
-        network = build_cnn2(input_var)
-    elif model == 'cnn_pose':
-        network = build_cnn_pose(input_var)
-    else:
-        print("Unrecognized model type %r." % model)
-
-    # Create a loss expression for training, i.e., a scalar objective we want
-    # to minimize (for our multi-class problem, it is the cross-entropy loss):
-    # And load them again later on like this:
-
-    lasagne.layers.set_all_param_values(network, param_values)
-
-    prediction = lasagne.layers.get_output(network)
+    prediction = lasagne.layers.get_output(network, deterministic=True)
 
     prediction_fn = theano.function([input_var], prediction)
 
-    y_pred = prediction_fn(X_test)
-
-
-    return y_pred
+    return prediction_fn
 
     # After training, we compute and print the test error:
     # test_err = 0
@@ -472,11 +450,11 @@ def get_predictions(X_test, model='cnn', param_values=[]):
 # more functions to better separate the code, but it wouldn't make it any
 # easier to read.
 
-def train_nn(X_train, y_train, X_val, y_val, modelType='cnn', num_epochs=500, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle'):
+def train_nn(X_train, y_train, X_val, y_val, meanImage, network, modelType = 'cnn', num_epochs=500, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle', param_values=[]):
     # Load the dataset
 
     #Assume X_train is n_batches x num Channels x height x width
-    meanImage = np.mean(X_train, axis=0)
+
     X_train = X_train - meanImage
     X_val = X_val - meanImage
 
@@ -485,26 +463,8 @@ def train_nn(X_train, y_train, X_val, y_val, modelType='cnn', num_epochs=500, sa
     model['mean'] = meanImage
     model['type'] = modelType
 
-    # Prepare Theano variables for inputs and targets
-    input_var = T.tensor4('inputs')
-    target_var = T.fmatrix('targets')
-
-    # Create neural network model (depending on first command line parameter)
-    print("Building model and compiling functions...")
-    if modelType == 'mlp':
-        network = build_mlp(input_var)
-    elif modelType.startswith('custom_mlp:'):
-        depth, width, drop_in, drop_hid = modelType.split(':', 1)[1].split(',')
-        network = build_custom_mlp(input_var, int(depth), int(width),
-                                   float(drop_in), float(drop_hid))
-    elif modelType == 'cnn':
-        network = build_cnn(input_var)
-    elif modelType == 'cnn2':
-        network = build_cnn2(input_var)
-    elif modelType == 'cnn_pose':
-        network = build_cnn_pose(input_var)
-    else:
-        print("Unrecognized modelType type %r." % modelType)
+    input_var = lasagne.layers.get_all_layers(network)[0].input_var
+    target_var = lasagne.layers.get_output(network, deterministic=True)
 
     # Create a loss expression for training, i.e., a scalar objective we want
     # to minimize (for our multi-class problem, it is the cross-entropy loss):
@@ -513,10 +473,11 @@ def train_nn(X_train, y_train, X_val, y_val, modelType='cnn', num_epochs=500, sa
     loss = loss.mean()
     # We could add some weight decay as well here, see lasagne.regularization.
 
-    # Create update expressions for training, i.e., how to modify the
-    # parameters at each training step. Here, we'll use Stochastic Gradient
-    # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
+        # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
+    if param_values != []:
+        lasagne.layers.set_all_param_values(network, param_values)
     params = lasagne.layers.get_all_params(network, trainable=True)
+
     updates = lasagne.updates.nesterov_momentum(
             loss, params, learning_rate=0.01, momentum=0.9)
 
@@ -542,7 +503,7 @@ def train_nn(X_train, y_train, X_val, y_val, modelType='cnn', num_epochs=500, sa
     print("Starting training...")
     # We iterate over epochs:
 
-    patience = 10
+    patience = 20
     best_valid = np.inf
     best_valid_epoch = 0
     best_weights = None
@@ -594,3 +555,108 @@ def train_nn(X_train, y_train, X_val, y_val, modelType='cnn', num_epochs=500, sa
     return model
 
 
+
+#
+#
+# def train_nn_batches(, network, modelType = 'cnn', num_epochs=500, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle'):
+#     # Load the dataset
+#
+#
+#     X_train, y_train, X_val, y_val
+#     #Assume X_train is n_batches x num Channels x height x width
+#     meanImage = np.mean(X_train, axis=0)
+#     X_train = X_train - meanImage
+#     X_val = X_val - meanImage
+#
+#     model = {}
+#
+#     model['mean'] = meanImage
+#     model['type'] = modelType
+#
+#     input_var = lasagne.layers.get_all_layers(network)[0].input_var
+#     target_var = lasagne.layers.get_output(network, deterministic=True)
+#
+#     # Create a loss expression for training, i.e., a scalar objective we want
+#     # to minimize (for our multi-class problem, it is the cross-entropy loss):
+#     prediction = lasagne.layers.get_output(network)
+#     loss = lasagne.objectives.squared_error(prediction, target_var)
+#     loss = loss.mean()
+#     # We could add some weight decay as well here, see lasagne.regularization.
+#
+#     params = lasagne.layers.get_all_params(network, trainable=True)     # Create update expressions for training, i.e., how to modify the
+#
+#     updates = lasagne.updates.nesterov_momentum(
+#             loss, params, learning_rate=0.01, momentum=0.9)
+#
+#     # Create a loss expression for validation/testing. The crucial difference
+#     # here is that we do a deterministic forward pass through the network,
+#     # disabling dropout layers.
+#     test_prediction = lasagne.layers.get_output(network, deterministic=True)
+#     test_loss = lasagne.objectives.squared_error(test_prediction,
+#                                                             target_var)
+#     test_loss = test_loss.mean()
+#     # As a bonus, also create an expression for the classification accuracy:
+#     # test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
+#     #                   dtype=theano.config.floatX)
+#
+#     # Compile a function performing a training step on a mini-batch (by giving
+#     # the updates dictionary) and returning the corresponding training loss:
+#     train_fn = theano.function([input_var, target_var], loss, updates=updates)
+#
+#     # Compile a second function computing the validation loss and accuracy:
+#     val_fn = theano.function([input_var, target_var], test_loss)
+#
+#     # Finally, launch the training loop.
+#     print("Starting training...")
+#     # We iterate over epochs:
+#
+#     patience = 10
+#     best_valid = np.inf
+#     best_valid_epoch = 0
+#     best_weights = None
+#
+#     for epoch in range(num_epochs):
+#
+#         # In each epoch, we do a full pass over the training data:
+#         train_err = 0
+#         train_batches = 0
+#         start_time = time.time()
+#         for batch in iterate_minibatches(X_train, y_train, 128, shuffle=True):
+#             inputs, targets = batch
+#             train_err += train_fn(inputs, targets)
+#             train_batches += 1
+#
+#         # And a full pass over the validation data:
+#         val_err = 0
+#         val_batches = 0
+#         for batch in iterate_minibatches(X_val, y_val, 128, shuffle=False):
+#             inputs, targets = batch
+#             err = val_fn(inputs, targets)
+#             val_err += err
+#             val_batches += 1
+#
+#         if val_err < best_valid:
+#             best_weights = lasagne.layers.get_all_param_values(network)
+#             if saveModelAtEpoch:
+#                 model['params'] = best_weights
+#                 with open(modelPath, 'wb') as pfile:
+#                     pickle.dump(model, pfile)
+#             best_valid = val_err
+#             best_valid_epoch = epoch
+#
+#         elif best_valid_epoch + patience < epoch:
+#             print("Early stopping.")
+#             # print("Best valid loss was {:.6f} at epoch {}.".format(
+#             #     best_valid, best_valid_epoch))
+#             break
+#
+#         # Then we print the results for this epoch:
+#         print("Epoch {} of {} took {:.3f}s".format(
+#             epoch + 1, num_epochs, time.time() - start_time))
+#         print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
+#         print("  validation loss:\t\t{:.6f}".format(val_err / val_batches))
+#
+#
+#     model['params'] = best_weights
+#
+#     return model

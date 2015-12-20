@@ -18,23 +18,34 @@ def writeImagesHdf5(imagesDir, imageSet):
     gtDataFile.create_dataset("images", data=images)
     gtDataFile.close()
 
-def readImages(imagesDir, imageSet, loadFromHdf5):
+def readImages(imagesDir, imageSet, loadGray=False, loadFromHdf5=False):
     if loadFromHdf5:
         if os.path.isfile(imagesDir + 'images.h5'):
             gtDataFile = h5py.File(imagesDir + 'images.h5', 'r')
-            return gtDataFile["images"][:][imageSet].astype(np.float32)/255.0
+            if not loadGray:
+                return gtDataFile["images"][:][imageSet].astype(np.float32)/255.0
+            else:
+                gtData = gtDataFile["images"][:][imageSet].astype(np.float32)/255.0
+                return 0.3*gtData[:,:,:,0] + 0.59*gtData[:,:,:,1] + 0.11*gtData[:,:,:,2]
     else:
         image = skimage.io.imread(imagesDir + 'im' + str(imageSet[0]) + '.jpeg')
         width = image.shape[1]
         height = image.shape[0]
-        images = np.zeros([len(imageSet), height, width, 3], dtype=np.float32)
+        if not loadGray:
+            images = np.zeros([len(imageSet), height, width, 3], dtype=np.float32)
+        else:
+            images = np.zeros([len(imageSet), height, width], dtype=np.float32)
         for imageit, imageid  in enumerate(imageSet):
             if os.path.isfile(imagesDir + 'im' + str(imageid) + '.jpeg'):
                 image = skimage.io.imread(imagesDir + 'im' + str(imageid) + '.jpeg')
             else:
                 print("Image " + str(imageid) + " does not exist!")
                 image = np.zeros_like(image)
-            images[imageit, :, :, :] = image/255.0
+            image = image/255.0
+            if not loadGray:
+                images[imageit, :, :, :] =  image
+            else:
+                images[imageit, :, :] =  0.3*image[:,:,0] + 0.59*image[:,:,1] + 0.11*image[:,:,2]
 
         return images
 

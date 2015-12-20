@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 
 #Main script options:
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -219,7 +219,7 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train3'
+prefix = 'train5'
 
 print("Creating Ground Truth")
 
@@ -273,9 +273,9 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-trainSize = 10000
+trainSize = 400000
 
-renderTeapotsList = np.arange(len(teapots))[0:1]
+renderTeapotsList = np.arange(len(teapots))[:]
 
 # for hdrit, hdri in enumerate(list(envMapDic.items())):
 #     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':

@@ -21,22 +21,34 @@ from chumpy import depends_on, Ch
 import scipy.sparse as sp
 
 class TheanoFunOnOpenDR(Ch):
-    terms = 'theano_output', 'theano_input', 'dim_output'
+    terms = 'opendr_input_gt'
     dterms = 'opendr_input'
 
     initialized = False
 
 
-    def compileFunctions(self):
+    def compileFunctions(self, theano_output, theano_input, dim_output, theano_input_gt, theano_output_gt):
         import theano
         import theano.tensor as T
-        self.prediction_fn = theano.function([self.theano_input], self.theano_output)
-        y = theano.tensor.as_tensor_variable(self.theano_output.ravel())
-        x = self.theano_input
+        self.prediction_fn = theano.function([theano_input], theano_output)
+
         # self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
-        self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
+        # self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
+
+        self.prediction_fn_gt = theano.function([theano_input_gt], theano_output_gt)
+
+        x = theano_input
+        gt_output = T.vector('gt_output')
+
+        # self.error = T.sum(theano_output + gt_output)
+        self.error = T.sum(T.pow(theano_output.ravel() - theano_output_gt.ravel(),2))
+
+        self.errorGrad = T.grad(self.error, x)
+
         from theano.compile.nanguardmode import NanGuardMode
-        self.grad = theano.function([x], self.J, updates=updates, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+        self.errorGrad_fun = theano.function([theano_input, theano_input_gt], self.errorGrad)
+        # self.error_fun = theano.function([theano_input, theano_input_gt], self.error, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+        self.error_fun = theano.function([theano_input, theano_input_gt], self.error)
         # self.grad = theano.function([x], self.J, updates=updates, mode='FAST_RUN')
 
         self.initialized = True
@@ -45,18 +57,31 @@ class TheanoFunOnOpenDR(Ch):
         if not self.initialized:
             self.compileFunctions()
 
-        x = self.opendr_input.r
+        x = self.opendr_input.r[None,None,:,:].astype(np.float32)
+        x_gt = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
+        # out_gt = self.predict_input_gt().ravel().astype(np.float32)
 
-        output = self.prediction_fn(x[None,None, :,:].astype(np.float32))
+        output = np.array(self.error_fun(x, x_gt))
 
+        return output.ravel()
+
+    def predict_input(self):
+        x = self.opendr_input.r[None,None,:,:].astype(np.float32)
+        output = self.prediction_fn(x)
+        return output.ravel()
+
+    def predict_input_gt(self):
+        x = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
+        output = self.prediction_fn_gt(x)
         return output.ravel()
 
     def compute_dr_wrt(self,wrt):
         if self.opendr_input is wrt:
             if not self.initialized:
                 self.compileFunctions()
-            x = self.opendr_input.r
-            jac = self.grad(x[None,None,:,:].astype(np.float32)).squeeze().reshape([self.dim_output,self.opendr_input.r.size])
+            x = self.opendr_input.r[None,None,:,:].astype(np.float32)
+            x_gt = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
+            jac = np.array(self.errorGrad_fun(x,x_gt)).squeeze().reshape([1,self.opendr_input.r.size])
 
             return sp.csr.csr_matrix(jac)
         return None
@@ -69,8 +94,6 @@ class TheanoFunOnOpenDR(Ch):
         jac = [sp.lil_matrix(np.array(grad_fun(x[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
 
         return sp.vstack(jac).tocsr()
-
-
 
 
 def recoverAmbientIntensities(hdritems, gtDataset, clampedCosCoeffs):

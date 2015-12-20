@@ -18,6 +18,7 @@ import h5py
 import ipdb
 import pickle
 import lasagne_nn
+import lasagne
 import theano
 
 #########################################
@@ -27,8 +28,8 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4'
-experimentPrefix = 'train4'
+gtPrefix = 'train5'
+experimentPrefix = 'train5_out_normal'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -36,8 +37,6 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 allDataIds = gtDataFile[gtPrefix]['trainIds']
-if not os.path.isfile(experimentDir + 'train.npy'):
-    generateExperiment(len(allDataIds), experimentDir, 0.9, 1)
 
 onlySynthetic = True
 
@@ -53,6 +52,7 @@ if writeHdf5:
     writeImagesHdf5(imagesDir, allDataIds)
 
 trainSet = np.load(experimentDir + 'train.npy')
+
 
 #Delete as soon as finished with prototyping:
 # trainSet = trainSet[0:int(len(trainSet)/2)]
@@ -70,21 +70,22 @@ groundTruth = groundTruth[trainSet]
 dataAzsGT = groundTruth['trainAzsGT']
 dataObjAzsGT = groundTruth['trainObjAzsGT']
 dataElevsGT = groundTruth['trainElevsGT']
-dataLightAzsGT = groundTruth['trainLightAzsGT']
-dataLightElevsGT = groundTruth['trainLightElevsGT']
-dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
-dataVColorGT = groundTruth['trainVColorGT']
-dataScenes = groundTruth['trainScenes']
+# dataLightAzsGT = groundTruth['trainLightAzsGT']
+# dataLightElevsGT = groundTruth['trainLightElevsGT']
+# dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
+# dataVColorGT = groundTruth['trainVColorGT']
+# dataScenes = groundTruth['trainScenes']
 dataTeapotIds = groundTruth['trainTeapotIds']
-dataEnvMaps = groundTruth['trainEnvMaps']
-dataOcclusions = groundTruth['trainOcclusions']
-dataTargetIndices = groundTruth['trainTargetIndices']
-dataComponentsGT = groundTruth['trainComponentsGT']
-dataComponentsGTRel = groundTruth['trainComponentsGTRel']
-dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
-dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
-dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
+# dataEnvMaps = groundTruth['trainEnvMaps']
+# dataOcclusions = groundTruth['trainOcclusions']
+# dataTargetIndices = groundTruth['trainTargetIndices']
+# dataComponentsGT = groundTruth['trainComponentsGT']
+# dataComponentsGTRel = groundTruth['trainComponentsGTRel']
+# dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+# dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+# dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
+
 
 gtDtype = groundTruth.dtype
 # gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,))]
@@ -93,16 +94,18 @@ gtDtype = groundTruth.dtype
 #
 trainAzsRel = np.mod(dataAzsGT - dataObjAzsGT, 2*np.pi)
 trainElevsGT = dataElevsGT
-trainComponentsGTRel = dataComponentsGTRel
-trainVColorGT = dataVColorGT
+# trainComponentsGTRel = dataComponentsGTRel
+# trainVColorGT = dataVColorGT
 
-loadFromHdf5 = True
+loadFromHdf5 = False
 
 print("Reading images.")
 
 # if loadFromHdf5:
-images = readImages(imagesDir, trainSet, loadFromHdf5)
 # images = readImages(imagesDir, trainSet, loadFromHdf5)
+# images = readImages(imagesDir, trainSet, loadFromHdf5)
+loadGray = True
+grayImages = readImages(imagesDir, trainSet, loadGray, loadFromHdf5)
 
 loadHogFeatures = False
 loadFourierFeatures = False
@@ -157,30 +160,46 @@ parameterTrainSet = set(['poseNN'])
 print("Training recognition models.")
 
 if 'poseNN' in parameterTrainSet:
+
+    network = lasagne_nn.load_network(modelType='cnn_pose', param_values=[])
+
     print("Training NN SH Components")
     validRatio = 0.9
     trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
     validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
     # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
 
-    grayTrainImages =  0.3*images[trainValSet][:,:,:,0] + 0.59*images[trainValSet][:,:,:,1] + 0.11*images[trainValSet][:,:,:,2]
-    grayValidImages =  0.3*images[validSet][:,:,:,0] + 0.59*images[validSet][:,:,:,1] + 0.11*images[validSet][:,:,:,2]
+    grayTrainImages =  grayImages[trainValSet][:,:,:]
+    grayValidImages =  grayImages[validSet][:,:,:]
     grayTrainImages = grayTrainImages[:,None, :,:]
     grayValidImages = grayValidImages[:,None, :,:]
     # import sys
     # sys.exit("NN")
+    param_values = []
+    modelType = 'cnn_pose'
+    fineTune = False
+    pretrainedExperimentDir =  'experiments/train4/'
+    if fineTune:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPose.pickle'
+        with open(pretrainedExperimentDir + 'neuralNetModelPose.pickle', 'rb') as pfile:
+            neuralNetModelPose = pickle.load(pfile)
 
-    modelPath=experimentDir + 'neuralNetModelPose.pickle'
+        meanImage = neuralNetModelPose['mean']
+        # ipdb.set_trace()
+        modelType = neuralNetModelPose['type']
+        param_values = neuralNetModelPose['params']
+    else:
+        meanImage = np.mean(grayTrainImages, axis=0)
+
+    modelPath=experimentDir + 'neuralNetModelPose_nopretrain.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 
-    poseNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), modelType='cnn_pose', num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath)
+    poseNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
 
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(poseNNmodel, pfile)
-
-
 
 if 'azimuthsRF' in parameterTrainSet:
     print("Training RFs Cos Azs")
