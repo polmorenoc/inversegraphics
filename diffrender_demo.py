@@ -97,7 +97,7 @@ dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 readDataId = 1
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[0:5]
+renderTeapotsList = np.arange(len(teapots))[:]
 
 sceneNumber = dataScenes[readDataId]
 

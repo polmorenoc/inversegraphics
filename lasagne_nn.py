@@ -22,9 +22,10 @@ import numpy as np
 import theano
 import theano.tensor as T
 import pickle
+import lasagne.layers.dnn
 import lasagne
 from lasagne.layers import InputLayer, DenseLayer, DropoutLayer
-# from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
+from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
 from lasagne.layers import MaxPool2DLayer as PoolLayer
 from lasagne.layers import LocalResponseNormalization2DLayer as NormLayer
 from lasagne.utils import floatX
@@ -119,7 +120,7 @@ def build_cnn(input_var=None):
 
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=32, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
@@ -131,7 +132,7 @@ def build_cnn(input_var=None):
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=32, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -162,7 +163,7 @@ def build_cnn_small(input_var=None):
 
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=16, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
@@ -174,7 +175,7 @@ def build_cnn_small(input_var=None):
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=16, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -205,7 +206,7 @@ def build_cnn2(input_var=None):
 
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=32, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
@@ -217,13 +218,13 @@ def build_cnn2(input_var=None):
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=32, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=32, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -254,7 +255,7 @@ def build_cnn_pose(input_var=None):
 
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=64, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
@@ -262,13 +263,13 @@ def build_cnn_pose(input_var=None):
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=64, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -287,7 +288,69 @@ def build_cnn_pose(input_var=None):
 
     # And, finally, the 10-unit output layer with 50% dropout on its inputs:
     network = lasagne.layers.DenseLayer(
+            network,
+            num_units=4,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    return network
+
+
+def build_cnn_pose_large(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    network = lasagne.layers.InputLayer(shape=(None, 1, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional layers.
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            network, num_filters=96, filter_size=(7, 7),
+            nonlinearity=lasagne.nonlinearities.rectify,
+            W=lasagne.init.GlorotUniform())
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(3, 3))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network = ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network = ConvLayer(
+            network, num_filters=512, filter_size=(3, 3),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network = ConvLayer(
+            network, num_filters=512, filter_size=(3, 3),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network = ConvLayer(
+            network, num_filters=512, filter_size=(3, 3),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(3, 3))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
             lasagne.layers.dropout(network, p=.5),
+            num_units=4096,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=4096,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # And, finally, the 10-unit output layer with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            network,
             num_units=4,
             nonlinearity=lasagne.nonlinearities.linear)
 
@@ -303,22 +366,24 @@ def build_cnn_pose(input_var=None):
     # This time we do not apply input dropout, as it tends to work less well
     # for convolutional layers.
 
+
+
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=64, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
 
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=64, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network = lasagne.layers.Conv2DLayer(
+    network = ConvLayer(
             network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -337,7 +402,7 @@ def build_cnn_pose(input_var=None):
 
     # And, finally, the 10-unit output layer with 50% dropout on its inputs:
     network = lasagne.layers.DenseLayer(
-            lasagne.layers.dropout(network, p=.5),
+            network,
             num_units=4,
             nonlinearity=lasagne.nonlinearities.linear)
 
@@ -404,14 +469,14 @@ def load_network(modelType='cnn', param_values=[]):
         network = build_cnn2(input_var)
     elif modelType == 'cnn_pose':
         network = build_cnn_pose(input_var)
+    elif modelType == 'cnn_pose_large':
+        network = build_cnn_pose_large(input_var)
     else:
         print("Unrecognized model type %r." % modelType)
 
 # parameters at each training step. Here, we'll use Stochastic Gradient
     # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
-    if param_values == []:
-        params = lasagne.layers.get_all_params(network, trainable=True)
-    else:
+    if param_values:
         lasagne.layers.set_all_param_values(network, param_values)
 
     return network
@@ -474,8 +539,9 @@ def train_nn(X_train, y_train, X_val, y_val, meanImage, network, modelType = 'cn
     # We could add some weight decay as well here, see lasagne.regularization.
 
         # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
-    if param_values != []:
+    if param_values:
         lasagne.layers.set_all_param_values(network, param_values)
+
     params = lasagne.layers.get_all_params(network, trainable=True)
 
     updates = lasagne.updates.nesterov_momentum(
@@ -494,9 +560,12 @@ def train_nn(X_train, y_train, X_val, y_val, meanImage, network, modelType = 'cn
 
     # Compile a function performing a training step on a mini-batch (by giving
     # the updates dictionary) and returning the corresponding training loss:
-    train_fn = theano.function([input_var, target_var], loss, updates=updates)
+    from theano.compile.nanguardmode import NanGuardMode
+    # train_fn = theano.function([input_var, target_var], loss, updates=updates, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+    train_fn = theano.function([input_var, target_var], loss)
 
     # Compile a second function computing the validation loss and accuracy:
+    # val_fn = theano.function([input_var, target_var], test_loss, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
     val_fn = theano.function([input_var, target_var], test_loss)
 
     # Finally, launch the training loop.

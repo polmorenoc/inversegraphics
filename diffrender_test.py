@@ -209,7 +209,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'train5_normalteapots_nnposepred_robust_render0'
+testPrefix = 'train4_nnposepred_robust_test'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -243,24 +243,24 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')[:200]
 
-# testSet = np.array([ 11230, 3235, 10711,  9775, 11230, 10255,  5060, 12784,  5410,  1341,14448, 12935, 13196,  6728,  9002,  7946,  1119,  5827,  4842,12435,  8152,  4745,  9512,  9641,  7165, 13950,  3567,   860,4105, 10330,  7218, 10176,  2310,  5325])
-testSetFixed = testSet
-whereBad = []
-for test_it, test_id in enumerate(testSet):
-    if test_id in ignore:
-        bad = np.where(testSetFixed==test_id)
-        testSetFixed = np.delete(testSetFixed, bad)
-        whereBad = whereBad + [bad]
-
-testSet = testSetFixed
-
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
 boolTestSet[testSet] = True
 testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
-groundTruth = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
-groundTruth[boolTestSet] = testGroundTruth
-groundTruth = groundTruth[testSet]
+groundTruthTest = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
+groundTruthTest[boolTestSet] = testGroundTruth
+groundTruth = groundTruthTest[testSet]
+dataTeapotIdsTest = groundTruth['trainTeapotIds']
+test = np.arange(len(testSet))
+
+# testSamplesIds= [2]
+# test = np.array([],dtype=np.uint16)
+# for testId in testSamplesIds:
+#     test = np.append(test, np.where(dataTeapotIdsTest == testId))
+#
+# groundTruth = groundTruth[test]
+#
+testSet = testSet[test]
 
 print("Reading experiment.")
 
@@ -284,6 +284,17 @@ dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
+
+# testSet = np.array([ 11230, 3235, 10711,  9775, 11230, 10255,  5060, 12784,  5410,  1341,14448, 12935, 13196,  6728,  9002,  7946,  1119,  5827,  4842,12435,  8152,  4745,  9512,  9641,  7165, 13950,  3567,   860,4105, 10330,  7218, 10176,  2310,  5325])
+testSetFixed = testSet
+whereBad = []
+for test_it, test_id in enumerate(testSet):
+    if test_id in ignore:
+        bad = np.where(testSetFixed==test_id)
+        testSetFixed = np.delete(testSetFixed, bad)
+        whereBad = whereBad + [bad]
+
+testSet = testSetFixed
 
 loadFromHdf5 = False
 
@@ -375,7 +386,7 @@ nearGTOffsetVColor = np.zeros(3)
 if 'neuralNetPose' in parameterRecognitionModels:
     poseModel = ""
 
-    with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'neuralNetModelPose_nopretrain.pickle', 'rb') as pfile:
         neuralNetModelPose = pickle.load(pfile)
 
     meanImage = neuralNetModelPose['mean']
@@ -393,6 +404,7 @@ if 'neuralNetPose' in parameterRecognitionModels:
     sinAzsPred = posePredictions[:,1]
     cosElevsPred = posePredictions[:,2]
     sinElevsPred = posePredictions[:,3]
+
 
 if 'randForestAzs' in parameterRecognitionModels:
     with open(trainModelsDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
@@ -879,7 +891,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                 options={'disp':False, 'maxiter':10}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-                free_variables = [ chAz, chEl]
+                free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
             if errorFun.r < bestModelLik:

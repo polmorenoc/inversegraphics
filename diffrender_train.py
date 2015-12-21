@@ -28,8 +28,8 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train5'
-experimentPrefix = 'train5_out_normal'
+gtPrefix = 'train4'
+experimentPrefix = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -97,7 +97,7 @@ trainElevsGT = dataElevsGT
 # trainComponentsGTRel = dataComponentsGTRel
 # trainVColorGT = dataVColorGT
 
-loadFromHdf5 = False
+loadFromHdf5 = True
 
 print("Reading images.")
 
@@ -160,8 +160,8 @@ parameterTrainSet = set(['poseNN'])
 print("Training recognition models.")
 
 if 'poseNN' in parameterTrainSet:
-
-    network = lasagne_nn.load_network(modelType='cnn_pose', param_values=[])
+    modelType = 'cnn_pose'
+    network = lasagne_nn.load_network(modelType=modelType, param_values=[])
 
     print("Training NN SH Components")
     validRatio = 0.9
@@ -176,8 +176,9 @@ if 'poseNN' in parameterTrainSet:
     # import sys
     # sys.exit("NN")
     param_values = []
-    modelType = 'cnn_pose'
-    fineTune = False
+
+    fineTune = True
+
     pretrainedExperimentDir =  'experiments/train4/'
     if fineTune:
         pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPose.pickle'
@@ -191,11 +192,12 @@ if 'poseNN' in parameterTrainSet:
     else:
         meanImage = np.mean(grayTrainImages, axis=0)
 
-    modelPath=experimentDir + 'neuralNetModelPose_nopretrain.pickle'
+    modelPath=experimentDir + 'neuralNetModelPosePretrainedTmp.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 
-    poseNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    ipdb.set_trace()
+    poseNNmodel = lasagne_nn.train_nn(grayTrainImages, poseGT[trainValSet].astype(np.float32), grayValidImages, poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=20, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
 
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:

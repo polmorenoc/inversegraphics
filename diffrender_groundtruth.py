@@ -273,7 +273,7 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-trainSize = 400000
+trainSize = 300000
 
 renderTeapotsList = np.arange(len(teapots))[:]
 
@@ -489,6 +489,7 @@ for sceneIdx in scenesToRender:
                     # updateEnviornmentMap(envMapFilename, scene)
 
                 for numTeapotTrain in range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList)))):
+                    print("New iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
                     ignore = False
                     chAmbientIntensityGT[:] = 0.75/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
                     phiOffset[:] = np.random.uniform(0,2*np.pi, 1)
