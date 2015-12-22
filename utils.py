@@ -6,27 +6,56 @@ import ipdb
 
 __author__ = 'pol'
 
-def writeImagesHdf5(imagesDir, imageSet):
+
+def writeImagesHdf5(imagesDir, writeDir, imageSet, writeGray=False ):
+    print("Writing HDF5 file")
     image = skimage.io.imread(imagesDir + 'im' + str(imageSet[0]) + '.jpeg')
+    imDtype = image.dtype
     width = image.shape[1]
     height = image.shape[0]
-    images = np.zeros([len(imageSet), height, width, 3], dtype=np.uint8)
+    if not writeGray:
+        gtDataFile = h5py.File(writeDir + 'images.h5', 'w')
+        images = np.array([], dtype = np.dtype('('+ str(height)+','+ str(width) +',3)uint8'))
+        gtDataset = gtDataFile.create_dataset("images", data=images, maxshape=(None,height,width, 3))
+        # images = np.zeros([len(imageSet), height, width, 3], dtype=np.uint8)
+    else:
+        imageGray = 0.3*image[:,:,0] + 0.59*image[:,:,1] + 0.11*image[:,:,2]
+        grayDtype = imageGray.dtype
+
+        gtDataFile = h5py.File(writeDir + 'images_gray.h5', 'w')
+        # images = np.zeros([], dtype=np.float32)
+        images = np.array([], dtype = np.dtype('('+ str(height)+','+ str(width) +')f'))
+        gtDataset = gtDataFile.create_dataset("images", data=images, maxshape=(None,height,width))
+
     for imageit, imageid  in enumerate(imageSet):
+        gtDataset.resize(gtDataset.shape[0]+1, axis=0)
+
         image = skimage.io.imread(imagesDir + 'im' + str(imageid) + '.jpeg').astype(np.uint8)
-        images[imageit, :, :, :] = image
-    gtDataFile = h5py.File(imagesDir + 'images.h5', 'w')
-    gtDataFile.create_dataset("images", data=images)
+        if not writeGray:
+            gtDataset[-1] = image
+        else:
+            image = image.astype(np.float32)/255.0
+            gtDataset[-1] = 0.3*image[:,:,0] + 0.59*image[:,:,1] + 0.11*image[:,:,2]
+
+        gtDataFile.flush()
+
     gtDataFile.close()
+    print("Ended writing HDF5 file")
 
 def readImages(imagesDir, imageSet, loadGray=False, loadFromHdf5=False):
     if loadFromHdf5:
-        if os.path.isfile(imagesDir + 'images.h5'):
-            gtDataFile = h5py.File(imagesDir + 'images.h5', 'r')
-            if not loadGray:
-                return gtDataFile["images"][:][imageSet].astype(np.float32)/255.0
-            else:
-                gtData = gtDataFile["images"][:][imageSet].astype(np.float32)/255.0
-                return 0.3*gtData[:,:,:,0] + 0.59*gtData[:,:,:,1] + 0.11*gtData[:,:,:,2]
+        if not loadGray:
+            if os.path.isfile(imagesDir + 'images.h5'):
+                gtDataFile = h5py.File(imagesDir + 'images.h5', 'r')
+                boolSet = np.zeros(gtDataFile["images"].shape[0]).astype(np.bool)
+                boolSet[imageSet] = True
+                return gtDataFile["images"][boolSet,:,:,:].astype(np.float32)/255.0
+        else:
+            if os.path.isfile(imagesDir + 'images_gray.h5'):
+                gtDataFile = h5py.File(imagesDir + 'images_gray.h5', 'r')
+                boolSet = np.zeros(gtDataFile["images"].shape[0]).astype(np.bool)
+                boolSet[imageSet] = True
+                return gtDataFile["images"][boolSet,:,:].astype(np.float32)
     else:
         image = skimage.io.imread(imagesDir + 'im' + str(imageSet[0]) + '.jpeg')
         width = image.shape[1]
@@ -48,6 +77,16 @@ def readImages(imagesDir, imageSet, loadGray=False, loadFromHdf5=False):
                 images[imageit, :, :] =  0.3*image[:,:,0] + 0.59*image[:,:,1] + 0.11*image[:,:,2]
 
         return images
+
+def readImagesHdf5(imagesDir, loadGray=False):
+    if not loadGray:
+        if os.path.isfile(imagesDir + 'images.h5'):
+             gtDataFile = h5py.File(imagesDir + 'images.h5', 'r')
+             return gtDataFile["images"]
+        else:
+            if os.path.isfile(imagesDir + 'images_gray.h5'):
+                gtDataFile = h5py.File(imagesDir + 'images_gray.h5', 'r')
+                return gtDataFile["images"]
 
 def generateExperiment(size, experimentDir, ratio, seed):
     np.random.seed(seed)
