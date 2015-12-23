@@ -209,7 +209,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'train5_out_normal_pred_nnposepred_largepred_largesamples_all'
+testPrefix = 'train5_out_normal_pred_nnposepred_smallnn'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -243,9 +243,9 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')[:200]
 
-# testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
-#        410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
-#        268444, 147111, 117287, 268145, 478618, 334784])
+testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
+       410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
+       268444, 147111, 117287, 268145, 478618, 334784])
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -394,7 +394,7 @@ nearGTOffsetVColor = np.zeros(3)
 if 'neuralNetPose' in parameterRecognitionModels:
     poseModel = ""
 
-    with open(trainModelsDirPose + 'neuralNetModelPoseLarge.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
         neuralNetModelPose = pickle.load(pfile)
 
     meanImage = neuralNetModelPose['mean']
@@ -414,7 +414,7 @@ if 'neuralNetPose' in parameterRecognitionModels:
     sinElevsPred = posePredictions[:,3]
 
 
-    with open(trainModelsDirPose + 'neuralNetModelPoseLarge.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
         neuralNetModelPose = pickle.load(pfile)
 
     meanImage = neuralNetModelPose['mean']
@@ -493,33 +493,33 @@ import theano
 import theano.tensor as T
 SHModel = ""
 
-# with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
-#     neuralNetModelPose = pickle.load(pfile)
-#
-# meanImage = neuralNetModelPose['mean'].reshape([150,150])
-# # ipdb.set_trace()
-# modelType = neuralNetModelPose['type']
-# param_values = neuralNetModelPose['params']
-# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-# layer = lasagne.layers.get_all_layers(network)[8]
-# inputLayer = lasagne.layers.get_all_layers(network)[0]
-# layer_output = lasagne.layers.get_output(layer, deterministic=True)
-# dim_output= layer.output_shape[1]
-#
-# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-# layerGT = lasagne.layers.get_all_layers(networkGT)[8]
-# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
-# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
-#
-# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
-#
-# chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
-#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
-#
-# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
-#
-# chThError.r
+with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+    neuralNetModelPose = pickle.load(pfile)
+
+meanImage = neuralNetModelPose['mean'].reshape([150,150])
+# ipdb.set_trace()
+modelType = neuralNetModelPose['type']
+param_values = neuralNetModelPose['params']
+network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+layer = lasagne.layers.get_all_layers(network)[-2]
+inputLayer = lasagne.layers.get_all_layers(network)[0]
+layer_output = lasagne.layers.get_output(layer, deterministic=True)
+dim_output= layer.output_shape[1]
+
+networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
+inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+
+rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+
+chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
+                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
+
+chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+
+chThError.r
 
 
 
@@ -591,9 +591,31 @@ azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
 directory = resultDir
 plt.ioff()
 fig = plt.figure()
-for sample_i, sampleAzsPredictions in enumerate(azsPredictions):
-    sample = (sample_i + 1)*2
-    plt.scatter(np.ones_like(sampleAzsPredictions)*sample, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
+errorFun = models[0]
+for test_i, sampleAzsPredictions in enumerate(azsPredictions):
+    testnum = (test_i + 1)*2
+    plt.scatter(np.ones_like(sampleAzsPredictions)*testnum, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
+
+    bestAzErr = np.finfo('f').max
+    bestAz = testAzsRel[test_i]
+    bestAzNormalErr = np.finfo('f').max
+    bestAzNormal = testAzsRel[test_i]
+    for sample_i in range(len(testAzsRel)):
+
+        color = testVColorGT[test_i]
+        az =  sampleAzsPredictions[sample_i]
+        el = testElevsGT[test_i]
+        lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+        chAz[:] = az
+        chEl[:] = el
+        chVColors[:] = color
+        chLightSHCoeffs[:] = lightCoefficientsRel
+        if chThError.r < bestAzErr:
+            bestAzErr = chThError.r
+            bestAz = az
+        if errorFun.r < bestAzNormalErr:
+            bestAzNormalErr = errorFun.r
+            bestAzNormal = az
 
     from sklearn import mixture
     # gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
@@ -605,9 +627,10 @@ for sample_i, sampleAzsPredictions in enumerate(azsPredictions):
     #     meanCos = gmm.means_[comp_i][1]
     #     azCompMean = np.arctan2(meanSin, meanCos)
     #     plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
-
-    plt.plot(sample,testAzsRel[sample_i]*180/np.pi, marker='o', ms=20, c='g')
-    plt.plot(sample, np.mod(azsPred[sample_i]*180/np.pi, 360), marker='o', ms=20, c='r')
+    plt.plot(testnum,bestAzNormal*180/np.pi, marker='o', ms=20, c='b')
+    plt.plot(testnum,bestAz*180/np.pi, marker='o', ms=20, c='y')
+    plt.plot(testnum,testAzsRel[test_i]*180/np.pi, marker='o', ms=20, c='g')
+    plt.plot(testnum, np.mod(azsPred[test_i]*180/np.pi, 360), marker='o', ms=20, c='r')
 
 plt.xlabel('Sample')
 plt.ylabel('Angular error')
@@ -619,9 +642,6 @@ plt.close(fig)
 # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
 
 ipdb.set_trace()
-
-
-
 
 azsGmms = []
 elevsGmms = []
