@@ -532,6 +532,17 @@ def get_prediction_fun(network):
     return prediction_fn
 
 
+def get_prediction_fun_nondeterministic(network):
+    # Load the dataset
+
+    # Prepare Theano variables for inputs and targets
+    input_var = lasagne.layers.get_all_layers(network)[0].input_var
+
+    prediction = lasagne.layers.get_output(network, deterministic=False)
+
+    prediction_fn = theano.function([input_var], prediction)
+
+    return prediction_fn
 
 def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType = 'cnn', num_epochs=150, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle', param_values=[]):
     # Load the dataset

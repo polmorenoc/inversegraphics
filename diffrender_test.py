@@ -209,7 +209,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'train4_nnposepred_robust_test'
+testPrefix = 'train5_out_normal_pred_nnposepred_largepred_largesamples_all'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -221,7 +221,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'linearRegressionVColors','ne
 gtPrefix = 'train5'
 experimentPrefix = 'train5_out_normal'
 trainPrefix = 'train4'
-trainPrefixPose = 'train4'
+trainPrefixPose = 'train5_out_normal'
 trainPrefixVColor = 'train4'
 trainPrefixLightCoeffs = 'train4'
 gtDir = 'groundtruth/' + gtPrefix + '/'
@@ -242,6 +242,10 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')[:200]
+
+# testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
+#        410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
+#        268444, 147111, 117287, 268145, 478618, 334784])
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -286,6 +290,9 @@ dataIds = groundTruth['trainIds']
 gtDtype = groundTruth.dtype
 
 # testSet = np.array([ 11230, 3235, 10711,  9775, 11230, 10255,  5060, 12784,  5410,  1341,14448, 12935, 13196,  6728,  9002,  7946,  1119,  5827,  4842,12435,  8152,  4745,  9512,  9641,  7165, 13950,  3567,   860,4105, 10330,  7218, 10176,  2310,  5325])
+
+
+
 testSetFixed = testSet
 whereBad = []
 for test_it, test_id in enumerate(testSet):
@@ -295,6 +302,7 @@ for test_it, test_id in enumerate(testSet):
         whereBad = whereBad + [bad]
 
 testSet = testSetFixed
+
 
 loadFromHdf5 = False
 
@@ -346,7 +354,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = False
 
 method = 1
@@ -386,7 +394,7 @@ nearGTOffsetVColor = np.zeros(3)
 if 'neuralNetPose' in parameterRecognitionModels:
     poseModel = ""
 
-    with open(trainModelsDirPose + 'neuralNetModelPose_nopretrain.pickle', 'rb') as pfile:
+    with open(trainModelsDirPose + 'neuralNetModelPoseLarge.pickle', 'rb') as pfile:
         neuralNetModelPose = pickle.load(pfile)
 
     meanImage = neuralNetModelPose['mean']
@@ -399,11 +407,38 @@ if 'neuralNetPose' in parameterRecognitionModels:
 
     network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
     posePredictionFun = lasagne_nn.get_prediction_fun(network)
-    posePredictions = posePredictionFun(grayTestImages)
+    posePredictions = posePredictionFun(grayTestImages.astype(np.float32))
     cosAzsPred = posePredictions[:,0]
     sinAzsPred = posePredictions[:,1]
     cosElevsPred = posePredictions[:,2]
     sinElevsPred = posePredictions[:,3]
+
+
+    with open(trainModelsDirPose + 'neuralNetModelPoseLarge.pickle', 'rb') as pfile:
+        neuralNetModelPose = pickle.load(pfile)
+
+    meanImage = neuralNetModelPose['mean']
+    # ipdb.set_trace()
+    modelType = neuralNetModelPose['type']
+    param_values = neuralNetModelPose['params']
+    grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+    grayTestImages = grayTestImages[:,None, :,:]
+    grayTestImages = grayTestImages - meanImage
+
+    network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+    nonDetPosePredictionFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
+    posePredictionsSamples = []
+    cosAzsPredSamples = []
+    sinAzsPredSamples = []
+    for i in range(100):
+        posePredictionsSample = nonDetPosePredictionFun(grayTestImages.astype(np.float32))
+        cosAzsPredSample = posePredictionsSample[:,0]
+        sinAzsPredSample = posePredictionsSample[:,1]
+        cosAzsPredSamples = cosAzsPredSamples + [cosAzsPredSample[:,None]]
+        sinAzsPredSamples = sinAzsPredSamples + [sinAzsPredSample[:,None]]
+
+    cosAzsPredSamples = np.hstack(cosAzsPredSamples)
+    sinAzsPredSamples = np.hstack(sinAzsPredSamples)
 
 
 if 'randForestAzs' in parameterRecognitionModels:
@@ -458,39 +493,35 @@ import theano
 import theano.tensor as T
 SHModel = ""
 
-with open(trainModelsDirLightCoeffs + 'neuralNetModelPose.pickle', 'rb') as pfile:
-    neuralNetModelPose = pickle.load(pfile)
+# with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+#     neuralNetModelPose = pickle.load(pfile)
+#
+# meanImage = neuralNetModelPose['mean'].reshape([150,150])
+# # ipdb.set_trace()
+# modelType = neuralNetModelPose['type']
+# param_values = neuralNetModelPose['params']
+# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layer = lasagne.layers.get_all_layers(network)[8]
+# inputLayer = lasagne.layers.get_all_layers(network)[0]
+# layer_output = lasagne.layers.get_output(layer, deterministic=True)
+# dim_output= layer.output_shape[1]
+#
+# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layerGT = lasagne.layers.get_all_layers(networkGT)[8]
+# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+#
+# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+#
+# chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
+#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
+#
+# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+#
+# chThError.r
 
-meanImage = neuralNetModelPose['mean'].reshape([150,150])
-# ipdb.set_trace()
-modelType = neuralNetModelPose['type']
-param_values = neuralNetModelPose['params']
-network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-layer = lasagne.layers.get_all_layers(network)[-2]
-inputLayer = lasagne.layers.get_all_layers(network)[0]
-layer_output = lasagne.layers.get_output(layer, deterministic=True)
-dim_output= layer.output_shape[1]
 
-networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
-inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
-layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
-
-rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
-
-chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
-                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
-
-chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
-
-chThError.r
-
-
-# chThFunGT = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGrayGT - meanImage, dim_output = dim_output)
-
-# chThFun.dr_wrt(chThFun.opendr_input)
-# chThFun.old_grads()
 
 # chNNAz = 2*ch.arctan(chThSHFun[1]/(ch.sqrt(chThSHFun[0]**2 + chThSHFun[1]**2) + chThSHFun[0]))
 # chNNEl = 2*ch.arctan(chThSHFun[3]/(ch.sqrt(chThSHFun[2]**2 + chThSHFun[3]**2) + chThSHFun[2]))
@@ -554,71 +585,111 @@ if not os.path.exists(resultDir +  'imgs/samples/'):
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
 azsPred = np.arctan2(sinAzsPred, cosAzsPred)
 
+
+
+azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
+directory = resultDir
+plt.ioff()
+fig = plt.figure()
+for sample_i, sampleAzsPredictions in enumerate(azsPredictions):
+    sample = (sample_i + 1)*2
+    plt.scatter(np.ones_like(sampleAzsPredictions)*sample, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
+
+    from sklearn import mixture
+    # gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
+
+    # gmm.fit(np.hstack([sinAzsPredictions[:,sample_i][:,None], cosAzsPredictions[:,sample_i][:,None]]))
+    # azsGmms = azsGmms + [gmm]
+    # for comp_i, weight in enumerate(gmm.weights_):
+    #     meanSin = gmm.means_[comp_i][0]
+    #     meanCos = gmm.means_[comp_i][1]
+    #     azCompMean = np.arctan2(meanSin, meanCos)
+    #     plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
+
+    plt.plot(sample,testAzsRel[sample_i]*180/np.pi, marker='o', ms=20, c='g')
+    plt.plot(sample, np.mod(azsPred[sample_i]*180/np.pi, 360), marker='o', ms=20, c='r')
+
+plt.xlabel('Sample')
+plt.ylabel('Angular error')
+x1,x2,y1,y2 = plt.axis()
+plt.axis((0,len(testSet+1)*2,0,360))
+plt.title('Neuralnet multiple predictions')
+fig.savefig(directory + 'neuralNet_Az_scatter.png', bbox_inches='tight')
+plt.close(fig)
+# elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
+
+ipdb.set_trace()
+
+
+
+
 azsGmms = []
 elevsGmms = []
-if recognitionType == 2:
-    azsPredictions = np.arctan2(sinAzsPredictions, cosAzsPredictions)
-    directory = resultDir
-    plt.ioff()
-    fig = plt.figure()
-    for sample_i, sampleAzsPredictions in enumerate(azsPredictions.T):
-        sample = (sample_i + 1)*2
-        plt.scatter(np.ones_like(sampleAzsPredictions)*sample, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
-
-        from sklearn import mixture
-        gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
-
-        gmm.fit(np.hstack([sinAzsPredictions[:,sample_i][:,None], cosAzsPredictions[:,sample_i][:,None]]))
-        azsGmms = azsGmms + [gmm]
-        for comp_i, weight in enumerate(gmm.weights_):
-            meanSin = gmm.means_[comp_i][0]
-            meanCos = gmm.means_[comp_i][1]
-            azCompMean = np.arctan2(meanSin, meanCos)
-            plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
-
-        plt.plot(sample,testAzsRel[sample_i]*180/np.pi, marker='o', ms=20, c='g')
-        plt.plot(sample, np.mod(azsPred[sample_i]*180/np.pi, 360), marker='o', ms=20, c='r')
-
-    plt.xlabel('Sample')
-    plt.ylabel('Angular error')
-    x1,x2,y1,y2 = plt.axis()
-    plt.axis((0,len(testSet+1)*2,0,360))
-    plt.title('Random forest multiple predictions')
-    fig.savefig(directory + 'randomForest_Az_scatter.png', bbox_inches='tight')
-    plt.close(fig)
+# if recognitionType == 2:
+#     azsPredictions = np.arctan2(sinAzsPredictions, cosAzsPredictions)
+#     directory = resultDir
+#     plt.ioff()
+#     fig = plt.figure()
+#     for sample_i, sampleAzsPredictions in enumerate(azsPredictions.T):
+#         sample = (sample_i + 1)*2
+#         plt.scatter(np.ones_like(sampleAzsPredictions)*sample, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
+#
+#         from sklearn import mixture
+#         gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
+#
+#         gmm.fit(np.hstack([sinAzsPredictions[:,sample_i][:,None], cosAzsPredictions[:,sample_i][:,None]]))
+#         azsGmms = azsGmms + [gmm]
+#         for comp_i, weight in enumerate(gmm.weights_):
+#             meanSin = gmm.means_[comp_i][0]
+#             meanCos = gmm.means_[comp_i][1]
+#             azCompMean = np.arctan2(meanSin, meanCos)
+#             plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
+#
+#         plt.plot(sample,testAzsRel[sample_i]*180/np.pi, marker='o', ms=20, c='g')
+#         plt.plot(sample, np.mod(azsPred[sample_i]*180/np.pi, 360), marker='o', ms=20, c='r')
+#
+#     plt.xlabel('Sample')
+#     plt.ylabel('Angular error')
+#     x1,x2,y1,y2 = plt.axis()
+#     plt.axis((0,len(testSet+1)*2,0,360))
+#     plt.title('Random forest multiple predictions')
+#     fig.savefig(directory + 'randomForest_Az_scatter.png', bbox_inches='tight')
+#     plt.close(fig)
+#     # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
+#
+# if recognitionType == 2:
+#     elevsPredictions = np.arctan2(sinElevsPredictions, cosElevsPredictions)
+#     directory = resultDir
+#     plt.ioff()
+#     fig = plt.figure()
+#     for sample_i, sampleElevsPredictions in enumerate(elevsPredictions.T):
+#         sample = (sample_i + 1)*2
+#         plt.scatter(np.ones_like(sampleElevsPredictions)*sample, np.mod(sampleElevsPredictions*180/np.pi, 90), c='b')
+#
+#         from sklearn import mixture
+#         gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
+#
+#         gmm.fit(np.hstack([sinElevsPredictions[:,sample_i][:,None], cosElevsPredictions[:,sample_i][:,None]]))
+#         elevsGmms = elevsGmms + [gmm]
+#         for comp_i, weight in enumerate(gmm.weights_):
+#             meanSin = gmm.means_[comp_i][0]
+#             meanCos = gmm.means_[comp_i][1]
+#             elCompMean = np.arctan2(meanSin, meanCos)
+#             plt.plot(sample-0.4, np.mod(elCompMean*180/np.pi, 90), marker='o', ms=weight*50, c='y')
+#
+#         plt.plot(sample, testElevsGT[sample_i]*180/np.pi, marker='o', ms=20, c='g')
+#         plt.plot(sample, np.mod(elevsPred[sample_i]*180/np.pi, 90), marker='o', ms=20, c='r')
+#
+#     plt.xlabel('Sample')
+#     plt.ylabel('Angular error')
+#     x1,x2,y1,y2 = plt.axis()
+#     plt.axis((0,len(testSet+1)*2,0,90))
+#     plt.title('Random forest multiple predictions')
+#     fig.savefig(directory + 'randomForest_Elev_scatter.png', bbox_inches='tight')
+#     plt.close(fig)
     # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
 
-if recognitionType == 2:
-    elevsPredictions = np.arctan2(sinElevsPredictions, cosElevsPredictions)
-    directory = resultDir
-    plt.ioff()
-    fig = plt.figure()
-    for sample_i, sampleElevsPredictions in enumerate(elevsPredictions.T):
-        sample = (sample_i + 1)*2
-        plt.scatter(np.ones_like(sampleElevsPredictions)*sample, np.mod(sampleElevsPredictions*180/np.pi, 90), c='b')
 
-        from sklearn import mixture
-        gmm = mixture.GMM(n_components=5, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
-
-        gmm.fit(np.hstack([sinElevsPredictions[:,sample_i][:,None], cosElevsPredictions[:,sample_i][:,None]]))
-        elevsGmms = elevsGmms + [gmm]
-        for comp_i, weight in enumerate(gmm.weights_):
-            meanSin = gmm.means_[comp_i][0]
-            meanCos = gmm.means_[comp_i][1]
-            elCompMean = np.arctan2(meanSin, meanCos)
-            plt.plot(sample-0.4, np.mod(elCompMean*180/np.pi, 90), marker='o', ms=weight*50, c='y')
-
-        plt.plot(sample, testElevsGT[sample_i]*180/np.pi, marker='o', ms=20, c='g')
-        plt.plot(sample, np.mod(elevsPred[sample_i]*180/np.pi, 90), marker='o', ms=20, c='r')
-
-    plt.xlabel('Sample')
-    plt.ylabel('Angular error')
-    x1,x2,y1,y2 = plt.axis()
-    plt.axis((0,len(testSet+1)*2,0,90))
-    plt.title('Random forest multiple predictions')
-    fig.savefig(directory + 'randomForest_Elev_scatter.png', bbox_inches='tight')
-    plt.close(fig)
-    # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
 
 # testPredPoseGMMs = []
 # colorGMMs = []
@@ -884,14 +955,15 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             if optimizationTypeDescr[optimizationType] == 'optimize':
                 print("** Minimizing intial predicted parameters. **")
                 model=1
-                errorFun = models[model]
-                # errorFun = chThError
+                # errorFun = models[model]
+                errorFun = chThError
                 method=1
                 stds[:] = 0.1
 
-                options={'disp':False, 'maxiter':10}
+                options={'disp':False, 'maxiter':20}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-                free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+                free_variables = [ chAz, chEl]
+                # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
             if errorFun.r < bestModelLik:
