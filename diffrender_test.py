@@ -209,7 +209,7 @@ def cb(_):
 seed = 1
 np.random.seed(seed)
 
-testPrefix = 'train5_out_normal_pred_nnposepred_smallnn'
+testPrefix = 'train5_out_normal_pred_nnposepred_dropoutbadsamples'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
@@ -241,8 +241,9 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-testSet = np.load(experimentDir + 'test.npy')[:200]
+testSet = np.load(experimentDir + 'test.npy')[:100]
 
+#Bad samples for data set train5 out normal.
 testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
        410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
        268444, 147111, 117287, 268145, 478618, 334784])
@@ -290,8 +291,6 @@ dataIds = groundTruth['trainIds']
 gtDtype = groundTruth.dtype
 
 # testSet = np.array([ 11230, 3235, 10711,  9775, 11230, 10255,  5060, 12784,  5410,  1341,14448, 12935, 13196,  6728,  9002,  7946,  1119,  5827,  4842,12435,  8152,  4745,  9512,  9641,  7165, 13950,  3567,   860,4105, 10330,  7218, 10176,  2310,  5325])
-
-
 
 testSetFixed = testSet
 whereBad = []
@@ -430,7 +429,7 @@ if 'neuralNetPose' in parameterRecognitionModels:
     posePredictionsSamples = []
     cosAzsPredSamples = []
     sinAzsPredSamples = []
-    for i in range(100):
+    for i in range(200):
         posePredictionsSample = nonDetPosePredictionFun(grayTestImages.astype(np.float32))
         cosAzsPredSample = posePredictionsSample[:,0]
         sinAzsPredSample = posePredictionsSample[:,1]
@@ -521,8 +520,6 @@ chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_
 
 chThError.r
 
-
-
 # chNNAz = 2*ch.arctan(chThSHFun[1]/(ch.sqrt(chThSHFun[0]**2 + chThSHFun[1]**2) + chThSHFun[0]))
 # chNNEl = 2*ch.arctan(chThSHFun[3]/(ch.sqrt(chThSHFun[2]**2 + chThSHFun[3]**2) + chThSHFun[2]))
 #
@@ -593,7 +590,13 @@ plt.ioff()
 fig = plt.figure()
 errorFun = models[0]
 for test_i, sampleAzsPredictions in enumerate(azsPredictions):
+
+    testId = dataIds[test_i]
+
+    rendererGT[:] = srgb2lin(images[test_i])
+
     testnum = (test_i + 1)*2
+
     plt.scatter(np.ones_like(sampleAzsPredictions)*testnum, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
 
     bestAzErr = np.finfo('f').max
@@ -627,8 +630,8 @@ for test_i, sampleAzsPredictions in enumerate(azsPredictions):
     #     meanCos = gmm.means_[comp_i][1]
     #     azCompMean = np.arctan2(meanSin, meanCos)
     #     plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
-    plt.plot(testnum,bestAzNormal*180/np.pi, marker='o', ms=20, c='b')
-    plt.plot(testnum,bestAz*180/np.pi, marker='o', ms=20, c='y')
+    plt.plot(testnum,np.mod(bestAzNormal*180/np.pi,360), marker='o', ms=20, c='purple')
+    plt.plot(testnum,np.mod(bestAz*180/np.pi,360), marker='o', ms=20, c='y')
     plt.plot(testnum,testAzsRel[test_i]*180/np.pi, marker='o', ms=20, c='g')
     plt.plot(testnum, np.mod(azsPred[test_i]*180/np.pi, 360), marker='o', ms=20, c='r')
 
@@ -641,7 +644,55 @@ fig.savefig(directory + 'neuralNet_Az_scatter.png', bbox_inches='tight')
 plt.close(fig)
 # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
 
-ipdb.set_trace()
+
+if not os.path.exists(resultDir + 'nn_samples/'):
+    os.makedirs(resultDir + 'nn_samples/')
+
+for test_i, sampleAzsPredictions in enumerate(azsPredictions):
+    plt.ioff()
+    fig = plt.figure()
+
+    testnum = (test_i + 1)*2
+
+    testId = dataIds[test_i]
+
+    rendererGT[:] = srgb2lin(images[test_i])
+
+    plt.hist(np.mod(sampleAzsPredictions*180/np.pi,360), bins=30)
+
+    bestAzErr = np.finfo('f').max
+    bestAz = testAzsRel[test_i]
+    bestAzNormalErr = np.finfo('f').max
+    bestAzNormal = testAzsRel[test_i]
+    for sample_i in range(len(testAzsRel)):
+
+        color = testVColorGT[test_i]
+        az =  sampleAzsPredictions[sample_i]
+        el = testElevsGT[test_i]
+        lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+        chAz[:] = az
+        chEl[:] = el
+        chVColors[:] = color
+        chLightSHCoeffs[:] = lightCoefficientsRel
+        if chThError.r < bestAzErr:
+            bestAzErr = chThError.r
+            bestAz = az
+        if errorFun.r < bestAzNormalErr:
+            bestAzNormalErr = errorFun.r
+            bestAzNormal = az
+
+    plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
+    plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
+    plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
+    plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
+
+    plt.xlabel('Sample')
+    plt.ylabel('Angular error')
+    x1,x2,y1,y2 = plt.axis()
+    plt.axis((0,360,y1,y2))
+    plt.title('Neuralnet multiple predictions')
+    fig.savefig(resultDir + 'nn_samples/' + 'sample' + str(test_i) + '.png', bbox_inches='tight')
+    plt.close(fig)
 
 azsGmms = []
 elevsGmms = []
