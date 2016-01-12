@@ -244,9 +244,9 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 testSet = np.load(experimentDir + 'test.npy')[:100]
 
 #Bad samples for data set train5 out normal.
-testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
-       410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
-       268444, 147111, 117287, 268145, 478618, 334784])
+# testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
+#        410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
+#        268444, 147111, 117287, 268145, 478618, 334784])
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTestSet = np.zeros(shapeGT).astype(np.bool)
@@ -354,7 +354,7 @@ recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 0
-computePredErrorFuns = False
+computePredErrorFuns = True
 
 method = 1
 model = 1
@@ -520,6 +520,32 @@ chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_
 
 chThError.r
 
+# with open(trainModelsDirPose + 'neuralNetModelPoseLarge.pickle', 'rb') as pfile:
+#     neuralNetModelPose = pickle.load(pfile)
+#
+# meanImage = neuralNetModelPose['mean'].reshape([150,150])
+# # ipdb.set_trace()
+# modelType = neuralNetModelPose['type']
+# param_values = neuralNetModelPose['params']
+# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layer = lasagne.layers.get_all_layers(network)[-2]
+# inputLayer = lasagne.layers.get_all_layers(network)[0]
+# layer_output = lasagne.layers.get_output(layer, deterministic=True)
+# dim_output= layer.output_shape[1]
+#
+# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
+# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+#
+# chThError8 = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
+#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
+#
+# chThError8.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+#
+# chThError8.r
+
+
 # chNNAz = 2*ch.arctan(chThSHFun[1]/(ch.sqrt(chThSHFun[0]**2 + chThSHFun[1]**2) + chThSHFun[0]))
 # chNNEl = 2*ch.arctan(chThSHFun[3]/(ch.sqrt(chThSHFun[2]**2 + chThSHFun[3]**2) + chThSHFun[2]))
 #
@@ -578,11 +604,8 @@ if not os.path.exists(resultDir + 'imgs/'):
 if not os.path.exists(resultDir +  'imgs/samples/'):
     os.makedirs(resultDir + 'imgs/samples/')
 
-
 elevsPred = np.arctan2(sinElevsPred, cosElevsPred)
 azsPred = np.arctan2(sinAzsPred, cosAzsPred)
-
-
 
 azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
 directory = resultDir
@@ -648,6 +671,8 @@ plt.close(fig)
 if not os.path.exists(resultDir + 'nn_samples/'):
     os.makedirs(resultDir + 'nn_samples/')
 
+errorFunRobust = models[1]
+errorFunGaussian = models[0]
 for test_i, sampleAzsPredictions in enumerate(azsPredictions):
     plt.ioff()
     fig = plt.figure()
@@ -663,7 +688,10 @@ for test_i, sampleAzsPredictions in enumerate(azsPredictions):
     bestAzErr = np.finfo('f').max
     bestAz = testAzsRel[test_i]
     bestAzNormalErr = np.finfo('f').max
+    bestAzRobustErr = np.finfo('f').max
     bestAzNormal = testAzsRel[test_i]
+    bestAzRobust = testAzsRel[test_i]
+    stds[:] = 0.1
     for sample_i in range(len(testAzsRel)):
 
         color = testVColorGT[test_i]
@@ -680,15 +708,46 @@ for test_i, sampleAzsPredictions in enumerate(azsPredictions):
         if errorFun.r < bestAzNormalErr:
             bestAzNormalErr = errorFun.r
             bestAzNormal = az
+        if errorFunRobust.r < bestAzRobustErr:
+            bestAzRobustErr = errorFunRobust.r
+            bestAzRobust = az
+
+        if errorFunGaussian.r < bestAzNormalErr:
+            bestAzNormalErr = errorFunGaussian.r
+            bestAzNormal = az
+
+    chThErrors = np.array([])
+    chThErrors8 = np.array([])
+    robustErrors = np.array([])
+    gaussianErrors = np.array([])
+    angles = np.array([])
+    for az in np.arange(0,2*np.pi,5*np.pi/180):
+        angles = np.append(angles, az*180/np.pi)
+        chAz[:] = az
+        chThErrors = np.append(chThErrors, chThError.r)
+        # chThErrors8 = np.append(chThErrors8, chThError8.r)
+        robustErrors = np.append(robustErrors, errorFunRobust.r)
+        gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
+
+    x1,x2,y1,y2 = plt.axis()
+
+    robustErrors = robustErrors - np.min(robustErrors)
+    gaussianErrors = gaussianErrors - np.min(gaussianErrors)
+    chThErrors = chThErrors - np.min(chThErrors)
+    plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
+    plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
+    plt.plot(angles, chThErrors*y2/np.max(chThErrors),  c='y')
+    # plt.plot(angles, chThErrors8*y2/np.max(chThErrors8),  c='pink')
 
     plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
+    plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
     plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
     plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
     plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
 
     plt.xlabel('Sample')
     plt.ylabel('Angular error')
-    x1,x2,y1,y2 = plt.axis()
+
     plt.axis((0,360,y1,y2))
     plt.title('Neuralnet multiple predictions')
     fig.savefig(resultDir + 'nn_samples/' + 'sample' + str(test_i) + '.png', bbox_inches='tight')

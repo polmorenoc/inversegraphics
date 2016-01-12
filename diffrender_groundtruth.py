@@ -219,7 +219,7 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train5'
+prefix = 'train4_occlusion'
 
 print("Creating Ground Truth")
 
@@ -273,9 +273,9 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-trainSize = 300000
+trainSize = 50000
 
-renderTeapotsList = np.arange(len(teapots))[:]
+renderTeapotsList = np.arange(len(teapots))[0:1]
 
 # for hdrit, hdri in enumerate(list(envMapDic.items())):
 #     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':
@@ -392,6 +392,7 @@ for sceneIdx in scenesToRender:
 
         scene.cycles.device = 'GPU'
         bpy.context.user_preferences.system.compute_device_type = 'CUDA'
+        ipdb.set_trace()
         bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
         bpy.ops.wm.save_userpref()
 
@@ -518,7 +519,7 @@ for sceneIdx in scenesToRender:
                     # approxProjection = np.sum(pEnvMap, axis=3)
                     # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
                     occlusion = getOcclusionFraction(rendererGT)
-                    if occlusion >= 0.1:
+                    if occlusion <= 0.01:
                         ignore = True
 
                     if useBlender and not ignore:
