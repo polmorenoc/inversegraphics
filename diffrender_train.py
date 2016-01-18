@@ -28,8 +28,8 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train5'
-experimentPrefix = 'train5_out_normal'
+gtPrefix = 'train4_occlusion'
+experimentPrefix = 'train4_occlusion_10k'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -43,7 +43,7 @@ onlySynthetic = True
 print("Reading images.")
 
 writeHdf5 = False
-writeGray = True
+writeGray = False
 if onlySynthetic:
     imagesDir = gtDir + 'images_opendr/'
 else:
@@ -59,7 +59,7 @@ else:
 
 
 # trainSet = np.load(experimentDir + 'train.npy')[:12800]
-trainSet = np.load(experimentDir + 'train.npy')
+trainSet = np.load(experimentDir + 'train.npy')[:15000]
 
 writeExpHdf5 = False
 if writeExpHdf5:
@@ -95,7 +95,6 @@ dataTeapotIds = groundTruth['trainTeapotIds']
 # dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
 
-
 gtDtype = groundTruth.dtype
 # gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,))]
 
@@ -106,20 +105,24 @@ trainElevsGT = dataElevsGT
 # trainComponentsGTRel = dataComponentsGTRel
 # trainVColorGT = dataVColorGT
 
-loadFromHdf5 = True
+loadFromHdf5 = False
 
 print("Reading images.")
 
 # if loadFromHdf5:
-# images = readImages(imagesDir, trainSet, loadFromHdf5)
-# images = readImages(imagesDir, trainSet, loadFromHdf5)
-loadGray = True
-imagesAreH5 = True
-if not imagesAreH5:
-    grayImages = readImages(imagesDir, trainSet, loadGray, loadFromHdf5)
-else:
-    grayImages = h5py.File(imagesExpDir + 'images_gray.h5', 'r')["images"]
 
+images = readImages(imagesDir, trainSet, False, loadFromHdf5)
+
+loadGray = True
+imagesAreH5 = False
+loadGrayFromHdf5 = False
+
+# if not imagesAreH5:
+#     grayImages = readImages(imagesDir, trainSet, loadGray, loadGrayFromHdf5)
+# else:
+#     grayImages = h5py.File(imagesExpDir + 'images_gray.h5', 'r')["images"]
+
+grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
 
 loadHogFeatures = False
 loadFourierFeatures = False
@@ -174,11 +177,11 @@ parameterTrainSet = set(['poseNN'])
 print("Training recognition models.")
 
 if 'poseNN' in parameterTrainSet:
-    modelType = 'cnn_pose_large'
+    modelType = 'cnn_pose'
     network = lasagne_nn.load_network(modelType=modelType, param_values=[])
 
     print("Training NN Pose Components")
-    validRatio = 0.95
+    validRatio = 0.9
 
     trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
     validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
@@ -192,12 +195,12 @@ if 'poseNN' in parameterTrainSet:
     # sys.exit("NN")
     param_values = []
 
-    fineTune = False
+    fineTune = True
 
-    pretrainedExperimentDir =  'experiments/train4/'
+    pretrainedExperimentDir =  'experiments/train3_test/'
     if fineTune:
-        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPose.pickle'
-        with open(pretrainedExperimentDir + 'neuralNetModelPose.pickle', 'rb') as pfile:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPoseCuda.pickle'
+        with open(pretrainedModelFile, 'rb') as pfile:
             neuralNetModelPose = pickle.load(pfile)
 
         meanImage = neuralNetModelPose['mean']
@@ -207,7 +210,7 @@ if 'poseNN' in parameterTrainSet:
     else:
         meanImage = np.zeros([150, 150])
 
-    modelPath=experimentDir + 'neuralNetModelPoseLarge.pickle'
+    modelPath=experimentDir + 'neuralNetModelPose.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 

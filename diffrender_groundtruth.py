@@ -273,7 +273,7 @@ for sceneIdx in scenesToRender:
         if not collisions[targetIndex][1]:
             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-trainSize = 50000
+trainSize = 100000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -519,7 +519,7 @@ for sceneIdx in scenesToRender:
                     # approxProjection = np.sum(pEnvMap, axis=3)
                     # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
                     occlusion = getOcclusionFraction(rendererGT)
-                    if occlusion <= 0.01:
+                    if occlusion < 0.01 or occlusion > 0.95:
                         ignore = True
 
                     if useBlender and not ignore:

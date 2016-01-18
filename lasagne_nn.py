@@ -548,6 +548,7 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     # Load the dataset
 
     print("Loading validation set")
+
     X_val = X_h5[trainSetVal::,:,:][:,None,:,:].astype(np.float32) - meanImage.astype(np.float32)
     print("Ended loading validation set")
 
