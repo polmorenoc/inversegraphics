@@ -209,7 +209,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_std01_predandoptAll'
+testPrefix = 'train4_occlusion_opt_train4occlusion10k_1000s_gaussian_nnsampling_useappearancemin_predandoptAll'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -351,7 +351,7 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 # testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
-recognitionType = 1
+recognitionType = 2
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 1
@@ -429,7 +429,7 @@ if 'neuralNetPose' in parameterRecognitionModels:
     posePredictionsSamples = []
     cosAzsPredSamples = []
     sinAzsPredSamples = []
-    for i in range(200):
+    for i in range(100):
         posePredictionsSample = nonDetPosePredictionFun(grayTestImages.astype(np.float32))
         cosAzsPredSample = posePredictionsSample[:,0]
         sinAzsPredSample = posePredictionsSample[:,1]
@@ -1085,7 +1085,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             chVColors[:] = color
             chLightSHCoeffs[:] = lightCoefficientsRel
 
-            model = 1
+            model = 0
             errorFun = models[model]
 
             bestPredAz = chAz.r
@@ -1114,7 +1114,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                     chLightSHCoeffs[:] = lightCoefficientsRel
                     chVColors[:] = color
-                    free_variables = [chLightSHCoeffs]
+                    free_variables = [chVColors, chLightSHCoeffs]
                     options={'disp':False, 'maxiter':5}
                     ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -1129,16 +1129,16 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                         bestModelLik = errorFun.r.copy()
                         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_predSample' + str(numPredSamples) + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-                # color = bestPredVColors
-                # lightCoefficientsRel = bestPredLightSHCoeffs
+                color = bestPredVColors
+                lightCoefficientsRel = bestPredLightSHCoeffs
                 az = bestPredAz
 
                     # previousAngles = np.vstack([previousAngles, np.array([[azsample, elsample],[chAz.r.copy(), chEl.r.copy()]])])
 
             chAz[:] = az
             chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
-            # chVColors[:] = color
-            # chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+            chVColors[:] = color
+            chLightSHCoeffs[:] = lightCoefficientsRel.copy()
 
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_sample' + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
             # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
@@ -1154,7 +1154,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 model=1
                 errorFun = models[model]
                 # errorFun = chThError
-                method=1
+                method=0
                 stds[:] = 0.1
 
                 options={'disp':False, 'maxiter':50}
