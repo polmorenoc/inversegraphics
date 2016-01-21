@@ -181,6 +181,11 @@ def cb(_):
     elapsed_time = time.time() - t
     print("Ended interation in  " + str(elapsed_time))
 
+    if samplingMode == True:
+        analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+    else:
+        analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/min_azNum' + str(sampleAzNum) +  '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+
     global pixelErrorFun
     global errorFun
     global iterat
@@ -209,7 +214,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_opt_train4occlusion10k_1000s_gaussian_nnsampling_useappearancemin_predandoptAll'
+testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_std01_nnsampling_optAllSH1to4_badsamples'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -241,8 +246,8 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-testSet = np.load(experimentDir + 'test.npy')[:100]
-# [np.array([ 4, 14, 18, 35, 56, 60, 66, 68, 72, 79, 82, 85, 87, 90])]
+testSet = np.load(experimentDir + 'test.npy')[:10]
+testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 
 #Bad samples for data set train5 out normal.
 # testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
@@ -373,10 +378,10 @@ boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
-methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom']
+methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom']
 
-options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-options={'disp':False, 'maxiter':maxiter}
+options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+options = {'disp':False, 'maxiter':maxiter}
 # options={'disp':False, 'maxiter':maxiter}
 # testRenderer = np.int(dataTeapotIds[testSet][0])
 # testRenderer = np.int(dataTeapotIds[0])
@@ -676,192 +681,103 @@ azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
 if not os.path.exists(resultDir + 'nn_samples/'):
     os.makedirs(resultDir + 'nn_samples/')
 
+if not os.path.exists(resultDir + 'az_samples/'):
+    os.makedirs(resultDir + 'az_samples/')
+
 analyzeSamples = False
 
-if analyzeSamples:
+def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH, sampleAzsPredictions=None, sampleStds=0.1):
+    global stds
+    global chAz
+    global test_i
+
+    plt.ioff()
+    fig = plt.figure()
+
+    stds[:] = sampleStds
+    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+    models = [negLikModel, negLikModelRobust, negLikModelRobust]
     errorFunRobust = models[1]
     errorFunGaussian = models[0]
-    for test_i, sampleAzsPredictions in enumerate(azsPredictions):
 
-        print("Analyzing sample " + str(test_i))
+    plt.hist(np.mod(sampleAzsPredictions*180/np.pi,360), bins=30, alpha=0.2)
 
-        plt.ioff()
-        fig = plt.figure()
-
-        testnum = (test_i + 1)*2
-
-        testId = dataIds[test_i]
-
-        rendererGT[:] = srgb2lin(np.copy(images[test_i]))
-
-        negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-        negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-        models = [negLikModel, negLikModelRobust, negLikModelRobust]
-        errorFunRobust = models[1]
-        errorFunGaussian = models[0]
-
-        plt.hist(np.mod(sampleAzsPredictions*180/np.pi,360), bins=30, alpha=0.2)
-
-        bestAzErr = np.finfo('f').max
-        bestAz = testAzsRel[test_i]
-        bestAzNormalErr = np.finfo('f').max
-        bestAzRobustErr = np.finfo('f').max
-        bestAzNormal = testAzsRel[test_i]
-        bestAzRobust = testAzsRel[test_i]
-        stds[:] = 0.1
-
-        el = testElevsGT[test_i]
-        chEl[:] = el
-        color = testVColorGT[test_i]
-        lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
-        chVColors[:] = color
-        chLightSHCoeffs[:] = lightCoefficientsRel
-
-        trainingTeapots = [0,14,20,25,26,1]
-        azRange = np.arange(0,2*np.pi,5*np.pi/180)
-        chThErrors = np.zeros([len(trainingTeapots), len(azRange)])
-
-        robustErrors = np.array([])
-        gaussianErrors = np.array([])
-        angles = np.array([])
-        for az_i, az in enumerate(azRange):
-            angles = np.append(angles, az*180/np.pi)
-            chAz[:] = az
-            for idx, renderer_idx in enumerate(trainingTeapots):
-                renderer_i = renderer_teapots[renderer_idx]
-                rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
-                chThError.opendr_input = rendererGray
-                chThErrors[idx, az_i] = chThError.r
+    bestAzErr = np.finfo('f').max
+    bestAz = testAzsRel[test_i]
+    bestAzNormalErr = np.finfo('f').max
+    bestAzRobustErr = np.finfo('f').max
+    bestAzNormal = testAzsRel[test_i]
+    bestAzRobust = testAzsRel[test_i]
 
 
-            robustErrors = np.append(robustErrors, errorFunRobust.r)
-            gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
+    currentAz = chAz.r.copy()
+    chEl[:] = sampleEl
+    chVColors[:] = sampleVColor
+    chLightSHCoeffs[:] = sampleSH
 
-        x1,x2,y1,y2 = plt.axis()
+    trainingTeapots = [0,14,20,25,26,1]
+    trainingTeapots = [0]
+    azRange = np.arange(0,2*np.pi,5*np.pi/180)
+    chThErrors = np.zeros([len(trainingTeapots), len(azRange)])
 
-        robustErrors = robustErrors - np.min(robustErrors)
-        gaussianErrors = gaussianErrors - np.min(gaussianErrors)
-        chThErrors = chThErrors - np.min(chThErrors)
-        plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
-        plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
+    robustErrors = np.array([])
+    gaussianErrors = np.array([])
+    angles = np.array([])
+    for az_i, az in enumerate(azRange):
+        angles = np.append(angles, az*180/np.pi)
+        chAz[:] = az
+        for idx, renderer_idx in enumerate(trainingTeapots):
+            renderer_i = renderer_teapots[renderer_idx]
+            rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
+            chThError.opendr_input = rendererGray
+            chThErrors[idx, az_i] = chThError.r
 
-        chThError.opendr_input = renderer
-        lineStyles = ['-', '--', '-.', ':']
-        for renderer_idx in range(len(trainingTeapots)):
-            plt.plot(angles, chThErrors[renderer_idx]*y2/np.max(chThErrors[renderer_idx]), linestyle=lineStyles[np.mod(renderer_idx,4)], c='y')
+        robustErrors = np.append(robustErrors, errorFunRobust.r)
+        gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
 
+    x1,x2,y1,y2 = plt.axis()
+
+    robustErrors = robustErrors - np.min(robustErrors)
+    gaussianErrors = gaussianErrors - np.min(gaussianErrors)
+    chThErrors = chThErrors - np.min(chThErrors)
+    plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
+    plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
+
+    chThError.opendr_input = renderer
+    lineStyles = ['-', '--', '-.', ':']
+    for renderer_idx in range(len(trainingTeapots)):
+        plt.plot(angles, chThErrors[renderer_idx]*y2/np.max(chThErrors[renderer_idx]), linestyle=lineStyles[np.mod(renderer_idx,4)], c='y')
+
+    if len(trainingTeapots) > 1:
         prodErrors = np.prod(chThErrors, axis=0)
         plt.plot(angles, prodErrors*y2/np.max(prodErrors), linestyle='-', c='black')
         meanErrors = np.mean(chThErrors, axis=0)
         plt.plot(angles, meanErrors*y2/np.max(meanErrors), linestyle='--', c='black')
         # plt.plot(angles, gaussianErrors*robustErrors*y2/np.max(gaussianErrors*robustErrors), linestyle='--', c='black')
 
-        # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
-        # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
-        plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
-        plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
-        plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
 
-        chAz[:] = testAzsRel[test_i]
+    # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
+    # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
+    plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
+    plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
+    plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
 
-        cv2.imwrite(resultDir + 'nn_samples/sample'+ str(test_i) + '_gt.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
-        cv2.imwrite(resultDir + 'nn_samples/sample'+ str(test_i) + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+    plt.axvline(np.mod(currentAz*180/np.pi, 360), linewidth=2, linestyle='--',c='b')
 
-        plt.xlabel('Sample')
-        plt.ylabel('Angular error')
+    cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-        plt.axis((0,360,y1,y2))
-        plt.title('Neuralnet multiple predictions')
-        fig.savefig(resultDir + 'nn_samples/' + 'sample' + str(test_i) + '.png', bbox_inches='tight')
-        plt.close(fig)
+    plt.xlabel('Sample')
+    plt.ylabel('Angular error')
 
-    for test_i, sampleAzsPredictions in enumerate(azsPredictions):
+    plt.axis((0,360,y1,y2))
+    plt.title('Neuralnet multiple predictions')
+    fig.savefig(figurePath + 'sample' + '.png', bbox_inches='tight')
+    plt.close(fig)
 
-        print("Analyzing predicted sample " + str(test_i))
+    chAz[:] = currentAz
 
-        plt.ioff()
-        fig = plt.figure()
 
-        testnum = (test_i + 1)*2
-
-        testId = dataIds[test_i]
-
-        rendererGT[:] = srgb2lin(np.copy(images[test_i]))
-
-        negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-        negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-        models = [negLikModel, negLikModelRobust, negLikModelRobust]
-        errorFunRobust = models[1]
-        errorFunGaussian = models[0]
-
-        plt.hist(np.mod(sampleAzsPredictions*180/np.pi,360), bins=30, alpha=0.2)
-
-        bestAzErr = np.finfo('f').max
-        bestAz = testAzsRel[test_i]
-        bestAzNormalErr = np.finfo('f').max
-        bestAzRobustErr = np.finfo('f').max
-        bestAzNormal = testAzsRel[test_i]
-        bestAzRobust = testAzsRel[test_i]
-
-        # el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
-        el = testElevsGT[test_i]
-        chEl[:] = el
-        color = vColorsPred[test_i]
-        lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
-        chVColors[:] = color
-        chLightSHCoeffs[:] = relLightCoefficientsGTPred[test_i]
-
-        chThErrors = np.zeros([len(trainingTeapots), len(azRange)])
-        robustErrors = np.array([])
-        gaussianErrors = np.array([])
-        angles = np.array([])
-        for az_i, az in enumerate(azRange):
-            angles = np.append(angles, az*180/np.pi)
-            chAz[:] = az
-
-            for idx, renderer_idx in enumerate(trainingTeapots):
-                renderer_i = renderer_teapots[renderer_idx]
-                rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
-                chThError.opendr_input = rendererGray
-                chThErrors[idx, az_i] = chThError.r
-
-            # chThErrors8 = np.append(chThErrors8, chThError8.r)
-            robustErrors = np.append(robustErrors, errorFunRobust.r)
-            gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
-
-        x1,x2,y1,y2 = plt.axis()
-
-        robustErrors = robustErrors - np.min(robustErrors)
-        gaussianErrors = gaussianErrors - np.min(gaussianErrors)
-        chThErrors = chThErrors - np.min(chThErrors)
-        plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
-        plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
-
-        chThError.opendr_input = renderer
-        lineStyles = ['-', '--', '-.', ':']
-        for renderer_idx in range(len(trainingTeapots)):
-            plt.plot(angles, chThErrors[renderer_idx]*y2/np.max(chThErrors[renderer_idx]), linestyle=lineStyles[np.mod(renderer_idx,4)], c='y')
-
-        prodErrors = np.prod(chThErrors, axis=0)
-        plt.plot(angles, prodErrors*y2/np.max(prodErrors), linestyle='-', c='black')
-        meanErrors = np.mean(chThErrors, axis=0)
-        plt.plot(angles, meanErrors*y2/np.max(meanErrors), linestyle='--', c='black')
-
-        # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
-        # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
-        plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
-        plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
-        plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
-
-        chAz[:] = testAzsRel[test_i]
-
-        plt.xlabel('Sample')
-        plt.ylabel('Angular error')
-
-        plt.axis((0,360,y1,y2))
-        plt.title('Neuralnet multiple predictions')
-        fig.savefig(resultDir + 'nn_samples/' + 'sample' + str(test_i) + '_predapp.png', bbox_inches='tight')
-        plt.close(fig)
     #
     # azsGmms = []
     # elevsGmms = []
@@ -1012,8 +928,10 @@ modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 # pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
+
 # if optimizationTypeDescr[optimizationType] != 'predict':
 startTime = time.time()
+samplingMode = False
 if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
     for test_i in range(len(testAzsRel)):
 
@@ -1085,7 +1003,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             chVColors[:] = color
             chLightSHCoeffs[:] = lightCoefficientsRel
 
-            model = 0
+            model = 1
             errorFun = models[model]
 
             bestPredAz = chAz.r
@@ -1096,25 +1014,33 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
             if recognitionType == 2:
 
+                if not os.path.exists(resultDir + 'az_samples/test' + str(test_i) + '/'):
+                    os.makedirs(resultDir + 'az_samples/test' + str(test_i) + '/')
+                samplingMode = True
+                cv2.imwrite(resultDir + 'az_samples/test' + str(test_i)  + '_gt.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
                 stds[:] = 0.1
 
-                azSampleStdev = np.sqrt(np.var(azsPredictions[test_i]))
+                azSampleStdev = 1.5*np.sqrt(np.var(azsPredictions[test_i]))
                 predAz = chAz.r
                 numSamples = max(int(2*azSampleStdev*180./(np.pi*10.)),1)
                 azSamples = np.linspace(0, azSampleStdev, numSamples)
                 totalAzSamples = predAz + np.concatenate([azSamples, -azSamples[1:]])
+                sampleAzNum  = 0
                 for sampleAz in totalAzSamples:
+                    global iterat
+                    iterat = 0
+                    sampleAzNum += 1
 
                     chAz[:] = sampleAz
                     # chEl[:] = elsample
                     print("Minimizing first step")
                     # model = 1
                     # errorFun = models[model]
-                    # method=1
+                    method = 1
 
                     chLightSHCoeffs[:] = lightCoefficientsRel
                     chVColors[:] = color
-                    free_variables = [chVColors, chLightSHCoeffs]
+                    free_variables = [chVColors, chLightSHCoeffs[1:4]]
                     options={'disp':False, 'maxiter':5}
                     ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -1122,8 +1048,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                         print("Found best angle!")
                         bestPredModelLik = errorFun.r.copy()
-                        bestPredAz = chAz.r.copy()
-                        # bestPredEl = min(max(chEl.r.copy(),radians(1)), np.pi/2-radians(1))
+                        bestPredAz = sampleAz
+                        bestPredEl = min(max(chEl.r.copy(),radians(1)), np.pi/2-radians(1))
                         bestPredVColors = chVColors.r.copy()
                         bestPredLightSHCoeffs = chLightSHCoeffs.r.copy()
                         bestModelLik = errorFun.r.copy()
@@ -1148,18 +1074,21 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             global iterat
             iterat = 0
 
+            samplingMode = False
+            sampleAzNum = 0
+
             sys.stdout.flush()
             if optimizationTypeDescr[optimizationType] == 'optimize':
-                print("** Minimizing intial predicted parameters. **")
-                model=1
+                print("** Minimizing from initial predicted parameters. **")
+                model = 1
                 errorFun = models[model]
                 # errorFun = chThError
-                method=0
+                method = 1
                 stds[:] = 0.1
 
                 options={'disp':False, 'maxiter':50}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-                free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+                free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs[1:4]]
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
