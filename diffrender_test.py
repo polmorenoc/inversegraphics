@@ -178,10 +178,11 @@ t = time.time()
 
 def cb(_):
     global t
+    global samplingMode
     elapsed_time = time.time() - t
     print("Ended interation in  " + str(elapsed_time))
 
-    if samplingMode == True:
+    if samplingMode:
         analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
     else:
         analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/min_azNum' + str(sampleAzNum) +  '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
@@ -246,8 +247,9 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-testSet = np.load(experimentDir + 'test.npy')[:10]
+testSet = np.load(experimentDir + 'test.npy')[:100]
 testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
+# [13:14]
 
 #Bad samples for data set train5 out normal.
 # testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
@@ -690,6 +692,7 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     global stds
     global chAz
     global test_i
+    global samplingMode
 
     plt.ioff()
     fig = plt.figure()
@@ -763,12 +766,21 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
     plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
 
+
     plt.axvline(np.mod(currentAz*180/np.pi, 360), linewidth=2, linestyle='--',c='b')
 
-    cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
     plt.xlabel('Sample')
     plt.ylabel('Angular error')
+
+    if samplingMode == False:
+
+        scaleAzSamples = np.array(errorFunAzSamples)
+        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+        scaleAzSamples = scaleAzSamples*0.5*y2/np.max(scaleAzSamples)
+        for azSample_i, azSample in enumerate(scaleAzSamples):
+            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=5., c='r')
+
 
     plt.axis((0,360,y1,y2))
     plt.title('Neuralnet multiple predictions')
@@ -776,7 +788,7 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     plt.close(fig)
 
     chAz[:] = currentAz
-
+    cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
     #
     # azsGmms = []
@@ -1013,19 +1025,21 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
             if recognitionType == 2:
-
+                errorFunAzSamples = []
                 if not os.path.exists(resultDir + 'az_samples/test' + str(test_i) + '/'):
                     os.makedirs(resultDir + 'az_samples/test' + str(test_i) + '/')
                 samplingMode = True
                 cv2.imwrite(resultDir + 'az_samples/test' + str(test_i)  + '_gt.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
                 stds[:] = 0.1
 
-                azSampleStdev = 1.5*np.sqrt(np.var(azsPredictions[test_i]))
+                # azSampleStdev = np.std(azsPredictions[test_i])
+                azSampleStdev = np.sqrt(-np.log(np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2))
                 predAz = chAz.r
-                numSamples = max(int(2*azSampleStdev*180./(np.pi*10.)),1)
+                numSamples = max(int(azSampleStdev*180./(np.pi*40.)),1)
                 azSamples = np.linspace(0, azSampleStdev, numSamples)
                 totalAzSamples = predAz + np.concatenate([azSamples, -azSamples[1:]])
                 sampleAzNum  = 0
+
                 for sampleAz in totalAzSamples:
                     global iterat
                     iterat = 0
@@ -1040,6 +1054,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                     chLightSHCoeffs[:] = lightCoefficientsRel
                     chVColors[:] = color
+                    #Todo test with adding chEl.
                     free_variables = [chVColors, chLightSHCoeffs[1:4]]
                     options={'disp':False, 'maxiter':5}
                     ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
@@ -1055,11 +1070,17 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                         bestModelLik = errorFun.r.copy()
                         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_predSample' + str(numPredSamples) + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
+                    errorFunAzSamples = errorFunAzSamples + [errorFun.r]
+
                 color = bestPredVColors
                 lightCoefficientsRel = bestPredLightSHCoeffs
                 az = bestPredAz
 
                     # previousAngles = np.vstack([previousAngles, np.array([[azsample, elsample],[chAz.r.copy(), chEl.r.copy()]])])
+
+                samplingMode = False
+                chAz[:] = az
+                analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel, azsPredictions[test_i], sampleStds=stds.r)
 
             chAz[:] = az
             chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
@@ -1074,7 +1095,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             global iterat
             iterat = 0
 
-            samplingMode = False
+
             sampleAzNum = 0
 
             sys.stdout.flush()
@@ -1090,6 +1111,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
                 free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs[1:4]]
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+                samplingMode = True
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
             if errorFun.r < bestModelLik:
