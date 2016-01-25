@@ -182,10 +182,10 @@ def cb(_):
     elapsed_time = time.time() - t
     print("Ended interation in  " + str(elapsed_time))
 
-    if samplingMode:
-        analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
-    else:
-        analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/min_azNum' + str(sampleAzNum) +  '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+    # if samplingMode:
+    #     analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+    # else:
+    #     analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/min_azNum' + str(sampleAzNum) +  '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
 
     global pixelErrorFun
     global errorFun
@@ -215,21 +215,23 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_std01_nnsampling_optAllSH1to4_badsamples'
+testPrefix = 'train4_occlusion_pred_train4occlusion10k_100s_std01_nnsampling_optAllSH1to4_nnAppLight'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'linRegModelSHZernike' ])
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','neuralNetModelSHLight' ])
 parameterRecognitionModels = set(['neuralNetPose', 'linearRegressionVColors','constantSHLight' ])
+parameterRecognitionModels = set(['neuralNetPose', 'neuralNetApperanceAndLight' ])
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
 gtPrefix = 'train4_occlusion'
 experimentPrefix = 'train4_occlusion_10k'
 trainPrefixPose = 'train4_occlusion_10k'
-trainPrefixVColor = 'train4'
+trainPrefixVColor = 'train4_occlusion_10k'
 trainPrefixLightCoeffs = 'train4'
+trainModelsDirAppLight = 'train4_occlusion_10k'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 featuresDir = gtDir
 
@@ -237,6 +239,7 @@ experimentDir = 'experiments/' + experimentPrefix + '/'
 trainModelsDirPose = 'experiments/' + trainPrefixPose + '/'
 trainModelsDirVColor = 'experiments/' + trainPrefixVColor + '/'
 trainModelsDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
+trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 resultDir = 'results/' + testPrefix + '/'
 
 ignoreGT = True
@@ -248,7 +251,7 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')[:100]
-testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
+# testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
 
 #Bad samples for data set train5 out normal.
@@ -362,7 +365,7 @@ recognitionType = 2
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 1
-computePredErrorFuns = True
+computePredErrorFuns = False
 
 method = 1
 model = 1
@@ -397,6 +400,7 @@ nearGTOffsetLighCoeffs = np.zeros(9)
 nearGTOffsetVColor = np.zeros(3)
 
 #Load trained recognition models
+nnBatchSize = 100
 
 if 'neuralNetPose' in parameterRecognitionModels:
     poseModel = ""
@@ -413,7 +417,12 @@ if 'neuralNetPose' in parameterRecognitionModels:
 
     network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
     posePredictionFun = lasagne_nn.get_prediction_fun(network)
-    posePredictions = posePredictionFun(grayTestImages.astype(np.float32))
+
+    posePredictions = np.zeros([len(grayTestImages), 4])
+    for start_idx in range(0, max(len(grayTestImages) - nnBatchSize,0) + 1, nnBatchSize):
+        posePredictions[start_idx:start_idx + nnBatchSize] = posePredictionFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+    # posePredictions = posePredictionFun(grayTestImages.astype(np.float32))
+
     cosAzsPred = posePredictions[:,0]
     sinAzsPred = posePredictions[:,1]
     cosElevsPred = posePredictions[:,2]
@@ -437,7 +446,10 @@ if 'neuralNetPose' in parameterRecognitionModels:
     cosAzsPredSamples = []
     sinAzsPredSamples = []
     for i in range(100):
-        posePredictionsSample = nonDetPosePredictionFun(grayTestImages.astype(np.float32))
+        posePredictionsSample = np.zeros([len(grayTestImages), 4])
+        for start_idx in range(0, max(len(grayTestImages) - nnBatchSize,0) + 1, nnBatchSize):
+            posePredictionsSample[start_idx:start_idx + nnBatchSize] = nonDetPosePredictionFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+
         cosAzsPredSample = posePredictionsSample[:,0]
         sinAzsPredSample = posePredictionsSample[:,1]
         cosAzsPredSamples = cosAzsPredSamples + [cosAzsPredSample[:,None]]
@@ -445,6 +457,49 @@ if 'neuralNetPose' in parameterRecognitionModels:
 
     cosAzsPredSamples = np.hstack(cosAzsPredSamples)
     sinAzsPredSamples = np.hstack(sinAzsPredSamples)
+
+
+if 'neuralNetApperanceAndLight' in parameterRecognitionModels:
+    nnModel = ""
+    with open(trainModelsDirAppLight + 'neuralNetModelAppLightCorrect.pickle', 'rb') as pfile:
+        neuralNetModelAppLight = pickle.load(pfile)
+
+    meanImage = neuralNetModelAppLight['mean']
+    modelType = neuralNetModelAppLight['type']
+    param_values = neuralNetModelAppLight['params']
+
+    testImages = images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+
+    network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+    appLightPredictionFun = lasagne_nn.get_prediction_fun(network)
+
+    appLightPredictions = np.zeros([len(testImages), 12])
+    for start_idx in range(0, max(len(testImages) - nnBatchSize + 1,1), nnBatchSize):
+        appLightPredictions[start_idx:start_idx + nnBatchSize] = appLightPredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+
+    # appLightPredictions = appLightPredictionFun(testImages.astype(np.float32))
+    relLightCoefficientsGTPred = appLightPredictions[:,:9]
+    vColorsPred = appLightPredictions[:,9:]
+
+if 'neuralNetVColors' in parameterRecognitionModels:
+    nnModel = ""
+    with open(trainModelsDirVColor + 'neuralNetModelAppearance.pickle', 'rb') as pfile:
+        neuralNetModelAppearance = pickle.load(pfile)
+
+    meanImage = neuralNetModelAppearance['mean']
+    modelType = neuralNetModelAppearance['type']
+    param_values = neuralNetModelAppearance['params']
+
+    testImages = images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+
+    network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+    appPredictionFun = lasagne_nn.get_prediction_fun(network)
+
+    appPredictions = np.zeros([len(grayTestImages), 3])
+    for start_idx in range(0, max(len(grayTestImages) - nnBatchSize,0) + 1, nnBatchSize):
+        appPredictions[start_idx:start_idx + nnBatchSize] = appPredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+
+    vColorsPred = appPredictions
 
 
 if 'randForestAzs' in parameterRecognitionModels:
@@ -777,9 +832,29 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
 
         scaleAzSamples = np.array(errorFunAzSamples)
         scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-        scaleAzSamples = scaleAzSamples*0.5*y2/np.max(scaleAzSamples)
+        scaleAzSamples = scaleAzSamples*0.25*y2/np.max(scaleAzSamples)
         for azSample_i, azSample in enumerate(scaleAzSamples):
             plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=5., c='r')
+
+        scaleAzSamples = np.array(errorFunGaussianAzSamples)
+        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+        scaleAzSamples = scaleAzSamples*0.4*y2/np.max(scaleAzSamples)
+        for azSample_i, azSample in enumerate(scaleAzSamples):
+            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=5., c='g')
+
+        scaleAzSamples = np.array(errorFunAzSamplesPred)
+        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+        scaleAzSamples = scaleAzSamples*0.65*y2/np.max(scaleAzSamples)
+        for azSample_i, azSample in enumerate(scaleAzSamples):
+            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=5., c='b')
+
+        scaleAzSamples = np.array(errorFunGaussianAzSamplesPred)
+        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+        scaleAzSamples = scaleAzSamples*0.75*y2/np.max(scaleAzSamples)
+        for azSample_i, azSample in enumerate(scaleAzSamples):
+            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=5., c='y')
+
+
 
 
     plt.axis((0,360,y1,y2))
@@ -989,27 +1064,6 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 #
                 # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
 
-            # else:
-            #     #Sampling
-            #     # poseComps, vmAzParams, vmElParams = testPredPoseGMMs[test_i]
-            #     sampleComp = choice(len(poseComps), size=1, p=poseComps)
-            #     # az = np.random.vonmises(vmAzParams[sampleComp][0],vmAzParams[sampleComp][1],1)
-            #     # el = np.random.vonmises(vmElParams[sampleComp][0],vmElParams[sampleComp][1],1)
-            #     az = azsPred[test_i]
-            #     el = elevsPred[test_i]
-            #
-            #     color = vColorsPred[test_i]
-            #     lightCoefficientsGTRel = relLightCoefficientsGTPred[test_i]
-
-            # chAz[:] = testAzsRel[test_i]
-            # chEl[:] = testElevsGT[test_i]
-            # chVColors[:] =  testVColorGT[test_i]
-            # # chVColors[:] = testPredVColors[test_i]
-            #
-            # chLightSHCoeffs[:] =testLightCoefficientsGTRel[test_i]
-            #
-            # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_reconstructed'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-
             chAz[:] = az
             chEl[:] = el
             chVColors[:] = color
@@ -1026,19 +1080,25 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
             if recognitionType == 2:
                 errorFunAzSamples = []
+                errorFunAzSamplesPred = []
+                errorFunGaussianAzSamplesPred = []
+                errorFunGaussianAzSamples = []
+
                 if not os.path.exists(resultDir + 'az_samples/test' + str(test_i) + '/'):
                     os.makedirs(resultDir + 'az_samples/test' + str(test_i) + '/')
                 samplingMode = True
                 cv2.imwrite(resultDir + 'az_samples/test' + str(test_i)  + '_gt.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
                 stds[:] = 0.1
-
+                # ipdb.set_trace()
                 # azSampleStdev = np.std(azsPredictions[test_i])
-                azSampleStdev = np.sqrt(-np.log(np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2))
+                azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
                 predAz = chAz.r
-                numSamples = max(int(azSampleStdev*180./(np.pi*40.)),1)
-                azSamples = np.linspace(0, azSampleStdev, numSamples)
+                numSamples = max(int(np.ceil(1.5*azSampleStdev*180./(np.pi*25.))),1)
+                azSamples = np.linspace(0, 1.5*azSampleStdev, numSamples)
                 totalAzSamples = predAz + np.concatenate([azSamples, -azSamples[1:]])
                 sampleAzNum  = 0
+
+                analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/pre_azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
 
                 for sampleAz in totalAzSamples:
                     global iterat
@@ -1057,7 +1117,13 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                     #Todo test with adding chEl.
                     free_variables = [chVColors, chLightSHCoeffs[1:4]]
                     options={'disp':False, 'maxiter':5}
+
+                    errorFunAzSamplesPred = errorFunAzSamplesPred + [errorFun.r]
+                    errorFunGaussianAzSamplesPred = errorFunGaussianAzSamplesPred + [models[0].r]
+
                     ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                    analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum), rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
 
                     if errorFun.r < bestPredModelLik:
 
@@ -1068,9 +1134,12 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                         bestPredVColors = chVColors.r.copy()
                         bestPredLightSHCoeffs = chLightSHCoeffs.r.copy()
                         bestModelLik = errorFun.r.copy()
+
                         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_predSample' + str(numPredSamples) + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                     errorFunAzSamples = errorFunAzSamples + [errorFun.r]
+                    errorFunGaussianAzSamples = errorFunGaussianAzSamples + [models[0].r]
+
 
                 color = bestPredVColors
                 lightCoefficientsRel = bestPredLightSHCoeffs

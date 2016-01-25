@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 
 #Main script options:
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -57,7 +57,7 @@ if glMode == 'glfw':
     # glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.05
+clip_start = 0.001
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
@@ -219,7 +219,7 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train4_occlusion'
+prefix = 'train3_occlusion'
 
 print("Creating Ground Truth")
 
@@ -258,22 +258,9 @@ print("Generating renders")
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-scenesToRender = range(len(sceneLines))[:]
-lenScenes = 0
-for sceneIdx in scenesToRender:
-    sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-    sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
+scenesToRender = range(len(sceneLines))[4:]
 
-    lenScenes += len(targetIndices)
-    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
-    with open(collisionSceneFile, 'rb') as pfile:
-        collisions = pickle.load(pfile)
-
-    for targetidx, targetIndex in enumerate(targetIndices):
-        if not collisions[targetIndex][1]:
-            print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
-
-trainSize = 100000
+trainSize = 20000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -339,10 +326,48 @@ if train_i == 0:
     np.random.seed(1)
 unlinkedObj = None
 
+renderOcclusions = True
+
+scenesToRenderOcclusions = []
+scenes = []
+lenScenes = 0
 for sceneIdx in scenesToRender:
 
-    print("Rendering scene: " + str(sceneIdx))
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+    sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
+
+    if renderOcclusions:
+        targetIndicesNew = []
+        occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
+        with open(occlusionSceneFile, 'rb') as pfile:
+            occlusions = pickle.load(pfile)
+
+        for targetidx, targetIndex in enumerate(targetIndices):
+            if not occlusions[targetIndex][1]:
+                print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " has no proper occlusion.")
+            else:
+                targetIndicesNew = targetIndicesNew + [targetIndex]
+        targetIndices = targetIndicesNew
+
+    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
+    scenes = scenes + [targetIndices]
+    with open(collisionSceneFile, 'rb') as pfile:
+        collisions = pickle.load(pfile)
+
+    for targetidx, targetIndex in enumerate(targetIndices):
+        if not collisions[targetIndex][1]:
+            print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
+
+    lenScenes += len(targetIndices)
+
+for scene_i, sceneIdx in enumerate(scenesToRender):
+
+    print("Rendering scene: " + str(sceneIdx))
+    sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+
+    targetIndices = scenes[scene_i]
+    if not targetIndices:
+        continue
 
     sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
     # v, f_list, vc, vn, uv, haveTextures_list, textures_list = sceneimport.loadSavedScene(sceneDicFile)
@@ -352,6 +377,11 @@ for sceneIdx in scenesToRender:
     collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
     with open(collisionSceneFile, 'rb') as pfile:
         collisions = pickle.load(pfile)
+
+    if renderOcclusions:
+        occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
+        with open(occlusionSceneFile, 'rb') as pfile:
+            occlusions = pickle.load(pfile)
 
     if useBlender and not loadBlenderSceneFile:
         bpy.ops.wm.read_factory_settings()
@@ -392,20 +422,24 @@ for sceneIdx in scenesToRender:
 
         scene.cycles.device = 'GPU'
         bpy.context.user_preferences.system.compute_device_type = 'CUDA'
-        ipdb.set_trace()
+
         bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
         bpy.ops.wm.save_userpref()
+
+        scene.world.horizon_color = mathutils.Color((1.0,1.0,1.0))
+        scene.camera.data.clip_start = 0.001
 
     unlinkedObj = None
     envMapFilename = None
 
     for targetidx, targetIndex in enumerate(targetIndices):
-        targetPosition = targetPositions[targetidx]
-        collisionProbs = np.zeros(len(collisions[targetIndex][1]))
+        targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
         import copy
         v, f_list, vc, vn, uv, haveTextures_list, textures_list = copy.deepcopy(v2), copy.deepcopy(f_list2), copy.deepcopy(vc2), copy.deepcopy(vn2), copy.deepcopy(uv2), copy.deepcopy(haveTextures_list2),  copy.deepcopy(textures_list2)
 
         removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+
+        collisionProbs = np.zeros(len(collisions[targetIndex][1]))
 
         # removeObjectData(int(targetIndex-1), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
@@ -413,6 +447,14 @@ for sceneIdx in scenesToRender:
             collisionProbs[intervalIdx] = collisions[targetIndex][1][intervalIdx][1] - collisions[targetIndex][1][intervalIdx][0]
 
         collisionsProbs = collisionProbs / np.sum(collisionProbs)
+
+        if renderOcclusions:
+            occlusionProbs = np.zeros(len(occlusions[targetIndex][1]))
+
+            for intervalIdx, interval in enumerate(occlusions[targetIndex][1]):
+                occlusionProbs[intervalIdx] = abs(occlusions[targetIndex][1][intervalIdx][1] - occlusions[targetIndex][1][intervalIdx][0])
+
+            occlusionProbs = occlusionProbs / np.sum(occlusionProbs)
 
         if useBlender:
             if unlinkedObj != None:
@@ -490,6 +532,7 @@ for sceneIdx in scenesToRender:
                     # updateEnviornmentMap(envMapFilename, scene)
 
                 for numTeapotTrain in range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList)))):
+
                     print("New iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
                     ignore = False
                     chAmbientIntensityGT[:] = 0.75/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
@@ -499,11 +542,19 @@ for sceneIdx in scenesToRender:
                     from numpy.random import choice
                     objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
                     objAzGT = np.random.uniform(0,1)*(collisions[targetIndex][1][objAzInterval][1] - collisions[targetIndex][1][objAzInterval][0]) + collisions[targetIndex][1][objAzInterval][0]
+
                     objAzGT = objAzGT*np.pi/180
                     chObjAzGT[:] = objAzGT.copy()
 
-                    chAzGT[:] = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
-                    chElGT[:] = np.random.uniform(0,np.pi/2, 1)
+                    if renderOcclusions:
+                        azInterval = choice(len(occlusionProbs), size=1, p=occlusionProbs)
+                        azGT = np.random.uniform(0,1)*(occlusions[targetIndex][1][azInterval][1] - occlusions[targetIndex][1][azInterval][0]) + occlusions[targetIndex][1][azInterval][0]
+                        chAzGT[:] = azGT*np.pi/180
+                    else:
+                        chAzGT[:] = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
+
+
+                    chElGT[:] = np.random.uniform(0.05,np.pi/2, 1)
 
                     chLightAzGT[:] = np.random.uniform(0,2*np.pi, 1)
                     chLightElGT[:] = np.random.uniform(0,np.pi/3, 1)
@@ -556,7 +607,7 @@ for sceneIdx in scenesToRender:
                     image = rendererGT.r[:].copy()
                     lin2srgb(image)
 
-                    if useBlender and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
+                    if useBlender and not ignore and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
                         ignore = True
 
                     if not ignore:
@@ -566,6 +617,8 @@ for sceneIdx in scenesToRender:
                             cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
                         cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+
 
                         #Add groundtruth to arrays
                         trainAzsGT = chAzGT.r

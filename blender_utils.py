@@ -455,7 +455,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
 
     camera.up_axis = 'Y'
     camera.data.angle = 60 * 180 / numpy.pi
-    camera.data.clip_start = 0.01
+    camera.data.clip_start = 0.001
     camera.data.clip_end = 10
 
     roomInstance = scene.objects[str(roomInstanceNum)]
@@ -484,7 +484,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
 
     world.light_settings.use_environment_light = False
     world.light_settings.environment_energy = 0.0
-    world.horizon_color = mathutils.Color((0.0,0.0,0.0))
+    world.horizon_color = mathutils.Color((1.0,1.0,1.0))
     # world.light_settings.samples = 20
 
     # world.light_settings.use_ambient_occlusion = False

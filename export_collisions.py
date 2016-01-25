@@ -104,7 +104,7 @@ for sceneIdx in range(len(sceneLines))[7:8]:
         intervals = []
         initInterval = 0
         endInterval = 0
-        ipdb.set_trace()
+
         for idx, intersection in enumerate(intersections):
             if not intersection[1]:
                 if startInterval:
@@ -123,6 +123,7 @@ for sceneIdx in range(len(sceneLines))[7:8]:
                 intervals = intervals + [[initInterval, endInterval+collisionInterval]]
             else:
                 intervals = intervals + [[initInterval, endInterval]]
+
 
 
         targetCollisions[targetParentIndex] = (targetParentPosition, intervals)

@@ -82,7 +82,7 @@ dataElevsGT = groundTruth['trainElevsGT']
 # dataLightAzsGT = groundTruth['trainLightAzsGT']
 # dataLightElevsGT = groundTruth['trainLightElevsGT']
 # dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
-# dataVColorGT = groundTruth['trainVColorGT']
+dataVColorGT = groundTruth['trainVColorGT']
 # dataScenes = groundTruth['trainScenes']
 dataTeapotIds = groundTruth['trainTeapotIds']
 # dataEnvMaps = groundTruth['trainEnvMaps']
@@ -91,8 +91,8 @@ dataTeapotIds = groundTruth['trainTeapotIds']
 # dataComponentsGT = groundTruth['trainComponentsGT']
 # dataComponentsGTRel = groundTruth['trainComponentsGTRel']
 # dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
-# dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
-# dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
+dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
 
 gtDtype = groundTruth.dtype
@@ -103,7 +103,7 @@ gtDtype = groundTruth.dtype
 trainAzsRel = np.mod(dataAzsGT - dataObjAzsGT, 2*np.pi)
 trainElevsGT = dataElevsGT
 # trainComponentsGTRel = dataComponentsGTRel
-# trainVColorGT = dataVColorGT
+trainVColorGT = dataVColorGT
 
 loadFromHdf5 = False
 
@@ -173,6 +173,7 @@ parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF'])
 # parameterTrainSet = set(['spherical_harmonicsZernike'])
 # parameterTrainSet = set(['spherical_harmonicsNN'])
 parameterTrainSet = set(['poseNN'])
+parameterTrainSet = set(['appearanceNN'])
 
 print("Training recognition models.")
 
@@ -199,7 +200,7 @@ if 'poseNN' in parameterTrainSet:
 
     pretrainedExperimentDir =  'experiments/train3_test/'
     if fineTune:
-        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPoseCuda.pickle'
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPose.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
             neuralNetModelPose = pickle.load(pfile)
 
@@ -220,6 +221,96 @@ if 'poseNN' in parameterTrainSet:
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(poseNNmodel, pfile)
+
+
+if 'appearanceAndLightNN' in parameterTrainSet:
+    modelType = 'cnn_appLight'
+    network = lasagne_nn.load_network(modelType=modelType, param_values=[])
+
+    print("Training NN Appereance and Light Components")
+    validRatio = 0.9
+
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    # grayTrainImages =  grayImages[trainValSet][:,:,:]
+    # grayValidImages =  grayImages[validSet][:,:,:]
+    # grayTrainImages = grayTrainImages[:,None, :,:]
+    # grayValidImages = grayValidImages[:,None, :,:]
+    # import sys
+    # sys.exit("NN")
+    param_values = []
+
+    fineTune = False
+
+    pretrainedExperimentDir =  'experiments/train3_test/'
+    if fineTune:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAppLight.pickle'
+        with open(pretrainedModelFile, 'rb') as pfile:
+            neuralNetModelPose = pickle.load(pfile)
+
+        meanImage = neuralNetModelPose['mean']
+        # ipdb.set_trace()
+        modelType = neuralNetModelPose['type']
+        param_values = neuralNetModelPose['params']
+    else:
+        meanImage = np.zeros([150, 150,3])
+
+    modelPath=experimentDir + 'neuralNetModelAppLightCorrect.pickle'
+
+    appLightGT = np.hstack([dataLightCoefficientsGTRel*dataAmbientIntensityGT[:,None] , trainVColorGT])
+
+    appLightNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), appLightGT[trainValSet].astype(np.float32), appLightGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(appLightNNmodel, pfile)
+
+
+if 'appearanceNN' in parameterTrainSet:
+    modelType = 'cnn_app'
+    network = lasagne_nn.load_network(modelType=modelType, param_values=[])
+
+    print("Training NN Appereance and Light Components")
+    validRatio = 0.9
+
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    # grayTrainImages =  grayImages[trainValSet][:,:,:]
+    # grayValidImages =  grayImages[validSet][:,:,:]
+    # grayTrainImages = grayTrainImages[:,None, :,:]
+    # grayValidImages = grayValidImages[:,None, :,:]
+    # import sys
+    # sys.exit("NN")
+    param_values = []
+
+    fineTune = False
+
+    pretrainedExperimentDir =  'experiments/train3_test/'
+    if fineTune:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAppearance.pickle'
+        with open(pretrainedModelFile, 'rb') as pfile:
+            neuralNetModelPose = pickle.load(pfile)
+
+        meanImage = neuralNetModelPose['mean']
+        # ipdb.set_trace()
+        modelType = neuralNetModelPose['type']
+        param_values = neuralNetModelPose['params']
+    else:
+        meanImage = np.zeros([150, 150,3])
+
+    modelPath=experimentDir + 'neuralNetModelAppearance.pickle'
+
+    appLightNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), trainVColorGT[trainValSet].astype(np.float32), trainVColorGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(appLightNNmodel, pfile)
 
 if 'azimuthsRF' in parameterTrainSet:
     print("Training RFs Cos Azs")
