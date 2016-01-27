@@ -258,7 +258,7 @@ print("Generating renders")
 
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
-scenesToRender = range(len(sceneLines))[4:]
+scenesToRender = range(len(sceneLines))[:]
 
 trainSize = 20000
 
