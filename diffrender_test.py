@@ -278,7 +278,6 @@ test = np.arange(len(testSet))
 testSet = testSet[test]
 
 print("Reading experiment.")
-
 dataAzsGT = groundTruth['trainAzsGT']
 dataObjAzsGT = groundTruth['trainObjAzsGT']
 dataElevsGT = groundTruth['trainElevsGT']
@@ -1480,7 +1479,7 @@ plt.close(fig)
 directory = resultDir + 'occlusion_shcoeffsserrors'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
-plt.scatter(testOcclusions * 100.0, errorsLightCoeffs)
+plt.scatter(testOcclusions * 100.0, np.mean(errorsLightCoeffs,axis=1))
 plt.xlabel('Occlusion (%)')
 plt.ylabel('Vertex Colors errors')
 x1,x2,y1,y2 = plt.axis()
