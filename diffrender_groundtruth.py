@@ -57,7 +57,7 @@ if glMode == 'glfw':
     # glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.001
+clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
@@ -219,9 +219,9 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train4_occlusion_wmask'
+prefix = 'train4_occlusion_mask'
 
-renderFromPreviousGT = False
+renderFromPreviousGT = True
 
 print("Creating Ground Truth")
 
@@ -265,7 +265,7 @@ replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[0:1]
 
-trainSize = 10
+trainSize = 20
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -275,15 +275,16 @@ renderTeapotsList = np.arange(len(teapots))[0:1]
 
 ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
 
-hdritems = list(envMapDic.items())[0:1]
+hdritems = list(envMapDic.items())[:]
 hdrstorender = []
-maxhdridx = -1
 phiOffsets = [0, np.pi/2, np.pi, 3*np.pi/2]
+
 for hdrFile, hdrValues in hdritems:
     hdridx = hdrValues[0]
     envMapCoeffs = hdrValues[1]
     if hdridx not in ignoreEnvMaps:
         hdrstorender = hdrstorender + [(hdrFile,hdrValues)]
+
 
     # if not os.path.exists('light_probes/envMap' + str(hdridx)):
     #     os.makedirs('light_probes/envMap' + str(hdridx))
@@ -307,8 +308,7 @@ for hdrFile, hdrValues in hdritems:
     #     chComponentGTRel[:] = chAmbientSHGTRel.r[:].copy()
     #     cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
 # sys.exit("")
-    if hdridx > maxhdridx:
-        maxhdridx = hdridx
+
 
 gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainComponentsGT', trainComponentsGT.dtype, (9,)),('trainComponentsGTRel', trainComponentsGTRel.dtype, (9,)), ('trainLightCoefficientsGT',trainLightCoefficientsGT.dtype, (9,)), ('trainLightCoefficientsGTRel', trainLightCoefficientsGTRel.dtype, (9,)), ('trainAmbientIntensityGT', trainAmbientIntensityGT.dtype), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype)]
 
@@ -334,7 +334,7 @@ if train_i == 0:
     np.random.seed(1)
 unlinkedObj = None
 
-renderOcclusions = True
+renderOcclusions = False
 
 scenesToRenderOcclusions = []
 scenes = []
@@ -370,6 +370,7 @@ for sceneIdx in scenesToRender:
 
 #Generate GT labels before rendering them.
 if not renderFromPreviousGT:
+
     for scene_i, sceneIdx in enumerate(scenesToRender):
 
         print("Generating groundtruth for scene: " + str(sceneIdx))
@@ -501,7 +502,7 @@ if renderFromPreviousGT:
     previousGTPrefix = 'train4_occlusion'
     groundTruthFilename = 'groundtruth/' + previousGTPrefix + '/groundTruth.h5'
     gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
-    groundTruthToRender = gtDataFileToRender[previousGTPrefix]['trainIds']
+    groundTruthToRender = gtDataFileToRender[previousGTPrefix]
 else:
     groundTruthToRender = gtDataFileToRender[prefix]
 
@@ -511,17 +512,14 @@ currentScene = -1
 currentTeapot = -1
 currentTargetIndex = -1
 
-for gtIdx in range(trainSize):
+for gtIdx in range(len(groundTruthToRender)):
 
-    sceneIdx = groundTruthToRender['trainScenes'][gtIdx]
+    sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
 
+    sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
 
     print("Rendering scene: " + str(sceneIdx))
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-
-    targetIndices = scenes[scene_i]
-    if not targetIndices:
-        continue
 
     sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 
@@ -574,7 +572,7 @@ for gtIdx in range(trainSize):
             bpy.ops.wm.save_userpref()
 
             scene.world.horizon_color = mathutils.Color((1.0,1.0,1.0))
-            scene.camera.data.clip_start = 0.001
+            scene.camera.data.clip_start = 0.05
 
     unlinkedObj = None
     envMapFilename = None
@@ -635,19 +633,21 @@ for gtIdx in range(trainSize):
 
     for hdrFile, hdrValues in hdritems:
         if hdridx == hdrValues[0]:
+
             envMapCoeffs[:] = hdrValues[1]
-            break
+            envMapFilename = hdrFile
 
         # envMapCoeffs[:] = np.array([[0.5,0,0.0,1,0,0,0,0,0], [0.5,0,0.0,1,0,0,0,0,0],[0.5,0,0.0,1,0,0,0,0,0]]).T
 
-        envMapFilename = hdrFile
+
             # updateEnviornmentMap(envMapFilename, scene)
-        envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+            envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+            break
 
     if useBlender:
         tm = cv2.createTonemapDrago(gamma=2.2)
         tmEnvMap = tm.process(envMapTexture)
-        cv2.imwrite(gtDir + 'sphericalharmonics/envMap' + str(hdridx) + '.jpeg' , 255*tmEnvMap[:,:,[2,1,0]])
+        # cv2.imwrite(gtDir + 'sphericalharmonics/envMap' + str(hdridx) + '.jpeg' , 255*tmEnvMap[:,:,[2,1,0]])
 
         updateEnviornmentMap(envMapFilename, scene)
 
@@ -746,6 +746,7 @@ for gtIdx in range(trainSize):
         if useBlender:
             cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
+        # cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
         np.save(gtDir + 'masks_occlusion/mask' + str(train_i)+ '.npy', vis_occluded)
 
         # cv2.imwrite(gtDir + 'masks/)

@@ -5,6 +5,19 @@ from skimage import data, color, exposure
 import numpy as np
 import ipdb
 
+def cColourDifference(rgb1, rgb2):
+    lab1 = cv2.cvtColor(np.uint8(rgb1.reshape([-1,1,3])*255), cv2.COLOR_RGB2LAB)/255
+    lab2 = cv2.cvtColor(np.uint8(rgb2.reshape([-1,1,3])*255), cv2.COLOR_RGB2LAB)/255
+    dist = np.sqrt(np.sum((lab1[:,0,1:] - lab2[:,0,1:])**2, axis=1))
+    return dist
+
+def eColourDifference(rgb1, rgb2):
+    lab1 = cv2.cvtColor(np.uint8(rgb1.reshape([-1,1,3])*255), cv2.COLOR_RGB2LAB)/255
+    lab2 = cv2.cvtColor(np.uint8(rgb2.reshape([-1,1,3])*255), cv2.COLOR_RGB2LAB)/255
+    dist = np.sqrt(np.sum((lab1[:,0] - lab2[:,0])**2, axis=1))
+    return dist
+
+
 # conf.cellSize = cellSize;
 # conf.numOrientations = 9;
 def computeHoG(image):

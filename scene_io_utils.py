@@ -336,10 +336,9 @@ def getSceneIdx(sceneNumber, scenesFile):
         sceneLine = sceneLines[sceneNum]
         sceneParts = sceneLine.split(' ')
         sceneFile = sceneParts[0]
-        sceneNumber = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
-        if sceneNumber == sceneNumber:
+        sceneNumInFile = int(re.search('.+?scene([0-9]+)\.txt', sceneFile, re.IGNORECASE).groups()[0])
+        if sceneNumInFile == sceneNumber:
             return sceneNum
-
     return -2
 
 def loadBlenderScene(sceneIdx, replaceableScenesFile):
