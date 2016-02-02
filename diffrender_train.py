@@ -117,12 +117,19 @@ loadGray = True
 imagesAreH5 = False
 loadGrayFromHdf5 = False
 
+
 # if not imagesAreH5:
 #     grayImages = readImages(imagesDir, trainSet, loadGray, loadGrayFromHdf5)
 # else:
 #     grayImages = h5py.File(imagesExpDir + 'images_gray.h5', 'r')["images"]
 
-grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+# grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+
+loadMask = True
+gtDirMask = 'groundtruth/train4_occlusion_mask/'
+masksDir =  gtDirMask + 'masks_occlusion/'
+if loadMask:
+    masksGT = loadMasks(masksDir, trainSet)
 
 loadHogFeatures = False
 loadFourierFeatures = False
@@ -176,6 +183,7 @@ parameterTrainSet = set(['poseNN'])
 parameterTrainSet = set(['appearanceAndLightNN'])
 parameterTrainSet = set(['neuralNetModelLight'])
 parameterTrainSet = set(['appearanceNN'])
+parameterTrainSet = set(['maskNN'])
 
 print("Training recognition models.")
 
@@ -293,6 +301,8 @@ if 'appearanceNN' in parameterTrainSet:
     fineTune = False
 
     pretrainedExperimentDir =  'experiments/train3_test/'
+
+
     if fineTune:
         pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAppearanceMask.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
@@ -313,6 +323,53 @@ if 'appearanceNN' in parameterTrainSet:
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(appNNmodel, pfile)
+
+if 'maskNN' in parameterTrainSet:
+    modelType = 'cnn_mask'
+    network = lasagne_nn.load_network(modelType=modelType, param_values=[])
+
+    print("Training NN Appeareance Components")
+    validRatio = 0.9
+
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    meanImage = np.mean(images, axis=0)
+
+    # grayTrainImages =  grayImages[trainValSet][:,:,:]
+    # grayValidImages =  grayImages[validSet][:,:,:]
+    # grayTrainImages = grayTrainImages[:,None, :,:]
+    # grayValidImages = grayValidImages[:,None, :,:]
+    # import sys
+    # sys.exit("NN")
+    param_values = []
+
+    fineTune = True
+
+    pretrainedExperimentDir =  experimentDir
+    if fineTune:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelMask.pickle'
+        with open(pretrainedModelFile, 'rb') as pfile:
+            neuralNetModelMask = pickle.load(pfile)
+
+        meanImage = neuralNetModelMask['mean']
+        # ipdb.set_trace()
+        modelType = neuralNetModelMask['type']
+        param_values = neuralNetModelMask['params']
+    else:
+        meanImage = np.zeros([150, 150,3])
+
+    modelPath=experimentDir + 'neuralNetModelMask.pickle'
+
+    masksGT = masksGT.reshape([-1, 150*150])
+    maskNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), masksGT[trainValSet].astype(np.float32), masksGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(maskNNmodel, pfile)
+
 
 if 'azimuthsRF' in parameterTrainSet:
     print("Training RFs Cos Azs")

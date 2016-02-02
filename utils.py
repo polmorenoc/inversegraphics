@@ -42,6 +42,15 @@ def writeImagesHdf5(imagesDir, writeDir, imageSet, writeGray=False ):
     gtDataFile.close()
     print("Ended writing HDF5 file")
 
+def loadMasks(imagesDir, maskSet):
+    masks = []
+    for imageit, imageid  in enumerate(maskSet):
+
+        if os.path.isfile(imagesDir + 'mask' + str(imageid) + '.npy'):
+            masks = masks + [np.load(imagesDir + 'mask' + str(imageid) + '.npy')[None,:,:]]
+
+    return np.vstack(masks)
+
 def readImages(imagesDir, imageSet, loadGray=False, loadFromHdf5=False):
     if loadFromHdf5:
         if not loadGray:

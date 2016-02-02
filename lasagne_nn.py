@@ -452,6 +452,72 @@ class MeanLayer(lasagne.layers.Layer):
     def get_output_shape_for(self, input_shape):
         return [input_shape[0],1]
 
+def build_cnn_mask(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    input = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            input, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=256,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=225,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=2250,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    numSmallMask = 2250
+    scaleFactor = 10
+    network = lasagne.layers.ReshapeLayer(network, ([0],1, numSmallMask))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    mask = lasagne.layers.Upscale1DLayer(
+            incoming=network,
+            scale_factor=scaleFactor)
+
+    mask = lasagne.layers.ReshapeLayer(mask, ([0], numSmallMask*scaleFactor))
+
+    mask = lasagne.layers.NonlinearityLayer(
+            mask,
+            nonlinearity=lasagne.nonlinearities.sigmoid)
+
+    return mask
+
 def build_cnn_appmask(input_var=None):
     # As a third model, we'll create a CNN of two convolution + pooling stages
     # and a fully-connected hidden layer in front of the output layer.
@@ -745,6 +811,8 @@ def load_network(modelType='cnn', param_values=[]):
         network = build_cnn_app(input_var)
     elif modelType == 'cnn_appmask':
         network = build_cnn_appmask(input_var)
+    elif modelType == 'cnn_mask':
+        network = build_cnn_mask(input_var)
     else:
         print("Unrecognized model type %r." % modelType)
 
@@ -784,6 +852,7 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
 
     print("Loading validation set")
 
+
     X_val = X_h5[trainSetVal::].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
     print("Ended loading validation set")
 
@@ -792,7 +861,6 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     model['mean'] = meanImage
     model['type'] = modelType
 
-
     if param_values:
         lasagne.layers.set_all_param_values(network, param_values)
 
@@ -800,20 +868,26 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     target_var = T.fmatrix('targets')
 
     prediction = lasagne.layers.get_output(network)
-    loss = lasagne.objectives.squared_error(prediction, target_var)
-    loss = loss.mean()
 
     params = lasagne.layers.get_all_params(network, trainable=True)
 
-    updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.01, momentum=0.9)
-
-
 
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
-    test_loss = lasagne.objectives.squared_error(test_prediction,
-                                                            target_var)
-    test_loss = test_loss.mean()
+
+    if modelType == 'cnn_mask':
+        loss = lasagne.objectives.binary_crossentropy(prediction, target_var)
+        loss = loss.mean()
+        test_loss = lasagne.objectives.binary_crossentropy(test_prediction, target_var)
+        test_loss = test_loss.mean()
+    else:
+        loss = lasagne.objectives.squared_error(prediction, target_var)
+        loss = loss.mean()
+        test_loss = lasagne.objectives.squared_error(test_prediction,
+                                                                target_var)
+        test_loss = test_loss.mean()
+
+    updates = lasagne.updates.nesterov_momentum(
+            loss, params, learning_rate=0.01, momentum=0.9)
 
     train_fn = theano.function([input_var, target_var], loss, updates=updates)
 
