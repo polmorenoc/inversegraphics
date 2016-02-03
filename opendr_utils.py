@@ -121,8 +121,6 @@ def recoverAmbientIntensities(hdritems, gtDataset, clampedCosCoeffs):
 
 
 def SHProjection(envMap, shCoefficients):
-
-
     #Backprojected.
     phis = 2*ch.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
     thetas = np.pi*np.tile((np.arange(envMap.shape[0])/envMap.shape[0]).reshape([envMap.shape[0],1,1]), [1,envMap.shape[1],3])

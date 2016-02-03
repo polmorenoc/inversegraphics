@@ -42,7 +42,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
 gtPrefix = 'train4_occlusion'
-experimentPrefix = 'train4_occlusion_10k'
+experimentPrefix = 'train4_occlusion'
 trainPrefixPose = 'train4_occlusion_10k'
 trainPrefixVColor = 'train4_occlusion_10k'
 trainPrefixLightCoeffs = 'train4_occlusion_10k'
@@ -205,6 +205,7 @@ meanErrorsVColorsC = np.mean(errorsVColorsC, axis=0)
 
 errorsPoseFitted = (np.array([]), np.array([]))
 errorsPoseFitted = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, fittedAzs, fittedElevs)
+stdevs = np.array([])
 if len(azsPredictions) > 0:
     stdevs = np.array([])
     for test_i, test_id in enumerate(testSet):
@@ -235,9 +236,7 @@ if len(stdevs) > 0:
     directory = resultDir + 'occlusion_nnazsamplesstdev'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, stdevs*180/np.pi, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, stdevs*180/np.pi, s=20, vmin=0, vmax=100, c='b')
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('NN Az samples stdev')
     x1,x2 = ax.get_xlim()
@@ -253,16 +252,14 @@ directory = resultDir + 'occlusion_vcolorserrorsE'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, errorsVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+scat = ax.scatter(testOcclusions * 100.0, errorsVColorsE, s=20, vmin=0, vmax=100, c='b')
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('Vertex Colors errors')
 x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,1))
-ax.title('Occlusion - vertex color prediction errors')
+ax.set_title('Occlusion - vertex color prediction errors')
 
 fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
@@ -271,16 +268,14 @@ directory = resultDir + 'occlusion_vcolorserrorsC'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, errorsVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+scat = ax.scatter(testOcclusions * 100.0, errorsVColorsC, s=20, vmin=0, vmax=100, c='b')
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('Vertex Colors errors')
 x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,1))
-ax.title('Occlusion - vertex color prediction errors')
+ax.set_title('Occlusion - vertex color prediction errors')
 fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 #Show scatter correlations with occlusions.
@@ -290,16 +285,14 @@ directory = resultDir + 'occlusion_shcoeffsserrors'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c='b', )
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('SH coefficient errors')
 x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,1))
-ax.title('Occlusion - SH coefficients fitted errors')
+ax.set_title('Occlusion - SH coefficients fitted errors')
 fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
@@ -308,16 +301,14 @@ directory = resultDir + 'occlusion_shcoeffsserrorsC'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c='b')
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('SH coefficient errors')
 x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,1))
-ax.title('Occlusion - SH coefficients fitted errors')
+ax.set_title('Occlusion - SH coefficients fitted errors')
 fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 #Show scatter correlations with occlusions.
@@ -329,16 +320,14 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_vcolorserrorsE'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, errorsFittedVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, errorsFittedVColorsE, s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Vertex Colors errors')
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
     ax.set_ylim((-0.0,1))
-    ax.title('Occlusion - vertex color fitted errors')
+    ax.set_title('Occlusion - vertex color fitted errors')
     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -346,16 +335,14 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_vcolorserrorsC'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, errorsFittedVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, errorsFittedVColorsC, s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Vertex Colors errors')
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
     ax.set_ylim((-0.0,1))
-    ax.title('Occlusion - vertex color fitted errors')
+    ax.set_title('Occlusion - vertex color fitted errors')
     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
     #Show scatter correlations with occlusions.
@@ -363,16 +350,14 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_shcoeffsserrors'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedLightCoeffs,axis=1)), s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Fitted SH coefficients errors')
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
     ax.set_ylim((-0.0,1))
-    ax.title('Occlusion - SH coefficients fitted errors')
+    ax.set_title('Occlusion - SH coefficients fitted errors')
     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
     #Show scatter correlations with occlusions.
@@ -380,16 +365,14 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_shcoeffsserrorsC'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Fitted SH coefficients errors')
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
     ax.set_ylim((-0.0,1))
-    ax.title('Occlusion - SH coefficients fitted errors')
+    ax.set_title('Occlusion - SH coefficients fitted errors')
     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -397,33 +380,28 @@ directory = resultDir + 'azimuth-pose-prediction'
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[0], s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[0], s=20, vmin=0, vmax=100)
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('Angular error')
 x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-180,180))
-ax.title('Performance scatter plot')
+ax.set_title('Performance scatter plot')
 fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
-
 
 directory = resultDir + 'elevation-pose-prediction'
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[1], s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[1], s=20, vmin=0, vmax=100)
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('Angular error')
 x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-90.0,90))
-ax.title('Performance scatter plot')
+ax.set_title('Performance scatter plot')
 fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
@@ -431,16 +409,15 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-azimuth-prediction'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, errorsPoseFitted[0], s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, errorsPoseFitted[0], s=20, vmin=0, vmax=100)
+
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Angular error')
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
     ax.set_ylim((-180.0,180))
-    ax.title('Performance scatter plot')
+    ax.set_title('Performance scatter plot')
     fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -448,16 +425,14 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-elevation-pose-prediction'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, errorsPoseFitted[1], s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    scat = ax.scatter(testOcclusions * 100.0, errorsPoseFitted[1], s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Angular error')
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
     ax.set_ylim((-90.0,90))
-    ax.title('Performance scatter plot')
+    ax.set_title('Performance scatter plot')
     fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -503,7 +478,9 @@ for occlusionLevel in range(100):
     if np.any(setUnderOcclusionLevel):
         occlusions = occlusions + [occlusionLevel]
         testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-        stdevs = stdevsFull[setUnderOcclusionLevel]
+
+        if len(stdevsFull) >0:
+            stdevs = stdevsFull[setUnderOcclusionLevel]
 
         colors = matplotlib.cm.plasma(testOcclusions)
 
@@ -512,11 +489,13 @@ for occlusionLevel in range(100):
         errorsLightCoeffsC = errorsLightCoeffsCFull[setUnderOcclusionLevel]
         errorsVColorsE = errorsVColorsEFull[setUnderOcclusionLevel]
         errorsVColorsC = errorsVColorsCFull[setUnderOcclusionLevel]
-        errorsPoseFitted =  np.vstack([errorsAzFittedFull[setUnderOcclusionLevel], errorsElFittedFull[setUnderOcclusionLevel]])
-        errorsFittedLightCoeffs = errorsFittedLightCoeffsFull[setUnderOcclusionLevel]
-        errorsFittedLightCoeffsC = errorsFittedLightCoeffsCFull[setUnderOcclusionLevel]
-        errorsFittedVColorsC = errorsFittedVColorsCFull[setUnderOcclusionLevel]
-        errorsFittedVColorsE = errorsFittedVColorsEFull[setUnderOcclusionLevel]
+
+        if optimizationTypeDescr[optimizationType] != 'predict':
+            errorsPoseFitted =  np.vstack([errorsAzFittedFull[setUnderOcclusionLevel], errorsElFittedFull[setUnderOcclusionLevel]])
+            errorsFittedLightCoeffs = errorsFittedLightCoeffsFull[setUnderOcclusionLevel]
+            errorsFittedLightCoeffsC = errorsFittedLightCoeffsCFull[setUnderOcclusionLevel]
+            errorsFittedVColorsC = errorsFittedVColorsCFull[setUnderOcclusionLevel]
+            errorsFittedVColorsE = errorsFittedVColorsEFull[setUnderOcclusionLevel]
 
         meanAbsErrAzsArr = np.append(meanAbsErrAzsArr,np.mean(np.abs(errorsPosePred[0])))
         meanAbsErrElevsArr = np.append(meanAbsErrElevsArr,np.mean(np.abs(errorsPosePred[1])))
@@ -558,11 +537,9 @@ x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,y2))
-ax.title('Cumulative Relative change per occlusion level')
+ax.set_title('Cumulative prediction per occlusion level')
 fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 plt.close(fig)
-
-
 
 directory = resultDir + 'predictionMeanError-Elev'
 fig = plt.figure()
@@ -579,10 +556,9 @@ x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,y2))
-ax.title('Cumulative Relative change per occlusion level')
+ax.set_title('Cumulative prediction per occlusion level')
 fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 plt.close(fig)
-
 
 directory = resultDir + 'predictionMeanError-VColors-C'
 fig = plt.figure()
@@ -598,7 +574,7 @@ x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,y2))
-ax.title('Cumulative Relative change per occlusion level')
+ax.set_title('Cumulative prediction per occlusion level')
 fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 plt.close(fig)
 
@@ -616,7 +592,7 @@ x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,y2))
-ax.title('Cumulative Relative change per occlusion level')
+ax.set_title('Cumulative prediction  per occlusion level')
 fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 plt.close(fig)
 
@@ -634,7 +610,7 @@ x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,y2))
-ax.title('Cumulative Relative change per occlusion level')
+ax.set_title('Cumulative prediction per occlusion level')
 fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 plt.close(fig)
 
@@ -652,11 +628,9 @@ x1,x2 = ax.get_xlim()
 y1,y2 = ax.get_ylim()
 ax.set_xlim((0,100))
 ax.set_ylim((-0.0,y2))
-ax.title('Cumulative Relative change per occlusion level')
+ax.set_title('Cumulative prediction per occlusion level')
 fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 plt.close(fig)
-
-
 if optimizationTypeDescr[optimizationType] != 'predict':
     directory = resultDir + 'relativeAzImprovement'
 
@@ -672,9 +646,9 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
-    ax.set_ylim((y1,y2))
+    ax.set_ylim((min(y1,0),max(0,y2)))
     ax.plot([0,100], [0, 0], ls="--", c=".3")
-    ax.title('Cumulative relative change per occlusion level')
+    ax.set_title('Cumulative relative change per occlusion level')
     fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -689,9 +663,9 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
-    ax.set_ylim((y1,y2))
+    ax.set_ylim((min(y1,0),max(0,y2)))
     ax.plot([0,100], [0, 0], ls="--", c=".3")
-    ax.title('Cumulative relative change per occlusion level')
+    ax.set_title('Cumulative relative change per occlusion level')
     fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 
 
@@ -706,9 +680,9 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
-    ax.set_ylim((y1,y2))
+    ax.set_ylim((min(y1,0),max(0,y2)))
     ax.plot([0,100], [0, 0], ls="--", c=".3")
-    ax.title('Cumulative relative change per occlusion level')
+    ax.set_title('Cumulative relative change per occlusion level')
     fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 
     directory = resultDir + 'relativeVColors-E-Improvement'
@@ -723,9 +697,9 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
-    ax.set_ylim((y1,y2))
+    ax.set_ylim((min(y1,0),max(0,y2)))
     ax.plot([0,100], [0, 0], ls="--", c=".3")
-    ax.title('Cumulative relative change per occlusion level')
+    ax.set_title('Cumulative relative change per occlusion level')
     fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 
     directory = resultDir + 'relativeSH-Improvement'
@@ -740,9 +714,9 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
-    ax.set_ylim((y1,y2))
+    ax.set_ylim((min(y1,0),max(0,y2)))
     ax.plot([0,100], [0, 0], ls="--", c=".3")
-    ax.title('Cumulative relative change per occlusion level')
+    ax.set_title('Cumulative relative change per occlusion level')
     fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 
     directory = resultDir + 'relativeSH-C-Improvement'
@@ -756,9 +730,9 @@ if optimizationTypeDescr[optimizationType] != 'predict':
     x1,x2 = ax.get_xlim()
     y1,y2 = ax.get_ylim()
     ax.set_xlim((0,100))
-    ax.set_ylim((y1,y2))
+    ax.set_ylim((min(y1,0),max(0,y2)))
     ax.plot([0,100], [0, 0], ls="--", c=".3")
-    ax.title('Cumulative relative change per occlusion level')
+    ax.set_title('Cumulative relative change per occlusion level')
     fig.savefig(directory + '-performance-plot.png', bbox_inches='tight')
 
 for occlusionLevel in [25,50,75,100]:
@@ -769,7 +743,9 @@ for occlusionLevel in [25,50,75,100]:
 
     setUnderOcclusionLevel = testOcclusionsFull*100 < occlusionLevel
     testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-    stdevs = stdevsFull[setUnderOcclusionLevel]
+
+    if len(stdevsFull) > 0:
+        stdevs = stdevsFull[setUnderOcclusionLevel]
 
     colors = matplotlib.cm.plasma(testOcclusions)
 
@@ -778,11 +754,13 @@ for occlusionLevel in [25,50,75,100]:
     errorsLightCoeffsC = errorsLightCoeffsCFull[setUnderOcclusionLevel]
     errorsVColorsE = errorsVColorsEFull[setUnderOcclusionLevel]
     errorsVColorsC = errorsVColorsCFull[setUnderOcclusionLevel]
-    errorsPoseFitted =  np.vstack([errorsAzFittedFull[setUnderOcclusionLevel], errorsElFittedFull[setUnderOcclusionLevel]])
-    errorsFittedLightCoeffs = errorsFittedLightCoeffsFull[setUnderOcclusionLevel]
-    errorsFittedLightCoeffsC = errorsFittedLightCoeffsCFull[setUnderOcclusionLevel]
-    errorsFittedVColorsC = errorsFittedVColorsCFull[setUnderOcclusionLevel]
-    errorsFittedVColorsE = errorsFittedVColorsEFull[setUnderOcclusionLevel]
+
+    if optimizationTypeDescr[optimizationType] != 'predict':
+        errorsPoseFitted =  np.vstack([errorsAzFittedFull[setUnderOcclusionLevel], errorsElFittedFull[setUnderOcclusionLevel]])
+        errorsFittedLightCoeffs = errorsFittedLightCoeffsFull[setUnderOcclusionLevel]
+        errorsFittedLightCoeffsC = errorsFittedLightCoeffsCFull[setUnderOcclusionLevel]
+        errorsFittedVColorsC = errorsFittedVColorsCFull[setUnderOcclusionLevel]
+        errorsFittedVColorsE = errorsFittedVColorsEFull[setUnderOcclusionLevel]
 
     meanAbsErrAzs = np.mean(np.abs(errorsPosePred[0]))
     meanAbsErrElevs = np.mean(np.abs(errorsPosePred[1]))
@@ -814,7 +792,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[0], s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[0], s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Occlusion (%)')
@@ -823,7 +801,7 @@ for occlusionLevel in [25,50,75,100]:
         y1,y2 = ax.get_ylim()
         ax.set_xlim((0,180))
         ax.set_ylim((-180,180))
-        ax.title('Neural net samples Performance scatter plot')
+        ax.set_title('Neural net samples Performance scatter plot')
 
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
@@ -833,7 +811,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(testOcclusions * 100.0, errorsVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(testOcclusions * 100.0, errorsVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Occlusion (%)')
@@ -842,7 +820,7 @@ for occlusionLevel in [25,50,75,100]:
         y1,y2 = ax.get_ylim()
         ax.set_xlim((0,180))
         ax.set_ylim((0,1))
-        ax.title('Neural net samples performance scatter plot')
+        ax.set_title('Neural net samples performance scatter plot')
 
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
@@ -854,17 +832,17 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(abs(errorsPosePred[0]), abs(errorsPoseFitted[0]), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(abs(errorsPosePred[0]), abs(errorsPoseFitted[0]), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted azimuth errors')
         ax.set_ylabel('Fitted azimuth errors')
         x1,x2 = ax.get_xlim()
         y1,y2 = ax.get_ylim()
-        ax.set_xlim((-180,180))
-        ax.set_ylim((-180,180))
-        ax.plot([-180, 180], [-180, 180], ls="--", c=".3")
-        ax.title('Predicted vs fitted azimuth errors')
+        ax.set_xlim((0,180))
+        ax.set_ylim((0,180))
+        ax.plot([0, 180], [0, 180], ls="--", c=".3")
+        ax.set_title('Predicted vs fitted azimuth errors')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -872,17 +850,17 @@ for occlusionLevel in [25,50,75,100]:
         directory = resultDir + 'pred-elevation-errors_fitted-elevation-error'
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(abs(errorsPosePred[1]), abs(errorsPoseFitted[1]), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(abs(errorsPosePred[1]), abs(errorsPoseFitted[1]), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted elevation errors')
         ax.set_ylabel('Fitted elevation errors')
         x1,x2 = ax.get_xlim()
         y1,y2 = ax.get_ylim()
-        ax.set_xlim((-90,90))
-        ax.set_ylim((-90,90))
-        ax.plot([-90,90], [-90,90], ls="--", c=".3")
-        ax.title('Predicted vs fitted azimuth errors')
+        ax.set_xlim((0,90))
+        ax.set_ylim((0,90))
+        ax.plot([0,90], [0,90], ls="--", c=".3")
+        ax.set_title('Predicted vs fitted azimuth errors')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -891,7 +869,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(np.sqrt(np.mean(errorsLightCoeffsC,axis=1)), np.sqrt(np.mean(errorsFittedLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(np.sqrt(np.mean(errorsLightCoeffsC,axis=1)), np.sqrt(np.mean(errorsFittedLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted SH coefficients errors')
@@ -901,7 +879,7 @@ for occlusionLevel in [25,50,75,100]:
         ax.set_xlim((0, 1))
         ax.set_ylim((0, 1))
         ax.plot([0, 1], [0, 1], ls="--", c=".3")
-        ax.title('Predicted vs fitted SH coefficients errors')
+        ax.set_title('Predicted vs fitted SH coefficients errors')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -909,7 +887,7 @@ for occlusionLevel in [25,50,75,100]:
         #Show scatter correlations with occlusions.
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(np.sqrt(np.mean(errorsLightCoeffs,axis=1)), np.sqrt(np.mean(errorsFittedLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(np.sqrt(np.mean(errorsLightCoeffs,axis=1)), np.sqrt(np.mean(errorsFittedLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted SH coefficients errors')
@@ -919,7 +897,7 @@ for occlusionLevel in [25,50,75,100]:
         ax.set_xlim((0, 1))
         ax.set_ylim((0, 1))
         ax.plot([0, 1], [0, 1], ls="--", c=".3")
-        ax.title('Predicted vs fitted SH coefficients errors')
+        ax.set_title('Predicted vs fitted SH coefficients errors')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -929,7 +907,7 @@ for occlusionLevel in [25,50,75,100]:
         #Show scatter correlations with occlusions.
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(errorsVColorsE, errorsFittedVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(errorsVColorsE, errorsFittedVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted VColor E coefficients errors')
@@ -939,7 +917,7 @@ for occlusionLevel in [25,50,75,100]:
         ax.set_xlim((0, 1))
         ax.set_ylim((0, 1))
         ax.plot([0, 1], [0, 1], ls="--", c=".3")
-        ax.title('Predicted vs fitted vertex color errors')
+        ax.set_title('Predicted vs fitted vertex color errors')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -948,7 +926,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(errorsVColorsC, errorsFittedVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(errorsVColorsC, errorsFittedVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted VColor C coefficients errors')
@@ -958,11 +936,9 @@ for occlusionLevel in [25,50,75,100]:
         ax.set_xlim((0, 1))
         ax.set_ylim((0, 1))
         ax.plot([0, 1], [0, 1], ls="--", c=".3")
-        ax.title('Predicted vs fitted vertex color errors')
+        ax.set_title('Predicted vs fitted vertex color errors')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
-
-
 
     directory = resultDir + 'predicted-azimuth-error'
     fig = plt.figure()
@@ -974,7 +950,7 @@ for occlusionLevel in [25,50,75,100]:
     y1,y2 = ax.get_ylim()
     ax.set_xlim((-180,180))
     ax.set_ylim((y1, y2))
-    ax.title('Error histogram')
+    ax.set_title('Error histogram')
     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -988,7 +964,7 @@ for occlusionLevel in [25,50,75,100]:
     y1,y2 = ax.get_ylim()
     ax.set_xlim((-90,90))
     ax.set_ylim((y1, y2))
-    ax.title('Error histogram')
+    ax.set_title('Error histogram')
     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
     plt.close(fig)
 
@@ -1006,7 +982,7 @@ for occlusionLevel in [25,50,75,100]:
         y1,y2 = ax.get_ylim()
         ax.set_xlim((-180,180))
         ax.set_ylim((y1, y2))
-        ax.title('Error histogram')
+        ax.set_title('Error histogram')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -1021,7 +997,7 @@ for occlusionLevel in [25,50,75,100]:
         y1,y2 = ax.get_ylim()
         ax.set_xlim((-90,90))
         ax.set_ylim((y1, y2))
-        ax.title('Error histogram')
+        ax.set_title('Error histogram')
         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
         plt.close(fig)
 
@@ -1102,12 +1078,13 @@ for occlusionLevel in [25,50,75,100]:
     # with open(resultDir + 'performance_SH_fit_standardised.tex', 'w') as expfile:
     #     expfile.write(performanceTable)
 
-    SMSE_SH = np.sqrt(np.mean(errorsFittedLightCoeffs, axis=0))
-    table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
-            ]
-    performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
-    with open(resultDir + 'performance_SH_fit.tex', 'w') as expfile:
-        expfile.write(performanceTable)
+    if not optimizationTypeDescr[optimizationType] == 'predict':
+        SMSE_SH = np.sqrt(np.mean(errorsFittedLightCoeffs, axis=0))
+        table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
+                ]
+        performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
+        with open(resultDir + 'performance_SH_fit.tex', 'w') as expfile:
+            expfile.write(performanceTable)
 
 
     SMSE_SH = np.sqrt(np.mean(errorsLightCoeffsC, axis=0))
@@ -1124,12 +1101,14 @@ for occlusionLevel in [25,50,75,100]:
     # with open(resultDir + 'performance_SH_fit_standardised.tex', 'w') as expfile:
     #     expfile.write(performanceTable)
 
-    SMSE_SH = np.sqrt(np.mean(errorsFittedLightCoeffsC, axis=0))
-    table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
-            ]
-    performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
-    with open(resultDir + 'performance_SH_fit_C.tex', 'w') as expfile:
-        expfile.write(performanceTable)
+    if not optimizationTypeDescr[optimizationType] == 'predict':
+        SMSE_SH = np.sqrt(np.mean(errorsFittedLightCoeffsC, axis=0))
+        table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
+                ]
+        performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
+        with open(resultDir + 'performance_SH_fit_C.tex', 'w') as expfile:
+            expfile.write(performanceTable)
 
 plt.ion()
 print("Finished backprojecting and fitting estimates.")
+
