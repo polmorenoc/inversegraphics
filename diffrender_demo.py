@@ -97,7 +97,7 @@ dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 readDataId = 1
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[:]
+renderTeapotsList = np.arange(len(teapots))[0:1]
 
 sceneNumber = dataScenes[readDataId]
 
@@ -241,10 +241,8 @@ phiOffset = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 
 chObjAzGT = ch.Ch(dataObjAzsGT[readDataId])
 chAzGT = ch.Ch(dataAzsGT[readDataId])
-chAzGT = ch.Ch([np.pi])
 chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(dataElevsGT[readDataId])
-chElGT = ch.Ch([np.pi/4])
 chDistGT = ch.Ch([camDistance])
 
 totalOffsetGT = phiOffsetGT + chObjAzGT
@@ -273,7 +271,6 @@ chComponentGTOriginal = ch.array(np.array(chAmbientSHGT + shDirLightGT*chLightIn
 chComponentGT = chAmbientSHGT
 # chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
-
 chAz = ch.Ch(dataAzsGT[readDataId])
 chObjAz = ch.Ch(dataObjAzsGT[readDataId])
 chEl =  ch.Ch(dataElevsGT[readDataId])
@@ -284,7 +281,6 @@ totalOffset = phiOffset + chObjAz
 chAmbientIntensity = ch.Ch(dataAmbientIntensityGT[readDataId])
 shCoeffsRGB = ch.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 shCoeffsRGBRel = ch.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-
 
 chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2]
 chShCoeffs = ch.Ch(0.3*shCoeffsRGB.r[:,0] + 0.59*shCoeffsRGB.r[:,1] + 0.11*shCoeffsRGB.r[:,2])
@@ -383,7 +379,7 @@ if useGTasBackground:
         renderer = renderer_teapots[teapot_i]
         renderer.set(background_image=rendererGT.r)
 
-currentTeapotModel = 2
+currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 
 import differentiable_renderer
@@ -455,7 +451,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.075
+initialPixelStdev = 0.01
 reduceVariance = False
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
@@ -472,20 +468,20 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-
-hogE_raw = hogGT - hogRenderer
-hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-hogError = ch.SumOfSquares(hogE_raw)
+# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+#
+# hogE_raw = hogGT - hogRenderer
+# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+# hogError = ch.SumOfSquares(hogE_raw)
 # hogError = ch.SumOfSquares(hogE_raw)
 
 # hogError = negLikModelRobust
 # hogCellErrors = pixelLikelihoodRobustCh
 
-models = [negLikModel, negLikModelRobust, hogError]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
-modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+modelsDescr = ["Gaussian Model", "Outlier model"]
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
 
@@ -501,7 +497,7 @@ modelsDescr = ["Gaussian Model", "Outlier model", "HOG"]
 # pixelModels2 = [pixelLikelihoodCh2, pixelLikelihoodRobustCh2]
 # models2 = [negLikModel2, negLikModelRobust2]
 
-model = 0
+model = 1
 
 pixelErrorFun = pixelModels[model]
 errorFun = models[model]
@@ -533,7 +529,7 @@ gradFinAzSurf = {}
 ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
-free_variables = [chShCoeffs]
+free_variables = [chAz, chEl, chVColors, chShCoeffs]
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -543,7 +539,8 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
 methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-method = 1
+methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'probLineSearch']
+method = 5
 exit = False
 minimize = False
 plotMinimization = False
@@ -1543,19 +1540,18 @@ if demoMode:
 
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-            hogGT, hogImGT, drconv = image_processing.diffHog(currentGT, drconv)
-            hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-            hogRenderer.dr_wrt(chAz)
+            # hogGT, hogImGT, drconv = image_processing.diffHog(currentGT, drconv)
+            # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+            # hogRenderer.dr_wrt(chAz)
+            #
+            # hogE_raw = hogGT - hogRenderer
+            # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+            # hogError = ch.SumOfSquares(hogE_raw)
 
-            hogE_raw = hogGT - hogRenderer
-            hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-            hogError = ch.SumOfSquares(hogE_raw)
-
-            # hogError = negLikModelRobust
-            # hogCellErrors = pixelLikelihoodRobustCh
-
-            models = [negLikModel, negLikModelRobust, hogError]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+            # models = [negLikModel, negLikModelRobust, hogError]
+            models = [negLikModel, negLikModelRobust]
+            # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
             # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 
             pixelErrorFun = pixelModels[model]

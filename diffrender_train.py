@@ -232,7 +232,6 @@ if 'poseNN' in parameterTrainSet:
     with open(modelPath, 'wb') as pfile:
         pickle.dump(poseNNmodel, pfile)
 
-
 if 'appearanceAndLightNN' in parameterTrainSet:
     modelType = 'cnn_appLight'
     network = lasagne_nn.load_network(modelType=modelType, param_values=[])
@@ -277,7 +276,6 @@ if 'appearanceAndLightNN' in parameterTrainSet:
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(appLightNNmodel, pfile)
-
 
 if 'appearanceNN' in parameterTrainSet:
     modelType = 'cnn_app'
@@ -369,7 +367,6 @@ if 'maskNN' in parameterTrainSet:
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(maskNNmodel, pfile)
-
 
 if 'azimuthsRF' in parameterTrainSet:
     print("Training RFs Cos Azs")
