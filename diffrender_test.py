@@ -206,7 +206,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_black_predsamplestest'
+testPrefix = 'train4_occlusion_10s_robust_std001_probLineSearch_varpose10_var0f_counter100'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -243,7 +243,7 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-numTests = 1000
+numTests = 10
 testSet = np.load(experimentDir + 'test.npy')[:numTests]
 # testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
@@ -360,9 +360,9 @@ optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 1
 computePredErrorFuns = True
 
-method = 1
+method = 6
 model = 1
-maxiter = 500
+maxiter = 100
 numSamples = 1
 
 # free_variables = [ chAz, chEl]
@@ -375,11 +375,17 @@ boundAz = (-3*np.pi, 3*np.pi)
 boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
-
-methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom']
-
+methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom', 'probLineSearch']
 options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-options = {'disp':False, 'maxiter':maxiter}
+azVar = 10
+elVar = 10
+vColorVar = 0.0001
+shCoeffsVar = 0.0001
+df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chLightSHCoeffs.r.shape)])
+options = {'disp':False, 'maxiter':maxiter, 'df_vars':df_vars}
+
+stds[:] = 0.01
+
 # options={'disp':False, 'maxiter':maxiter}
 # testRenderer = np.int(dataTeapotIds[testSet][0])
 # testRenderer = np.int(dataTeapotIds[0])
@@ -1166,16 +1172,16 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                     break
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None]], axis=1))
-            approxProjectionGT = np.sum(pEnvMap, axis=3)
+            approxProjectionGT = np.sum(pEnvMap, axis=(2,3))
             approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT]
 
-            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_GT.jpeg' , 255*approxProjectionGT[:,:,[2,1,0]])
+            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_GT.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None]], axis=1))
-            approxProjectionPred = np.sum(pEnvMap, axis=3)
+            approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
 
             approxProjectionsPredList = [approxProjectionPred]
-            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Pred.jpeg' , 255*approxProjectionPred[:,:,[2,1,0]])
+            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Pred.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
             # totalOffset = phiOffset + chObjAzGT
             # np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
@@ -1227,7 +1233,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                     print("Minimizing first step")
                     model = 1
                     errorFun = models[model]
-                    method = 1
+                    # method = 1
 
                     chLightSHCoeffs[:] = lightCoefficientsRel
                     chVColors[:] = color
@@ -1289,16 +1295,16 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 model = 1
                 errorFun = models[model]
                 # errorFun = chThError
-                method = 1
-                stds[:] = 0.1
+                # method = 6
+                stds[:] = 0.01
 
-                options={'disp':False, 'maxiter':50}
+                # options={'disp':False, 'maxiter':50}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
                 free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 samplingMode = True
 
-                azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
+                # azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
                 # if azSampleStdev*180/np.pi < 100:
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -1342,9 +1348,9 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             fittedRelLightCoeffsList = fittedRelLightCoeffsList + [bestLightSHCoeffs]
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([bestLightSHCoeffs[:,None], bestLightSHCoeffs[:,None], bestLightSHCoeffs[:,None]], axis=1))
-            approxProjectionFitted = np.sum(pEnvMap, axis=3)
+            approxProjectionFitted = np.sum(pEnvMap, axis=(2,3))
             approxProjectionsFittedList = approxProjectionsFittedList + [approxProjectionFitted]
-            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Fitted.jpeg' , 255*approxProjectionFitted[:,:,[2,1,0]])
+            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Fitted.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
         if optimizationTypeDescr[optimizationType] != 'predict':
             if fittedVColorsList:
@@ -1460,6 +1466,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 totalTime = time.time() - startTime
 print("Took " + str(totalTime/len(testSet)) + " time per instance.")
 
+
 errorsPosePred = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPred, elevsPred)
 
 testVColorGTGray = 0.3*testVColorGT[:,0] + 0.59*testVColorGT[:,1] + 0.11*testVColorGT[:,2]
@@ -1527,6 +1534,7 @@ if optimizationTypeDescr[optimizationType] != 'predict':
 np.savez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errorsPosePred[0], predErrorElevs=errorsPosePred[1], errorsLightCoeffs=errorsLightCoeffs, errorsLightCoeffsC=errorsLightCoeffsC,errorsEnvMap=errorsEnvMap, errorsVColorsE=errorsVColorsE, errorsVColorsC=errorsVColorsC, errorsFittedAzs=errorsPoseFitted[0], errorsFittedElevs=errorsPoseFitted[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedLightCoeffsC=errorsFittedLightCoeffsC, errorsFittedEnvMap=errorsFittedEnvMap, errorsFittedVColorsE=errorsFittedVColorsE, errorsFittedVColorsC=errorsFittedVColorsC, testOcclusions=testOcclusions)
 np.savez(resultDir + 'samples.npz', testSet = testSet, azsPred= azsPred, elevsPred=elevsPred, fittedAzs=fittedAzs, fittedElevs=fittedElevs, vColorsPred=vColorsPred, fittedVColors=fittedVColors, relLightCoefficientsGTPred=relLightCoefficientsPred, fittedRelLightCoeffs=fittedRelLightCoeffs)
 
+print("Avg Likelihood improvement per second of: " + str(np.mean(fittedErrorFuns - predictedErrorFuns)/ totalTime))
 ##Print and plotting results now:
 
 plt.ioff()

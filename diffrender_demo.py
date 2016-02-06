@@ -37,7 +37,7 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
-refreshWhileMinimizing = False
+refreshWhileMinimizing = True
 computePerformance = True
 savePerformance = True
 glModes = ['glfw','mesa']
@@ -530,6 +530,15 @@ ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
 free_variables = [chAz, chEl, chVColors, chShCoeffs]
+azVar = 1
+elVar = 1
+vColorVar = 0.00001
+shCoeffsVar = 0.00001
+df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chShCoeffs.r.shape)])
+
+maxiter = 50
+method=1
+options={'disp':False, 'maxiter':maxiter}
 
 mintime = time.time()
 boundEl = (0, np.pi/2.0)
@@ -538,9 +547,8 @@ boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 
-methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead']
-methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'probLineSearch']
-method = 5
+methods=['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom', 'probLineSearch']
+
 exit = False
 minimize = False
 plotMinimization = False
@@ -884,26 +892,26 @@ def printStats():
     global printStatsBool
     printStatsBool = False
 
-def cb(_):
-    global t
-    elapsed_time = time.time() - t
-    print("Ended interation in  " + str(elapsed_time))
+def cb(errorFunMin):
+    # global t
+    # elapsed_time = time.time() - t
+    # print("Ended interation in  " + str(elapsed_time))
+    #
+    # global pixelErrorFun
+    # global errorFun
+    # global iterat
+    # iterat = iterat + 1
+    print("Callback! " )
+    # print("Model Log Likelihood: " + str(errorFunMin.r))
+    # global imagegt
+    # global renderer
+    # global gradAz
+    # global gradEl
+    # global performance
+    # global azimuths
+    # global elevations
 
-    global pixelErrorFun
-    global errorFun
-    global iterat
-    iterat = iterat + 1
-    print("Callback! " + str(iterat))
-    print("Model Log Likelihood: " + str(errorFun.r))
-    global imagegt
-    global renderer
-    global gradAz
-    global gradEl
-    global performance
-    global azimuths
-    global elevations
-
-    t = time.time()
+    # t = time.time()
 
 def cb2(_):
     global t
@@ -1273,29 +1281,50 @@ def readKeys(window, key, scancode, action, mods):
 
     global method
     global methods
+    global options
+    global maxiter
     if key == glfw.KEY_1 and action == glfw.RELEASE:
         method = 0
+        options={'disp':False, 'maxiter':maxiter}
         print("Changed to minimizer: " + methods[method])
     if key == glfw.KEY_2 and action == glfw.RELEASE:
         method = 1
+        maxiter = 20
+        options={'disp':False, 'maxiter':maxiter}
         print("Changed to minimizer: " + methods[method])
     if key == glfw.KEY_3 and action == glfw.RELEASE:
         method = 2
+        options={'disp':False, 'maxiter':maxiter}
         print("Changed to minimizer: " + methods[method])
     if key == glfw.KEY_4 and action == glfw.RELEASE:
+
         print("Changed to minimizer: " + methods[method])
         method = 3
+        options={'disp':False, 'maxiter':maxiter}
     if key == glfw.KEY_5 and action == glfw.RELEASE:
         method = 4
+        maxiter = 1000
+        options={'disp':False, 'maxiter':maxiter}
+        print("Changed to minimizer: " + methods[method])
+    if key == glfw.KEY_6 and action == glfw.RELEASE:
+        method = 5
+        maxiter = 200
+        options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+        print("Changed to minimizer: " + methods[method])
+    if key == glfw.KEY_7 and action == glfw.RELEASE:
+        maxiter = 50
+        method = 6
+        options={'disp':False, 'maxiter':maxiter, 'df_vars':df_vars}
         print("Changed to minimizer: " + methods[method])
 
     global minimize
     global free_variables
+    global df_vars
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_M and action == glfw.RELEASE:
         free_variables = [renderer.v.a.a]
         minimize = True
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_M and action == glfw.RELEASE:
-        free_variables = [chAz, chEl]
+        free_variables = [chAz, chEl, chVColors, chShCoeffs]
         minimize = True
 
 def timeRendering(iterations):
@@ -1561,9 +1590,8 @@ if demoMode:
 
         if minimize:
             iterat = 0
-            maxiter = 100
             print("Minimizing with method " + methods[method])
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options={'disp':False, 'maxiter':maxiter})
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options=options)
             plotMinimization = True
             minimize = False
 
