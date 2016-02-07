@@ -206,7 +206,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_1000s_robust_std001_probLineSearch'
+testPrefix = 'train4_occlusion_1_probLineSearch'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -243,7 +243,7 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-numTests = 1000
+numTests = 100
 testSet = np.load(experimentDir + 'test.npy')[:numTests]
 # testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
@@ -377,10 +377,10 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom', 'probLineSearch']
 options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-azVar = 4
-elVar = 4
-vColorVar = 0.0001
-shCoeffsVar = 0.0001
+azVar = 0.1
+elVar = 0.1
+vColorVar = 0.01
+shCoeffsVar = 0.01
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chLightSHCoeffs.r.shape)])
 options = {'disp':False, 'maxiter':maxiter, 'df_vars':df_vars}
 
@@ -1306,6 +1306,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                 # azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
                 # if azSampleStdev*180/np.pi < 100:
+                ipdb.set_trace()
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]

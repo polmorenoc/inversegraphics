@@ -165,6 +165,7 @@ def probLineSearch(func, x0, f0, df0, search_direction, alpha0,
         # build Gram matrix
         G = np.diag(Sig.ravel()) + np.r_[np.c_[kTT, kdTT], np.c_[kdTT.T, dkdTT]]
 
+
         A = np.linalg.solve(G, np.append(Y, dY_projected))
 
         # posterior mean function and all its derivatives
