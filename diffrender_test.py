@@ -206,7 +206,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_10s_robust_std001_probLineSearch_varpose10_var0f_counter100'
+testPrefix = 'train4_occlusion_1000s_robust_std001_probLineSearch'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -243,7 +243,7 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-numTests = 10
+numTests = 1000
 testSet = np.load(experimentDir + 'test.npy')[:numTests]
 # testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
@@ -362,7 +362,7 @@ computePredErrorFuns = True
 
 method = 6
 model = 1
-maxiter = 100
+maxiter = 200
 numSamples = 1
 
 # free_variables = [ chAz, chEl]
@@ -377,8 +377,8 @@ bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
 methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom', 'probLineSearch']
 options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-azVar = 10
-elVar = 10
+azVar = 4
+elVar = 4
 vColorVar = 0.0001
 shCoeffsVar = 0.0001
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chLightSHCoeffs.r.shape)])
@@ -1173,14 +1173,14 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None]], axis=1))
             approxProjectionGT = np.sum(pEnvMap, axis=(2,3))
-            approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT]
+            approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT[None,:]]
 
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_GT.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None]], axis=1))
             approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
 
-            approxProjectionsPredList = [approxProjectionPred]
+            approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Pred.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
             # totalOffset = phiOffset + chObjAzGT
@@ -1349,7 +1349,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([bestLightSHCoeffs[:,None], bestLightSHCoeffs[:,None], bestLightSHCoeffs[:,None]], axis=1))
             approxProjectionFitted = np.sum(pEnvMap, axis=(2,3))
-            approxProjectionsFittedList = approxProjectionsFittedList + [approxProjectionFitted]
+            approxProjectionsFittedList = approxProjectionsFittedList + [approxProjectionFitted[None,:]]
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Fitted.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
         if optimizationTypeDescr[optimizationType] != 'predict':
@@ -1370,7 +1370,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
         errorsLightCoeffsCSoFar = (testVColorGTGray[:,None][:test_i+1] *testLightCoefficientsGTRel[:test_i+1] - vColorsPredGray[:,None][:test_i+1] * relLightCoefficientsPred[:test_i + 1]) ** 2
 
-        errorsEnvMapSoFar = (testVColorGTGray[:,None][:test_i+1]*approxProjectionsGT[:test_i+1] - vColorsPredGray[:,None][:test_i+1] * approxProjectionsPred[:test_i+1])**2
+        errorsEnvMapSoFar = (testVColorGTGray[:,None,None][:test_i+1]*approxProjectionsGT[:test_i+1] - vColorsPredGray[:,None,None][:test_i+1] * approxProjectionsPred[:test_i+1])**2
 
         errorsVColorsESoFar = image_processing.eColourDifference(testVColorGT[:test_i+1], vColorsPred[:test_i+1])
         errorsVColorsCSoFar = image_processing.cColourDifference(testVColorGT[:test_i+1], vColorsPred[:test_i+1])
@@ -1403,7 +1403,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             errorsFittedLightCoeffsC = (testVColorGTGray[:,None][:test_i+1]*testLightCoefficientsGTRel[:test_i+1] - fittedVColorsGray[:,None][:test_i+1]*fittedRelLightCoeffs)**2
 
             errorsFittedLightCoeffs = (testLightCoefficientsGTRel[:test_i+1] - fittedRelLightCoeffs)**2
-            errorsFittedEnvMap= (testVColorGTGray[:,None][:test_i+1]*approxProjectionsGT[:test_i+1] - fittedVColorsGray[:,None][:test_i+1] * approxProjectionsFitted[:test_i+1])**2
+            errorsFittedEnvMap= (testVColorGTGray[:,None, None][:test_i+1]*approxProjectionsGT[:test_i+1] - fittedVColorsGray[:,None,None][:test_i+1] * approxProjectionsFitted[:test_i+1])**2
             errorsFittedVColorsE = image_processing.eColourDifference(testVColorGT[:test_i+1], fittedVColors)
             errorsFittedVColorsC = image_processing.cColourDifference(testVColorGT[:test_i+1], fittedVColors)
             meanErrorsFittedLightCoeffs = np.sqrt(np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0))
@@ -1474,7 +1474,7 @@ vColorsPredGray = 0.3*vColorsPred[:,0] + 0.59*vColorsPred[:,1] + 0.11*vColorsPre
 
 errorsLightCoeffsC = (testVColorGTGray[:,None] * testLightCoefficientsGTRel - vColorsPredGray[:,None] * relLightCoefficientsPred) ** 2
 errorsLightCoeffs = (testLightCoefficientsGTRel - relLightCoefficientsPred) ** 2
-errorsEnvMap= (testVColorGTGray[:,None][:test_i+1]*approxProjectionsGT[:test_i+1] - vColorsPredGray[:,None][:test_i+1] * approxProjectionsPred[:test_i+1])**2
+errorsEnvMap= (testVColorGTGray[:,None,None][:test_i+1]*approxProjectionsGT[:test_i+1] - vColorsPredGray[:,None,None][:test_i+1] * approxProjectionsPred[:test_i+1])**2
 
 errorsVColorsE = image_processing.eColourDifference(testVColorGT, vColorsPred)
 errorsVColorsC = image_processing.cColourDifference(testVColorGT, vColorsPred)
@@ -1527,7 +1527,7 @@ if optimizationTypeDescr[optimizationType] != 'predict':
 
     errorsFittedLightCoeffs = (testLightCoefficientsGTRel - fittedRelLightCoeffs)**2
 
-    errorsFittedEnvMap = (testVColorGTGray[:,None][:test_i+1]*approxProjectionsGT[:test_i+1] - fittedVColorsGray[:,None][:test_i+1] * approxProjectionsFitted[:test_i+1])**2
+    errorsFittedEnvMap = (testVColorGTGray[:,None,None][:test_i+1]*approxProjectionsGT[:test_i+1] - fittedVColorsGray[:,None,None][:test_i+1] * approxProjectionsFitted[:test_i+1])**2
     errorsFittedVColorsE = image_processing.eColourDifference(testVColorGT, fittedVColors)
     errorsFittedVColorsC = image_processing.cColourDifference(testVColorGT, fittedVColors)
 
@@ -1627,7 +1627,7 @@ directory = resultDir + 'occlusion_shEnvMap'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsEnvMap,axis=[1,2])), s=20, vmin=0, vmax=100, c='b')
+scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsEnvMap,axis=(1,2))), s=20, vmin=0, vmax=100, c='b')
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('SH Environment map errors')
 x1,x2 = ax.get_xlim()
@@ -1703,7 +1703,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_SHenvMap'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedEnvMap,axis=[1,2])), s=20, vmin=0, vmax=100)
+    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedEnvMap,axis=(1,2))), s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Fitted SH coefficients errors')
     x1,x2 = ax.get_xlim()
@@ -1806,6 +1806,7 @@ medianAbsErrElevsFittedArr = np.array([])
 meanErrorsFittedLightCoeffsArr = np.array([])
 meanErrorsFittedLightCoeffsCArr = np.array([])
 meanErrorsEnvMapArr = np.array([])
+meanErrorsFittedEnvMapArr =  np.array([])
 meanErrorsFittedVColorsCArr = np.array([])
 meanErrorsFittedVColorsEArr = np.array([])
 
@@ -1860,7 +1861,7 @@ for occlusionLevel in range(100):
         if optimizationTypeDescr[optimizationType] != 'predict':
             meanErrorsFittedLightCoeffsArr = np.append(meanErrorsFittedLightCoeffsArr,np.sqrt(np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0)))
             meanErrorsFittedLightCoeffsCArr = np.append(meanErrorsFittedLightCoeffsCArr,np.sqrt(np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0)))
-            meanErrorsFittedEnvMapArr = np.append(meanErrorsFittedEnvMapArr,np.sqrt(np.mean(errorsEnvMap)))
+            meanErrorsFittedEnvMapArr = np.append(meanErrorsFittedEnvMapArr,np.sqrt(np.mean(errorsFittedEnvMap)))
             meanErrorsFittedVColorsCArr = np.append(meanErrorsFittedVColorsCArr,np.mean(errorsFittedVColorsC, axis=0))
             meanErrorsFittedVColorsEArr = np.append(meanErrorsFittedVColorsEArr,np.mean(errorsFittedVColorsE, axis=0))
 
@@ -2268,7 +2269,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(np.sqrt(np.mean(errorsEnvMap,axis=[1,2])), np.sqrt(np.mean(errorsFittedEnvMap,axis=[1,2])), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(np.sqrt(np.mean(errorsEnvMap,axis=(1,2))), np.sqrt(np.mean(errorsFittedEnvMap,axis=(1,2))), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted SH coefficients errors')
@@ -2514,4 +2515,3 @@ for occlusionLevel in [25,50,75,100]:
 
 plt.ion()
 print("Finished backprojecting and fitting estimates.")
-
