@@ -518,6 +518,82 @@ def build_cnn_mask(input_var=None):
 
     return mask
 
+def build_cnn_mask_large(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    input = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            input, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    ipdb.set_trace()
+    lasagne.layers.get_output_shape(network)
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(1, 1))
+
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=1125,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=1125,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network),
+            num_units=2500,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    # numSmallMask = 2250
+    # scaleFactor = 10
+    # network = lasagne.layers.ReshapeLayer(network, ([0],1, numSmallMask))
+    #
+    # # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    # mask = lasagne.layers.Upscale1DLayer(
+    #         incoming=network,
+    #         scale_factor=scaleFactor)
+    #
+    # mask = lasagne.layers.ReshapeLayer(mask, ([0], numSmallMask*scaleFactor))
+
+    mask = lasagne.layers.NonlinearityLayer(
+            network,
+            nonlinearity=lasagne.nonlinearities.sigmoid)
+
+    return mask
+
 def build_cnn_appmask(input_var=None):
     # As a third model, we'll create a CNN of two convolution + pooling stages
     # and a fully-connected hidden layer in front of the output layer.
@@ -813,6 +889,9 @@ def load_network(modelType='cnn', param_values=[]):
         network = build_cnn_appmask(input_var)
     elif modelType == 'cnn_mask':
         network = build_cnn_mask(input_var)
+    elif modelType == 'cnn_mask_large':
+        network = build_cnn_mask_large(input_var)
+
     else:
         print("Unrecognized model type %r." % modelType)
 
@@ -902,7 +981,7 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     best_valid = np.inf
     best_valid_epoch = 0
     best_weights = None
-    batchSize = 64
+    batchSize = 32
     for epoch in range(num_epochs):
 
         # In each epoch, we do a full pass over the training data:

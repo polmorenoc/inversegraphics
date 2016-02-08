@@ -117,7 +117,6 @@ loadGray = True
 imagesAreH5 = False
 loadGrayFromHdf5 = False
 
-
 # if not imagesAreH5:
 #     grayImages = readImages(imagesDir, trainSet, loadGray, loadGrayFromHdf5)
 # else:
@@ -300,7 +299,6 @@ if 'appearanceNN' in parameterTrainSet:
 
     pretrainedExperimentDir =  'experiments/train3_test/'
 
-
     if fineTune:
         pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAppearanceMask.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
@@ -323,7 +321,7 @@ if 'appearanceNN' in parameterTrainSet:
         pickle.dump(appNNmodel, pfile)
 
 if 'maskNN' in parameterTrainSet:
-    modelType = 'cnn_mask'
+    modelType = 'cnn_mask_large'
     network = lasagne_nn.load_network(modelType=modelType, param_values=[])
 
     print("Training NN Appeareance Components")
@@ -333,7 +331,7 @@ if 'maskNN' in parameterTrainSet:
     validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
     # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
 
-    meanImage = np.mean(images, axis=0)
+
 
     # grayTrainImages =  grayImages[trainValSet][:,:,:]
     # grayValidImages =  grayImages[validSet][:,:,:]
@@ -343,11 +341,11 @@ if 'maskNN' in parameterTrainSet:
     # sys.exit("NN")
     param_values = []
 
-    fineTune = True
+    fineTune = False
 
     pretrainedExperimentDir =  experimentDir
     if fineTune:
-        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelMask.pickle'
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelMaskLarge.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
             neuralNetModelMask = pickle.load(pfile)
 
@@ -358,10 +356,18 @@ if 'maskNN' in parameterTrainSet:
     else:
         meanImage = np.zeros([150, 150,3])
 
-    modelPath=experimentDir + 'neuralNetModelMask.pickle'
+    modelPath=experimentDir + 'neuralNetModelMaskLarge.pickle'
 
-    masksGT = masksGT.reshape([-1, 150*150])
-    maskNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), masksGT[trainValSet].astype(np.float32), masksGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    # masksGT = masksGT.reshape([-1, 150,150])
+
+    rsMasksGt = np.zeros([len(masksGT), 50,50])
+    for mask_i, mask in enumerate(masksGT):
+        rsMasksGt[mask_i] = skimage.transform.resize(mask, [50,50])
+
+    meanImage = np.mean(images, axis=0)
+    rsMasksGt = rsMasksGt.reshape([rsMasksGt.shape[0], 50*50])
+
+    maskNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), rsMasksGt[trainValSet].astype(np.float32), rsMasksGt[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
 
     # np.savez(modelPath, *SHNNparams)

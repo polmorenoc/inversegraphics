@@ -214,7 +214,7 @@ parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randFores
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','neuralNetModelSHLight' ])
 parameterRecognitionModels = set(['neuralNetPose', 'linearRegressionVColors','constantSHLight' ])
 parameterRecognitionModels = set(['neuralNetPose', 'neuralNetApperanceAndLight', 'neuralNetVColors' ])
-parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neuralNetVColors' ])
+parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neuralNetVColors', 'neuralNetModelMask' ])
 # parameterRecognitionModels = set(['neuralNetPose', 'neuralNetApperanceAndLight'])
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
@@ -494,15 +494,15 @@ if 'neuralNetApperanceAndLight' in parameterRecognitionModels:
     appLightPredictionNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
 
     for i in range(100):
-        appLightPredictions = np.zeros([len(testImages), 12])
+        appLightPredictionsSample = np.zeros([len(testImages), 12])
         for start_idx in range(0, len(testImages), nnBatchSize):
-            appLightPredictions[start_idx:start_idx + nnBatchSize] = appLightPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+            appLightPredictionsSample[start_idx:start_idx + nnBatchSize] = appLightPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
 
         # appLightPredictions = appLightPredictionFun(testImages.astype(np.float32))
         # relLightCoefficientsGTPred = appLightPredictions[:,:9]
         # vColorsPred =
 
-        vColorsPredSamples = vColorsPredSamples + [appLightPredictions[:,9:][:,:,None]]
+        vColorsPredSamples = vColorsPredSamples + [appLightPredictionsSample[:,9:][:,:,None]]
 
     vColorsPredSamples = np.concatenate(vColorsPredSamples, axis=2)
 
@@ -531,11 +531,11 @@ if 'neuralNetVColors' in parameterRecognitionModels:
     appPredictionNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
 
     for i in range(100):
-        appPredictions = np.zeros([len(testImages), 3])
+        appPredictionsSample = np.zeros([len(testImages), 3])
         for start_idx in range(0, len(testImages), nnBatchSize):
-            appPredictions[start_idx:start_idx + nnBatchSize] = appPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+            appPredictionsSample[start_idx:start_idx + nnBatchSize] = appPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
 
-        vColorsPredSamples = vColorsPredSamples + [appPredictions[:,:][:,:,None]]
+        vColorsPredSamples = vColorsPredSamples + [appPredictionsSample[:,:][:,:,None]]
 
     vColorsPredSamples = np.concatenate(vColorsPredSamples, axis=2)
 
@@ -642,22 +642,11 @@ if 'neuralNetModelSHLight' in parameterRecognitionModels:
 
     relLightCoefficientsPred = lightPredictions
 
-    # #Samples:
-    # vColorsPredSamples = []
-    # appPredictionNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-    #
-    # for i in range(100):
-    #     appPredictions = np.zeros([len(testImages), 3])
-    #     for start_idx in range(0, len(testImages)nnBatchSize):
-    #         appPredictions[start_idx:start_idx + nnBatchSize] = appPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-    #
-    #     vColorsPredSamples = vColorsPredSamples + [appPredictions[:,:][:,:,None]]
-    #
-    # vColorsPredSamples = np.concatenate(vColorsPredSamples, axis=2)
+
 
 if 'neuralNetModelMask' in parameterRecognitionModels:
     nnModel = ""
-    with open(trainModelsDirLightCoeffs + 'neuralNetModelMask.pickle', 'rb') as pfile:
+    with open(trainModelsDirLightCoeffs + 'neuralNetModelMaskLarge.pickle', 'rb') as pfile:
         neuralNetModelSHLight = pickle.load(pfile)
 
     meanImage = neuralNetModelSHLight['mean']
@@ -680,13 +669,28 @@ if 'neuralNetModelMask' in parameterRecognitionModels:
     maskPredNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
 
     for i in range(100):
-        maskPredictions = np.zeros([len(testImages), width*height])
+        maskPredictionsSamples = np.zeros([len(testImages), width*height])
         for start_idx in range(0, len(testImages),nnBatchSize):
-            maskPredictions[start_idx:start_idx + nnBatchSize] = maskPredNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+            maskPredictionsSamples[start_idx:start_idx + nnBatchSize] = maskPredNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
 
-        maskSamples = maskSamples + [maskPredictions[:,:][:,:,None]]
+        maskSamples = maskSamples + [maskPredictionsSamples[:,:][:,:,None]]
 
     maskSamples = np.concatenate(maskSamples, axis=2)
+    loadMask = True
+
+    gtDirMask = 'groundtruth/train4_occlusion_mask/'
+
+    masksDir =  gtDirMask + 'masks_occlusion/'
+    if loadMask:
+        masksGT = loadMasks(masksDir, testSet)
+    for i in range(10):
+        for j in range(10):
+            maskSample = maskSamples[i,:,j]
+            plt.imsave('tmp/mask' + str(i) + '_j' + str(j) + '.png', maskSample.reshape([150,150]))
+
+        plt.imsave('tmp/GT_mask' + str(i) + '.png', masksGT[i].reshape([150,150]))
+        plt.imsave('tmp/mask' + str(i) + '.png', maskSample.reshape([150,150]))
+        cv2.imwrite('tmp/img' + str(i) + '.png', cv2.cvtColor(np.uint8(lin2srgb(images[i])*255), cv2.COLOR_RGB2BGR))
 
 
 if 'randomForestSHZernike' in parameterRecognitionModels:
