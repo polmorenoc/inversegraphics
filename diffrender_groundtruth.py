@@ -514,7 +514,13 @@ currentTargetIndex = -1
 
 teapot = None
 
-for gtIdx in range(len(groundTruthToRender)):
+if renderFromPreviousGT:
+    rangeGT = range(train_i, len(groundTruthToRender))
+else:
+    rangeGT = range(len(groundTruthToRender))
+
+ipdb.set_trace()
+for gtIdx in rangeGT:
 
     sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
 
@@ -620,7 +626,6 @@ for gtIdx in range(len(groundTruthToRender)):
         if useBlender:
             if currentScene != -1 and  currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
                 if teapot.name in scene.objects:
-                    ipdb.set_trace(r)
                     scene.objects.unlink(teapot)
 
             teapot = blender_teapots[currentTeapotModel]
