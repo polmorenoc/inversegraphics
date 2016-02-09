@@ -341,7 +341,7 @@ if 'maskNN' in parameterTrainSet:
     # sys.exit("NN")
     param_values = []
 
-    fineTune = False
+    fineTune = True
 
     pretrainedExperimentDir =  experimentDir
     if fineTune:

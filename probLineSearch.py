@@ -102,6 +102,7 @@ def probLineSearch(func, x0, f0, df0, search_direction, alpha0,
 
     # -- scaled noise ---------------------------------------------------------
     sigmaf  = np.sqrt(var_f0)/(alpha0*beta)
+
     sigmadf = np.sqrt(np.dot((search_direction**2).T,var_df0))/beta
 
     # -- initiate data storage ------------------------------------------------

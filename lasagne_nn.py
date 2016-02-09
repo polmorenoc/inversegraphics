@@ -536,7 +536,6 @@ def build_cnn_mask_large(input_var=None):
 
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
-    ipdb.set_trace()
     lasagne.layers.get_output_shape(network)
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network =  ConvLayer(

@@ -658,18 +658,18 @@ if 'neuralNetModelMask' in parameterRecognitionModels:
     network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
     maskPredictionFun = lasagne_nn.get_prediction_fun(network)
 
-    maskPredictions = np.zeros([len(testImages), width*height])
+    maskPredictions = np.zeros([len(testImages), 50*50])
     for start_idx in range(0, len(testImages), nnBatchSize):
         maskPredictions[start_idx:start_idx + nnBatchSize] = maskPredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
 
-    maskPredictions = np.reshape(maskPredictions, [len(testImages), height,width])
+    maskPredictions = np.reshape(maskPredictions, [len(testImages), 50,50])
 
     # #Samples:
     maskSamples = []
     maskPredNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
 
     for i in range(100):
-        maskPredictionsSamples = np.zeros([len(testImages), width*height])
+        maskPredictionsSamples = np.zeros([len(testImages), 50*50])
         for start_idx in range(0, len(testImages),nnBatchSize):
             maskPredictionsSamples[start_idx:start_idx + nnBatchSize] = maskPredNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
 
@@ -686,10 +686,10 @@ if 'neuralNetModelMask' in parameterRecognitionModels:
     for i in range(10):
         for j in range(10):
             maskSample = maskSamples[i,:,j]
-            plt.imsave('tmp/mask' + str(i) + '_j' + str(j) + '.png', maskSample.reshape([150,150]))
+            plt.imsave('tmp/mask' + str(i) + '_j' + str(j) + '.png', maskSample.reshape([50,50]))
 
         plt.imsave('tmp/GT_mask' + str(i) + '.png', masksGT[i].reshape([150,150]))
-        plt.imsave('tmp/mask' + str(i) + '.png', maskSample.reshape([150,150]))
+        plt.imsave('tmp/mask' + str(i) + '.png', maskSample.reshape([50,50]))
         cv2.imwrite('tmp/img' + str(i) + '.png', cv2.cvtColor(np.uint8(lin2srgb(images[i])*255), cv2.COLOR_RGB2BGR))
 
 

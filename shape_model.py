@@ -62,31 +62,3 @@ def chGetNormals(vertices, faces):
     return opendr.geometry.VertNormals(vertices, faces).reshape((-1,3))
 
 
-#%% Load data
-filePath = 'teapotModel.pkl'
-teapotModel = loadObject(filePath)
-faces = teapotModel['faces']
-
-#%% Sample random shape Params
-latentDim = np.shape(teapotModel['ppcaW'])[1]
-shapeParams = np.random.randn(latentDim)
-
-chShapeParams = ch.Ch(shapeParams)
-chVertices = chShapeParamsToVerts(chShapeParams, teapotModel['meshLinearTransform'], teapotModel['ppcaW'], teapotModel['ppcaB'])
-chNormals = chGetNormals(chVertices, faces)
-
-samples = 10
-for sample in range(samples):
-    shapeParams = np.random.randn(latentDim)
-    chShapeParams[:] = shapeParams
-    #%% Get mesh vertices and normals
-    vertices = shapeParamsToVerts(shapeParams, teapotModel)
-    normals = getNormals(vertices, faces)
-
-    chVertices.r
-    chNormals.r
-
-    ipdb.set_trace()
-        #%% Save as .obj
-    # filePath = '/home/charlie/PhD/data/models/Teapots/test.obj'
-    # saveObj(vertices, faces, normals, filePath)

@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 
 #Main script options:
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -219,7 +219,7 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train4_occlusion_mask'
+prefix = 'train4_occlusion_cycles'
 
 renderFromPreviousGT = True
 
@@ -265,7 +265,7 @@ replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[0:1]
 
-trainSize = 20
+trainSize = 10000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -512,6 +512,8 @@ currentScene = -1
 currentTeapot = -1
 currentTargetIndex = -1
 
+teapot = None
+
 for gtIdx in range(len(groundTruthToRender)):
 
     sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
@@ -593,7 +595,7 @@ for gtIdx in range(len(groundTruthToRender)):
             unlinkedObj = scene.objects[str(targetIndex)]
             scene.objects.unlink(unlinkedObj)
 
-    teapot = None
+
     teapot_i = groundTruthToRender['trainTeapotIds'][gtIdx]
 
     if sceneIdx != currentScene or targetIndex != currentTargetIndex or teapot_i != currentTeapot:
@@ -616,12 +618,13 @@ for gtIdx in range(len(groundTruthToRender)):
         print("Ground truth on new teapot" + str(teapot_i))
 
         if useBlender:
-            if teapot != None:
-                scene.objects.unlink(teapot)
+            if currentScene != -1 and  currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
+                if teapot.name in scene.objects:
+                    ipdb.set_trace(r)
+                    scene.objects.unlink(teapot)
 
             teapot = blender_teapots[currentTeapotModel]
-            if teapot.name in scene.objects:
-                scene.objects.unlink(teapot)
+
             teapotGT = blender_teapots[currentTeapotModel]
             # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
 

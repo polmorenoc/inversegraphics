@@ -27,7 +27,7 @@ plt.ion()
 #__GL_THREADED_OPTIMIZATIONS
 
 #Main script options:
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
@@ -64,7 +64,7 @@ if glMode == 'glfw':
     glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.05
+clip_start = 0.01
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
@@ -95,6 +95,15 @@ dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 
 readDataId = 1
+
+import shape_model
+#%% Load data
+filePath = 'teapotModel.pkl'
+teapotModel = shape_model.loadObject(filePath)
+faces = teapotModel['faces']
+
+#%% Sample random shape Params
+latentDim = np.shape(teapotModel['ppcaW'])[1]
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
@@ -338,7 +347,41 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
-    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    shapeParams = np.random.randn(latentDim)
+    chShapeParams = ch.Ch(shapeParams)
+    chVertices = shape_model.chShapeParamsToVerts(chShapeParams, teapotModel['meshLinearTransform'], teapotModel['ppcaW'], teapotModel['ppcaB'])
+    ipdb.set_trace()
+    chNormals = shape_model.chGetNormals(chVertices, faces)
+    smNormals = [chNormals]
+    smFaces = [[faces]]
+    smVColors = [chVColorsGT*np.ones(chVertices.shape)]
+    smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
+    smHaveTextures = [[False]]
+    smTexturesList = [[None]]
+    smCenter = np.mean(chVertices.r, axis=0)
+    chVertices = chVertices - smCenter
+    minZ = np.min(chVertices.r[:,2])
+    chMinZ = ch.min(chVertices[:,2])
+    # chVertices[:,2]  = chVertices[:,2]  - minZ
+    zeroZVerts = chVertices[:,2]- chMinZ
+    chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
+    maxZ = np.max(chVertices.r[:,2])
+    minZ = np.min(chVertices.r[:,2])
+    maxY = np.max(chVertices.r[:,0])
+    minY = np.min(chVertices.r[:,0])
+    scaleZ = 0.265/(maxZ-minZ)
+    scaleY = 0.18/(maxY-minY)
+    ratio =  (maxZ-minZ)/(maxY-minY)
+    if ratio > 0.265/0.18:
+        scaleSM = scaleZ
+    else:
+        scaleSM = scaleY
+    chVertices = chVertices*scaleSM
+    smCenter = np.mean(chVertices.r, axis=0)
+    smVertices = [chVertices]
+
+    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+    # renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
     renderer.r
@@ -368,10 +411,56 @@ for teapot_i in range(len(renderTeapotsList)):
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+shapeParams = np.random.randn(latentDim)
+
+chShapeParamsGT = ch.Ch(shapeParams)
+chVertices = shape_model.chShapeParamsToVerts(chShapeParamsGT, teapotModel['meshLinearTransform'], teapotModel['ppcaW'], teapotModel['ppcaB'])
+chNormals = shape_model.chGetNormals(chVertices, faces)
+
+
+smNormals = [chNormals]
+smFaces = [[faces]]
+smVColors = [chVColorsGT*np.ones(chVertices.shape)]
+smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
+smHaveTextures = [[False]]
+smTexturesList = [[None]]
+
+smCenter = np.mean(chVertices.r, axis=0)
+chVertices = chVertices - smCenter
+minZ = np.min(chVertices.r[:,2])
+
+chMinZ = ch.min(chVertices[:,2])
+# chVertices[:,2]  = chVertices[:,2]  - minZ
+zeroZVerts = chVertices[:,2]- chMinZ
+chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
+maxZ = np.max(chVertices.r[:,2])
+minZ = np.min(chVertices.r[:,2])
+maxY = np.max(chVertices.r[:,0])
+minY = np.min(chVertices.r[:,0])
+scaleZ = 0.265/(maxZ-minZ)
+scaleY = 0.18/(maxY-minY)
+
+ratio =  (maxZ-minZ)/(maxY-minY)
+
+# scaleZ = 0.265/(maxZ-minZ)
+# scaleY = 0.18/(maxY-minY)
+#
+# scaleZ = 0.265/(maxZ-minZ)
+# scaleY = 0.18/(maxY-minY)
+if ratio > 0.265/0.18:
+    scaleSM = scaleZ
+else:
+    scaleSM = scaleY
+chVertices = chVertices*scaleSM
+smCenter = np.mean(chVertices.r, axis=0)
+smVertices = [chVertices]
+
+# addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVertices, smFaces, smVColors, smNormals, smUVs, smHaveTextures, smTexturesList)
+
 
 center = center_teapots[currentTeapotModel]
-rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
+rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenter, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 rendererGT.msaa = True
 rendererGT.overdraw = True
 if useGTasBackground:
@@ -530,11 +619,13 @@ ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
 free_variables = [chAz, chEl, chVColors, chShCoeffs]
+free_variables = [chShapeParams]
 azVar = 1
 elVar = 1
 vColorVar = 0.00001
 shCoeffsVar = 0.00001
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chShCoeffs.r.shape)])
+df_vars = np.concatenate([np.ones(chShapeParams.shape)])
 
 maxiter = 50
 method=1
@@ -1321,10 +1412,10 @@ def readKeys(window, key, scancode, action, mods):
     global free_variables
     global df_vars
     if mods==glfw.MOD_SHIFT and key == glfw.KEY_M and action == glfw.RELEASE:
-        free_variables = [renderer.v.a.a]
+        # free_variables = [renderer.v.a.a]
         minimize = True
     if mods!=glfw.MOD_SHIFT and key == glfw.KEY_M and action == glfw.RELEASE:
-        free_variables = [chAz, chEl, chVColors, chShCoeffs]
+        # free_variables = [chAz, chEl, chVColors, chShCoeffs]
         minimize = True
 
 def timeRendering(iterations):
@@ -1591,7 +1682,7 @@ if demoMode:
         if minimize:
             iterat = 0
             print("Minimizing with method " + methods[method])
-            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb, options=options)
+            ch.minimize({'raw': errorFun}, bounds=bounds, method=methods[method], x0=free_variables, callback=cb2, options=options)
             plotMinimization = True
             minimize = False
 
