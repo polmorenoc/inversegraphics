@@ -15,11 +15,45 @@ def shapeParamsToVerts(shapeParams, teapotModel):
     vertices = teapotModel['meshLinearTransform'].dot(landmarks)
     return vertices
 
-def chShapeParamsToVerts(shapeParams, meshLinearTransform, ppcaW, ppcaB):
-    landmarksLong = ch.dot(shapeParams,ppcaW.T) + ppcaB
-    landmarks = landmarksLong.reshape([-1,3])
+def chShapeParamsToVerts(landmarks, meshLinearTransform):
     vertices = ch.dot(meshLinearTransform,landmarks)
     return vertices
+
+
+def chShapeParamsToNormals(N, landmarks, linT):
+    T = ch.dot(linT,landmarks)
+    invT = []
+    nLandmarks = landmarks.r.shape[0]
+    for i in range(nLandmarks):
+        R = T[3*i:3*(i+1),:3]
+        invR = ch.inv(R.T)
+        invT = invT + [invR]
+
+    invT = ch.vstack(invT)
+    newNormals = ch.dot(N, invT)
+    import opendr.geometry
+    n = opendr.geometry.NormalizedNx3(newNormals)
+
+    return n
+
+def getT(targetPoints, linT):
+    T = linT.dot(targetPoints)
+    return T
+
+def shapeParamsToNormals(shapeParams, teapotModel):
+    landmarksLong = shapeParams.dot(teapotModel['ppcaW'].T) + teapotModel['ppcaB']
+    landmarks = longToPoints3D(landmarksLong)
+    T = getT(landmarks, teapotModel['linT'])
+    nLandmarks = np.shape(landmarks)[0]
+    invT = np.empty([3*nLandmarks, 3])
+    for i in range(nLandmarks):
+        R = T[3*i:3*(i+1),:3]
+        invR = np.linalg.inv(R)
+        invT[3*i:3*(i+1),:] = invR
+    newNormals = np.array(teapotModel['N'].dot(invT))
+    normalize_v3(newNormals)
+
+    return newNormals
 
 def saveObj(vertices, faces, normals, filePath):
     with open(filePath, 'w') as f:

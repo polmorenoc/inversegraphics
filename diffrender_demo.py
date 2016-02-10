@@ -349,12 +349,20 @@ for teapot_i in range(len(renderTeapotsList)):
 
     shapeParams = np.random.randn(latentDim)
     chShapeParams = ch.Ch(shapeParams)
-    chVertices = shape_model.chShapeParamsToVerts(chShapeParams, teapotModel['meshLinearTransform'], teapotModel['ppcaW'], teapotModel['ppcaB'])
+
+    landmarksLong = ch.dot(chShapeParams,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
+    landmarks = landmarksLong.reshape([-1,3])
+    chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
+    teapotNormals = teapotModel['N']
+    chNormals = shape_model.chShapeParamsToNormals(teapotNormals, landmarks, teapotModel['linT'])
+    rot = mathutils.Matrix.Rotation(radians(90), 4, 'X')
+    # chNormals= ch.dot(np.array(rot)[0:3, 0:3], chNormals.T).T
+    chNormals2 = ch.array(shape_model.shapeParamsToNormals(shapeParams, teapotModel))
+    chNormals3 = shape_model.chGetNormals(chVertices, faces)
     ipdb.set_trace()
-    chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
     smFaces = [[faces]]
-    smVColors = [chVColorsGT*np.ones(chVertices.shape)]
+    smVColors = [chVColors*np.ones(chVertices.shape)]
     smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
     smHaveTextures = [[False]]
     smTexturesList = [[None]]
@@ -367,8 +375,8 @@ for teapot_i in range(len(renderTeapotsList)):
     chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
     maxZ = np.max(chVertices.r[:,2])
     minZ = np.min(chVertices.r[:,2])
-    maxY = np.max(chVertices.r[:,0])
-    minY = np.min(chVertices.r[:,0])
+    maxY = np.max(chVertices.r[:,1])
+    minY = np.min(chVertices.r[:,1])
     scaleZ = 0.265/(maxZ-minZ)
     scaleY = 0.18/(maxY-minY)
     ratio =  (maxZ-minZ)/(maxY-minY)
@@ -414,11 +422,14 @@ renderer = renderer_teapots[currentTeapotModel]
 shapeParams = np.random.randn(latentDim)
 
 chShapeParamsGT = ch.Ch(shapeParams)
-chVertices = shape_model.chShapeParamsToVerts(chShapeParamsGT, teapotModel['meshLinearTransform'], teapotModel['ppcaW'], teapotModel['ppcaB'])
-chNormals = shape_model.chGetNormals(chVertices, faces)
+landmarksLong = ch.dot(chShapeParamsGT,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
+landmarks = landmarksLong.reshape([-1,3])
+chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
+chNormalsGT = shape_model.chShapeParamsToNormals(teapotModel['N'], landmarks, teapotModel['linT'])
+chNormalsGT = shape_model.shapeParamsToNormals(shapeParams, teapotModel)
 
 
-smNormals = [chNormals]
+smNormals = [chNormalsGT]
 smFaces = [[faces]]
 smVColors = [chVColorsGT*np.ones(chVertices.shape)]
 smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
@@ -435,8 +446,8 @@ zeroZVerts = chVertices[:,2]- chMinZ
 chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
 maxZ = np.max(chVertices.r[:,2])
 minZ = np.min(chVertices.r[:,2])
-maxY = np.max(chVertices.r[:,0])
-minY = np.min(chVertices.r[:,0])
+maxY = np.max(chVertices.r[:,1])
+minY = np.min(chVertices.r[:,1])
 scaleZ = 0.265/(maxZ-minZ)
 scaleY = 0.18/(maxY-minY)
 
@@ -455,8 +466,8 @@ chVertices = chVertices*scaleSM
 smCenter = np.mean(chVertices.r, axis=0)
 smVertices = [chVertices]
 
-# addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVertices, smFaces, smVColors, smNormals, smUVs, smHaveTextures, smTexturesList)
+addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+# addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVertices, smFaces, smVColors, smNormals, smUVs, smHaveTextures, smTexturesList)
 
 
 center = center_teapots[currentTeapotModel]
