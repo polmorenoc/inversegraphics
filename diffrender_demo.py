@@ -106,7 +106,7 @@ faces = teapotModel['faces']
 latentDim = np.shape(teapotModel['ppcaW'])[1]
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[27:28]
+renderTeapotsList = np.arange(len(teapots))[0:1]
 
 sceneNumber = dataScenes[readDataId]
 
@@ -352,15 +352,18 @@ for teapot_i in range(len(renderTeapotsList)):
     shapeParams = np.random.randn(latentDim)
     chShapeParams = ch.Ch(shapeParams)
 
-    landmarksLong = ch.dot(chShapeParams,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
-    landmarks = landmarksLong.reshape([-1,3])
-    chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
-    teapotNormals = teapotModel['N']
-    chNormals = shape_model.chShapeParamsToNormals(teapotNormals, landmarks, teapotModel['linT'])
-    rot = mathutils.Matrix.Rotation(radians(90), 4, 'X')
+    # landmarksLong = ch.dot(chShapeParams,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
+    # landmarks = landmarksLong.reshape([-1,3])
+    # chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
+    chVertices = shape_model.VerticesModel(chShapeParams =chShapeParams,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
+
+    # teapotNormals = teapotModel['N']
+    # chNormals = shape_model.chShapeParamsToNormals(teapotNormals, landmarks, teapotModel['linT'])
+    # rot = mathutils.Matrix.Rotation(radians(90), 4, 'X')
     # chNormals= ch.dot(np.array(rot)[0:3, 0:3], chNormals.T).T
-    chNormals2 = ch.array(shape_model.shapeParamsToNormals(shapeParams, teapotModel))
-    chNormals3 = shape_model.chGetNormals(chVertices, faces)
+    # chNormals2 = ch.array(shape_model.shapeParamsToNormals(shapeParams, teapotModel))
+    chNormals = shape_model.chGetNormals(chVertices, faces)
+
 
     smNormals = [chNormals]
     smFaces = [[faces]]
@@ -421,8 +424,9 @@ for teapot_i in range(len(renderTeapotsList)):
 currentTeapotModel = 0
 renderer = renderer_teapots[currentTeapotModel]
 
-shapeParams = np.random.randn(latentDim)
+# shapeParams = np.random.randn(latentDim)
 
+shapeParams[0] = shapeParams[0] + 0.1
 chShapeParamsGT = ch.Ch(shapeParams)
 landmarksLong = ch.dot(chShapeParamsGT,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
 landmarks = landmarksLong.reshape([-1,3])
@@ -468,14 +472,16 @@ chVertices = chVertices*scaleSM
 smCenter = np.mean(chVertices.r, axis=0)
 smVertices = [chVertices]
 
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
-# addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVertices, smFaces, smVColors, smNormals, smUVs, smHaveTextures, smTexturesList)
+# addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVertices, smFaces, smVColors, smNormals, smUVs, smHaveTextures, smTexturesList)
 
 
 center = center_teapots[currentTeapotModel]
 
-ipdb.set_trace()
 rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenter, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
+
+ipdb.set_trace()
+
 rendererGT.msaa = True
 rendererGT.overdraw = True
 if useGTasBackground:
@@ -1203,7 +1209,7 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
         chScale[2] = chScale[2].r - 0.05
     global errorFun
-    if key != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
         print("Azimuth grad check: ")
         jacs, approxjacs, check = ch.optimization.gradCheck(errorFun, [chAz], [1.49e-08])
         print("Grad check jacs: " + "%.2f" % jacs)
@@ -1228,7 +1234,7 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_D:
         refresh = True
         # chComponent[0] = chComponent[0].r + 0.1
-    if key == glfw.MOD_SHIFT and glfw.KEY_D:
+    if mods == glfw.MOD_SHIFT and glfw.KEY_D:
         refresh = True
         # chComponent[0] = chComponent[0].r - 0.1
     global drawSurf
@@ -1256,7 +1262,7 @@ def readKeys(window, key, scancode, action, mods):
 
     global groundTruthBlender
     global blenderRender
-    if key != glfw.MOD_SHIFT and key == glfw.KEY_B and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and key == glfw.KEY_B and action == glfw.RELEASE:
         if useBlender:
             updateErrorFunctions = True
             groundTruthBlender = not groundTruthBlender
@@ -1317,26 +1323,26 @@ def readKeys(window, key, scancode, action, mods):
     global stds
     global globalPrior
     global plotMinimization
-    if key == glfw.KEY_KP_1 and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_1 and action == glfw.RELEASE:
         stds[:] = stds.r[0]/1.5
         print("New standard devs of " + str(stds.r))
         refresh = True
         drawSurf = False
         plotMinimization = False
-    if key == glfw.KEY_KP_2 and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_2 and action == glfw.RELEASE:
         stds[:] = stds.r[0]*1.5
         print("New standard devs of " + str(stds.r))
         refresh = True
         drawSurf = False
         plotMinimization = False
 
-    if key == glfw.KEY_KP_4 and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and key == glfw.KEY_KP_4 and action == glfw.RELEASE:
         globalPrior[0] = globalPrior.r[0] - 0.05
         print("New foreground prior of" + str(globalPrior.r))
         refresh = True
         drawSurf = False
         plotMinimization = False
-    if key == glfw.KEY_KP_5 and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_5 and action == glfw.RELEASE:
         globalPrior[0] = globalPrior.r[0] + 0.05
         print("New foreground prior of " + str(globalPrior.r))
         refresh = True
@@ -1346,15 +1352,45 @@ def readKeys(window, key, scancode, action, mods):
     global changeRenderer
     global currentTeapotModel
     changeRenderer = False
-    if key == glfw.KEY_KP_7 and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_7 and action == glfw.RELEASE:
         currentTeapotModel = (currentTeapotModel - 1) % len(renderTeapotsList)
         changeRenderer = True
-    if key == glfw.KEY_KP_8 and action == glfw.RELEASE:
+    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_8 and action == glfw.RELEASE:
         currentTeapotModel = (currentTeapotModel + 1) % len(renderTeapotsList)
         changeRenderer = True
 
     global renderer
-
+    global chShapeParams
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_1 and action == glfw.RELEASE:
+        refresh = True
+        chShapeParams[1] = chShapeParams.r[1] + 0.2
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_2 and action == glfw.RELEASE:
+        refresh = True
+        chShapeParams[2] = chShapeParams.r[2] + 0.2
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_3 and action == glfw.RELEASE:
+        chShapeParams[3] = chShapeParams.r[3] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_4 and action == glfw.RELEASE:
+        chShapeParams[4] = chShapeParams.r[4] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_5 and action == glfw.RELEASE:
+        chShapeParams[5] = chShapeParams.r[5] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_6 and action == glfw.RELEASE:
+        chShapeParams[6] = chShapeParams.r[6] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_8 and action == glfw.RELEASE:
+        chShapeParams[7] = chShapeParams.r[7] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_9 and action == glfw.RELEASE:
+        chShapeParams[9] = chShapeParams.r[9] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_8 and action == glfw.RELEASE:
+        chShapeParams[8] = chShapeParams.r[8] + 0.2
+        refresh = True
+    if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_0 and action == glfw.RELEASE:
+        chShapeParams[0] = chShapeParams.r[0] + 0.2
+        refresh = True
 
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True

@@ -2,6 +2,8 @@ import numpy as np
 import pickle
 import chumpy as ch
 import ipdb
+from chumpy import depends_on, Ch
+import scipy.sparse as sp
 
 #%% Helper functions
 def longToPoints3D(pointsLong):
@@ -18,6 +20,29 @@ def shapeParamsToVerts(shapeParams, teapotModel):
 def chShapeParamsToVerts(landmarks, meshLinearTransform):
     vertices = ch.dot(meshLinearTransform,landmarks)
     return vertices
+
+
+class VerticesModel(Ch):
+    terms = 'meshLinearTransform', 'W', 'b'
+    dterms = 'chShapeParams'
+
+
+    def compute_r(self):
+        landmarks = np.dot(self.chShapeParams.r,self.W.T) + self.b
+        landmarks = landmarks.reshape([-1,3])
+        return np.dot(self.meshLinearTransform, landmarks)
+
+
+    def compute_dr_wrt(self,wrt):
+        if self.chShapeParams is wrt:
+            # ipdb.set_trace()
+            jac = self.meshLinearTransform.dot(self.W.reshape([self.meshLinearTransform.shape[1], -1,  len(self.chShapeParams)]).transpose((1,0,2))).reshape([-1,len(self.chShapeParams)])
+
+            return jac
+        return None
+
+
+
 
 
 def chShapeParamsToNormals(N, landmarks, linT):

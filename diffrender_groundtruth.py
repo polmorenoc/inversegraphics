@@ -554,7 +554,7 @@ for gtIdx in rangeGT:
             scene.render.resolution_y = height
             scene.render.tile_x = height/numTileAxis
             scene.render.tile_y = width
-            scene.cycles.samples = 2048
+            scene.cycles.samples = 4000
             bpy.context.screen.scene = scene
             addEnvironmentMapWorld(scene)
             scene.render.image_settings.file_format = 'OPEN_EXR'
