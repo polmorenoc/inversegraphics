@@ -25,16 +25,17 @@ def chShapeParamsToNormals(N, landmarks, linT):
     invT = []
     nLandmarks = landmarks.r.shape[0]
     for i in range(nLandmarks):
-        R = T[3*i:3*(i+1),:3]
+        R = T[4*i:4*i+3,:3].T
         invR = ch.inv(R.T)
         invT = invT + [invR]
 
     invT = ch.vstack(invT)
     newNormals = ch.dot(N, invT)
+
     import opendr.geometry
     n = opendr.geometry.NormalizedNx3(newNormals)
 
-    return n
+    return newNormals
 
 def getT(targetPoints, linT):
     T = linT.dot(targetPoints)
@@ -47,7 +48,7 @@ def shapeParamsToNormals(shapeParams, teapotModel):
     nLandmarks = np.shape(landmarks)[0]
     invT = np.empty([3*nLandmarks, 3])
     for i in range(nLandmarks):
-        R = T[3*i:3*(i+1),:3]
+        R = T[4*i:4*i+3,:3].T
         invR = np.linalg.inv(R)
         invT[3*i:3*(i+1),:] = invR
     newNormals = np.array(teapotModel['N'].dot(invT))

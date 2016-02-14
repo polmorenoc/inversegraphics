@@ -13,11 +13,11 @@ def loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender
     textures_list_teapots = []
     blender_teapots = []
     center_teapots = []
-    for teapotIdx in renderTeapotsList:
-        teapotNum = renderTeapotsList[teapotIdx]
+    for teapotIdx, teapotNum in enumerate(renderTeapotsList):
+
         objectDicFile = 'data/target' + str(teapotNum) + '.pickle'
         if useBlender:
-            teapot = targetModels[teapotNum]
+            teapot = targetModels[teapotIdx]
             teapot.layers[1] = True
             teapot.layers[2] = True
             blender_teapots = blender_teapots + [teapot]

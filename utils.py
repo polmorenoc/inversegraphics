@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import skimage
+import skimage.io
 import h5py
 import ipdb
 

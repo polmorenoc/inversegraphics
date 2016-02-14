@@ -20,8 +20,8 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion'
-experimentPrefix = 'train4_occlusion_10k'
+gtPrefix = 'train4_occlusion_cycles'
+experimentPrefix = 'train4_occlusion_cycles_tmp'
 experimentDescr = 'Synthetic test set with occlusions'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
@@ -29,9 +29,8 @@ experimentDir = 'experiments/' + experimentPrefix + '/'
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-onlySynthetic = True
+onlySynthetic = False
 
-print("Reading images.")
 
 print("Reading experiment data.")
 
@@ -61,8 +60,39 @@ dataIds = groundTruth['trainIds']
 gtDtype = groundTruth.dtype
 
 allDataIds = gtDataFile[gtPrefix]['trainIds']
+
+########## Check if there is anything wrong with the renders:
+
+print("Reading images.")
+# images = readImages(imagesDir, trainSet, False, loadFromHdf5)
+writeHdf5 = False
+writeGray = False
+if writeHdf5:
+    writeImagesHdf5(gtDir, gtDir, allDataIds, writeGray)
+if onlySynthetic:
+    imagesDir = gtDir + 'images_opendr/'
+else:
+    imagesDir = gtDir + 'images/'
+
+loadGray = True
+imagesAreH5 = False
+loadGrayFromHdf5 = False
+
+if not imagesAreH5:
+    grayImages = readImages(imagesDir, allDataIds, loadGray, loadGrayFromHdf5)
+else:
+    grayImages = h5py.File(imagesDir + 'images_gray.h5', 'r')["images"]
+
+badImages = np.where(np.mean(grayImages, (1,2)) < 0.01)[0]
+
+for id, badImage in enumerate(grayImages[badImages]):
+    plt.imsave('tmp/check/badImage' + str(badImages[id]) + '.png', np.tile(badImage[:,:,None], [1,1,3]))
+#
+
 if not os.path.isfile(experimentDir + 'train.npy'):
-    generateExperiment(len(allDataIds), experimentDir, 0.9, 1)
+    generateExperiment(len(allDataIds), experimentDir, 1, seed)
+
+########## Out of sample selections.
 
 # testSamplesIds= [2,4]
 # trainSamplesIds = [0,14,20,25,26,1]

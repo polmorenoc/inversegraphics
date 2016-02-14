@@ -1,7 +1,7 @@
- import pyassimp
- from pyassimp.postprocess import *
+import pyassimp
+from pyassimp.postprocess import *
 
- modelPath = '../databaseFull/models/teapots/78ed1a0383cd2eab7552b099aebcb24e/Teapot_fixed.dae'
+modelPath = '../databaseFull/models/teapots/78ed1a0383cd2eab7552b099aebcb24e/Teapot_fixed.dae'
 
 # aiProcessPreset_TargetRealtime_Quality = ( \
 #     aiProcess_CalcTangentSpace              |  \

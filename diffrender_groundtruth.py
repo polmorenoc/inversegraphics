@@ -219,7 +219,7 @@ numTileAxis = 3
 # Initialization ends here
 #########################################
 
-prefix = 'train4_occlusion_cycles'
+prefix = 'train4_occlusion_cycles_t27'
 
 renderFromPreviousGT = True
 
@@ -267,7 +267,7 @@ scenesToRender = range(len(sceneLines))[0:1]
 
 trainSize = 10000
 
-renderTeapotsList = np.arange(len(teapots))[0:1]
+renderTeapotsList = np.arange(len(teapots))[:]
 
 # for hdrit, hdri in enumerate(list(envMapDic.items())):
 #     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':
@@ -519,7 +519,8 @@ if renderFromPreviousGT:
 else:
     rangeGT = range(len(groundTruthToRender))
 
-ipdb.set_trace()
+teapot_i = 27
+
 for gtIdx in rangeGT:
 
     sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
@@ -603,6 +604,7 @@ for gtIdx in rangeGT:
 
 
     teapot_i = groundTruthToRender['trainTeapotIds'][gtIdx]
+    teapot_i = 27
 
     if sceneIdx != currentScene or targetIndex != currentTargetIndex or teapot_i != currentTeapot:
         rendererGT.makeCurrentContext()
@@ -709,8 +711,8 @@ for gtIdx in rangeGT:
     vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
     vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
 
-    # if occlusion < 0.01 or occlusion > 0.95:
-    #     ignore = True
+    if occlusion > 0.9:
+        ignore = True
 
     if useBlender and not ignore:
 

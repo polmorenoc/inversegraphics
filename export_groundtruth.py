@@ -1,8 +1,7 @@
 import save_exr_images
-reload(save_exr_images)
 from save_exr_images import exportExrImages
 import os
-print "Reading xml "
+print ("Reading xml ")
 
 
 outputDir = '../data/output/'
@@ -29,5 +28,5 @@ for instance in lines:
     try:
         exportExrImages(outputDir, imgDir, teapot, frame, sceneNum, targetIndex, prefix)
     except Exception as e:
-        print e
+        print(e)
 

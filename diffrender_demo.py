@@ -27,13 +27,13 @@ plt.ion()
 #__GL_THREADED_OPTIMIZATIONS
 
 #Main script options:
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
 demoMode = True
 showSubplots = True
-unpackModelsFromBlender = False
+unpackModelsFromBlender = True
 unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
@@ -106,7 +106,7 @@ faces = teapotModel['faces']
 latentDim = np.shape(teapotModel['ppcaW'])[1]
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[0:1]
+renderTeapotsList = np.arange(len(teapots))[27:28]
 
 sceneNumber = dataScenes[readDataId]
 
@@ -249,7 +249,9 @@ phiOffsetGT = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 phiOffset = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 
 chObjAzGT = ch.Ch(dataObjAzsGT[readDataId])
+chObjAzGT[:] = 0
 chAzGT = ch.Ch(dataAzsGT[readDataId])
+chAzGT[:] = 0
 chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(dataElevsGT[readDataId])
 chDistGT = ch.Ch([camDistance])
@@ -359,7 +361,7 @@ for teapot_i in range(len(renderTeapotsList)):
     # chNormals= ch.dot(np.array(rot)[0:3, 0:3], chNormals.T).T
     chNormals2 = ch.array(shape_model.shapeParamsToNormals(shapeParams, teapotModel))
     chNormals3 = shape_model.chGetNormals(chVertices, faces)
-    ipdb.set_trace()
+
     smNormals = [chNormals]
     smFaces = [[faces]]
     smVColors = [chVColors*np.ones(chVertices.shape)]
@@ -471,6 +473,8 @@ addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapot
 
 
 center = center_teapots[currentTeapotModel]
+
+ipdb.set_trace()
 rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenter, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 rendererGT.msaa = True
 rendererGT.overdraw = True
@@ -1272,6 +1276,7 @@ def readKeys(window, key, scancode, action, mods):
 
     if key == glfw.KEY_P and action == glfw.RELEASE:
         ipdb.set_trace()
+
         refresh = True
 
     if key == glfw.KEY_N and action == glfw.RELEASE:

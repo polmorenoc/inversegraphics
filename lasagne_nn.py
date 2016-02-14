@@ -841,7 +841,7 @@ def iterate_minibatches_h5(inputs_h5, trainSet, trainValSet, targets, batchsize,
     if shuffle:
         indices = np.arange(len(trainValSet))
         np.random.shuffle(indices)
-    for start_idx in range(0, len(trainValSet) - batchsize + 1, batchsize):
+    for start_idx in range(0, len(trainValSet), batchsize):
         if shuffle:
             excerpt = indices[start_idx:start_idx + batchsize]
         else:
@@ -930,6 +930,8 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
 
     print("Loading validation set")
 
+    if meanImage.ndim == 2:
+        meanImage = meanImage[:,:,None]
 
     X_val = X_h5[trainSetVal::].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
     print("Ended loading validation set")
@@ -980,21 +982,20 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     best_valid = np.inf
     best_valid_epoch = 0
     best_weights = None
-    batchSize = 32
+    batchSize = 64
     for epoch in range(num_epochs):
-
         # In each epoch, we do a full pass over the training data:
         train_err = 0
         train_batches = 0
         start_time = time.time()
-        slicesize = 1280
+        slicesize = 10000
         sliceidx = 0
-        for start_idx in range(0, trainSetVal - slicesize + 1, slicesize):
+        for start_idx in range(0, trainSetVal, slicesize):
             sliceidx += 1
             print("Working on slice " + str(sliceidx) + " of " +  str(int(trainSetVal/slicesize)))
-            X_train = X_h5[start_idx:start_idx + slicesize].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+            X_train = X_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
 
-            for batch in iterate_minibatches(X_train, y_train[start_idx:start_idx + slicesize], batchSize, shuffle=True):
+            for batch in iterate_minibatches(X_train, y_train[start_idx:min(start_idx + slicesize,trainSetVal)], batchSize, shuffle=True):
                 # print("Batch " + str(train_batches))
                 inputs, targets = batch
                 train_err += train_fn(inputs, targets)

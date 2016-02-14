@@ -28,8 +28,8 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion'
-experimentPrefix = 'train4_occlusion_10k'
+gtPrefix = 'train3_occlusion'
+experimentPrefix = 'train3_occlusion_alltrain'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -38,32 +38,12 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 allDataIds = gtDataFile[gtPrefix]['trainIds']
 
-onlySynthetic = True
-
-print("Reading images.")
-
-writeHdf5 = False
-writeGray = False
-if onlySynthetic:
-    imagesDir = gtDir + 'images_opendr/'
-else:
-    imagesDir = gtDir + 'images/'
-
-if writeHdf5:
-    writeImagesHdf5(imagesDir, imagesDir, allDataIds, writeGray)
-
-if onlySynthetic:
-    imagesExpDir = experimentDir + 'opendr_'
-else:
-    imagesExpDir = experimentDir + ''
+onlySynthetic = False
 
 
 # trainSet = np.load(experimentDir + 'train.npy')[:12800]
-trainSet = np.load(experimentDir + 'train.npy')[:15000]
+trainSet = np.load(experimentDir + 'train.npy')[:]
 
-writeExpHdf5 = False
-if writeExpHdf5:
-    writeImagesHdf5(imagesDir, imagesExpDir, trainSet, writeGray)
 
 print("Reading experiment data.")
 
@@ -109,18 +89,19 @@ loadFromHdf5 = False
 
 print("Reading images.")
 
-# if loadFromHdf5:
-
-images = readImages(imagesDir, trainSet, False, loadFromHdf5)
+if onlySynthetic:
+    imagesDir = gtDir + 'images_opendr/'
+else:
+    imagesDir = gtDir + 'images/'
 
 loadGray = True
 imagesAreH5 = False
 loadGrayFromHdf5 = False
 
-# if not imagesAreH5:
-#     grayImages = readImages(imagesDir, trainSet, loadGray, loadGrayFromHdf5)
-# else:
-#     grayImages = h5py.File(imagesExpDir + 'images_gray.h5', 'r')["images"]
+if not imagesAreH5:
+    grayImages = readImages(imagesDir, trainSet, loadGray, loadGrayFromHdf5)
+else:
+    grayImages = h5py.File(imagesDir + 'images_gray.h5', 'r')["images"]
 
 # grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
 
@@ -182,7 +163,7 @@ parameterTrainSet = set(['poseNN'])
 parameterTrainSet = set(['appearanceAndLightNN'])
 parameterTrainSet = set(['neuralNetModelLight'])
 parameterTrainSet = set(['appearanceNN'])
-parameterTrainSet = set(['maskNN'])
+parameterTrainSet = set(['poseNN'])
 
 print("Training recognition models.")
 
@@ -205,7 +186,7 @@ if 'poseNN' in parameterTrainSet:
     # sys.exit("NN")
     param_values = []
 
-    fineTune = True
+    fineTune = False
 
     pretrainedExperimentDir =  'experiments/train3_test/'
     if fineTune:
@@ -220,11 +201,13 @@ if 'poseNN' in parameterTrainSet:
     else:
         meanImage = np.zeros([150, 150])
 
+    meanImage = np.mean(grayImages, axis=0)
+
     modelPath=experimentDir + 'neuralNetModelPose.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 
-    poseNNmodel = lasagne_nn.train_nn_h5(grayImages, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=100, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    poseNNmodel = lasagne_nn.train_nn_h5(grayImages.reshape([grayImages.shape[0],1,grayImages.shape[1],grayImages.shape[2]]), len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=100, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
 
     # np.savez(modelPath, *SHNNparams)
@@ -264,6 +247,8 @@ if 'appearanceAndLightNN' in parameterTrainSet:
         param_values = neuralNetModelAppLight['params']
     else:
         meanImage = np.zeros([150, 150,3])
+
+    meanImage = np.mean(images, axis=0)
 
     modelPath=experimentDir + 'neuralNetModelAppLight.pickle'
 
@@ -310,6 +295,8 @@ if 'appearanceNN' in parameterTrainSet:
         param_values = neuralNetModelAppearance['params']
     else:
         meanImage = np.zeros([150, 150,3])
+
+    meanImage = np.mean(images, axis=0)
 
     modelPath=experimentDir + 'neuralNetModelAppearanceMask.pickle'
 
