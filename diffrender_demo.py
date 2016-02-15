@@ -45,6 +45,7 @@ glMode = glModes[0]
 sphericalMap = False
 
 np.random.seed(1)
+
 width, height = (150, 150)
 win = -1
 
@@ -248,12 +249,13 @@ envMapCoeffsGT = ch.Ch(envMapCoeffs)
 phiOffsetGT = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 phiOffset = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 
-chObjAzGT = ch.Ch(dataObjAzsGT[readDataId])
-chObjAzGT[:] = 0
+chObjAzGT = ch.Ch(dataObjAzsGT[readDataId]) - np.pi/2
+# chObjAzGT[:] = 0
 chAzGT = ch.Ch(dataAzsGT[readDataId])
-chAzGT[:] = 0
+# chAzGT[:] = 0
 chAzRelGT = chAzGT - chObjAzGT
 chElGT = ch.Ch(dataElevsGT[readDataId])
+# chElGT[:] = 0
 chDistGT = ch.Ch([camDistance])
 
 totalOffsetGT = phiOffsetGT + chObjAzGT
@@ -283,8 +285,11 @@ chComponentGT = chAmbientSHGT
 # chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
 chAz = ch.Ch(dataAzsGT[readDataId])
-chObjAz = ch.Ch(dataObjAzsGT[readDataId])
+# chAz[:] = 0
+chObjAz = ch.Ch(dataObjAzsGT[readDataId]) - np.pi/2
+# chObjAz[:] = 0
 chEl =  ch.Ch(dataElevsGT[readDataId])
+# chEl[:] = 0
 chAzRel = chAz - chObjAz
 
 totalOffset = phiOffset + chObjAz
@@ -356,6 +361,7 @@ for teapot_i in range(len(renderTeapotsList)):
     # landmarks = landmarksLong.reshape([-1,3])
     # chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
     chVertices = shape_model.VerticesModel(chShapeParams =chShapeParams,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
+    chVertices.init()
 
     # teapotNormals = teapotModel['N']
     # chNormals = shape_model.chShapeParamsToNormals(teapotNormals, landmarks, teapotModel['linT'])
@@ -371,26 +377,27 @@ for teapot_i in range(len(renderTeapotsList)):
     smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
     smHaveTextures = [[False]]
     smTexturesList = [[None]]
-    smCenter = np.mean(chVertices.r, axis=0)
+    smCenter = ch.mean(chVertices, axis=0)
     chVertices = chVertices - smCenter
-    minZ = np.min(chVertices.r[:,2])
+    minZ = ch.min(chVertices[:,2])
     chMinZ = ch.min(chVertices[:,2])
     # chVertices[:,2]  = chVertices[:,2]  - minZ
     zeroZVerts = chVertices[:,2]- chMinZ
     chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
-    maxZ = np.max(chVertices.r[:,2])
-    minZ = np.min(chVertices.r[:,2])
-    maxY = np.max(chVertices.r[:,1])
-    minY = np.min(chVertices.r[:,1])
+    maxZ = ch.max(chVertices[:,2])
+    minZ = ch.min(chVertices[:,2])
+    maxY = ch.max(chVertices[:,1])
+    minY = ch.min(chVertices[:,1])
     scaleZ = 0.265/(maxZ-minZ)
     scaleY = 0.18/(maxY-minY)
     ratio =  (maxZ-minZ)/(maxY-minY)
-    if ratio > 0.265/0.18:
-        scaleSM = scaleZ
-    else:
-        scaleSM = scaleY
+    # if ratio > 0.265/0.18:
+    #     scaleSM = scaleZ
+    # else:
+    #     scaleSM = scaleY
+    scaleSM = ch.min(ch.concatenate([scaleY, scaleZ]))
     chVertices = chVertices*scaleSM
-    smCenter = np.mean(chVertices.r, axis=0)
+    smCenter = ch.mean(chVertices, axis=0)
     smVertices = [chVertices]
 
     renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
@@ -426,61 +433,57 @@ renderer = renderer_teapots[currentTeapotModel]
 
 # shapeParams = np.random.randn(latentDim)
 
-shapeParams[0] = shapeParams[0] + 0.1
+shapeParams = np.random.randn(latentDim)
 chShapeParamsGT = ch.Ch(shapeParams)
-landmarksLong = ch.dot(chShapeParamsGT,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
-landmarks = landmarksLong.reshape([-1,3])
-chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
-chNormalsGT = shape_model.chShapeParamsToNormals(teapotModel['N'], landmarks, teapotModel['linT'])
-chNormalsGT = shape_model.shapeParamsToNormals(shapeParams, teapotModel)
 
+chVerticesGT = shape_model.VerticesModel(chShapeParams =chShapeParamsGT,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
+chVerticesGT.init()
 
-smNormals = [chNormalsGT]
-smFaces = [[faces]]
-smVColors = [chVColorsGT*np.ones(chVertices.shape)]
-smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
-smHaveTextures = [[False]]
-smTexturesList = [[None]]
+# chNormalsGT = shape_model.chShapeParamsToNormals(teapotModel['N'], landmarks, teapotModel['linT'])
+# chNormalsGT = shape_model.shapeParamsToNormals(shapeParams, teapotModel)
+chNormalsGT = shape_model.chGetNormals(chVerticesGT, faces)
 
-smCenter = np.mean(chVertices.r, axis=0)
-chVertices = chVertices - smCenter
-minZ = np.min(chVertices.r[:,2])
+smNormalsGT = [chNormalsGT]
+smFacesGT = [[faces]]
+smVColorsGT = [chVColorsGT*np.ones(chVerticesGT.shape)]
+smUVsGT = ch.Ch(np.zeros([chVerticesGT.shape[0],2]))
+smHaveTexturesGT = [[False]]
+smTexturesListGT = [[None]]
 
-chMinZ = ch.min(chVertices[:,2])
-# chVertices[:,2]  = chVertices[:,2]  - minZ
-zeroZVerts = chVertices[:,2]- chMinZ
-chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
-maxZ = np.max(chVertices.r[:,2])
-minZ = np.min(chVertices.r[:,2])
-maxY = np.max(chVertices.r[:,1])
-minY = np.min(chVertices.r[:,1])
+smCenterGT = ch.mean(chVerticesGT, axis=0)
+chVerticesGT = chVerticesGT - smCenter
+minZ = ch.min(chVerticesGT[:,2])
+
+chMinZ = ch.min(chVerticesGT[:,2])
+# chVerticesGT[:,2]  = chVerticesGT[:,2]  - minZ
+zeroZVerts = chVerticesGT[:,2]- chMinZ
+chVerticesGT = ch.hstack([chVerticesGT[:,0:2] , zeroZVerts.reshape([-1,1])])
+maxZ = ch.max(chVerticesGT[:,2])
+minZ = ch.min(chVerticesGT[:,2])
+maxY = ch.max(chVerticesGT[:,1])
+minY = ch.min(chVerticesGT[:,1])
 scaleZ = 0.265/(maxZ-minZ)
 scaleY = 0.18/(maxY-minY)
 
-ratio =  (maxZ-minZ)/(maxY-minY)
+ratioGT =  (maxZ-minZ)/(maxY-minY)
 
-# scaleZ = 0.265/(maxZ-minZ)
-# scaleY = 0.18/(maxY-minY)
-#
-# scaleZ = 0.265/(maxZ-minZ)
-# scaleY = 0.18/(maxY-minY)
-if ratio > 0.265/0.18:
-    scaleSM = scaleZ
-else:
-    scaleSM = scaleY
-chVertices = chVertices*scaleSM
-smCenter = np.mean(chVertices.r, axis=0)
-smVertices = [chVertices]
+# if ratioGT.r > 0.265/0.18:
+#     scaleSMGT = scaleZ
+# else:
+#     scaleSMGT = scaleY
+scaleSMGT = ch.min(ch.concatenate([scaleY, scaleZ]))
+
+chVerticesGT = chVerticesGT*scaleSMGT
+smCenterGT = ch.mean(chVerticesGT, axis=0)
+smVerticesGT = [chVerticesGT]
 
 # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVertices, smFaces, smVColors, smNormals, smUVs, smHaveTextures, smTexturesList)
+addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
 
 
 center = center_teapots[currentTeapotModel]
 
-rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenter, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
-
-ipdb.set_trace()
+rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 
 rendererGT.msaa = True
 rendererGT.overdraw = True
@@ -542,13 +545,31 @@ def imageGT():
     global groundTruthBlender
     global rendererGT
     global blenderRender
+    global datasetGroundtruth
+    if datasetGroundtruth:
+        return np.copy(np.array(imageDataset)).astype(np.float64)
 
     if groundTruthBlender:
         return blenderRender
     else:
         return np.copy(np.array(rendererGT.r)).astype(np.float64)
 
+
+
+
+global datasetGroundtruth
+datasetGroundtruth = False
+syntheticGroundtruth = True
+if syntheticGroundtruth:
+    imagesDir = gtDir + 'images_opendr/'
+else:
+    imagesDir = gtDir + 'images/'
+import utils
+image = utils.readImages(imagesDir, [readDataId], False)[0]
+imageDataset = srgb2lin(image)
+
 imagegt = imageGT()
+
 chImage = ch.array(imagegt)
 # E_raw_simple = renderer - rendererGT
 negVisGT = ~vis_gt
@@ -578,20 +599,19 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-#
-# hogE_raw = hogGT - hogRenderer
-# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-# hogError = ch.SumOfSquares(hogE_raw)
+hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+
+hogE_raw = hogGT - hogRenderer
+hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 # hogError = ch.SumOfSquares(hogE_raw)
 
-# hogError = negLikModelRobust
-# hogCellErrors = pixelLikelihoodRobustCh
 
-models = [negLikModel, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
-modelsDescr = ["Gaussian Model", "Outlier model"]
+models = [negLikModel, negLikModelRobust, hogError]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+modelsDescr = ["Gaussian Model", "Outlier model" , "HoG"]
+
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
 
@@ -622,7 +642,7 @@ changedGT = False
 refresh = True
 drawSurf = False
 makeVideo = False
-updateErrorFunctions = False
+updateErrorFunctions = True
 pendingCyclesRender = True
 performance = {}
 elevations = {}
@@ -640,7 +660,7 @@ ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
 free_variables = [chAz, chEl, chVColors, chShCoeffs]
-free_variables = [chShapeParams]
+free_variables = [chShapeParams, chAz, chEl]
 azVar = 1
 elVar = 1
 vColorVar = 0.00001
@@ -677,8 +697,8 @@ global chElSaved
 global chComponentSaved
 chAzSaved = chAz.r[0]
 chElSaved = chEl.r[0]
-chComponentSaved = chComponent.r[0]
-
+# chComponentSaved = chComponent.r[0]
+chShapeParamsSaved = chShapeParams.r[:]
 if showSubplots:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
     pos1 = ax1.get_position()
@@ -1187,27 +1207,27 @@ def readKeys(window, key, scancode, action, mods):
         refresh = True
         chEl[0] = chEl[0].r + radians(1)
 
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
-        refresh = True
-        chScale[0] = chScale[0].r + 0.05
-
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
-        refresh = True
-        chScale[0] = chScale[0].r - 0.05
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
-        refresh = True
-        chScale[1] = chScale[1].r + 0.05
-
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
-        refresh = True
-        chScale[1] = chScale[1].r - 0.05
-    if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
-        refresh = True
-        chScale[2] = chScale[2].r + 0.05
-
-    if mods==glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
-        refresh = True
-        chScale[2] = chScale[2].r - 0.05
+    # if mods!=glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
+    #     refresh = True
+    #     chScale[0] = chScale[0].r + 0.05
+    #
+    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_X and action == glfw.RELEASE:
+    #     refresh = True
+    #     chScale[0] = chScale[0].r - 0.05
+    # if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
+    #     refresh = True
+    #     chScale[1] = chScale[1].r + 0.05
+    #
+    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_Y and action == glfw.RELEASE:
+    #     refresh = True
+    #     chScale[1] = chScale[1].r - 0.05
+    # if mods!=glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
+    #     refresh = True
+    #     chScale[2] = chScale[2].r + 0.05
+    #
+    # if mods==glfw.MOD_SHIFT and key == glfw.KEY_Z and action == glfw.RELEASE:
+    #     refresh = True
+    #     chScale[2] = chScale[2].r - 0.05
     global errorFun
     if mods != glfw.MOD_SHIFT and key == glfw.KEY_C and action == glfw.RELEASE:
         print("Azimuth grad check: ")
@@ -1289,24 +1309,28 @@ def readKeys(window, key, scancode, action, mods):
         print("Back to GT!")
         chAz[:] = chAzGT.r[:]
         chEl[:] = chElGT.r[:]
+        chShapeParams[:] = chShapeParamsGT.r[:]
         # chComponent[:] = chComponentGT.r[:]
         refresh = True
 
     global chAzSaved
     global chElSaved
     global chComponentSaved
+    global chShapeParamsSaved
 
     if key == glfw.KEY_Z and action == glfw.RELEASE:
         print("Saved!")
         chAzSaved = chAz.r[0]
         chElSaved = chEl.r[0]
-        chComponentSaved = chComponent.r[0]
+        chShapeParamsSaved = chShapeParams.r[:]
+        # chComponentSaved = chComponent.r[0]
 
     if key == glfw.KEY_X and action == glfw.RELEASE:
         print("Back to Saved!")
         chAz[0] = chAzSaved
         chEl[0] = chElSaved
-        chComponent[0] = chComponentSaved
+        # chComponent[0] = chComponentSaved
+        chShapeParams[:] = chShapeParamsSaved
         refresh = True
 
     global printStatsBool
@@ -1323,26 +1347,26 @@ def readKeys(window, key, scancode, action, mods):
     global stds
     global globalPrior
     global plotMinimization
-    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_1 and action == glfw.RELEASE:
+    if mods != glfw.MOD_CONTROL and  mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_1 and action == glfw.RELEASE:
         stds[:] = stds.r[0]/1.5
         print("New standard devs of " + str(stds.r))
         refresh = True
         drawSurf = False
         plotMinimization = False
-    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_2 and action == glfw.RELEASE:
+    if mods != glfw.MOD_CONTROL and  mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_2 and action == glfw.RELEASE:
         stds[:] = stds.r[0]*1.5
         print("New standard devs of " + str(stds.r))
         refresh = True
         drawSurf = False
         plotMinimization = False
 
-    if mods != glfw.MOD_SHIFT and key == glfw.KEY_KP_4 and action == glfw.RELEASE:
+    if mods != glfw.MOD_CONTROL and   mods != glfw.MOD_SHIFT and key == glfw.KEY_KP_4 and action == glfw.RELEASE:
         globalPrior[0] = globalPrior.r[0] - 0.05
         print("New foreground prior of" + str(globalPrior.r))
         refresh = True
         drawSurf = False
         plotMinimization = False
-    if mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_5 and action == glfw.RELEASE:
+    if mods != glfw.MOD_CONTROL and mods != glfw.MOD_SHIFT and  key == glfw.KEY_KP_5 and action == glfw.RELEASE:
         globalPrior[0] = globalPrior.r[0] + 0.05
         print("New foreground prior of " + str(globalPrior.r))
         refresh = True
@@ -1391,6 +1415,38 @@ def readKeys(window, key, scancode, action, mods):
     if mods == glfw.MOD_SHIFT and key == glfw.KEY_KP_0 and action == glfw.RELEASE:
         chShapeParams[0] = chShapeParams.r[0] + 0.2
         refresh = True
+
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_1 and action == glfw.RELEASE:
+        refresh = True
+        chShapeParams[1] = chShapeParams.r[1] - 0.2
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_2 and action == glfw.RELEASE:
+        refresh = True
+        chShapeParams[2] = chShapeParams.r[2] - 0.2
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_3 and action == glfw.RELEASE:
+        chShapeParams[3] = chShapeParams.r[3] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_4 and action == glfw.RELEASE:
+        chShapeParams[4] = chShapeParams.r[4] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_5 and action == glfw.RELEASE:
+        chShapeParams[5] = chShapeParams.r[5] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_6 and action == glfw.RELEASE:
+        chShapeParams[6] = chShapeParams.r[6] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_8 and action == glfw.RELEASE:
+        chShapeParams[7] = chShapeParams.r[7] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_9 and action == glfw.RELEASE:
+        chShapeParams[9] = chShapeParams.r[9] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_8 and action == glfw.RELEASE:
+        chShapeParams[8] = chShapeParams.r[8] - 0.2
+        refresh = True
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_KP_0 and action == glfw.RELEASE:
+        chShapeParams[0] = chShapeParams.r[0] - 0.2
+        refresh = True
+
 
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True
@@ -1698,13 +1754,14 @@ if demoMode:
             changeRenderer = False
 
         if updateErrorFunctions:
-            currentGT = rendererGT
-            if useBlender and groundTruthBlender:
-                image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
-                image[image>1]=1
-                blenderRender = image
-                currentGT = blenderRender
+            # currentGT = rendererGT
+            # if useBlender and groundTruthBlender:
+            #     image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
+            #     image[image>1]=1
+            #     blenderRender = image
+            #     currentGT = blenderRender
 
+            currentGT = ch.Ch(imageGT())
             negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=currentGT, variances=variances))/numPixels
             negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances))/numPixels
             pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=currentGT, variances=variances)
@@ -1712,18 +1769,17 @@ if demoMode:
 
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-            # hogGT, hogImGT, drconv = image_processing.diffHog(currentGT, drconv)
-            # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-            # hogRenderer.dr_wrt(chAz)
-            #
-            # hogE_raw = hogGT - hogRenderer
-            # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-            # hogError = ch.SumOfSquares(hogE_raw)
+            hogGT, hogImGT, _ = image_processing.diffHog(currentGT, drconv)
+            hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+
+            hogE_raw = hogGT - hogRenderer
+            hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+            hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
             # models = [negLikModel, negLikModelRobust, hogError]
-            models = [negLikModel, negLikModelRobust]
+            models = [negLikModel, negLikModelRobust, hogError]
             # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
             # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 
             pixelErrorFun = pixelModels[model]
