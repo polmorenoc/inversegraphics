@@ -22,7 +22,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_black_predsamplestest'
+testPrefix = 'train4_occlusion_1000s_robust_std001_minimize'
 
 # testPrefixWrite= 'train4_occlusion_1000s_allplots_robust_std001'
 
@@ -158,6 +158,8 @@ testComponentsGT = dataComponentsGT
 testComponentsGTRel = dataComponentsGTRel
 testOcclusions = dataOcclusions
 
+
+
 testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
 
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
@@ -229,6 +231,22 @@ if optimizationTypeDescr[optimizationType] != 'predict':
 plt.ioff()
 import seaborn
 
+directory = resultDir
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.hist(testOcclusions*100, bins=30)
+ax.set_xlabel('Occlusion level')
+ax.set_ylabel('Counts')
+x1,x2 = ax.get_xlim()
+y1,y2 = ax.get_ylim()
+# ax.set_xlim((-180,180))
+# ax.set_ylim((y1, y2))
+ax.set_title('Occlusion histogram')
+fig.savefig(directory + 'occlusion-histogram.png', bbox_inches='tight')
+plt.close(fig)
+
+
+ipdb.set_trace()
 
 colors = matplotlib.cm.plasma(testOcclusions)
 

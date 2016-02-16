@@ -27,13 +27,13 @@ plt.ion()
 #__GL_THREADED_OPTIMIZATIONS
 
 #Main script options:
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
 useCycles = True
 demoMode = True
 showSubplots = True
-unpackModelsFromBlender = True
+unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
@@ -44,7 +44,7 @@ glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
 
-np.random.seed(1)
+np.random.seed(2)
 
 width, height = (150, 150)
 win = -1
@@ -71,7 +71,8 @@ frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height
 camDistance = 0.4
 
 gtPrefix = 'train3'
-gtDir = 'groundtruth/' + gtPrefix + '/'
+gtDirPref = 'train3'
+gtDir = 'groundtruth/' + gtDirPref + '/'
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 groundTruth = gtDataFile[gtPrefix]
@@ -95,7 +96,7 @@ dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 
-readDataId = 1
+readDataId = 0
 
 import shape_model
 #%% Load data
@@ -107,7 +108,7 @@ faces = teapotModel['faces']
 latentDim = np.shape(teapotModel['ppcaW'])[1]
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[0:1]
+renderTeapotsList = np.arange(len(teapots))[27:28]
 
 sceneNumber = dataScenes[readDataId]
 
@@ -249,7 +250,7 @@ envMapCoeffsGT = ch.Ch(envMapCoeffs)
 phiOffsetGT = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 phiOffset = ch.Ch(dataEnvMapPhiOffsets[readDataId])
 
-chObjAzGT = ch.Ch(dataObjAzsGT[readDataId]) - np.pi/2
+chObjAzGT = ch.Ch(dataObjAzsGT[readDataId])
 # chObjAzGT[:] = 0
 chAzGT = ch.Ch(dataAzsGT[readDataId])
 # chAzGT[:] = 0
@@ -286,7 +287,7 @@ chComponentGT = chAmbientSHGT
 
 chAz = ch.Ch(dataAzsGT[readDataId])
 # chAz[:] = 0
-chObjAz = ch.Ch(dataObjAzsGT[readDataId]) - np.pi/2
+chObjAz = ch.Ch(dataObjAzsGT[readDataId])
 # chObjAz[:] = 0
 chEl =  ch.Ch(dataElevsGT[readDataId])
 # chEl[:] = 0
@@ -377,27 +378,28 @@ for teapot_i in range(len(renderTeapotsList)):
     smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
     smHaveTextures = [[False]]
     smTexturesList = [[None]]
-    smCenter = ch.mean(chVertices, axis=0)
-    chVertices = chVertices - smCenter
+
+
+    chVertices = chVertices - ch.mean(chVertices, axis=0)
     minZ = ch.min(chVertices[:,2])
     chMinZ = ch.min(chVertices[:,2])
     # chVertices[:,2]  = chVertices[:,2]  - minZ
     zeroZVerts = chVertices[:,2]- chMinZ
     chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
-    maxZ = ch.max(chVertices[:,2])
-    minZ = ch.min(chVertices[:,2])
-    maxY = ch.max(chVertices[:,1])
-    minY = ch.min(chVertices[:,1])
-    scaleZ = 0.265/(maxZ-minZ)
-    scaleY = 0.18/(maxY-minY)
-    ratio =  (maxZ-minZ)/(maxY-minY)
-    # if ratio > 0.265/0.18:
-    #     scaleSM = scaleZ
-    # else:
-    #     scaleSM = scaleY
-    scaleSM = ch.min(ch.concatenate([scaleY, scaleZ]))
-    chVertices = chVertices*scaleSM
-    smCenter = ch.mean(chVertices, axis=0)
+    # maxZ = ch.max(chVertices[:,2])
+    # minZ = ch.min(chVertices[:,2])
+    # maxY = ch.max(chVertices[:,1])
+    # minY = ch.min(chVertices[:,1])
+    # scaleZ = 0.265/(maxZ-minZ)
+    # scaleY = 0.18/(maxY-minY)
+    # ratio =  (maxZ-minZ)/(maxY-minY)
+    # # if ratio > 0.265/0.18:
+    # #     scaleSM = scaleZ
+    # # else:
+    # #     scaleSM = scaleY
+    # scaleSM = ch.min(ch.concatenate([scaleY, scaleZ]))
+    chVertices = chVertices*0.09
+    smCenter = ch.array([0,0,0.1])
     smVertices = [chVertices]
 
     renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
@@ -451,30 +453,31 @@ smHaveTexturesGT = [[False]]
 smTexturesListGT = [[None]]
 
 smCenterGT = ch.mean(chVerticesGT, axis=0)
-chVerticesGT = chVerticesGT - smCenter
+
+chVerticesGT = chVerticesGT - ch.mean(chVerticesGT, axis=0)
 minZ = ch.min(chVerticesGT[:,2])
 
 chMinZ = ch.min(chVerticesGT[:,2])
-# chVerticesGT[:,2]  = chVerticesGT[:,2]  - minZ
+
 zeroZVerts = chVerticesGT[:,2]- chMinZ
 chVerticesGT = ch.hstack([chVerticesGT[:,0:2] , zeroZVerts.reshape([-1,1])])
-maxZ = ch.max(chVerticesGT[:,2])
-minZ = ch.min(chVerticesGT[:,2])
-maxY = ch.max(chVerticesGT[:,1])
-minY = ch.min(chVerticesGT[:,1])
-scaleZ = 0.265/(maxZ-minZ)
-scaleY = 0.18/(maxY-minY)
-
-ratioGT =  (maxZ-minZ)/(maxY-minY)
+# maxZ = ch.max(chVerticesGT[:,2])
+# minZ = ch.min(chVerticesGT[:,2])
+# maxY = ch.max(chVerticesGT[:,1])
+# minY = ch.min(chVerticesGT[:,1])
+# scaleZ = 0.265/(maxZ-minZ)
+# scaleY = 0.18/(maxY-minY)
+#
+# ratioGT =  (maxZ-minZ)/(maxY-minY)
 
 # if ratioGT.r > 0.265/0.18:
 #     scaleSMGT = scaleZ
 # else:
 #     scaleSMGT = scaleY
-scaleSMGT = ch.min(ch.concatenate([scaleY, scaleZ]))
+# scaleSMGT = ch.min(ch.concatenate([scaleY, scaleZ]))
 
-chVerticesGT = chVerticesGT*scaleSMGT
-smCenterGT = ch.mean(chVerticesGT, axis=0)
+chVerticesGT = chVerticesGT*0.09
+smCenterGT = ch.array([0,0,0.1])
 smVerticesGT = [chVerticesGT]
 
 # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
@@ -559,11 +562,11 @@ def imageGT():
 
 global datasetGroundtruth
 datasetGroundtruth = False
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 if syntheticGroundtruth:
-    imagesDir = gtDir + 'images_opendr/'
+    imagesDir = gtDir + '/images_opendr/'
 else:
-    imagesDir = gtDir + 'images/'
+    imagesDir = gtDir + '/images/'
 import utils
 image = utils.readImages(imagesDir, [readDataId], False)[0]
 imageDataset = srgb2lin(image)
@@ -599,18 +602,17 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
+# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+#
+# hogE_raw = hogGT - hogRenderer
+# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+# hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
-hogE_raw = hogGT - hogRenderer
-hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
-# hogError = ch.SumOfSquares(hogE_raw)
 
-
-models = [negLikModel, negLikModelRobust, hogError]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
-modelsDescr = ["Gaussian Model", "Outlier model" , "HoG"]
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+modelsDescr = ["Gaussian Model", "Outlier model" ]
 
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
@@ -720,6 +722,10 @@ if showSubplots:
     gtoverlay = lin2srgb(gtoverlay)
     gtoverlay[np.tile(edges.reshape([shapeIm[0],shapeIm[1],1]),[1,1,3]).astype(np.bool)] = 1
     pim1 = ax1.imshow(gtoverlay)
+    #
+    # extent = ax1.get_window_extent().transformed(f.dpi_scale_trans.inverted())
+    # f.savefig('ax1_figure.png', bbox_inches=extent)
+
 
     # ax3.set_title("Pixel negative log probabilities")
     # pim3 = ax3.imshow(-pixelErrorFun.r)
@@ -1451,6 +1457,11 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_R and action == glfw.RELEASE:
         refresh = True
 
+    if mods == glfw.MOD_CONTROL and key == glfw.KEY_R and action == glfw.RELEASE:
+        refresh = True
+        chShapeParams[:] = np.random.randn(latentDim)
+        chShapeParamsGT[:] = np.random.randn(latentDim)
+
     global pixelErrorFun
     global pixelErrorFun2
     global errorFun2
@@ -1733,6 +1744,7 @@ if demoMode:
             # image = cv2.imread(scene.render.filepath)
             # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
             image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
+            plt.imsave('blenderImage.png', lin2srgb(image))
             image[image>1]=1
             blenderRender = image
 
@@ -1769,17 +1781,17 @@ if demoMode:
 
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-            hogGT, hogImGT, _ = image_processing.diffHog(currentGT, drconv)
-            hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-
-            hogE_raw = hogGT - hogRenderer
-            hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-            hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
+            # hogGT, hogImGT, _ = image_processing.diffHog(currentGT, drconv)
+            # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
+            #
+            # hogE_raw = hogGT - hogRenderer
+            # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
+            # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
             # models = [negLikModel, negLikModelRobust, hogError]
-            models = [negLikModel, negLikModelRobust, hogError]
+            models = [negLikModel, negLikModelRobust]
             # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
             # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 
             pixelErrorFun = pixelModels[model]

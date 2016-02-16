@@ -206,7 +206,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_1_probLineSearch'
+testPrefix = 'train4_occlusion_occlusion_outliers'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -214,7 +214,7 @@ parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randFores
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','linearRegressionVColors','neuralNetModelSHLight' ])
 parameterRecognitionModels = set(['neuralNetPose', 'linearRegressionVColors','constantSHLight' ])
 parameterRecognitionModels = set(['neuralNetPose', 'neuralNetApperanceAndLight', 'neuralNetVColors' ])
-parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neuralNetVColors', 'neuralNetModelMask' ])
+parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neuralNetVColors' ])
 # parameterRecognitionModels = set(['neuralNetPose', 'neuralNetApperanceAndLight'])
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
@@ -243,8 +243,8 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-numTests = 100
-testSet = np.load(experimentDir + 'test.npy')[:numTests]
+numTests = 1000
+testSet = np.load(experimentDir + 'test.npy')[:numTests][[133,145]]
 # testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
 
@@ -360,7 +360,7 @@ optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 1
 computePredErrorFuns = True
 
-method = 6
+method = 1
 model = 1
 maxiter = 200
 numSamples = 1
@@ -683,14 +683,14 @@ if 'neuralNetModelMask' in parameterRecognitionModels:
     masksDir =  gtDirMask + 'masks_occlusion/'
     if loadMask:
         masksGT = loadMasks(masksDir, testSet)
-    for i in range(10):
-        for j in range(10):
-            maskSample = maskSamples[i,:,j]
-            plt.imsave('tmp/mask' + str(i) + '_j' + str(j) + '.png', maskSample.reshape([50,50]))
-
-        plt.imsave('tmp/GT_mask' + str(i) + '.png', masksGT[i].reshape([150,150]))
-        plt.imsave('tmp/mask' + str(i) + '.png', maskSample.reshape([50,50]))
-        cv2.imwrite('tmp/img' + str(i) + '.png', cv2.cvtColor(np.uint8(lin2srgb(images[i])*255), cv2.COLOR_RGB2BGR))
+    # for i in range(10):
+    #     for j in range(10):
+    #         maskSample = maskSamples[i,:,j]
+    #         plt.imsave('tmp/mask' + str(i) + '_j' + str(j) + '.png', maskSample.reshape([50,50]))
+    #
+    #     plt.imsave('tmp/GT_mask' + str(i) + '.png', masksGT[i].reshape([150,150]))
+    #     plt.imsave('tmp/mask' + str(i) + '.png', maskSample.reshape([50,50]))
+    #     cv2.imwrite('tmp/img' + str(i) + '.png', cv2.cvtColor(np.uint8(lin2srgb(images[i])*255), cv2.COLOR_RGB2BGR))
 
 
 if 'randomForestSHZernike' in parameterRecognitionModels:
@@ -1310,7 +1310,6 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                 # azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
                 # if azSampleStdev*180/np.pi < 100:
-                ipdb.set_trace()
                 ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
@@ -1356,6 +1355,11 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             approxProjectionFitted = np.sum(pEnvMap, axis=(2,3))
             approxProjectionsFittedList = approxProjectionsFittedList + [approxProjectionFitted[None,:]]
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Fitted.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
+
+            vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
+            post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+            plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+            ipdb.set_trace()
 
         if optimizationTypeDescr[optimizationType] != 'predict':
             if fittedVColorsList:
