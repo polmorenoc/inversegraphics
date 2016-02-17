@@ -1036,3 +1036,7 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
 
     return model
 
+
+def triplets(X, labels):
+
+

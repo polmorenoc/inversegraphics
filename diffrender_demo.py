@@ -30,6 +30,8 @@ plt.ion()
 useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
+datasetGroundtruth = False
+syntheticGroundtruth = True
 useCycles = True
 demoMode = True
 showSubplots = True
@@ -44,7 +46,7 @@ glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
 
-np.random.seed(2)
+np.random.seed(1)
 
 width, height = (150, 150)
 win = -1
@@ -70,8 +72,8 @@ clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
 
-gtPrefix = 'train3'
-gtDirPref = 'train3'
+gtPrefix = 'train4_occlusion_shapemodel_testnew'
+gtDirPref = 'train4_occlusion_shapemodel_testnew'
 gtDir = 'groundtruth/' + gtDirPref + '/'
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
@@ -95,12 +97,13 @@ dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
 dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
+dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
-readDataId = 0
+readDataId = 135
 
 import shape_model
 #%% Load data
-filePath = 'teapotModel.pkl'
+filePath = 'data/teapotModel.pkl'
 teapotModel = shape_model.loadObject(filePath)
 faces = teapotModel['faces']
 
@@ -286,9 +289,9 @@ chComponentGT = chAmbientSHGT
 # chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
 chAz = ch.Ch(dataAzsGT[readDataId])
-# chAz[:] = 0
+chAz[:] = 0
 chObjAz = ch.Ch(dataObjAzsGT[readDataId])
-# chObjAz[:] = 0
+chObjAz[:] = 0
 chEl =  ch.Ch(dataElevsGT[readDataId])
 # chEl[:] = 0
 chAzRel = chAz - chObjAz
@@ -356,6 +359,7 @@ for teapot_i in range(len(renderTeapotsList)):
     centermod = center_teapots[teapot_i]
 
     shapeParams = np.random.randn(latentDim)
+    shapeParams = dataShapeModelCoeffsGT[readDataId]
     chShapeParams = ch.Ch(shapeParams)
 
     # landmarksLong = ch.dot(chShapeParams,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
@@ -364,6 +368,7 @@ for teapot_i in range(len(renderTeapotsList)):
     chVertices = shape_model.VerticesModel(chShapeParams =chShapeParams,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
     chVertices.init()
 
+    chVertices = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVertices.T).T
     # teapotNormals = teapotModel['N']
     # chNormals = shape_model.chShapeParamsToNormals(teapotNormals, landmarks, teapotModel['linT'])
     # rot = mathutils.Matrix.Rotation(radians(90), 4, 'X')
@@ -436,11 +441,13 @@ renderer = renderer_teapots[currentTeapotModel]
 # shapeParams = np.random.randn(latentDim)
 
 shapeParams = np.random.randn(latentDim)
+shapeParams = dataShapeModelCoeffsGT[readDataId]
 chShapeParamsGT = ch.Ch(shapeParams)
 
 chVerticesGT = shape_model.VerticesModel(chShapeParams =chShapeParamsGT,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
 chVerticesGT.init()
 
+chVerticesGT = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVerticesGT.T).T
 # chNormalsGT = shape_model.chShapeParamsToNormals(teapotModel['N'], landmarks, teapotModel['linT'])
 # chNormalsGT = shape_model.shapeParamsToNormals(shapeParams, teapotModel)
 chNormalsGT = shape_model.chGetNormals(chVerticesGT, faces)
@@ -483,7 +490,6 @@ smVerticesGT = [chVerticesGT]
 # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
 
-
 center = center_teapots[currentTeapotModel]
 
 rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
@@ -517,7 +523,6 @@ numPixels = shapeIm[0] * shapeIm[1]
 shapeIm3D = [vis_im.shape[0], vis_im.shape[1], 3]
 
 if useBlender:
-
     center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
     # addLamp(scene, center, chLightAzGT.r, chLightElGT.r, chLightDistGT, chLightIntensityGT.r)
     #Add ambient lighting to scene (rectangular lights at even intervals).
@@ -558,15 +563,12 @@ def imageGT():
         return np.copy(np.array(rendererGT.r)).astype(np.float64)
 
 
-
-
 global datasetGroundtruth
-datasetGroundtruth = False
-syntheticGroundtruth = False
+
 if syntheticGroundtruth:
-    imagesDir = gtDir + '/images_opendr/'
+    imagesDir = gtDir + 'images_opendr/'
 else:
-    imagesDir = gtDir + '/images/'
+    imagesDir = gtDir + 'images/'
 import utils
 image = utils.readImages(imagesDir, [readDataId], False)[0]
 imageDataset = srgb2lin(image)
@@ -608,7 +610,6 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, '
 # hogE_raw = hogGT - hogRenderer
 # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
 # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
-
 
 models = [negLikModel, negLikModelRobust]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
