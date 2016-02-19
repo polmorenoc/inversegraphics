@@ -30,7 +30,7 @@ plt.ion()
 # Initialization starts here
 #########################################
 prefix = 'train4_occlusion_shapemodel'
-previousGTPrefix = 'train4_occlusion'
+previousGTPrefix = 'train3_occlusion'
 
 #Main script options:
 renderFromPreviousGT = True

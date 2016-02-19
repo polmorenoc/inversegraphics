@@ -426,7 +426,7 @@ if 'neuralNetModelLight' in parameterTrainSet:
 
 if 'neuralNetModelShape' in parameterTrainSet:
 
-    modelType = 'cnn_shape'
+    modelType = 'cnn_shape_large'
     network = lasagne_nn.load_network(modelType=modelType, param_values=[])
 
     print("Training NN Shape Components")
@@ -437,10 +437,10 @@ if 'neuralNetModelShape' in parameterTrainSet:
 
     param_values = []
 
-    fineTune = False
-    pretrainedExperimentDir =  'experiments/train3_test/'
+    fineTune = True
+    pretrainedExperimentDir =  'experiments/train4_occlusion_shapemodel_10k/'
     if fineTune:
-        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelShape.pickle'
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelShapeLarge.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
             neuralNetModelShape = pickle.load(pfile)
 
@@ -451,7 +451,7 @@ if 'neuralNetModelShape' in parameterTrainSet:
     else:
         meanImage = np.zeros([150, 150,3])
 
-    modelPath=experimentDir + 'neuralNetModelShape.pickle'
+    modelPath=experimentDir + 'neuralNetModelShapeLarge.pickle'
     shapeNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), dataShapeModelCoeffsGT[trainValSet].astype(np.float32), dataShapeModelCoeffsGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
