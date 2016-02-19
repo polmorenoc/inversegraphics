@@ -235,6 +235,9 @@ trainModelsDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
 trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 resultDir = 'results/' + testPrefix + '/'
 
+useShapeModel = True
+
+
 ignoreGT = True
 ignore = []
 if os.path.isfile(gtDir + 'ignore.npy'):
@@ -286,12 +289,14 @@ dataTeapotIds = groundTruth['trainTeapotIds']
 dataEnvMaps = groundTruth['trainEnvMaps']
 dataOcclusions = groundTruth['trainOcclusions']
 dataTargetIndices = groundTruth['trainTargetIndices']
-dataComponentsGT = groundTruth['trainComponentsGT']
-dataComponentsGTRel = groundTruth['trainComponentsGTRel']
 dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
 dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
+
+if useShapeModel:
+    dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
+
 
 gtDtype = groundTruth.dtype
 
@@ -331,8 +336,8 @@ testLightAzsGT = dataLightAzsGT
 testLightElevsGT = dataLightElevsGT
 testLightIntensitiesGT = dataLightIntensitiesGT
 testVColorGT = dataVColorGT
-testComponentsGT = dataComponentsGT
-testComponentsGTRel = dataComponentsGTRel
+if useShapeModel:
+    testShapeParamsGT = dataShapeModelCoeffsGT
 
 testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
 
@@ -392,7 +397,55 @@ stds[:] = 0.01
 testRenderer = 0
 
 # testRenderer = 2
-renderer = renderer_teapots[testRenderer]
+if useShapeModel:
+    import shape_model
+    #%% Load data
+    filePath = 'data/teapotModel.pkl'
+    teapotModel = shape_model.loadObject(filePath)
+    faces = teapotModel['faces']
+
+    #%% Sample random shape Params
+    latentDim = np.shape(teapotModel['ppcaW'])[1]
+    shapeParams = np.random.randn(latentDim)
+    chShapeParams = ch.Ch(shapeParams)
+
+    meshLinearTransform=teapotModel['meshLinearTransform']
+    W=teapotModel['ppcaW']
+    b=teapotModel['ppcaB']
+
+    chVertices = shape_model.VerticesModel(chShapeParams=chShapeParams,meshLinearTransform=meshLinearTransform,W = W,b=b)
+    chVertices.init()
+
+    chVertices = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVertices.T).T
+
+    chNormals = shape_model.chGetNormals(chVertices, faces)
+
+    smNormals = [chNormals]
+    smFaces = [[faces]]
+    smVColors = [chVColors*np.ones(chVertices.shape)]
+    smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
+    smHaveTextures = [[False]]
+    smTexturesList = [[None]]
+
+    chVerticesGT = chVertices - ch.mean(chVertices, axis=0)
+    minZ = ch.min(chVerticesGT[:,2])
+
+    chMinZ = ch.min(chVerticesGT[:,2])
+
+    zeroZVerts = chVerticesGT[:,2]- chMinZ
+    chVertices = ch.hstack([chVerticesGT[:,0:2] , zeroZVerts.reshape([-1,1])])
+
+    chVertices = chVerticesGT*0.09
+    smCenter = ch.array([0,0,0.1])
+
+    smVertices = [chVertices]
+    chNormals = shape_model.chGetNormals(chVertices, faces)
+    smNormals = [chNormals]
+
+    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+else:
+    renderer = renderer_teapots[testRenderer]
+
 nearGTOffsetRelAz = 0
 nearGTOffsetEl = 0
 nearGTOffsetLighCoeffs = np.zeros(9)
@@ -642,6 +695,26 @@ if 'neuralNetModelSHLight' in parameterRecognitionModels:
 
     relLightCoefficientsPred = lightPredictions
 
+if 'neuralNetModelShape' in parameterRecognitionModels and useShapeModel:
+    nnModel = ""
+    with open(trainModelsDirLightCoeffs + 'neuralNetModelShape.pickle', 'rb') as pfile:
+        neuralNetModelSHLight = pickle.load(pfile)
+
+    meanImage = neuralNetModelSHLight['mean']
+    modelType = neuralNetModelSHLight['type']
+    param_values = neuralNetModelSHLight['params']
+
+    testImages = images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+
+    network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+    shapePredictionFun = lasagne_nn.get_prediction_fun(network)
+
+    shapePredictions = np.zeros([len(testImages), latentDim])
+    for start_idx in range(0, len(testImages), nnBatchSize):
+        shapePredictions[start_idx:start_idx + nnBatchSize] = shapePredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+
+    shapeParamsPred = shapePredictions
+
 
 
 if 'neuralNetModelMask' in parameterRecognitionModels:
@@ -797,6 +870,7 @@ hdritems = list(envMapDic.items())[:]
 # # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
 #
 #
+
 
 ## NN individual prediction samples analysis.
 if not os.path.exists(resultDir + 'nn_samples/'):
@@ -1011,15 +1085,31 @@ errorsLightCoeffs = (testLightCoefficientsGTRel - relLightCoefficientsPred) ** 2
 errorsVColorsE = image_processing.eColourDifference(testVColorGT, vColorsPred)
 errorsVColorsC = image_processing.cColourDifference(testVColorGT, vColorsPred)
 
+envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred, testLightCoefficientsGTRel)
+errorsLightCoeffsC = (testLightCoefficientsGTRel - envMapScaling* relLightCoefficientsPred) ** 2
+
+if useShapeModel:
+    errorsShapeParams = (testShapeParamsGT - shapeParamsPred) ** 2
+
+meanErrorsLightCoeffsC = np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0)
+
 meanAbsErrAzs = np.mean(np.abs(errorsPosePred[0]))
 meanAbsErrElevs = np.mean(np.abs(errorsPosePred[1]))
 
 medianAbsErrAzs = np.median(np.abs(errorsPosePred[0]))
 medianAbsErrElevs = np.median(np.abs(errorsPosePred[1]))
 
-meanErrorsLightCoeffs = np.sqrt(np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0))
+meanErrorsLightCoeffs = np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0)
+
+if useShapeModel:
+    meanErrorsShapeParams = np.mean(np.mean(errorsShapeParams,axis=1), axis=0)
+else:
+    meanErrorsShapeParams = 0
+
 meanErrorsVColorsE = np.mean(errorsVColorsE, axis=0)
+
 meanErrorsVColorsC = np.mean(errorsVColorsC, axis=0)
+
 
 #Fit:
 print("Fitting predictions")
@@ -1027,6 +1117,7 @@ print("Fitting predictions")
 fittedAzs = np.array([])
 fittedElevs = np.array([])
 fittedRelLightCoeffs = []
+fittedShapeParamsList = []
 fittedVColors = []
 
 predictedErrorFuns = np.array([])
@@ -1084,14 +1175,8 @@ samplingMode = False
 
 testOcclusions = dataOcclusions
 
-testVColorGTGray = 0.3*testVColorGT[:,0] + 0.59*testVColorGT[:,1] + 0.11*testVColorGT[:,2]
-vColorsPredGray = 0.3*vColorsPred[:,0] + 0.59*vColorsPred[:,1] + 0.11*vColorsPred[:,2]
-errorsLightCoeffsC = (testVColorGTGray[:,None] * testLightCoefficientsGTRel - vColorsPredGray[:,None] * relLightCoefficientsPred) ** 2
-meanErrorsLightCoeffsC = np.sqrt(np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0))
-
 fittedVColorsList = []
 fittedRelLightCoeffsList = []
-
 
 approxProjectionsFittedList = []
 approxProjectionsGTList = []
@@ -1105,6 +1190,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         bestModelLik = np.finfo('f').max
         bestVColors = chVColors.r
         bestLightSHCoeffs = chLightSHCoeffs.r
+        if useShapeModel:
+            bestShapeParams = chShapeParams.r
 
         testId = dataIds[test_i]
         print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
@@ -1138,6 +1225,9 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 az = testAzsRel[test_i] + nearGTOffsetRelAz
                 el = testElevsGT[test_i] + nearGTOffsetEl
                 lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+
+                if useShapeModel:
+                    shapeParams = testShapeParamsGT[test_i]
             elif recognitionType == 1 or recognitionType == 2:
                 #Point (mean) estimate:
                 az = azsPred[test_i]
@@ -1151,11 +1241,15 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 lightCoefficientsRel = relLightCoefficientsPred[test_i]
                 #
                 # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+                if useShapeModel:
+                    shapeParams = shapeParamsPred
 
             chAz[:] = az
             chEl[:] = el
             chVColors[:] = color
             chLightSHCoeffs[:] = lightCoefficientsRel
+            if useShapeModel:
+                chShapeParams[:] = shapeParams
 
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
@@ -1221,6 +1315,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 bestPredEl = min(max(chEl.r.copy(),radians(1)), np.pi/2-radians(1))
                 bestPredVColors = chVColors.r.copy()
                 bestPredLightSHCoeffs = chLightSHCoeffs.r.copy()
+                if useShapeModel:
+                    bestPredShapeParams = chShapeParams.r.copy()
                 bestModelLik = np.finfo('f').max
                 bestPredModelLik = np.finfo('f').max
                 # analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/pre'  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
@@ -1261,6 +1357,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                         bestPredEl = min(max(chEl.r.copy(),radians(1)), np.pi/2-radians(1))
                         bestPredVColors = chVColors.r.copy()
                         bestPredLightSHCoeffs = chLightSHCoeffs.r.copy()
+                        if useShapeModel:
+                            bestPredShapeParams = chShapeParams.r.copy()
                         bestModelLik = errorFun.r.copy()
 
                         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_predSample' + str(numPredSamples) + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
@@ -1271,6 +1369,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 color = bestPredVColors
                 lightCoefficientsRel = bestPredLightSHCoeffs
                 az = bestPredAz
+                if useShapeModel:
+                    shapeParams = bestShapeParams
 
                 # previousAngles = np.vstack([previousAngles, np.array([[azsample, elsample],[chAz.r.copy(), chEl.r.copy()]])])
 
@@ -1282,6 +1382,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
             chVColors[:] = color
             chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+            if useShapeModel:
+                chShapeParams[:] = shapeParams
 
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_sample' + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
             # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
@@ -1304,7 +1406,10 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                 # options={'disp':False, 'maxiter':50}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-                free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+                if useShapeModel:
+                    free_variables = [ chAz, chEl, chShapeParams, chVColors, chLightSHCoeffs]
+                else:
+                    free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 samplingMode = True
 
@@ -1322,6 +1427,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 bestFittedEl = min(max(chEl.r.copy(),radians(1)), np.pi/2-radians(1))
                 bestVColors = chVColors.r.copy()
                 bestLightSHCoeffs = chLightSHCoeffs.r.copy()
+                if useShapeModel:
+                    bestShapeParams = chShapeParams.r.copy()
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
             else:
                 bestFittedAz = bestPredAz.copy()
@@ -1333,6 +1440,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             chEl[:] = min(max(bestFittedEl,radians(1)), np.pi/2-radians(1))
             chVColors[:] = bestVColors
             chLightSHCoeffs[:] = bestLightSHCoeffs
+            if useShapeModel:
+                chShapeParams[:] = bestShapeParams
 
             # model=1
             # errorFun = models[model]
@@ -1350,6 +1459,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             fittedElevs = np.append(fittedElevs, bestFittedEl)
             fittedVColorsList = fittedVColorsList + [bestVColors]
             fittedRelLightCoeffsList = fittedRelLightCoeffsList + [bestLightSHCoeffs]
+            if useShapeModel:
+                fittedShapeParamsList = fittedShapeParamsList + [bestShapeParams]
 
             pEnvMap = SHProjection(envMapTexture, np.concatenate([bestLightSHCoeffs[:,None], bestLightSHCoeffs[:,None], bestLightSHCoeffs[:,None]], axis=1))
             approxProjectionFitted = np.sum(pEnvMap, axis=(2,3))
@@ -1358,8 +1469,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
             vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
             post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
-            plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-            ipdb.set_trace()
+            plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+
 
         if optimizationTypeDescr[optimizationType] != 'predict':
             if fittedVColorsList:
@@ -1372,17 +1483,24 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 approxProjectionsPred = np.vstack(approxProjectionsPredList)
             if approxProjectionsGTList:
                 approxProjectionsGT = np.vstack(approxProjectionsGTList)
+            if fittedShapeParamsList and useShapeModel:
+                fittedShapeParams = np.vstack(fittedShapeParamsList)
 
         errorsPosePredSoFar = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, azsPred, elevsPred)
 
         errorsLightCoeffsSoFar = (testLightCoefficientsGTRel[:test_i+1] - relLightCoefficientsPred[:test_i + 1]) ** 2
 
-        errorsLightCoeffsCSoFar = (testVColorGTGray[:,None][:test_i+1] *testLightCoefficientsGTRel[:test_i+1] - vColorsPredGray[:,None][:test_i+1] * relLightCoefficientsPred[:test_i + 1]) ** 2
+        envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred[:test_i + 1], testLightCoefficientsGTRel[:test_i+1])
+        errorsLightCoeffsCSoFar = (testLightCoefficientsGTRel[:test_i+1] - envMapScaling* relLightCoefficientsPred[:test_i + 1]) ** 2
 
-        errorsEnvMapSoFar = (testVColorGTGray[:,None,None][:test_i+1]*approxProjectionsGT[:test_i+1] - vColorsPredGray[:,None,None][:test_i+1] * approxProjectionsPred[:test_i+1])**2
+        envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsPred[:test_i + 1].reshape([test_i, -1]), approxProjectionsGT[:test_i+1].reshape([test_i, -1]))
+        errorsEnvMapSoFar = (approxProjectionsGT[:test_i+1] - envMapProjScaling[:,None,None]*approxProjectionsPred[:test_i+1])**2
 
         errorsVColorsESoFar = image_processing.eColourDifference(testVColorGT[:test_i+1], vColorsPred[:test_i+1])
         errorsVColorsCSoFar = image_processing.cColourDifference(testVColorGT[:test_i+1], vColorsPred[:test_i+1])
+
+        if useShapeModel:
+            errorsShapeParamsSoFar = (testShapeParamsGT[:test_i+1] - shapeParamsPred[:test_i + 1]) ** 2
 
         meanAbsErrAzsSoFar = np.mean(np.abs(errorsPosePred[0][:test_i+1]))
         meanAbsErrElevsSoFar = np.mean(np.abs(errorsPosePred[1][:test_i+1]))
@@ -1390,9 +1508,14 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         medianAbsErrAzsSoFar = np.median(np.abs(errorsPosePred[0][:test_i+1]))
         medianAbsErrElevsSoFar = np.median(np.abs(errorsPosePred[1][:test_i+1]))
 
-        meanErrorsLightCoeffsCSoFar = np.sqrt(np.mean(np.mean(errorsLightCoeffsCSoFar,axis=1), axis=0))
-        meanErrorsLightCoeffsSoFar = np.sqrt(np.mean(np.mean(errorsLightCoeffsSoFar,axis=1), axis=0))
-        meanErrorsEnvMapSoFar = np.sqrt(np.mean(errorsEnvMapSoFar))
+        meanErrorsLightCoeffsCSoFar = np.mean(np.mean(errorsLightCoeffsCSoFar,axis=1), axis=0)
+        meanErrorsLightCoeffsSoFar = np.mean(np.mean(errorsLightCoeffsSoFar,axis=1), axis=0)
+        if useShapeModel:
+            meanErrorsShapeParamsSoFar = np.mean(np.mean(errorsShapeParamsSoFar,axis=1), axis=0)
+        else:
+            meanErrorsShapeParamsSoFar = 0
+
+        meanErrorsEnvMapSoFar = np.mean(errorsEnvMapSoFar)
         meanErrorsVColorsESoFar = np.mean(errorsVColorsESoFar, axis=0)
         meanErrorsVColorsCSoFar = np.mean(errorsVColorsCSoFar, axis=0)
 
@@ -1407,20 +1530,33 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         errorsFittedLightCoeffs = np.array([])
         errorsFittedVColorsE = np.array([])
         errorsFittedVColorsC = np.array([])
+        errorsFittedShapeParamsSoFar = np.array([])
+
         if optimizationTypeDescr[optimizationType] != 'predict':
-            fittedVColorsGray = 0.3*fittedVColors[:,0] + 0.59*fittedVColors[:,1] + 0.11*fittedVColors[:,2]
-            errorsFittedLightCoeffsC = (testVColorGTGray[:,None][:test_i+1]*testLightCoefficientsGTRel[:test_i+1] - fittedVColorsGray[:,None][:test_i+1]*fittedRelLightCoeffs)**2
 
             errorsFittedLightCoeffs = (testLightCoefficientsGTRel[:test_i+1] - fittedRelLightCoeffs)**2
-            errorsFittedEnvMap= (testVColorGTGray[:,None, None][:test_i+1]*approxProjectionsGT[:test_i+1] - fittedVColorsGray[:,None,None][:test_i+1] * approxProjectionsFitted[:test_i+1])**2
+            if useShapeModel:
+                errorsFittedShapeParams = (testShapeParamsGT[:test_i+1] - fittedShapeParams[:test_i + 1]) ** 2
+
+            envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsFitted[:test_i + 1].reshape([test_i, -1]), approxProjectionsGT[:test_i+1].reshape([test_i, -1]))
+
+            errorsFittedEnvMap= (approxProjectionsGT[:test_i+1] -  envMapProjScaling[:,None, None]*approxProjectionsFitted[:test_i+1])**2
+
+            envMapScaling = scaleInvariantMSECoeff(fittedRelLightCoeffs[:test_i + 1], testLightCoefficientsGTRel[:test_i+1])
+            errorsFittedLightCoeffsC = (testLightCoefficientsGTRel[:test_i+1] - envMapScaling* fittedRelLightCoeffs[:test_i + 1]) ** 2
+
             errorsFittedVColorsE = image_processing.eColourDifference(testVColorGT[:test_i+1], fittedVColors)
             errorsFittedVColorsC = image_processing.cColourDifference(testVColorGT[:test_i+1], fittedVColors)
-            meanErrorsFittedLightCoeffs = np.sqrt(np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0))
-            meanErrorsFittedLightCoeffsC = np.sqrt(np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0))
-            meanErrorsFittedEnvMap = np.sqrt(np.mean(errorsFittedEnvMap))
+            meanErrorsFittedLightCoeffs = np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0)
+
+            if useShapeModel:
+                meanErrorsFittedShapeParams = np.mean(np.mean(errorsFittedShapeParams,axis=1), axis=0)
+            else:
+                meanErrorsFittedShapeParams = 0
+            meanErrorsFittedLightCoeffsC = np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0)
+            meanErrorsFittedEnvMap = np.mean(errorsFittedEnvMap)
             meanErrorsFittedVColorsE = np.mean(errorsFittedVColorsE, axis=0)
             meanErrorsFittedVColorsC = np.mean(errorsFittedVColorsC, axis=0)
-
 
         #Write statistics to file.
         with open(resultDir + 'performance.txt', 'w') as expfile:
@@ -1434,7 +1570,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             expfile.write("Mean SH Components Error (predicted) " +  str(meanErrorsLightCoeffs)+ '\n')
             expfile.write("Mean SH Components Error (predicted) " +  str(meanErrorsLightCoeffsC)+ '\n')
             expfile.write("Mean Vertex Colors Error E (predicted) " +  str(meanErrorsVColorsE)+ '\n')
-            expfile.write("Mean Vertex Colors Error C (predicted) " +  str(meanErrorsVColorsC)+ '\n\n')
+            expfile.write("Mean Vertex Colors Error C (predicted) " +  str(meanErrorsVColorsC)+ '\n')
+            expfile.write("Mean Shape Error (predicted) " +  str(meanErrorsShapeParams)+ '\n\n')
 
             expfile.write("Mean Azimuth Error (pred so far) " +  str(meanAbsErrAzsSoFar) + '\n')
             expfile.write("Mean Elevation Error (pred so far) " +  str(meanAbsErrElevsSoFar)+ '\n')
@@ -1444,7 +1581,8 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             expfile.write("Mean SH Components Error (pred so far) " +  str(meanErrorsLightCoeffsCSoFar)+ '\n')
             expfile.write("Mean SH Env Map Error (pred so far) " +  str(meanErrorsEnvMapSoFar)+ '\n')
             expfile.write("Mean Vertex Colors Error E (pred so far) " +  str(meanErrorsVColorsESoFar)+ '\n')
-            expfile.write("Mean Vertex Colors Error C (pred so far) " +  str(meanErrorsVColorsCSoFar)+ '\n\n')
+            expfile.write("Mean Vertex Colors Error C (pred so far) " +  str(meanErrorsVColorsCSoFar)+ '\n')
+            expfile.write("Mean Shape Error (pred so far) " +  str(meanErrorsShapeParamsSoFar)+ '\n\n')
 
             if not optimizationTypeDescr[optimizationType] == 'predict':
                 expfile.write("Mean Azimuth Error (fitted) " + str(meanAbsErrAzsFitted) + '\n')
@@ -1457,6 +1595,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 expfile.write("Mean SH Env Map Error (fitted) " +  str(meanErrorsFittedEnvMap)+ '\n')
                 expfile.write("Mean Vertex Colors Error E (fitted) " +  str(meanErrorsFittedVColorsE)+ '\n')
                 expfile.write("Mean Vertex Colors Error C (fitted) " +  str(meanErrorsFittedVColorsC)+ '\n')
+                expfile.write("Mean Shape Error (fitted) " +  str(meanErrorsFittedShapeParams)+ '\n')
 
         #
         # if not optimizationTypeDescr[optimizationType] == 'predict':
@@ -1481,9 +1620,16 @@ errorsPosePred = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, 
 testVColorGTGray = 0.3*testVColorGT[:,0] + 0.59*testVColorGT[:,1] + 0.11*testVColorGT[:,2]
 vColorsPredGray = 0.3*vColorsPred[:,0] + 0.59*vColorsPred[:,1] + 0.11*vColorsPred[:,2]
 
-errorsLightCoeffsC = (testVColorGTGray[:,None] * testLightCoefficientsGTRel - vColorsPredGray[:,None] * relLightCoefficientsPred) ** 2
 errorsLightCoeffs = (testLightCoefficientsGTRel - relLightCoefficientsPred) ** 2
-errorsEnvMap= (testVColorGTGray[:,None,None][:test_i+1]*approxProjectionsGT[:test_i+1] - vColorsPredGray[:,None,None][:test_i+1] * approxProjectionsPred[:test_i+1])**2
+
+if useShapeModel:
+    errorsShapeParams = (testShapeParamsGT - shapeParamsPred) ** 2
+
+envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsPred.reshape([test_i, -1]), approxProjectionsGT.reshape([test_i, -1]))
+errorsEnvMap= (approxProjectionsGT -  envMapProjScaling[:,None, None]*approxProjectionsPred)**2
+envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred, testLightCoefficientsGTRel)
+errorsLightCoeffsC = (testLightCoefficientsGTRel - envMapScaling* relLightCoefficientsPred) ** 2
+
 
 errorsVColorsE = image_processing.eColourDifference(testVColorGT, vColorsPred)
 errorsVColorsC = image_processing.cColourDifference(testVColorGT, vColorsPred)
@@ -1494,9 +1640,15 @@ meanAbsErrElevs = np.mean(np.abs(errorsPosePred[1]))
 medianAbsErrAzs = np.median(np.abs(errorsPosePred[0]))
 medianAbsErrElevs = np.median(np.abs(errorsPosePred[1]))
 
-meanErrorsLightCoeffs = np.sqrt(np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0))
-meanErrorsLightCoeffsC = np.sqrt(np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0))
-meanErrorsEnvMap = np.sqrt(np.mean(errorsEnvMap))
+meanErrorsLightCoeffs = np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0)
+
+if useShapeModel:
+    meanErrorsShapeParams = np.mean(np.mean(errorsShapeParams,axis=1), axis=0)
+else:
+    meanErrorsShapeParams = 0
+
+meanErrorsLightCoeffsC = np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0)
+meanErrorsEnvMap = np.mean(errorsEnvMap)
 meanErrorsVColorsE = np.mean(errorsVColorsE, axis=0)
 meanErrorsVColorsC = np.mean(errorsVColorsC, axis=0)
 
@@ -1509,6 +1661,7 @@ if len(azsPredictions) > 0:
 
 errorsFittedLightCoeffsC = np.array([])
 errorsFittedLightCoeffs = np.array([])
+errorsFittedShapeParams = np.array([])
 errorsFittedEnvMap= np.array([])
 
 errorsFittedVColorsE = np.array([])
@@ -1523,6 +1676,7 @@ meanErrorsFittedLightCoeffsC = np.nan
 meanErrorsFittedEnvMap = np.nan
 meanErrorsFittedVColorsC = np.nan
 meanErrorsFittedVColorsE = np.nan
+meanErrorsFittedShapeParams = np.nan
 
 if optimizationTypeDescr[optimizationType] != 'predict':
     errorsPoseFitted = recognition_models.evaluatePrediction(testAzsRel, testElevsGT, fittedAzs, fittedElevs)
@@ -1532,16 +1686,25 @@ if optimizationTypeDescr[optimizationType] != 'predict':
 
     fittedVColorsGray = 0.3*fittedVColors[:,0] + 0.59*fittedVColors[:,1] + 0.11*fittedVColors[:,2]
 
-    errorsFittedLightCoeffsC = (testVColorGTGray[:,None]*testLightCoefficientsGTRel - fittedVColorsGray[:,None]*fittedRelLightCoeffs)**2
-
     errorsFittedLightCoeffs = (testLightCoefficientsGTRel - fittedRelLightCoeffs)**2
 
-    errorsFittedEnvMap = (testVColorGTGray[:,None,None][:test_i+1]*approxProjectionsGT[:test_i+1] - fittedVColorsGray[:,None,None][:test_i+1] * approxProjectionsFitted[:test_i+1])**2
+    if useShapeModel:
+        errorsShapeParams = (testShapeParamsGT - fittedShapeParams)**2
+
+    envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsFitted.reshape([test_i, -1]), approxProjectionsGT.reshape([test_i, -1]))
+    errorsFittedEnvMap= (approxProjectionsGT -  envMapProjScaling[:,None, None]*approxProjectionsFitted)**2
+    envMapScaling = scaleInvariantMSECoeff(fittedRelLightCoeffs, testLightCoefficientsGTRel)
+    errorsFittedLightCoeffsC = (testLightCoefficientsGTRel - envMapScaling* fittedRelLightCoeffs) ** 2
+
     errorsFittedVColorsE = image_processing.eColourDifference(testVColorGT, fittedVColors)
     errorsFittedVColorsC = image_processing.cColourDifference(testVColorGT, fittedVColors)
 
-np.savez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errorsPosePred[0], predErrorElevs=errorsPosePred[1], errorsLightCoeffs=errorsLightCoeffs, errorsLightCoeffsC=errorsLightCoeffsC,errorsEnvMap=errorsEnvMap, errorsVColorsE=errorsVColorsE, errorsVColorsC=errorsVColorsC, errorsFittedAzs=errorsPoseFitted[0], errorsFittedElevs=errorsPoseFitted[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedLightCoeffsC=errorsFittedLightCoeffsC, errorsFittedEnvMap=errorsFittedEnvMap, errorsFittedVColorsE=errorsFittedVColorsE, errorsFittedVColorsC=errorsFittedVColorsC, testOcclusions=testOcclusions)
-np.savez(resultDir + 'samples.npz', testSet = testSet, azsPred= azsPred, elevsPred=elevsPred, fittedAzs=fittedAzs, fittedElevs=fittedElevs, vColorsPred=vColorsPred, fittedVColors=fittedVColors, relLightCoefficientsGTPred=relLightCoefficientsPred, fittedRelLightCoeffs=fittedRelLightCoeffs)
+if not useShapeModel:
+    np.savez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errorsPosePred[0], predErrorElevs=errorsPosePred[1], errorsLightCoeffs=errorsLightCoeffs, errorsLightCoeffsC=errorsLightCoeffsC,errorsEnvMap=errorsEnvMap, errorsVColorsE=errorsVColorsE, errorsVColorsC=errorsVColorsC, errorsFittedAzs=errorsPoseFitted[0], errorsFittedElevs=errorsPoseFitted[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedLightCoeffsC=errorsFittedLightCoeffsC, errorsFittedEnvMap=errorsFittedEnvMap, errorsFittedVColorsE=errorsFittedVColorsE, errorsFittedVColorsC=errorsFittedVColorsC, testOcclusions=testOcclusions)
+    np.savez(resultDir + 'samples.npz', testSet = testSet, azsPred= azsPred, elevsPred=elevsPred, fittedAzs=fittedAzs, fittedElevs=fittedElevs, vColorsPred=vColorsPred, fittedVColors=fittedVColors, relLightCoefficientsGTPred=relLightCoefficientsPred, fittedRelLightCoeffs=fittedRelLightCoeffs)
+else:
+    np.avez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errorsPosePred[0], predErrorElevs=errorsPosePred[1], errorsLightCoeffs=errorsLightCoeffs, errorsShapeParams=errorsShapeParams, errorsLightCoeffsC=errorsLightCoeffsC,errorsEnvMap=errorsEnvMap, errorsVColorsE=errorsVColorsE, errorsVColorsC=errorsVColorsC, errorsFittedAzs=errorsPoseFitted[0], errorsFittedElevs=errorsPoseFitted[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedLightCoeffsC=errorsFittedLightCoeffsC, errorsFittedEnvMap=errorsFittedEnvMap, errorsFittedVColorsE=errorsFittedVColorsE, errorsFittedVColorsC=errorsFittedVColorsC, errorsFittedShapeParams=errorsFittedShapeParams, testOcclusions=testOcclusions)
+    np.savez(resultDir + 'samples.npz', testSet = testSet, azsPred= azsPred, elevsPred=elevsPred, fittedAzs=fittedAzs, fittedElevs=fittedElevs, vColorsPred=vColorsPred, fittedVColors=fittedVColors, relLightCoefficientsGTPred=relLightCoefficientsPred, shapeParamsPred=shapeParamsPred, fittedRelLightCoeffs=fittedRelLightCoeffs, fittedShapeParams=fittedShapeParams)
 
 print("Avg Likelihood improvement per second of: " + str(np.mean(fittedErrorFuns - predictedErrorFuns)/ totalTime))
 ##Print and plotting results now:
@@ -1605,7 +1768,7 @@ directory = resultDir + 'occlusion_shcoeffsserrors'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c='b', )
+scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsLightCoeffs,axis=1), s=20, vmin=0, vmax=100, c='b', )
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('SH coefficient errors')
 x1,x2 = ax.get_xlim()
@@ -1616,12 +1779,28 @@ ax.set_title('Occlusion - SH coefficients predicted errors')
 fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
 plt.close(fig)
 
+if useShapeModel:
+    directory = resultDir + 'occlusion_shapeparams'
+    #Show scatter correlations with occlusions.
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsShapeParams,axis=1), s=20, vmin=0, vmax=100, c='b', )
+    ax.set_xlabel('Occlusion (%)')
+    ax.set_ylabel('Shape parameters errors')
+    x1,x2 = ax.get_xlim()
+    y1,y2 = ax.get_ylim()
+    ax.set_xlim((0,100))
+    ax.set_ylim((-0.0,1))
+    ax.set_title('Occlusion - Shape parameters predicted errors')
+    fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
+    plt.close(fig)
+
 
 directory = resultDir + 'occlusion_shcoeffsserrorsC'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c='b')
+scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsLightCoeffsC,axis=1), s=20, vmin=0, vmax=100, c='b')
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('SH coefficient errors')
 x1,x2 = ax.get_xlim()
@@ -1636,7 +1815,7 @@ directory = resultDir + 'occlusion_shEnvMap'
 #Show scatter correlations with occlusions.
 fig = plt.figure()
 ax = fig.add_subplot(111)
-scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsEnvMap,axis=(1,2))), s=20, vmin=0, vmax=100, c='b')
+scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsEnvMap,axis=(1,2)), s=20, vmin=0, vmax=100, c='b')
 ax.set_xlabel('Occlusion (%)')
 ax.set_ylabel('SH Environment map errors')
 x1,x2 = ax.get_xlim()
@@ -1683,7 +1862,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_shcoeffsserrors'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedLightCoeffs,axis=1)), s=20, vmin=0, vmax=100)
+    scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedLightCoeffs,axis=1), s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Fitted SH coefficients errors')
     x1,x2 = ax.get_xlim()
@@ -1698,7 +1877,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_shcoeffsserrorsC'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100)
+    scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedLightCoeffsC,axis=1), s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Fitted SH coefficients errors')
     x1,x2 = ax.get_xlim()
@@ -1712,7 +1891,7 @@ if not optimizationTypeDescr[optimizationType] == 'predict':
     directory = resultDir + 'fitted-occlusion_SHenvMap'
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    scat = ax.scatter(testOcclusions * 100.0, np.sqrt(np.mean(errorsFittedEnvMap,axis=(1,2))), s=20, vmin=0, vmax=100)
+    scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedEnvMap,axis=(1,2)), s=20, vmin=0, vmax=100)
     ax.set_xlabel('Occlusion (%)')
     ax.set_ylabel('Fitted SH coefficients errors')
     x1,x2 = ax.get_xlim()
@@ -1854,9 +2033,9 @@ for occlusionLevel in range(100):
         medianAbsErrAzsArr = np.append(medianAbsErrAzsArr,np.median(np.abs(errorsPosePred[0])))
         medianAbsErrElevsArr = np.append(medianAbsErrElevsArr,np.median(np.abs(errorsPosePred[1])))
 
-        meanErrorsLightCoeffsArr = np.append(meanErrorsLightCoeffsArr,np.sqrt(np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0)))
-        meanErrorsLightCoeffsCArr = np.append(meanErrorsLightCoeffsCArr,np.sqrt(np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0)))
-        meanErrorsEnvMapArr = np.append(meanErrorsEnvMapArr,np.sqrt(np.mean(errorsEnvMap)))
+        meanErrorsLightCoeffsArr = np.append(meanErrorsLightCoeffsArr,np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0))
+        meanErrorsLightCoeffsCArr = np.append(meanErrorsLightCoeffsCArr,np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0))
+        meanErrorsEnvMapArr = np.append(meanErrorsEnvMapArr,np.mean(errorsEnvMap))
         meanErrorsVColorsEArr = np.append(meanErrorsVColorsEArr,np.mean(errorsVColorsE, axis=0))
         meanErrorsVColorsCArr = np.append(meanErrorsVColorsCArr,np.mean(errorsVColorsC, axis=0))
 
@@ -1868,9 +2047,9 @@ for occlusionLevel in range(100):
             medianAbsErrElevsFittedArr = np.append(medianAbsErrElevsFittedArr,np.median(np.abs(errorsPoseFitted[1])))
 
         if optimizationTypeDescr[optimizationType] != 'predict':
-            meanErrorsFittedLightCoeffsArr = np.append(meanErrorsFittedLightCoeffsArr,np.sqrt(np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0)))
-            meanErrorsFittedLightCoeffsCArr = np.append(meanErrorsFittedLightCoeffsCArr,np.sqrt(np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0)))
-            meanErrorsFittedEnvMapArr = np.append(meanErrorsFittedEnvMapArr,np.sqrt(np.mean(errorsFittedEnvMap)))
+            meanErrorsFittedLightCoeffsArr = np.append(meanErrorsFittedLightCoeffsArr,np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0))
+            meanErrorsFittedLightCoeffsCArr = np.append(meanErrorsFittedLightCoeffsCArr,np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0))
+            meanErrorsFittedEnvMapArr = np.append(meanErrorsFittedEnvMapArr,np.mean(errorsFittedEnvMap))
             meanErrorsFittedVColorsCArr = np.append(meanErrorsFittedVColorsCArr,np.mean(errorsFittedVColorsC, axis=0))
             meanErrorsFittedVColorsEArr = np.append(meanErrorsFittedVColorsEArr,np.mean(errorsFittedVColorsE, axis=0))
 
@@ -2158,9 +2337,9 @@ for occlusionLevel in [25,50,75,100]:
 
     medianAbsErrAzs = np.median(np.abs(errorsPosePred[0]))
     medianAbsErrElevs = np.median(np.abs(errorsPosePred[1]))
-    meanErrorsLightCoeffs = np.sqrt(np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0))
-    meanErrorsLightCoeffsC = np.sqrt(np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0))
-    meanErrorsEnvMap = np.sqrt(np.mean(errorsEnvMap))
+    meanErrorsLightCoeffs = np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0)
+    meanErrorsLightCoeffsC = np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0)
+    meanErrorsEnvMap = np.mean(errorsEnvMap)
     meanErrorsVColorsE = np.mean(errorsVColorsE, axis=0)
     meanErrorsVColorsC = np.mean(errorsVColorsC, axis=0)
 
@@ -2172,9 +2351,9 @@ for occlusionLevel in [25,50,75,100]:
         medianAbsErrElevsFitted = np.median(np.abs(errorsPoseFitted[1]))
 
     if optimizationTypeDescr[optimizationType] != 'predict':
-        meanErrorsFittedLightCoeffs = np.sqrt(np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0))
-        meanErrorsFittedLightCoeffsC = np.sqrt(np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0))
-        meanErrorsFittedEnvMap = np.sqrt(np.mean(errorsFittedEnvMap))
+        meanErrorsFittedLightCoeffs = np.mean(np.mean(errorsFittedLightCoeffs,axis=1), axis=0)
+        meanErrorsFittedLightCoeffsC = np.mean(np.mean(errorsFittedLightCoeffsC,axis=1), axis=0)
+        meanErrorsFittedEnvMap = np.mean(errorsFittedEnvMap)
         meanErrorsFittedVColorsC = np.mean(errorsFittedVColorsC, axis=0)
         meanErrorsFittedVColorsE = np.mean(errorsFittedVColorsE, axis=0)
 
@@ -2260,7 +2439,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(np.sqrt(np.mean(errorsLightCoeffsC,axis=1)), np.sqrt(np.mean(errorsFittedLightCoeffsC,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(np.mean(errorsLightCoeffsC,axis=1), np.mean(errorsFittedLightCoeffsC,axis=1), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted SH coefficients errors')
@@ -2278,7 +2457,7 @@ for occlusionLevel in [25,50,75,100]:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(np.sqrt(np.mean(errorsEnvMap,axis=(1,2))), np.sqrt(np.mean(errorsFittedEnvMap,axis=(1,2))), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(np.mean(errorsEnvMap,axis=(1,2))), np.mean(errorsFittedEnvMap,axis=(1,2), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted SH coefficients errors')
@@ -2297,7 +2476,7 @@ for occlusionLevel in [25,50,75,100]:
         #Show scatter correlations with occlusions.
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(np.sqrt(np.mean(errorsLightCoeffs,axis=1)), np.sqrt(np.mean(errorsFittedLightCoeffs,axis=1)), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
+        scat = ax.scatter(np.mean(errorsLightCoeffs,axis=1), np.mean(errorsFittedLightCoeffs,axis=1), s=20, vmin=0, vmax=100, c=testOcclusions*100, cmap=matplotlib.cm.plasma)
         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
         ax.set_xlabel('Predicted SH coefficients errors')
@@ -2477,7 +2656,7 @@ for occlusionLevel in [25,50,75,100]:
     # with open(resultDir + 'performance_SH_standardised.tex', 'w') as expfile:
     #     expfile.write(performanceTable)
 
-    SMSE_SH = np.sqrt(np.mean(errorsLightCoeffs, axis=0))
+    SMSE_SH = np.mean(errorsLightCoeffs, axis=0)
     table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
             ]
     performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
@@ -2492,7 +2671,7 @@ for occlusionLevel in [25,50,75,100]:
     #     expfile.write(performanceTable)
 
     if not optimizationTypeDescr[optimizationType] == 'predict':
-        SMSE_SH = np.sqrt(np.mean(errorsFittedLightCoeffs, axis=0))
+        SMSE_SH = np.mean(errorsFittedLightCoeffs, axis=0)
         table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
                 ]
         performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
@@ -2500,7 +2679,7 @@ for occlusionLevel in [25,50,75,100]:
             expfile.write(performanceTable)
 
 
-    SMSE_SH = np.sqrt(np.mean(errorsLightCoeffsC, axis=0))
+    SMSE_SH = np.mean(errorsLightCoeffsC, axis=0)
     table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
             ]
     performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")
@@ -2515,7 +2694,7 @@ for occlusionLevel in [25,50,75,100]:
     #     expfile.write(performanceTable)
 
     if not optimizationTypeDescr[optimizationType] == 'predict':
-        SMSE_SH = np.sqrt(np.mean(errorsFittedLightCoeffsC, axis=0))
+        SMSE_SH = np.mean(errorsFittedLightCoeffsC, axis=0)
         table = [[SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2],SMSE_SH[3], SMSE_SH[4], SMSE_SH[5],SMSE_SH[6], SMSE_SH[7], SMSE_SH[8] ],
                 ]
         performanceTable = tabulate.tabulate(table, headers=headers,tablefmt="latex", floatfmt=".2f")

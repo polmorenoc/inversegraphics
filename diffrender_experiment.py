@@ -21,7 +21,7 @@ seed = 1
 np.random.seed(seed)
 
 gtPrefix = 'train4_occlusion_shapemodel'
-experimentPrefix = 'train4_occlusion_shapemodel_10k'
+experimentPrefix = 'train4_occlusion_shapemodel_17k'
 experimentDescr = 'Synthetic test set with occlusions and shape model'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
@@ -92,8 +92,8 @@ if not os.path.isfile(experimentDir + 'train.npy'):
     np.random.seed(seed)
     data = np.arange(size)
     np.random.shuffle(data)
-    train = data[0:10000]
-    test = data[10000:15000]
+    train = data[0:17000]
+    test = data[17000::]
 
     if not os.path.exists(experimentDir):
         os.makedirs(experimentDir)

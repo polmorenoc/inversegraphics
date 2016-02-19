@@ -293,6 +293,56 @@ def build_cnn_pose(input_var=None):
     return network
 
 
+def build_cnn_pose_color(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    network = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=256,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=32,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # And, finally, the 10-unit output layer with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            network,
+            num_units=4,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    return network
+
 def build_cnn_appLight(input_var=None):
     # As a third model, we'll create a CNN of two convolution + pooling stages
     # and a fully-connected hidden layer in front of the output layer.
@@ -348,7 +398,7 @@ def build_cnn_shape(input_var=None):
     # and a fully-connected hidden layer in front of the output layer.
 
     # Input layer, as usual:
-    input = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+    network = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
                                         input_var=input_var)
     # This time we do not apply input dropout, as it tends to work less well
     # for convolutional
@@ -356,7 +406,7 @@ def build_cnn_shape(input_var=None):
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
     network = ConvLayer(
-            input, num_filters=64, filter_size=(5, 5),
+            network, num_filters=64, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
 
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -383,6 +433,114 @@ def build_cnn_shape(input_var=None):
     network = lasagne.layers.DenseLayer(
             lasagne.layers.dropout(network, p=.5),
             num_units=32,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # And, finally, the 10-unit output layer with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            network,
+            num_units=10,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    return network
+
+def build_cnn_shape_k(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    input = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            input, num_filters=32, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network =  ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.0),
+            num_units=128,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    ## A fully-connected layer of 256 units with 50% dropout on its inputs:
+    #network = lasagne.layers.DenseLayer(
+    #        lasagne.layers.dropout(network, p=.0),
+    #        num_units=128,
+    #        nonlinearity=lasagne.nonlinearities.rectify)
+
+    # And, finally, the 10-unit output layer with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            network,
+            num_units=10,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    return network
+
+def build_cnn_shape_medium(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    input = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            input, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=256,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=128,
             nonlinearity=lasagne.nonlinearities.rectify)
 
     # And, finally, the 10-unit output layer with 50% dropout on its inputs:
@@ -979,6 +1137,8 @@ def load_network(modelType='cnn', param_values=[]):
         network = build_cnn_pose(input_var)
     elif modelType == 'cnn_pose_large':
         network = build_cnn_pose_large(input_var)
+    elif modelType == 'cnn_pose_color':
+        network = build_cnn_pose_color(input_var)
     elif modelType == 'cnn_pose_norm':
         network = build_cnn_pose_norm(input_var)
     elif modelType == 'cnn_pose_large_norm':
@@ -989,6 +1149,8 @@ def load_network(modelType='cnn', param_values=[]):
         network = build_cnn_shape(input_var)
     elif modelType == 'cnn_shape_large':
         network = build_cnn_shape_large(input_var)
+    elif modelType == 'cnn_shape_medium':
+        network = build_cnn_shape_medium(input_var)
     elif modelType == 'cnn_appLight':
         network = build_cnn_appLight(input_var)
     elif modelType == 'cnn_app':
@@ -1087,17 +1249,17 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     print("Starting training...")
     # We iterate over epochs:
 
-    patience = 10
+    patience = 20
     best_valid = np.inf
     best_valid_epoch = 0
     best_weights = None
-    batchSize = 32
+    batchSize = 128
     for epoch in range(num_epochs):
         # In each epoch, we do a full pass over the training data:
         train_err = 0
         train_batches = 0
         start_time = time.time()
-        slicesize = 10000
+        slicesize = 20000
         sliceidx = 0
         for start_idx in range(0, trainSetVal, slicesize):
             sliceidx += 1

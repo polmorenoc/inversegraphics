@@ -7,6 +7,13 @@ import ipdb
 
 __author__ = 'pol'
 
+def scaleInvariantMSECoeff(x_pred, x_target):
+    #Rows: test samples
+    #Cols: target variables
+    scales = np.sum((np.dot(x_pred.T.dot(x_target)/(x_pred.T.dot(x_pred)), x_pred) - x_target)**2, axis=1)
+
+    return scales
+
 
 def writeImagesHdf5(imagesDir, writeDir, imageSet, writeGray=False ):
     print("Writing HDF5 file")

@@ -65,7 +65,7 @@ dataVColorGT = groundTruth['trainVColorGT']
 # dataScenes = groundTruth['trainScenes']
 dataTeapotIds = groundTruth['trainTeapotIds']
 # dataEnvMaps = groundTruth['trainEnvMaps']
-# dataOcclusions = groundTruth['trainOcclusions']
+dataOcclusions = groundTruth['trainOcclusions']
 # dataTargetIndices = groundTruth['trainTargetIndices']
 # dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
 dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
@@ -96,16 +96,23 @@ loadGray = False
 imagesAreH5 = False
 loadGrayFromHdf5 = False
 
-if not imagesAreH5:
-    grayImages = readImages(imagesDir, trainSet, loadGray, loadGrayFromHdf5)
-else:
-    grayImages = h5py.File(imagesDir + 'images_gray.h5', 'r')["images"]
+filter = np.ones(len(trainSet)).astype(np.bool)
+filter = dataOcclusions < 0.8
+trainSet = trainSet[filter]
+
+trainLightCoefficientsGTRel = dataLightCoefficientsGTRel[filter]
+trainShapeModelCoeffsGT = dataShapeModelCoeffsGT[filter]
+trainAzsRel=trainAzsRel[filter]
+trainElevsGT =trainElevsGT[filter]
+trainVColorGT=trainVColorGT[filter]
+
+grayImages = readImages(imagesDir, trainSet, True, loadGrayFromHdf5)
 
 images = readImages(imagesDir, trainSet, False, False)
 
 # grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
 
-loadMask = True
+loadMask = False
 gtDirMask = 'groundtruth/train4_occlusion_mask/'
 masksDir =  gtDirMask + 'masks_occlusion/'
 if loadMask:
@@ -163,6 +170,7 @@ parameterTrainSet = set(['poseNN'])
 parameterTrainSet = set(['appearanceAndLightNN'])
 parameterTrainSet = set(['neuralNetModelLight'])
 parameterTrainSet = set(['neuralNetModelShape'])
+parameterTrainSet = set(['poseNNColor'])
 
 # parameterTrainSet = set(['appearanceNN'])
 # parameterTrainSet = set(['poseNN'])
@@ -201,15 +209,59 @@ if 'poseNN' in parameterTrainSet:
         modelType = neuralNetModelPose['type']
         param_values = neuralNetModelPose['params']
     else:
-        meanImage = np.zeros([150, 150])
+        meanImage = np.mean(grayImages, axis=0)
 
-    meanImage = np.mean(grayImages, axis=0)
 
-    modelPath=experimentDir + 'neuralNetModelPose.pickle'
+    modelPath=experimentDir + 'neuralNetModelPose2.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 
     poseNNmodel = lasagne_nn.train_nn_h5(grayImages.reshape([grayImages.shape[0],1,grayImages.shape[1],grayImages.shape[2]]), len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(poseNNmodel, pfile)
+
+if 'poseNNColor' in parameterTrainSet:
+    modelType = 'cnn_pose_color'
+    network = lasagne_nn.load_network(modelType=modelType, param_values=[])
+
+    print("Training NN Pose Components")
+    validRatio = 0.9
+
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    # grayTrainImages =  grayImages[trainValSet][:,:,:]
+    # grayValidImages =  grayImages[validSet][:,:,:]
+    # grayTrainImages = grayTrainImages[:,None, :,:]
+    # grayValidImages = grayValidImages[:,None, :,:]
+    # import sys
+    # sys.exit("NN")
+    param_values = []
+
+    fineTune = False
+
+    pretrainedExperimentDir =  'experiments/train3_test/'
+    if fineTune:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelPoseColor.pickle'
+        with open(pretrainedModelFile, 'rb') as pfile:
+            neuralNetModelPose = pickle.load(pfile)
+
+        meanImage = neuralNetModelPose['mean']
+        # ipdb.set_trace()
+        modelType = neuralNetModelPose['type']
+        param_values = neuralNetModelPose['params']
+    else:
+        meanImage = np.mean(images, axis=0)
+
+    modelPath=experimentDir + 'neuralNetModelPoseColor.pickle'
+
+    poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
+
+    poseNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
 
     # np.savez(modelPath, *SHNNparams)
@@ -248,9 +300,7 @@ if 'appearanceAndLightNN' in parameterTrainSet:
         modelType = neuralNetModelAppLight['type']
         param_values = neuralNetModelAppLight['params']
     else:
-        meanImage = np.zeros([150, 150,3])
-
-    meanImage = np.mean(images, axis=0)
+        meanImage = np.mean(images, axis=0)
 
     modelPath=experimentDir + 'neuralNetModelAppLight.pickle'
 
@@ -296,9 +346,8 @@ if 'appearanceNN' in parameterTrainSet:
         modelType = neuralNetModelAppearance['type']
         param_values = neuralNetModelAppearance['params']
     else:
-        meanImage = np.zeros([150, 150,3])
+        meanImage = np.mean(images, axis=0)
 
-    meanImage = np.mean(images, axis=0)
 
     modelPath=experimentDir + 'neuralNetModelAppearanceMask.pickle'
 
@@ -343,7 +392,7 @@ if 'maskNN' in parameterTrainSet:
         modelType = neuralNetModelMask['type']
         param_values = neuralNetModelMask['params']
     else:
-        meanImage = np.zeros([150, 150,3])
+        meanImage = np.mean(images, axis=0)
 
     modelPath=experimentDir + 'neuralNetModelMaskLarge.pickle'
 
@@ -414,7 +463,7 @@ if 'neuralNetModelLight' in parameterTrainSet:
         modelType = neuralNetModelLight['type']
         param_values = neuralNetModelLight['params']
     else:
-        meanImage = np.zeros([150, 150,3])
+        meanImage = np.mean(images, axis=0)
 
     lightGT = dataLightCoefficientsGTRel*dataAmbientIntensityGT[:,None]
 
@@ -426,7 +475,7 @@ if 'neuralNetModelLight' in parameterTrainSet:
 
 if 'neuralNetModelShape' in parameterTrainSet:
 
-    modelType = 'cnn_shape_large'
+    modelType = 'cnn_shape'
     network = lasagne_nn.load_network(modelType=modelType, param_values=[])
 
     print("Training NN Shape Components")
@@ -437,10 +486,10 @@ if 'neuralNetModelShape' in parameterTrainSet:
 
     param_values = []
 
-    fineTune = True
+    fineTune = False
     pretrainedExperimentDir =  'experiments/train4_occlusion_shapemodel_10k/'
     if fineTune:
-        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelShapeLarge.pickle'
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelShape.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
             neuralNetModelShape = pickle.load(pfile)
 
@@ -449,9 +498,9 @@ if 'neuralNetModelShape' in parameterTrainSet:
         modelType = neuralNetModelShape['type']
         param_values = neuralNetModelShape['params']
     else:
-        meanImage = np.zeros([150, 150,3])
+        meanImage = np.mean(images, axis=0)
 
-    modelPath=experimentDir + 'neuralNetModelShapeLarge.pickle'
+    modelPath=experimentDir + 'neuralNetModelShape.pickle'
     shapeNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), dataShapeModelCoeffsGT[trainValSet].astype(np.float32), dataShapeModelCoeffsGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
