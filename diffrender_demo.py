@@ -404,7 +404,7 @@ for teapot_i in range(len(renderTeapotsList)):
     # #     scaleSM = scaleY
     # scaleSM = ch.min(ch.concatenate([scaleY, scaleZ]))
     chVertices = chVertices*0.09
-    smCenter = ch.array([0,0,0.1])
+    smCenter = ch.array([0,0,0.0])
     smVertices = [chVertices]
 
     renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )

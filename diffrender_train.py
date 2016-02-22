@@ -97,7 +97,8 @@ imagesAreH5 = False
 loadGrayFromHdf5 = False
 
 filter = np.ones(len(trainSet)).astype(np.bool)
-filter = dataOcclusions < 0.8
+filter = np.array(tuple(dataOcclusions > 0) and tuple(dataOcclusions < 0.9))
+# filter = dataOcclusions < 0.3
 trainSet = trainSet[filter]
 
 trainLightCoefficientsGTRel = dataLightCoefficientsGTRel[filter]
@@ -105,10 +106,11 @@ trainShapeModelCoeffsGT = dataShapeModelCoeffsGT[filter]
 trainAzsRel=trainAzsRel[filter]
 trainElevsGT =trainElevsGT[filter]
 trainVColorGT=trainVColorGT[filter]
+trainAmbientIntensityGT = dataAmbientIntensityGT[filter]
 
 grayImages = readImages(imagesDir, trainSet, True, loadGrayFromHdf5)
 
-images = readImages(imagesDir, trainSet, False, False)
+# images = readImages(imagesDir, trainSet, False, False)
 
 # grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
 
@@ -166,11 +168,11 @@ parameterTrainSet = set(['azimuthsRF', 'elevationsRF', 'vcolorsRF'])
 # parameterTrainSet = set(['spherical_harmonicsZernike'])
 # parameterTrainSet = set(['spherical_harmonicsZernike'])
 # parameterTrainSet = set(['spherical_harmonicsNN'])
-parameterTrainSet = set(['poseNN'])
 parameterTrainSet = set(['appearanceAndLightNN'])
+parameterTrainSet = set(['appearanceNN'])
 parameterTrainSet = set(['neuralNetModelLight'])
 parameterTrainSet = set(['neuralNetModelShape'])
-parameterTrainSet = set(['poseNNColor'])
+parameterTrainSet = set(['poseNN'])
 
 # parameterTrainSet = set(['appearanceNN'])
 # parameterTrainSet = set(['poseNN'])
@@ -304,7 +306,7 @@ if 'appearanceAndLightNN' in parameterTrainSet:
 
     modelPath=experimentDir + 'neuralNetModelAppLight.pickle'
 
-    appLightGT = np.hstack([dataLightCoefficientsGTRel*dataAmbientIntensityGT[:,None] , trainVColorGT])
+    appLightGT = np.hstack([trainLightCoefficientsGTRel*trainAmbientIntensityGT[:,None] , trainVColorGT])
 
     appLightNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), appLightGT[trainValSet].astype(np.float32), appLightGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
@@ -337,7 +339,7 @@ if 'appearanceNN' in parameterTrainSet:
     pretrainedExperimentDir =  'experiments/train3_test/'
 
     if fineTune:
-        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAppearanceMask.pickle'
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAppearance.pickle'
         with open(pretrainedModelFile, 'rb') as pfile:
             neuralNetModelAppearance = pickle.load(pfile)
 
@@ -349,7 +351,7 @@ if 'appearanceNN' in parameterTrainSet:
         meanImage = np.mean(images, axis=0)
 
 
-    modelPath=experimentDir + 'neuralNetModelAppearanceMask.pickle'
+    modelPath=experimentDir + 'neuralNetModelAppearance.pickle'
 
     appNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), trainVColorGT[trainValSet].astype(np.float32), trainVColorGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
@@ -465,7 +467,7 @@ if 'neuralNetModelLight' in parameterTrainSet:
     else:
         meanImage = np.mean(images, axis=0)
 
-    lightGT = dataLightCoefficientsGTRel*dataAmbientIntensityGT[:,None]
+    lightGT = trainLightCoefficientsGTRel*trainAmbientIntensityGT[:,None]
 
     modelPath=experimentDir + 'neuralNetModelLight.pickle'
     lightNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), lightGT[trainValSet].astype(np.float32), lightGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
@@ -486,7 +488,7 @@ if 'neuralNetModelShape' in parameterTrainSet:
 
     param_values = []
 
-    fineTune = False
+    fineTune = True
     pretrainedExperimentDir =  'experiments/train4_occlusion_shapemodel_10k/'
     if fineTune:
         pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelShape.pickle'
@@ -498,10 +500,10 @@ if 'neuralNetModelShape' in parameterTrainSet:
         modelType = neuralNetModelShape['type']
         param_values = neuralNetModelShape['params']
     else:
-        meanImage = np.mean(images, axis=0)
+        meanImage = np.mean(grayImages, axis=0)
 
     modelPath=experimentDir + 'neuralNetModelShape.pickle'
-    shapeNNmodel = lasagne_nn.train_nn_h5(images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]), len(trainValSet), dataShapeModelCoeffsGT[trainValSet].astype(np.float32), dataShapeModelCoeffsGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    shapeNNmodel = lasagne_nn.train_nn_h5(grayImages.reshape([grayImages.shape[0],1,grayImages.shape[1],grayImages.shape[2]]), len(trainValSet), trainShapeModelCoeffsGT[trainValSet].astype(np.float32), trainShapeModelCoeffsGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # np.savez(modelPath, *SHNNparams)
     with open(modelPath, 'wb') as pfile:
         pickle.dump(shapeNNmodel, pfile)
@@ -514,7 +516,7 @@ if 'spherical_harmonicsZernike' in parameterTrainSet:
     # with open(experimentDir + 'linRegModelZernike' + str(numCoeffs) +'_win' + str(win) + '.pickle', 'wb') as pfile:
     #     pickle.dump(linRegModelZernikeSH, pfile)
     trainZernikeCoeffs[trainZernikeCoeffs >= 1000] = 35
-    randForestModelRelZernikeSH = recognition_models.trainRandomForest(trainZernikeCoeffs, dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None])
+    randForestModelRelZernikeSH = recognition_models.trainRandomForest(trainZernikeCoeffs, trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None])
     with open(experimentDir + 'randomForestModelZernike400' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'wb') as pfile:
         pickle.dump(randForestModelRelZernikeSH, pfile)
 

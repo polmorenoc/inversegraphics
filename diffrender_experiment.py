@@ -131,4 +131,3 @@ if not os.path.isfile(experimentDir + 'train.npy'):
 with open(experimentDir + 'description.txt', 'w') as expfile:
     expfile.write(experimentDescr)
 
-

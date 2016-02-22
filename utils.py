@@ -7,10 +7,11 @@ import ipdb
 
 __author__ = 'pol'
 
+from numpy.core.umath_tests import matrix_multiply
 def scaleInvariantMSECoeff(x_pred, x_target):
     #Rows: test samples
     #Cols: target variables
-    scales = np.sum((np.dot(x_pred.T.dot(x_target)/(x_pred.T.dot(x_pred)), x_pred) - x_target)**2, axis=1)
+    scales = (matrix_multiply(x_pred[:,None,:],x_target[:,:,None])/matrix_multiply(x_pred[:,None,:],x_pred[:,:,None])).ravel()
 
     return scales
 
@@ -132,4 +133,3 @@ def saveScatter(xaxis, yaxis, xlabel, ylabel, filename):
     plt.title('Performance scatter plot')
     fig.savefig(filename)
     plt.close(fig)
-

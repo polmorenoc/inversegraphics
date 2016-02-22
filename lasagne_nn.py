@@ -398,7 +398,7 @@ def build_cnn_shape(input_var=None):
     # and a fully-connected hidden layer in front of the output layer.
 
     # Input layer, as usual:
-    network = lasagne.layers.InputLayer(shape=(None, 3, 150, 150),
+    network = lasagne.layers.InputLayer(shape=(None, 1, 150, 150),
                                         input_var=input_var)
     # This time we do not apply input dropout, as it tends to work less well
     # for convolutional
@@ -1306,5 +1306,4 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
     model['params'] = best_weights
 
     return model
-
 
