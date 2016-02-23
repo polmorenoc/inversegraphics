@@ -22,6 +22,7 @@ from opendr_utils import *
 import OpenGL.GL as GL
 import light_probes
 import imageio
+from utils import *
 plt.ion()
 
 #__GL_THREADED_OPTIMIZATIONS
@@ -30,6 +31,7 @@ plt.ion()
 useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
+useShapeModel = True
 datasetGroundtruth = False
 syntheticGroundtruth = True
 useCycles = True
@@ -48,7 +50,7 @@ sphericalMap = False
 
 np.random.seed(1)
 
-width, height = (150, 150)
+width, height = (30, 30)
 win = -1
 
 if glMode == 'glfw':
@@ -72,8 +74,8 @@ clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
 
-gtPrefix = 'train4_occlusion_shapemodel_testnew'
-gtDirPref = 'train4_occlusion_shapemodel_testnew'
+gtPrefix = 'train4_occlusion_shapemodel'
+gtDirPref = 'train4_occlusions_shapemodel_test'
 gtDir = 'groundtruth/' + gtDirPref + '/'
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
@@ -90,8 +92,6 @@ dataTeapotIds = groundTruth['trainTeapotIds']
 dataEnvMaps = groundTruth['trainEnvMaps']
 dataOcclusions = groundTruth['trainOcclusions']
 dataTargetIndices = groundTruth['trainTargetIndices']
-dataComponentsGT = groundTruth['trainComponentsGT']
-dataComponentsGTRel = groundTruth['trainComponentsGTRel']
 dataIds = groundTruth['trainIds']
 dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
 dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
@@ -99,16 +99,26 @@ dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
-readDataId = 135
 
+readDataId = 1
 import shape_model
-#%% Load data
-filePath = 'data/teapotModel.pkl'
-teapotModel = shape_model.loadObject(filePath)
-faces = teapotModel['faces']
 
-#%% Sample random shape Params
-latentDim = np.shape(teapotModel['ppcaW'])[1]
+if useShapeModel:
+    import shape_model
+    #%% Load data
+    filePath = 'data/teapotModel.pkl'
+    teapotModel = shape_model.loadObject(filePath)
+    faces = teapotModel['faces']
+
+    #%% Sample random shape Params
+    latentDim = np.shape(teapotModel['ppcaW'])[1]
+    shapeParams = np.random.randn(latentDim)
+    chShapeParams = ch.Ch(shapeParams)
+
+    meshLinearTransform=teapotModel['meshLinearTransform']
+    W=teapotModel['ppcaW']
+    b=teapotModel['ppcaB']
+
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[27:28]
@@ -289,11 +299,8 @@ chComponentGT = chAmbientSHGT
 # chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
 chAz = ch.Ch(dataAzsGT[readDataId])
-chAz[:] = 0
 chObjAz = ch.Ch(dataObjAzsGT[readDataId])
-chObjAz[:] = 0
 chEl =  ch.Ch(dataElevsGT[readDataId])
-# chEl[:] = 0
 chAzRel = chAz - chObjAz
 
 totalOffset = phiOffset + chObjAz
@@ -358,6 +365,13 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
+    renderer = createRendererTarget(glMode, False, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer.msaa = True
+    renderer.overdraw = True
+    renderer.r
+    renderer_teapots = renderer_teapots + [renderer]
+
+if useShapeModel:
     shapeParams = np.random.randn(latentDim)
     shapeParams = dataShapeModelCoeffsGT[readDataId]
     chShapeParams = ch.Ch(shapeParams)
@@ -365,7 +379,7 @@ for teapot_i in range(len(renderTeapotsList)):
     # landmarksLong = ch.dot(chShapeParams,teapotModel['ppcaW'].T) + teapotModel['ppcaB']
     # landmarks = landmarksLong.reshape([-1,3])
     # chVertices = shape_model.chShapeParamsToVerts(landmarks, teapotModel['meshLinearTransform'])
-    chVertices = shape_model.VerticesModel(chShapeParams =chShapeParams,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
+    chVertices = shape_model.VerticesModel(chShapeParams =chShapeParams,meshLinearTransform=meshLinearTransform,W=W,b=b)
     chVertices.init()
 
     chVertices = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVertices.T).T
@@ -384,36 +398,28 @@ for teapot_i in range(len(renderTeapotsList)):
     smHaveTextures = [[False]]
     smTexturesList = [[None]]
 
-
     chVertices = chVertices - ch.mean(chVertices, axis=0)
     minZ = ch.min(chVertices[:,2])
     chMinZ = ch.min(chVertices[:,2])
     # chVertices[:,2]  = chVertices[:,2]  - minZ
     zeroZVerts = chVertices[:,2]- chMinZ
     chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
-    # maxZ = ch.max(chVertices[:,2])
-    # minZ = ch.min(chVertices[:,2])
-    # maxY = ch.max(chVertices[:,1])
-    # minY = ch.min(chVertices[:,1])
-    # scaleZ = 0.265/(maxZ-minZ)
-    # scaleY = 0.18/(maxY-minY)
-    # ratio =  (maxZ-minZ)/(maxY-minY)
-    # # if ratio > 0.265/0.18:
-    # #     scaleSM = scaleZ
-    # # else:
-    # #     scaleSM = scaleY
-    # scaleSM = ch.min(ch.concatenate([scaleY, scaleZ]))
+
     chVertices = chVertices*0.09
-    smCenter = ch.array([0,0,0.0])
+    smCenter = ch.array([0,0,0.1])
     smVertices = [chVertices]
 
-    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
-    # renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
-    renderer.msaa = True
-    renderer.overdraw = True
-    renderer.r
-    renderer_teapots = renderer_teapots + [renderer]
+    smFacesB = [smFaces]
+    smVerticesB = [smVertices]
+    smVColorsB = [smVColors]
+    smNormalsB = [smNormals]
+    smUVsB = [smUVs]
+    smHaveTexturesB = [smHaveTextures]
+    smTexturesListB = [smTexturesList]
 
+    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, smVerticesB, smVColorsB, smFacesB, smNormalsB, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
+
+    renderer.msaa = False
 
 # # # Funky theano stuff
 # import lasagne_nn
@@ -436,59 +442,50 @@ for teapot_i in range(len(renderTeapotsList)):
 # sys.exit(0)
 
 currentTeapotModel = 0
-renderer = renderer_teapots[currentTeapotModel]
+
+if not useShapeModel:
+    renderer = renderer_teapots[currentTeapotModel]
 
 # shapeParams = np.random.randn(latentDim)
+if useShapeModel:
+    shapeParams = np.random.randn(latentDim)
+    shapeParams = dataShapeModelCoeffsGT[readDataId]
+    chShapeParamsGT = ch.Ch(shapeParams)
 
-shapeParams = np.random.randn(latentDim)
-shapeParams = dataShapeModelCoeffsGT[readDataId]
-chShapeParamsGT = ch.Ch(shapeParams)
+    chVerticesGT = shape_model.VerticesModel(chShapeParams =chShapeParamsGT,meshLinearTransform=meshLinearTransform,W=W,b=b)
+    chVerticesGT.init()
 
-chVerticesGT = shape_model.VerticesModel(chShapeParams =chShapeParamsGT,meshLinearTransform=teapotModel['meshLinearTransform'],W=teapotModel['ppcaW'],b=teapotModel['ppcaB'])
-chVerticesGT.init()
+    chVerticesGT = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVerticesGT.T).T
+    # chNormalsGT = shape_model.chShapeParamsToNormals(teapotModel['N'], landmarks, teapotModel['linT'])
+    # chNormalsGT = shape_model.shapeParamsToNormals(shapeParams, teapotModel)
+    chNormalsGT = shape_model.chGetNormals(chVerticesGT, faces)
 
-chVerticesGT = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVerticesGT.T).T
-# chNormalsGT = shape_model.chShapeParamsToNormals(teapotModel['N'], landmarks, teapotModel['linT'])
-# chNormalsGT = shape_model.shapeParamsToNormals(shapeParams, teapotModel)
-chNormalsGT = shape_model.chGetNormals(chVerticesGT, faces)
+    smNormalsGT = [chNormalsGT]
+    smFacesGT = [[faces]]
+    smVColorsGT = [chVColorsGT*np.ones(chVerticesGT.shape)]
+    smUVsGT = ch.Ch(np.zeros([chVerticesGT.shape[0],2]))
+    smHaveTexturesGT = [[False]]
+    smTexturesListGT = [[None]]
 
-smNormalsGT = [chNormalsGT]
-smFacesGT = [[faces]]
-smVColorsGT = [chVColorsGT*np.ones(chVerticesGT.shape)]
-smUVsGT = ch.Ch(np.zeros([chVerticesGT.shape[0],2]))
-smHaveTexturesGT = [[False]]
-smTexturesListGT = [[None]]
+    smCenterGT = ch.mean(chVerticesGT, axis=0)
 
-smCenterGT = ch.mean(chVerticesGT, axis=0)
+    chVerticesGT = chVerticesGT - ch.mean(chVerticesGT, axis=0)
+    minZ = ch.min(chVerticesGT[:,2])
 
-chVerticesGT = chVerticesGT - ch.mean(chVerticesGT, axis=0)
-minZ = ch.min(chVerticesGT[:,2])
+    chMinZ = ch.min(chVerticesGT[:,2])
 
-chMinZ = ch.min(chVerticesGT[:,2])
+    zeroZVerts = chVerticesGT[:,2]- chMinZ
+    chVerticesGT = ch.hstack([chVerticesGT[:,0:2] , zeroZVerts.reshape([-1,1])])
 
-zeroZVerts = chVerticesGT[:,2]- chMinZ
-chVerticesGT = ch.hstack([chVerticesGT[:,0:2] , zeroZVerts.reshape([-1,1])])
-# maxZ = ch.max(chVerticesGT[:,2])
-# minZ = ch.min(chVerticesGT[:,2])
-# maxY = ch.max(chVerticesGT[:,1])
-# minY = ch.min(chVerticesGT[:,1])
-# scaleZ = 0.265/(maxZ-minZ)
-# scaleY = 0.18/(maxY-minY)
-#
-# ratioGT =  (maxZ-minZ)/(maxY-minY)
 
-# if ratioGT.r > 0.265/0.18:
-#     scaleSMGT = scaleZ
-# else:
-#     scaleSMGT = scaleY
-# scaleSMGT = ch.min(ch.concatenate([scaleY, scaleZ]))
+    chVerticesGT = chVerticesGT*0.09
+    smCenterGT = ch.array([0,0,0.1])
+    smVerticesGT = [chVerticesGT]
 
-chVerticesGT = chVerticesGT*0.09
-smCenterGT = ch.array([0,0,0.1])
-smVerticesGT = [chVerticesGT]
-
-# addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+if useShapeModel:
+    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+else:
+    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 center = center_teapots[currentTeapotModel]
 
@@ -502,7 +499,8 @@ if useGTasBackground:
         renderer.set(background_image=rendererGT.r)
 
 currentTeapotModel = 0
-renderer = renderer_teapots[currentTeapotModel]
+if not useShapeModel:
+    renderer = renderer_teapots[currentTeapotModel]
 
 import differentiable_renderer
 paramsList = [chAz, chEl]
@@ -570,7 +568,11 @@ if syntheticGroundtruth:
 else:
     imagesDir = gtDir + 'images/'
 import utils
+import skimage.transform
 image = utils.readImages(imagesDir, [readDataId], False)[0]
+if image.shape[0] != height or image.shape[1] != width:
+    image = skimage.transform.resize(image, [height,width])
+
 imageDataset = srgb2lin(image)
 
 imagegt = imageGT()
@@ -611,9 +613,13 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, '
 # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
 # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
-models = [negLikModel, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
-modelsDescr = ["Gaussian Model", "Outlier model" ]
+import opendr.filters
+robPyr = opendr.filters.gaussian_pyramid(pixelLikelihoodRobustCh, n_levels=3, normalization=None)
+robPyrSum = ch.sum(robPyr)
+
+models = [negLikModel, negLikModelRobust, robPyrSum]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
+modelsDescr = ["Gaussian Model", "Outlier model", "Pyramid Robust" ]
 
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
@@ -663,7 +669,7 @@ ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
 free_variables = [chAz, chEl, chVColors, chShCoeffs]
-free_variables = [chShapeParams, chAz, chEl]
+free_variables = [chShapeParams]
 azVar = 1
 elVar = 1
 vColorVar = 0.00001
@@ -736,17 +742,19 @@ if showSubplots:
     # ax4.set_title("Posterior probabilities")
     # pim4 = ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
     # cb4 = plt.colorbar(pim4, ax=ax4,use_gridspec=True)
-
-    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, chAz, 0.01745)
-    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, chEl, 0.01745)
+    paramWrt1 = chAz
+    paramWrt1 = chShapeParams[0]
+    paramWrt2 = chShapeParams[1]
+    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt1, 0.1)
+    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)
 
     ax3.set_title("Dr wrt. Azimuth Checkgrad")
 
 
-    drazsum = np.sign(-diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)
+    drazsum = np.sign(-diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(paramWrt1).reshape(shapeIm[0],shapeIm[1],1)
 
-    drazsumnobnd = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)*(1-renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
-    drazsumbnd = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+    drazsumnobnd = -pixelErrorFun.dr_wrt(paramWrt1).reshape(shapeIm[0],shapeIm[1],1)*(1-renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+    drazsumbnd = -pixelErrorFun.dr_wrt(paramWrt1).reshape(shapeIm[0],shapeIm[1],1)*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
 
     drazsumnobnddiff = diffAz.reshape(shapeIm[0],shapeIm[1],1)*(1-renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
     drazsumbnddiff = diffAz.reshape(shapeIm[0],shapeIm[1],1)*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
@@ -755,20 +763,20 @@ if showSubplots:
     cb3 = plt.colorbar(img3, ax=ax3,use_gridspec=True)
     cb3.mappable = img3
 
-    ax4.set_title("Dr wrt. Elevation Checkgrad")
-    drazsum = np.sign(-diffEl.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1)
+    ax4.set_title("Dr wrt. param 2 Checkgrad")
+    drazsum = np.sign(-diffEl.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(paramWrt2).reshape(shapeIm[0],shapeIm[1],1)
     img4 = ax4.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb4 = plt.colorbar(img4, ax=ax4,use_gridspec=True)
     cb4.mappable = img4
 
-    ax5.set_title("Dr wrt. Azimuth")
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    ax5.set_title("Dr wrt. param 1")
+    drazsum = -pixelErrorFun.dr_wrt(paramWrt1).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb5 = plt.colorbar(img5, ax=ax5,use_gridspec=True)
     cb5.mappable = img5
 
-    ax6.set_title("Dr wrt. Elevation")
-    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+    ax6.set_title("Dr wrt. param 2")
+    drazsum = -pixelErrorFun.dr_wrt(paramWrt2).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
     img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
     cb6 = plt.colorbar(img6, ax=ax6,use_gridspec=True)
     cb6.mappable = img6
@@ -842,51 +850,58 @@ def refreshSubplots():
     rendererIm = lin2srgb(renderer.r.copy())
     pim2.set_data(rendererIm)
 
-    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, chAz, 0.01745)
-    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, chEl, 0.01745)
+    paramWrt1 = chAz
+    paramWrt1 = chShapeParams[0]
+    paramWrt2 = chShapeParams[1]
 
+    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt1, 0.1)
+    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)
+
+    global model
 
     if model != 2:
+
         # ax3.set_title("Pixel negative log probabilities")
         # pim3 = ax3.imshow(-pixelErrorFun.r)
         # cb3.mappable = pim3
         # cb3.update_normal(pim3)
-        ax3.set_title("Dr wrt. Azimuth Checkgrad")
-        drazsum = -np.sign(diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chAz).reshape(shapeIm[0],shapeIm[1],1)
+        ax3.set_title("Dr wrt. Parameter 0 Checkgrad")
+        drazsum = -np.sign(diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(paramWrt1).reshape(shapeIm[0],shapeIm[1],1)
         # drazsum = drazsum*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
         img3 = ax3.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
         cb3.mappable = img3
-    else:
-        ax3.set_title("HoG Image GT")
-        pim3 = ax3.imshow(hogImGT.r)
-        cb3.mappable = pim3
-        cb3.update_normal(pim3)
+        # else:
+        #     ax3.set_title("HoG Image GT")
+        #     pim3 = ax3.imshow(hogImGT.r)
+        #     cb3.mappable = pim3
+        #     cb3.update_normal(pim3)
 
-    if model != 2:
+
         # ax4.set_title("Posterior probabilities")
         # ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
-        ax4.set_title("Dr wrt. Elevation Checkgrad")
-        drazsum = -np.sign(diffEl.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(chEl).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
+        ax4.set_title("Dr wrt. Parameter 1 Checkgrad")
+        drazsum = -np.sign(diffEl.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(paramWrt2).reshape(shapeIm[0],shapeIm[1],1).reshape(shapeIm[0],shapeIm[1],1)
         img4 = ax4.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
         cb4.mappable = img4
-    else:
 
-        ax4.set_title("HoG image renderer")
-        ax4.set_title("HoG Image GT")
-        pim4 = ax4.imshow(hogImRenderer.r)
-        cb4.mappable = pim4
-        cb4.update_normal(pim4)
+        # else:
+        #     ax4.set_title("HoG image renderer")
+        #     ax4.set_title("HoG Image GT")
+        #     pim4 = ax4.imshow(hogImRenderer.r)
+        #     cb4.mappable = pim4
+        #     cb4.update_normal(pim4)
 
-    sdy, sdx = pixelErrorFun.shape
-    drazsum = -pixelErrorFun.dr_wrt(chAz).reshape(sdy,sdx,1).reshape(sdy,sdx,1)
-    # drazsum = drazsum*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
-    img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    cb5.mappable = img5
-    cb5.update_normal(img5)
-    drazsum = -pixelErrorFun.dr_wrt(chEl).reshape(sdy, sdx,1).reshape(sdy,sdx,1)
-    img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-    cb6.mappable = img6
-    cb6.update_normal(img6)
+        sdy, sdx = pixelErrorFun.shape
+        drazsum = -pixelErrorFun.dr_wrt(paramWrt1).reshape(sdy,sdx,1).reshape(sdy,sdx,1)
+        # drazsum = drazsum*(renderer.boundarybool_image.reshape(shapeIm[0],shapeIm[1],1))
+        img5 = ax5.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb5.mappable = img5
+        cb5.update_normal(img5)
+        drazsum = -pixelErrorFun.dr_wrt(paramWrt2).reshape(sdy, sdx,1).reshape(sdy,sdx,1)
+        img6 = ax6.imshow(drazsum.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+        cb6.mappable = img6
+        cb6.update_normal(img6)
+
     f.canvas.draw()
     plt.pause(0.01)
 
@@ -1005,6 +1020,11 @@ def printStats():
 
     print("Dr wrt cam Azimuth: " + str(errorFun.dr_wrt(chAz)))
     print("Dr wrt cam Elevation: " + str(errorFun.dr_wrt(chEl)))
+
+    if useShapeModel:
+        print("Dr wrt Shape Param 0: " + str(errorFun.dr_wrt(chShapeParams[0])))
+        print("Dr wrt Shape Param 1: " + str(errorFun.dr_wrt(chShapeParams[1])))
+
     # print("Dr wrt Distance: " + str(errorFun.dr_wrt(chDist)))
     print("Occlusion is " + str(getOcclusionFraction(rendererGT)*100) + " %")
 
@@ -1025,8 +1045,8 @@ def printStats():
 
     azDiff = np.arctan2(np.arcsin(chAzGT - chAz.r[0]), np.arccos(chAzGT - chAz.r[0]))
     elDiff = np.arctan2(np.arcsin(chElGT - chEl.r[0]), np.arccos(chElGT - chEl.r[0]))
-    print("Current Azimuth difference of " + str(azDiff*180/np.pi))
-    print("Current Elevation difference of " + str(elDiff*180/np.pi))
+    # print("Current Azimuth difference of " + str(azDiff*180/np.pi))
+    # print("Current Elevation difference of " + str(elDiff*180/np.pi))
 
     global printStatsBool
     printStatsBool = False
@@ -1520,7 +1540,7 @@ def readKeys(window, key, scancode, action, mods):
     if key == glfw.KEY_6 and action == glfw.RELEASE:
         method = 5
         maxiter = 200
-        options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+        options = {'disp':False, 'maxiter':maxiter, 'lr':0.01, 'momentum':0.5, 'decay':0.99}
         print("Changed to minimizer: " + methods[method])
     if key == glfw.KEY_7 and action == glfw.RELEASE:
         maxiter = 50
@@ -1789,11 +1809,13 @@ if demoMode:
             # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
             # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
-            # models = [negLikModel, negLikModelRobust, hogError]
-            models = [negLikModel, negLikModelRobust]
-            # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, hogCellErrors]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
-            # pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+            robPyr = opendr.filters.gaussian_pyramid(pixelLikelihoodRobustCh, n_levels=3, normalization=None)
+            robPyrSum = ch.sum(robPyr)
+
+            models = [negLikModel, negLikModelRobust, robPyrSum]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
+            modelsDescr = ["Gaussian Model", "Outlier model", "Pyramid Robust" ]
+
 
             pixelErrorFun = pixelModels[model]
             errorFun = models[model]

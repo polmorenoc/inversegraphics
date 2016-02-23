@@ -45,26 +45,6 @@ def chamferDistanceModelToData(img, template, minThresImage, maxThresImage, minT
 
     bwEdges1 = cv2.distanceTransform(~imgEdges, cv2.DIST_L2, 5)
 
-    # cv2.imshow('ImageWindow',np.uint8(img*255))
-
-    # cv2.waitKey()
-
-    # cv2.imshow('ImageWindow',np.uint8(template*255))
-
-    # cv2.waitKey()
-
-    # cv2.imshow('ImageWindow',~tempEdges)
-
-    # cv2.waitKey()
-
-    # ipdb.set_trace()
-
-    # disp = cv2.normalize(bwEdges1, bwEdges1, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-
-    # cv2.imshow('ImageWindow', disp)
-
-    # cv2.waitKey()
-
     score = np.sum(np.multiply(tempEdges/255, bwEdges1))/np.sum(tempEdges/255.0)
 
     return score
@@ -167,6 +147,8 @@ class LogRobustModel(Ch):
         visibility = self.renderer.visibility_image
         visible = visibility != 4294967295
 
+        visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
+
         return ch.log(pixelLikelihoodRobustCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
 
@@ -183,6 +165,8 @@ class LogGaussianModel(Ch):
     def logProb(self):
         visibility = self.renderer.visibility_image
         visible = visibility != 4294967295
+
+        visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
 
         return logPixelLikelihoodCh(self.groundtruth, self.renderer, visible, 'MASK', self.variances)
 

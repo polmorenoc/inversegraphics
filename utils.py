@@ -133,3 +133,171 @@ def saveScatter(xaxis, yaxis, xlabel, ylabel, filename):
     plt.title('Performance scatter plot')
     fig.savefig(filename)
     plt.close(fig)
+
+#Method from https://github.com/adamlwgriffiths/Pyrr/blob/master/pyrr/geometry.py
+def create_cube(scale=(1.0,1.0,1.0), st=False, rgba=np.array([1.,1.,1.,1.]), dtype='float32', type='triangles'):
+    """Returns a Cube reading for rendering."""
+
+    shape = [24, 3]
+    rgba_offset = 3
+
+    width, height, depth = scale
+    # half the dimensions
+    width /= 2.0
+    height /= 2.0
+    depth /= 2.0
+
+    vertices = np.array([
+        # front
+        # top right
+        ( width, height, depth,),
+        # top left
+        (-width, height, depth,),
+        # bottom left
+        (-width,-height, depth,),
+        # bottom right
+        ( width,-height, depth,),
+
+        # right
+        # top right
+        ( width, height,-depth),
+        # top left
+        ( width, height, depth),
+        # bottom left
+        ( width,-height, depth),
+        # bottom right
+        ( width,-height,-depth),
+
+        # back
+        # top right
+        (-width, height,-depth),
+        # top left
+        ( width, height,-depth),
+        # bottom left
+        ( width,-height,-depth),
+        # bottom right
+        (-width,-height,-depth),
+
+        # left
+        # top right
+        (-width, height, depth),
+        # top left
+        (-width, height,-depth),
+        # bottom left
+        (-width,-height,-depth),
+        # bottom right
+        (-width,-height, depth),
+
+        # top
+        # top right
+        ( width, height,-depth),
+        # top left
+        (-width, height,-depth),
+        # bottom left
+        (-width, height, depth),
+        # bottom right
+        ( width, height, depth),
+
+        # bottom
+        # top right
+        ( width,-height, depth),
+        # top left
+        (-width,-height, depth),
+        # bottom left
+        (-width,-height,-depth),
+        # bottom right
+        ( width,-height,-depth),
+    ], dtype=dtype)
+
+    st_values = None
+    rgba_values = None
+
+    if st:
+        # default st values
+        st_values = np.tile(
+            np.array([
+                (1.0, 1.0,),
+                (0.0, 1.0,),
+                (0.0, 0.0,),
+                (1.0, 0.0,),
+            ], dtype=dtype),
+            (6,1,)
+        )
+
+        if isinstance(st, bool):
+            pass
+        elif isinstance(st, (int, float)):
+            st_values *= st
+        elif isinstance(st, (list, tuple, np.ndarray)):
+            st = np.array(st, dtype=dtype)
+            if st.shape == (2,2,):
+                # min / max
+                st_values *= st[1] - st[0]
+                st_values += st[0]
+            elif st.shape == (4,2,):
+                # per face st values specified manually
+                st_values[:] = np.tile(st, (6,1,))
+            elif st.shape == (6,2,):
+                # st values specified manually
+                st_values[:] = st
+            else:
+                raise ValueError('Invalid shape for st')
+        else:
+            raise ValueError('Invalid value for st')
+
+        shape[-1] += st_values.shape[-1]
+        rgba_offset += st_values.shape[-1]
+
+    if len(rgba) > 0:
+        # default rgba values
+        rgba_values = np.tile(np.array([1.0, 1.0, 1.0, 1.0], dtype=dtype), (24,1,))
+
+        if isinstance(rgba, bool):
+            pass
+        elif isinstance(rgba, (int, float)):
+            # int / float expands to RGBA with all values == value
+            rgba_values *= rgba
+        elif isinstance(rgba, (list, tuple, np.ndarray)):
+            rgba = np.array(rgba, dtype=dtype)
+
+            if rgba.shape == (3,):
+                rgba_values = np.tile(rgba, (24,1,))
+            elif rgba.shape == (4,):
+                rgba_values[:] = np.tile(rgba, (24,1,))
+            elif rgba.shape == (4,3,):
+                rgba_values = np.tile(rgba, (6,1,))
+            elif rgba.shape == (4,4,):
+                rgba_values = np.tile(rgba, (6,1,))
+            elif rgba.shape == (6,3,):
+                rgba_values = np.repeat(rgba, 4, axis=0)
+            elif rgba.shape == (6,4,):
+                rgba_values = np.repeat(rgba, 4, axis=0)
+            elif rgba.shape == (24,3,):
+                rgba_values = rgba
+            elif rgba.shape == (24,4,):
+                rgba_values = rgba
+            else:
+                raise ValueError('Invalid shape for rgba')
+        else:
+            raise ValueError('Invalid value for rgba')
+
+        shape[-1] += rgba_values.shape[-1]
+
+    data = np.empty(shape, dtype=dtype)
+    data[:,:3] = vertices
+    if st_values is not None:
+        data[:,3:5] = st_values
+    if rgba_values is not None:
+        data[:,rgba_offset:] = rgba_values
+
+    if type == 'triangles':
+        # counter clockwise
+        # top right -> top left -> bottom left
+        # top right -> bottom left -> bottom right
+        indices = np.tile(np.array([0, 1, 2, 0, 2, 3], dtype='int'), (6,1))
+        for face in range(6):
+            indices[face] += (face * 4)
+        indices.shape = (-1,)
+
+
+    return data, indices

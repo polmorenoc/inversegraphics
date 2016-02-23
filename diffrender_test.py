@@ -38,7 +38,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_shapemodel_10k_robust_std001_100s_SMminDoubleStd001_withMSAA'
+testPrefix = 'train4_occlusion_shapemodel_10k_robust_std001_test_knownAppAndPose_background'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -143,7 +143,7 @@ for teapot_i in range(len(renderTeapotsList)):
     haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
-    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.msaa = False
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
@@ -256,8 +256,8 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 numTests = 100
-testSet = np.load(experimentDir + 'test.npy')[:numTests][[4,8, 39,44,49,75]]
-testSet = np.load(experimentDir + 'test.npy')[:numTests]
+testSet = np.load(experimentDir + 'test.npy')[:numTests][[4,8, 13, 39,44,49,75]]
+# testSet = np.load(experimentDir + 'test.npy')[:numTests]
 # testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
 
@@ -449,7 +449,7 @@ if useShapeModel:
     chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
 
-    renderer = createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 else:
@@ -1269,13 +1269,16 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
                 # el = testElevsGT[test_i]
 
+                az = testAzsRel[test_i]
+                el = testElevsGT[test_i]
+
                 color = vColorsPred[test_i]
                 #
-                # color = testVColorGT[test_i]
+                color = testVColorGT[test_i]
 
                 lightCoefficientsRel = relLightCoefficientsPred[test_i]
                 #
-                # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+                lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
                 if useShapeModel:
                     shapeParams = shapeParamsPred[test_i]
 
@@ -1441,16 +1444,17 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                 # options={'disp':False, 'maxiter':50}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-                if useShapeModel:
-                    free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
-                else:
-                    free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
-                # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
-                samplingMode = True
-
-                # azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
-                # if azSampleStdev*180/np.pi < 100:
-                ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                # if useShapeModel:
+                #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
+                # else:
+                #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
+                # # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
+                # samplingMode = True
+                #
+                # # azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
+                # # if azSampleStdev*180/np.pi < 100:
+                #
+                # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
                 #
                 stds[:] = 0.01
                 free_variables = [ chShapeParams ]

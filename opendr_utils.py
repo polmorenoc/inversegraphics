@@ -1,5 +1,6 @@
 __author__ = 'pol'
 
+from utils import *
 import opendr
 import chumpy as ch
 import geometry
@@ -294,7 +295,7 @@ def exportEnvMapSHLightCoefficients():
         pickle.dump(envMapDic, pfile)
 
 
-def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
     renderer.set(glMode=glMode)
 
@@ -308,12 +309,7 @@ def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_l
 
     vch = [ch.dot(vflat[mesh],transformation) + targetPosition for mesh in rangeMeshes]
 
-    if len(vch)==1:
-        vstack = vch[0]
-    else:
-        vstack = ch.vstack(vch)
 
-    camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
     vnflat = [item for sublist in vn for item in sublist]
 
     vnch = [vnflat[mesh] for mesh in rangeMeshes]
@@ -327,6 +323,33 @@ def createRendererTarget(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_l
     vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponent)
     # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
+    if hasBackground:
+        dataCube, facesCube = create_cube(scale=(10,10,10), st=False, rgba=np.array([1.0, 1.0, 1.0, 1.0]), dtype='float32', type='triangles')
+        verticesCube = ch.Ch(dataCube[:,0:3])
+        UVsCube = ch.Ch(np.zeros([verticesCube.shape[0],2]))
+
+        facesCube = facesCube.reshape([-1,3])
+        import shape_model
+        normalsCube = -shape_model.chGetNormals(verticesCube, facesCube)
+        haveTexturesCube = [[False]]
+        texturesListCube = [[None]]
+        vColorsCube = ch.Ch(dataCube[:,3:6])
+
+        vch = vch + [verticesCube]
+        f_list = f_list + [[[facesCube]]]
+        vnch = vnch + [normalsCube]
+        vc_list = vc_list + [vColorsCube]
+        textures_list = textures_list + [texturesListCube]
+        haveTextures_list = haveTextures_list + [haveTexturesCube]
+        uv = uv + [UVsCube]
+
+
+    if len(vch)==1:
+        vstack = vch[0]
+    else:
+        vstack = ch.vstack(vch)
+
+    camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
 
     setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
@@ -551,11 +574,14 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
 
     f = []
     f_listflat = [item for sublist in f_list for item in sublist]
+    lenMeshes = 0
 
-    for mesh in f_listflat:
-        lenMeshes = len(f)
+    for mesh_i, mesh in enumerate(f_listflat):
+        polygonLen = 0
         for polygons in mesh:
             f = f + [polygons + lenMeshes]
+            polygonLen += len(polygons)
+        lenMeshes += len(vch[mesh_i])
     fstack = np.vstack(f)
 
     # vnflat = [item for sublist in vnch for item in sublist]
@@ -606,6 +632,15 @@ def addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vmod,
     uv.insert(0,uvmod)
     haveTextures_list.insert(0,haveTexturesmod_list)
     textures_list.insert(0,texturesmod_list)
+
+def addObjectDataLast(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list):
+    v.insert(-1,vmod)
+    f_list.insert(-1,fmod_list)
+    vc.insert(-1,vcmod)
+    vn.insert(-1,vnmod)
+    uv.insert(-1,uvmod)
+    haveTextures_list.insert(-1,haveTexturesmod_list)
+    textures_list.insert(-1,texturesmod_list)
 
 def removeObjectData(objIdx, v, f_list, vc, vn, uv, haveTextures_list, textures_list):
 
