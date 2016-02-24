@@ -50,7 +50,7 @@ sphericalMap = False
 
 np.random.seed(1)
 
-width, height = (30, 30)
+width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
@@ -419,7 +419,7 @@ if useShapeModel:
 
     renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, smVerticesB, smVColorsB, smFacesB, smNormalsB, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
 
-    renderer.msaa = False
+    renderer.msaa = True
 
 # # # Funky theano stuff
 # import lasagne_nn

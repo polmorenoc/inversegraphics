@@ -1,4 +1,4 @@
-__author__ = 'pol'
+test__author__ = 'pol'
 
 import matplotlib
 matplotlib.use('Qt4Agg')
@@ -38,7 +38,7 @@ seed = 1
 np.random.seed(seed)
 
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_100s_dropoutsamples_std01_nnsampling_minSH'
-testPrefix = 'train4_occlusion_shapemodel_10k_robust_std001_test_knownAppAndPose_background'
+testPrefix = 'train4_occlusion_shapemodel_10k_robust_std001_test_background_std001Mix09wPrior_std005_prior100_best'
 # testPrefix = 'train4_occlusion_opt_train4occlusion10k_10s_std01_bad'
 
 parameterRecognitionModels = set(['randForestAzs', 'randForestElevs', 'randForestVColors', 'linearRegressionVColors', 'neuralNetModelSHLight', ])
@@ -144,7 +144,7 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
     renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
-    renderer.msaa = False
+    renderer.msaa = True
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
 
@@ -175,8 +175,8 @@ stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
 globalPrior = ch.Ch([0.9])
 
-negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
+negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
 pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
 pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 # negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
@@ -214,6 +214,16 @@ def cb(_):
     iterat = iterat + 1
     print("Callback! " + str(iterat))
     print("Sq Error: " + str(errorFun.r))
+
+    global negLikModelRobustSmallStd
+    global bestShapeParamsSmallStd
+    global bestRobustSmallStdError
+    if minimizingShape and useShapeModel:
+        if negLikModelRobustSmallStd.r  < bestRobustSmallStdError:
+            ipdb.set_trace()
+            bestRobustSmallStdError = negLikModelRobustSmallStd.r.copy()
+            bestShapeParamsSmallStd = chShapeParams.r.copy()
+    print("Small Std Error " + str(negLikModelRobustSmallStd.r))
     global imagegt
     global renderer
     global gradAz
@@ -257,6 +267,9 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 numTests = 100
 testSet = np.load(experimentDir + 'test.npy')[:numTests][[4,8, 13, 39,44,49,75]]
+# testSet = np.load(experimentDir + 'test.npy')[:numTests][[49]]
+# testSet = np.load(experimentDir + 'test.npy')[:numTests][[75]]
+# testSet = np.load(experimentDir + 'test.npy')[:numTests][[4,49]]
 # testSet = np.load(experimentDir + 'test.npy')[:numTests]
 # testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
 # [13:14]
@@ -452,6 +465,7 @@ if useShapeModel:
     renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
+
 else:
     renderer = renderer_teapots[testRenderer]
 
@@ -483,7 +497,7 @@ if 'neuralNetPose' in parameterRecognitionModels:
     grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
     grayTestImages = grayTestImages[:,None, :,:]
 
-    grayTestImages = grayTestImages - meanImage.reshape([1,1, height,width])
+    grayTestImages = grayTestImages - meanImage.reshape([1,1, grayTestImages.shape[2],grayTestImages.shape[3]])
 
     network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
     posePredictionFun = lasagne_nn.get_prediction_fun(network)
@@ -507,7 +521,7 @@ if 'neuralNetPose' in parameterRecognitionModels:
     param_values = neuralNetModelPose['params']
     grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
     grayTestImages = grayTestImages[:,None, :,:]
-    grayTestImages = grayTestImages - meanImage.reshape([1,1, height,width])
+    grayTestImages = grayTestImages - meanImage.reshape([1,1, grayTestImages.shape[2],grayTestImages.shape[3]])
 
     # network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
     nonDetPosePredictionFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
@@ -715,7 +729,7 @@ if 'neuralNetModelShape' in parameterRecognitionModels and useShapeModel:
 
     grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
     grayTestImages = grayTestImages[:,None, :,:]
-    grayTestImages = grayTestImages - meanImage.reshape([1,1, height,width])
+    grayTestImages = grayTestImages - meanImage.reshape([1,1, grayTestImages.shape[2],grayTestImages.shape[3]])
 
     network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
     shapePredictionFun = lasagne_nn.get_prediction_fun(network)
@@ -905,8 +919,10 @@ def analyzeHue(figurePath, rendererGT, renderer, sampleEl, sampleAz, sampleSH, s
     fig = plt.figure()
 
     stds[:] = sampleStds
-    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
+    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
+    stds = ch.Ch([initialPixelStdev])
+
     models = [negLikModel, negLikModelRobust, negLikModelRobust]
     errorFunRobust = models[1]
     errorFunGaussian = models[0]
@@ -988,8 +1004,8 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     fig = plt.figure()
 
     stds[:] = sampleStds
-    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
+    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
     models = [negLikModel, negLikModelRobust, negLikModelRobust]
     errorFunRobust = models[1]
     errorFunGaussian = models[0]
@@ -1175,8 +1191,8 @@ shapeIm = [height, width]
 #Update all error functions with the right renderers.
 print("Using " + modelsDescr[model])
 
-negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
+negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
 pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
 pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 # negLikModel = -generative_models.modelLogLikelihoodCh(rendererGT, renderer, np.array([]), 'FULL', variances)/numPixels
@@ -1220,6 +1236,8 @@ approxProjectionsPredList = []
 if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
     for test_i in range(len(testAzsRel)):
 
+
+
         bestFittedAz = chAz.r
         bestFittedEl = chEl.r
         bestModelLik = np.finfo('f').max
@@ -1228,13 +1246,19 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         if useShapeModel:
             bestShapeParams = chShapeParams.r
 
+
         testId = dataIds[test_i]
         print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
-        rendererGT[:] = srgb2lin(images[test_i])
+        image = skimage.transform.resize(images[test_i], [height,width])
+        rendererGT[:] = srgb2lin(image)
 
         negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
         negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+        stdsSmall = ch.Ch([0.01])
+        variancesSmall = stdsSmall ** 2
+        negLikModelRobustSmallStd = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variancesSmall))/numPixels
+
         models = [negLikModel, negLikModelRobust]
 
         # hogGT, hogImGT, _ = image_processing.diffHog(rendererGT, drconv)
@@ -1269,16 +1293,16 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
                 # el = testElevsGT[test_i]
 
-                az = testAzsRel[test_i]
-                el = testElevsGT[test_i]
+                # az = testAzsRel[test_i]
+                # el = testElevsGT[test_i]
 
                 color = vColorsPred[test_i]
                 #
-                color = testVColorGT[test_i]
+                # color = testVColorGT[test_i]
 
                 lightCoefficientsRel = relLightCoefficientsPred[test_i]
                 #
-                lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+                # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
                 if useShapeModel:
                     shapeParams = shapeParamsPred[test_i]
 
@@ -1335,7 +1359,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
                 samplingMode = True
                 cv2.imwrite(resultDir + 'az_samples/test' + str(test_i)  + '_gt.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
                 stds[:] = 0.1
-                # ipdb.set_trace()
+                #
                 # azSampleStdev = np.std(azsPredictions[test_i])
 
                 azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
@@ -1436,6 +1460,7 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
             sys.stdout.flush()
             if optimizationTypeDescr[optimizationType] == 'optimize':
                 print("** Minimizing from initial predicted parameters. **")
+                globalPrior[:] = 0.9
                 model = 1
                 errorFun = models[model]
                 # errorFun = chThError
@@ -1444,28 +1469,35 @@ if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
 
                 # options={'disp':False, 'maxiter':50}
                 # options={'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
-                # if useShapeModel:
-                #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
-                # else:
-                #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
+                if useShapeModel:
+                    free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
+                else:
+                    free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
                 # # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 # samplingMode = True
                 #
                 # # azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
                 # # if azSampleStdev*180/np.pi < 100:
                 #
-                # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                minimizingShape = False
+                ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
                 #
-                stds[:] = 0.01
-                free_variables = [ chShapeParams ]
+                stds[:] = 0.05
+                errorFun = models[0]
+                free_variables = [chShapeParams]
 
-                ch.minimize({'raw': errorFun  }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                if useShapeModel:
+                    bestRobustSmallStdError = negLikModelRobustSmallStd.r.copy()
+                    bestShapeParamsSmallStd = chShapeParams.r.copy()
 
+                minimizingShape = True
+                ch.minimize({'raw': errorFun + 100*ch.sum(chShapeParams**2)/numPixels}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                chShapeParams[:] = bestShapeParamsSmallStd.copy()
                 # stds[:] = 0.01
                 # free_variables = [ chAz, chEl, chShapeParams, chVColors, chLightSHCoeffs]
-                #
-                # ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
+                # ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                 # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
                 # stds[:] = 0.01
