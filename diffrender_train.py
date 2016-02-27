@@ -214,7 +214,7 @@ if 'poseNN' in parameterTrainSet:
         meanImage = np.mean(grayImages, axis=0)
 
 
-    modelPath=experimentDir + 'neuralNetModelPose2.pickle'
+    modelPath=experimentDir + 'neuralNetModelPose3.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
 

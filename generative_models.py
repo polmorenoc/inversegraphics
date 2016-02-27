@@ -5,7 +5,7 @@ import ipdb
 import scipy
 from numbapro import autojit
 import chumpy as ch
-
+from chumpy.ch import MatVecMult, Ch, depends_on
 
 def scoreImage(img, template, method, methodParams):
     score = 0
@@ -50,8 +50,6 @@ def chamferDistanceModelToData(img, template, minThresImage, maxThresImage, minT
     return score
 
 
-
-
 def chamferDistanceDataToModel(img, template, minThresImage, maxThresImage, minThresTemplate, maxThresTemplate):
     imgEdges = cv2.Canny(np.uint8(img*255), minThresImage,maxThresImage)
 
@@ -93,6 +91,12 @@ def modelLogLikelihoodRobustCh(image, template, testMask, backgroundModel, layer
 
     return liksum
 
+def modelLogLikelihoodRobustRegionCh(image, template, testMask, backgroundModel, layerPriors, variances):
+    likelihood = pixelLikelihoodRobustRegionCh(image, template, testMask, backgroundModel,  layerPriors, variances)
+    liksum = ch.sum(ch.log(likelihood))
+
+    return liksum
+
 def modelLogLikelihood(image, template, testMask, backgroundModel, variances):
     likelihood = pixelLikelihood(image, template, testMask, backgroundModel, variances)
     liksum = np.sum(np.log(likelihood))
@@ -115,6 +119,7 @@ def pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior
     foregroundProbs = np.prod(1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2) + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 
+
 def pixelLikelihoodRobustCh(image, template, testMask, backgroundModel, layerPrior, variances):
     sigma = ch.sqrt(variances)
     mask = testMask
@@ -129,9 +134,58 @@ def pixelLikelihoodRobustCh(image, template, testMask, backgroundModel, layerPri
     foregroundProbs = (probs[:,:,0] * probs[:,:,1] * probs[:,:,2]) * layerPrior + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 
+def pixelLikelihoodRobustRegionCh(image, template, testMask, backgroundModel, layerPrior, variances):
+    sigma = ch.sqrt(variances)
+    mask = testMask
+    if backgroundModel == 'FULL':
+        mask = np.ones(image.shape[0:2])
+    # mask = np.repeat(mask[..., np.newaxis], 3, 2)
+    repPriors = ch.tile(layerPrior, image.shape[0:2])
+    # sum = np.sum(np.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=np.sqrt(variances) ) + (1 - repPriors)))
+    # uniformProbs = np.ones(image.shape)
+
+    imshape = image.shape
+    from opendr.filters import filter_for
+    from opendr.filters import GaussianKernel2D
+
+    blur_mtx = filter_for(imshape[0], imshape[1], imshape[2] if len(imshape)>2 else 1, kernel = GaussianKernel2D(3, 1))
+    blurred_image = MatVecMult(blur_mtx, image).reshape(imshape)
+    blurred_template = MatVecMult(blur_mtx, template).reshape(imshape)
+
+    probs = ch.exp( - (blurred_image - template)**2 / (2 * variances)) * (1./(sigma * np.sqrt(2 * np.pi)))
+    foregroundProbs = (probs[:,:,0] * probs[:,:,1] * probs[:,:,2]) * layerPrior + (1 - repPriors)
+    return foregroundProbs * mask + (1-mask)
+
+
 
 import chumpy as ch
 from chumpy import depends_on, Ch
+
+class EdgeFilter(Ch):
+    dterms = ['renderer', 'rendererGT']
+
+    def compute_r(self):
+        return self.blurredDiff()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            return self.blurredDiff().dr_wrt(self.renderer)
+
+    def blurredDiff(self):
+        edges = self.renderer.boundarybool_image
+        imshape = self.renderer.shape
+        rgbEdges = np.tile(edges.reshape([imshape[0],imshape[1],1]),[1,1,3]).astype(np.bool)
+
+        from opendr.filters import filter_for
+        from opendr.filters import GaussianKernel2D
+
+        blur_mtx = filter_for(imshape[0], imshape[1], imshape[2] if len(imshape)>2 else 1, kernel = GaussianKernel2D(3, 1))
+        blurred_diff = MatVecMult(blur_mtx, self.renderer - self.rendererGT).reshape(imshape)
+
+        return blurred_diff[rgbEdges]
+
+
+
 
 class LogRobustModel(Ch):
     dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
@@ -151,6 +205,24 @@ class LogRobustModel(Ch):
 
         return ch.log(pixelLikelihoodRobustCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
+
+class LogRobustModelRegion(Ch):
+    dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        visibility = self.renderer.visibility_image
+        visible = visibility != 4294967295
+
+        visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
+
+        return ch.log(pixelLikelihoodRobustRegionCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
 class LogGaussianModel(Ch):
     dterms = ['renderer', 'groundtruth', 'variances']
@@ -192,7 +264,8 @@ def logPixelLikelihoodCh(image, template, testMask, backgroundModel, variances):
     uniformProbs = np.ones(image.shape[0:2])
     logprobs =   (-(image - template)**2 / (2. * variances))  - ch.log((sigma * np.sqrt(2.0 * np.pi)))
     pixelLogProbs = logprobs[:,:,0] + logprobs[:,:,1] + logprobs[:,:,2]
-    return pixelLogProbs * mask + (1.-mask)
+    return pixelLogProbs * mask
+
 
 def pixelLikelihoodCh(image, template, testMask, backgroundModel, layerPrior, variances):
     sigma = ch.sqrt(variances)

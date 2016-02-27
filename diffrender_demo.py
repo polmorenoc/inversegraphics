@@ -27,7 +27,7 @@ plt.ion()
 
 #__GL_THREADED_OPTIMIZATIONS
 
-#Main script options:
+#Main script options:r
 useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
@@ -600,6 +600,10 @@ negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, grou
 
 negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
 
+modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+
+pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+
 pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
 
 pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
@@ -614,12 +618,15 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, '
 # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
 import opendr.filters
-robPyr = opendr.filters.gaussian_pyramid(pixelLikelihoodRobustCh, n_levels=3, normalization=None)
+robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=3, normalization=None)
 robPyrSum = ch.sum(robPyr)
 
-models = [negLikModel, negLikModelRobust, robPyrSum]
+# edgeErrorPixels = generative_models.EdgeFilter(rendererGT=rendererGT, renderer=renderer)**2
+# edgeError = ch.sum(edgeErrorPixels)
+
+models = [negLikModel, negLikModelRobust,  robPyrSum]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
-modelsDescr = ["Gaussian Model", "Outlier model", "Pyramid Robust" ]
+modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust", "Pyr Error" ]
 
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 
@@ -677,7 +684,7 @@ shCoeffsVar = 0.00001
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chShCoeffs.r.shape)])
 df_vars = np.concatenate([np.ones(chShapeParams.shape)])
 
-maxiter = 50
+maxiter = 20
 method=1
 options={'disp':False, 'maxiter':maxiter}
 
@@ -854,13 +861,13 @@ def refreshSubplots():
     paramWrt1 = chShapeParams[0]
     paramWrt2 = chShapeParams[1]
 
-    diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt1, 0.1)
-    diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)
 
     global model
 
-    if model != 2:
+    if model != 3:
 
+        diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt1, 0.1)
+        diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)
         # ax3.set_title("Pixel negative log probabilities")
         # pim3 = ax3.imshow(-pixelErrorFun.r)
         # cb3.mappable = pim3
@@ -942,58 +949,58 @@ def plotSurface(model):
         surf = axperf.plot_surface(x2, y2, z2, rstride=3, cstride=3, cmap=cm.coolwarm, linewidth=0.1, alpha=0.85)
 
         # scaleSurfGrads = 5./avgSurfGradMagnitudes
-        # for point in range(len(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])):
-        #     perfi = performanceSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     azi = azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     eli = elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     gradAzi = -gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     gradEli = -gradElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     scaleGrad = np.sqrt(gradAzi**2+gradEli**2) / 5
-        #
-        #     arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi/scaleGrad], [eli*180./np.pi, eli*180./np.pi + gradEli/scaleGrad], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
-        #     axperf.add_artist(arrowGrad)
-        #
-        #     diffAzi = -gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     diffEli = -gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
-        #     scaleDiff = np.sqrt(diffAzi**2+diffEli**2) / 5
-        #     colorArrow = 'g'
-        #     if diffAzi * gradAzi + diffEli * gradEli < 0:
-        #         colorArrow = 'r'
-        #     arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi/scaleDiff], [eli*180./np.pi, eli*180./np.pi + diffEli/scaleDiff], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+        for point in range(len(performanceSurf[(model, chAzGT.r[0], chElGT.r[0])])):
+            perfi = performanceSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            azi = azimuthsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            eli = elevationsSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            gradAzi = -gradAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            gradEli = -gradElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            scaleGrad = np.sqrt(gradAzi**2+gradEli**2) / 5
+
+            arrowGrad = Arrow3D([azi*180./np.pi, azi*180./np.pi + gradAzi/scaleGrad], [eli*180./np.pi, eli*180./np.pi + gradEli/scaleGrad], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+            axperf.add_artist(arrowGrad)
+
+            diffAzi = -gradFinAzSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            diffEli = -gradFinElSurf[(model, chAzGT.r[0], chElGT.r[0])][point]
+            scaleDiff = np.sqrt(diffAzi**2+diffEli**2) / 5
+            colorArrow = 'g'
+            if diffAzi * gradAzi + diffEli * gradEli < 0:
+                colorArrow = 'r'
+            arrowGradDiff = Arrow3D([azi*180./np.pi, azi*180./np.pi + diffAzi/scaleDiff], [eli*180./np.pi, eli*180./np.pi + diffEli/scaleDiff], [perfi, perfi], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
         #     axperf.add_artist(arrowGradDiff)
 
         axperf.plot([chAzGT.r[0]*180./np.pi, chAzGT.r[0]*180./np.pi], [chElGT.r[0]*180./np.pi,chElGT.r[0]*180./np.pi], [z2.min(), z2.max()], 'b--', linewidth=1)
 
         errorFun = models[model]
 
-        # axperf.plot(chAz.r*180./np.pi, chEl.r*180./np.pi, errorFun.r[0], 'yD')
-        #
-        # import scipy.sparse as sp
-        # if sp.issparse(errorFun.dr_wrt(chAz)):
-        #     drAz = -errorFun.dr_wrt(chAz).toarray()[0][0]
-        # else:
-        #     drAz = -errorFun.dr_wrt(chAz)[0][0]
-        # if sp.issparse(errorFun.dr_wrt(chEl)):
-        #     drEl = -errorFun.dr_wrt(chEl).toarray()[0][0]
-        # else:
-        #     drEl = -errorFun.dr_wrt(chEl)[0][0]
-        # scaleDr = np.sqrt(drAz**2+drEl**2) / 5
-        # chAzOldi = chAz.r[0]
-        # chElOldi = chEl.r[0]
-        # diffAz = -ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
-        # diffEl = -ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
-        # scaleDiff = np.sqrt(diffAz**2+diffEl**2) / 5
-        # chAz[0] = chAzOldi
-        # chEl[0] = chElOldi
-        #
-        # arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz/scaleDr], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl/scaleDr], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
-        # axperf.add_artist(arrowGrad)
-        # colorArrow = 'g'
-        # if diffAz * drAz + diffEl * drEl < 0:
-        #     colorArrow = 'r'
-        #
-        # arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz/scaleDiff], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl/scaleDiff], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
-        # axperf.add_artist(arrowGradDiff)
+        axperf.plot(chAz.r*180./np.pi, chEl.r*180./np.pi, errorFun.r[0], 'yD')
+
+        import scipy.sparse as sp
+        if sp.issparse(errorFun.dr_wrt(chAz)):
+            drAz = -errorFun.dr_wrt(chAz).toarray()[0][0]
+        else:
+            drAz = -errorFun.dr_wrt(chAz)[0][0]
+        if sp.issparse(errorFun.dr_wrt(chEl)):
+            drEl = -errorFun.dr_wrt(chEl).toarray()[0][0]
+        else:
+            drEl = -errorFun.dr_wrt(chEl)[0][0]
+        scaleDr = np.sqrt(drAz**2+drEl**2) / 5
+        chAzOldi = chAz.r[0]
+        chElOldi = chEl.r[0]
+        diffAz = -ch.optimization.gradCheckSimple(errorFun, chAz, 0.01745)
+        diffEl = -ch.optimization.gradCheckSimple(errorFun, chEl, 0.01745)
+        scaleDiff = np.sqrt(diffAz**2+diffEl**2) / 5
+        chAz[0] = chAzOldi
+        chEl[0] = chElOldi
+
+        arrowGrad = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + drAz/scaleDr], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + drEl/scaleDr], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color="b")
+        axperf.add_artist(arrowGrad)
+        colorArrow = 'g'
+        if diffAz * drAz + diffEl * drEl < 0:
+            colorArrow = 'r'
+
+        arrowGradDiff = Arrow3D([chAz.r[0]*180./np.pi, chAz.r[0]*180./np.pi + diffAz/scaleDiff], [chEl.r[0]*180./np.pi, chEl.r[0]*180./np.pi + diffEl/scaleDiff], [errorFun.r[0], errorFun.r[0]], mutation_scale=10, lw=1, arrowstyle="-|>", color=colorArrow)
+        axperf.add_artist(arrowGradDiff)
 
     if plotMinimization:
         if azimuths.get((model, chAzGT.r[0], chElGT.r[0])) != None:
@@ -1799,8 +1806,14 @@ if demoMode:
             negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances))/numPixels
             pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=currentGT, variances=variances)
             pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances)
+            modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+            pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=currentGT, foregroundPrior=globalPrior, variances=variances)
 
             post = generative_models.layerPosteriorsRobustCh(currentGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+
+            edgeErrorPixels = generative_models.EdgeFilter(rendererGT=currentGT, renderer=renderer)**2
+            edgeError = ch.sum(edgeErrorPixels)
+
 
             # hogGT, hogImGT, _ = image_processing.diffHog(currentGT, drconv)
             # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
@@ -1809,12 +1822,16 @@ if demoMode:
             # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
             # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
-            robPyr = opendr.filters.gaussian_pyramid(pixelLikelihoodRobustCh, n_levels=3, normalization=None)
+            import opendr.filters
+            robPyr = opendr.filters.gaussian_pyramid(renderer - currentGT, n_levels=3, normalization=None)
             robPyrSum = ch.sum(robPyr)
+
+            # edgeErrorPixels = generative_models.EdgeFilter(rendererGT=currentGT, renderer=renderer)**2
+            # edgeError = ch.sum(edgeErrorPixels)
 
             models = [negLikModel, negLikModelRobust, robPyrSum]
             pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
-            modelsDescr = ["Gaussian Model", "Outlier model", "Pyramid Robust" ]
+            modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust", "Pyr Error" ]
 
 
             pixelErrorFun = pixelModels[model]
