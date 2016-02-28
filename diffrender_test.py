@@ -1202,7 +1202,7 @@ modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
 errorFun = models[model]
 
 
-testPrefix = 'train4_occlusion_shapemodel_10k_background_type7_vcolorFirst2_poseLast10'
+testPrefix = 'train4_occlusion_shapemodel_10k_background_type7_vcolorFirstNoLight5_noPose_all'
 
 testPrefixBase = testPrefix
 
@@ -1210,10 +1210,10 @@ stds[:] = 0.1
 errorFunTest = negLikModelRobust
 
 runExp = True
-shapePenaltyTests = [0.0]
-stdsTests = [0.05]
+shapePenaltyTests = [0, 0,0]
+stdsTests = [0.1, 0.075, 0.05]
 modelTests = len(stdsTests)*[1]
-modelTests = [1]
+modelTests = [1,1,1]
 methodTests = len(stdsTests)*[1]
 
 for testSetting, model in enumerate(modelTests):
@@ -1517,17 +1517,17 @@ for testSetting, model in enumerate(modelTests):
                     #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
                     #
                     #
-                    # stds[:] = stdsTests[testSetting]
 
-                    stds[:] =  0.01
+
+                    stds[:] =  0.02
                     #
-                    free_variables = [chVColors, chLightSHCoeffs]
+                    free_variables = [chVColors]
 
                     shapePenalty = 0.000
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
 
-                    options={'disp':False, 'maxiter':2}
+                    options={'disp':False, 'maxiter':5}
 
                     ch.minimize({'raw': errorFun  }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -1535,11 +1535,11 @@ for testSetting, model in enumerate(modelTests):
 
 
 
-                    stds[:] =  0.05
+                    stds[:] = stdsTests[testSetting]
                     #
                     free_variables = [chShapeParams, chVColors, chLightSHCoeffs]
 
-                    shapePenalty = 0.000
+                    shapePenalty = 0.0
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
 
@@ -1594,10 +1594,10 @@ for testSetting, model in enumerate(modelTests):
                     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it3'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                     #
-                    free_variables = [chAz, chEl]
+                    free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
                     stds[:] = 0.01
                     shapePenalty = 0.0000
-                    options={'disp':False, 'maxiter':10}
+                    options={'disp':False, 'maxiter':30}
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
