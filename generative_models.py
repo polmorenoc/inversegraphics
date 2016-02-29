@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipdb
 import scipy
-from numbapro import autojit
 import chumpy as ch
 from chumpy.ch import MatVecMult, Ch, depends_on
 

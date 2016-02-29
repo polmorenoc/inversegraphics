@@ -674,7 +674,8 @@ for gtIdx in rangeGT:
         rendererGT.makeCurrentContext()
         rendererGT.clear()
         contextdata.cleanupContext(contextdata.getContext())
-        glfw.destroy_window(rendererGT.win)
+        if glMode == 'glfw':
+            glfw.destroy_window(rendererGT.win)
         del rendererGT
 
         currentTeapotModel = teapot_i

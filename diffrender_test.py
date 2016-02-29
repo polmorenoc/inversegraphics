@@ -1361,7 +1361,7 @@ modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
 errorFun = models[model]
 
 
-testPrefix = 'train4_occlusion_shapemodel_10k_background_typeVC-ALL-ALL'
+testPrefix = 'train4_occlusion_shapemodel_10k_background_POSESHAPESH-ALL'
 
 testPrefixBase = testPrefix
 
@@ -1425,6 +1425,8 @@ for testSetting, model in enumerate(modelTests):
 
     if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         for test_i in range(len(testAzsRel)):
+
+            resultDir = 'results/' + testPrefix + '/'
 
             testOcclusions = dataOcclusions
 
@@ -1676,30 +1678,30 @@ for testSetting, model in enumerate(modelTests):
                     #
                     #
 
-                    stds[:] =  0.015
+                    # stds[:] =  0.01
+                    # #
+                    # free_variables = [chVColors]
                     #
-                    free_variables = [chVColors]
-
-                    shapePenalty = 0.000
-                    # free_variables = [chShapeParams ]
-                    minimizingShape = True
-
-                    options={'disp':False, 'maxiter':5}
-
-                    ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-
-                    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-
+                    # shapePenalty = 0.000
+                    # # free_variables = [chShapeParams ]
+                    # minimizingShape = True
+                    #
+                    # options={'disp':False, 'maxiter':10}
+                    #
+                    # ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                    #
+                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    #
 
                     stds[:] = stdsTests[testSetting]
                     #
-                    free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
+                    free_variables = [chShapeParams,chAz, chEl, chLightSHCoeffs]
 
                     shapePenalty = 0.0001
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
 
-                    options={'disp':False, 'maxiter':50}
+                    options={'disp':False, 'maxiter':40}
 
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -2099,8 +2101,8 @@ for testSetting, model in enumerate(modelTests):
 
                 if len(azsPredictions) > 0:
                     stdevs = np.array([])
-                    for test_i, test_id in enumerate(testSet[:numFitted]):
-                        stdevs = np.append(stdevs, np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1]))))
+                    for testStdev_i, test_id in enumerate(testSet[:numFitted]):
+                        stdevs = np.append(stdevs, np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[testStdev_i])**2 + np.mean(cosAzsPredSamples[testStdev_i])**2,1]))))
                 else:
                     stdevs = np.array([])
 
