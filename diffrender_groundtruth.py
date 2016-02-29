@@ -15,7 +15,6 @@ import image_processing
 import numpy as np
 import cv2
 from blender_utils import *
-import glfw
 import generative_models
 import matplotlib.pyplot as plt
 from opendr_utils import *
@@ -50,6 +49,8 @@ width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
+    import glfw
+
     #Initialize base GLFW context for the Demo and to share context among all renderers.
     glfw.init()
     glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
