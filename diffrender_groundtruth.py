@@ -35,6 +35,7 @@ previousGTPrefix = 'train4_occlusion_shapemodel'
 renderFromPreviousGT = True
 useShapeModel = True
 
+useOpenDR = True
 useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = False
@@ -43,7 +44,7 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 glModes = ['glfw','mesa']
-glMode = glModes[0]
+glMode = glModes[1]
 
 width, height = (150, 150)
 win = -1
@@ -824,8 +825,9 @@ for gtIdx in rangeGT:
         chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale
         lin2srgb(blenderRender)
 
-    image = rendererGT.r[:].copy()
-    lin2srgb(image)
+    if useOpenDR:
+        image = rendererGT.r[:].copy()
+        lin2srgb(image)
 
     if useBlender and not ignore and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
         ignore = True
@@ -835,7 +837,7 @@ for gtIdx in rangeGT:
         # illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
         if useBlender:
             cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        else:
+        elif useOpenDR:
             cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
 
