@@ -618,8 +618,9 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, '
 # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
 import opendr.filters
-robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=3, normalization=None)
-robPyrSum = ch.sum(robPyr)
+robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization=None)/numPixels
+robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
+
 
 # edgeErrorPixels = generative_models.EdgeFilter(rendererGT=rendererGT, renderer=renderer)**2
 # edgeError = ch.sum(edgeErrorPixels)
@@ -1823,8 +1824,8 @@ if demoMode:
             # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
             import opendr.filters
-            robPyr = opendr.filters.gaussian_pyramid(renderer - currentGT, n_levels=3, normalization=None)
-            robPyrSum = ch.sum(robPyr)
+            robPyr = opendr.filters.gaussian_pyramid(renderer - currentGT, n_levels=6, normalization=None)/numPixels
+            robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
 
             # edgeErrorPixels = generative_models.EdgeFilter(rendererGT=currentGT, renderer=renderer)**2
             # edgeError = ch.sum(edgeErrorPixels)

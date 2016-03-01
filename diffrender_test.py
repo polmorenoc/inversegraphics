@@ -186,7 +186,6 @@ import opendr.filters
 robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
 robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
 
-
 # models = [negLikModel, negLikModelRobust, hogError]
 models = [negLikModel, negLikModelRobust, robPyrSum]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
@@ -1368,7 +1367,7 @@ modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
 errorFun = models[model]
 
 
-testPrefix = 'train4_occlusion_shapemodel_10k_background_VC-PYRSHAPEPOSE-ALL'
+testPrefix = 'train4_occlusion_shapemodel_10k_background_VCSHONLY'
 
 testPrefixBase = testPrefix
 
@@ -1684,42 +1683,42 @@ for testSetting, model in enumerate(modelTests):
                     #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
                     #
                     #
-
-                    stds[:] =  0.01
                     #
-                    free_variables = [chVColors, chLightSHCoeffs]
-
-                    shapePenalty = 0.000
-                    # free_variables = [chShapeParams ]
-                    minimizingShape = True
-
-                    options={'disp':False, 'maxiter':1}
-
-                    ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-
-                    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    # stds[:] =  0.01
+                    # #
+                    # free_variables = [chVColors, chLightSHCoeffs]
                     #
-
-                    stds[:] = stdsTests[testSetting]
+                    # shapePenalty = 0.000
+                    # # free_variables = [chShapeParams ]
+                    # minimizingShape = True
                     #
-                    free_variables = [chShapeParams,chAz, chEl]
-
-                    shapePenalty = 0.0001
-                    # free_variables = [chShapeParams ]
-                    minimizingShape = True
-
-                    options={'disp':False, 'maxiter':15}
-
-                    ch.minimize({'raw': models[model]  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-
-                    maxShapeSize = 2.5
-                    largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    if np.any(largeShapeParams):
-                        print("Warning: found large shape parameters to fix!")
-                    chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
+                    # options={'disp':False, 'maxiter':1}
                     #
-                    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    # ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
                     #
+                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    # #
+                    #
+                    # stds[:] = stdsTests[testSetting]
+                    # #
+                    # free_variables = [chShapeParams,chAz, chEl]
+                    #
+                    # shapePenalty = 0.0001
+                    # # free_variables = [chShapeParams ]
+                    # minimizingShape = True
+                    #
+                    # options={'disp':False, 'maxiter':15}
+                    #
+                    # ch.minimize({'raw': models[model]  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                    #
+                    # maxShapeSize = 2.5
+                    # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                    # if np.any(largeShapeParams):
+                    #     print("Warning: found large shape parameters to fix!")
+                    # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
+                    # #
+                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    # #
                     # stds[:] = stdsTests[testSetting]
                     # #
                     # free_variables = [chAz, chEl, chShapeParams, chVColors, chLightSHCoeffs]
@@ -1760,10 +1759,10 @@ for testSetting, model in enumerate(modelTests):
                     #
                     # #######
                     #
-                    free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
+                    free_variables = [chVColors, chLightSHCoeffs]
                     stds[:] = 0.01
                     shapePenalty = 0.0000
-                    options={'disp':False, 'maxiter':1}
+                    options={'disp':False, 'maxiter':200}
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
