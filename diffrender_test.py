@@ -178,14 +178,18 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 
-modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+# modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+#
+# pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
-pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+import opendr.filters
+robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
+robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
 
 
 # models = [negLikModel, negLikModelRobust, hogError]
-models = [negLikModel, negLikModelRobust, modelLogLikelihoodRobustRegionCh]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustRegionCh]
+models = [negLikModel, negLikModelRobust, robPyrSum]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
 modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
 
 model = 1
@@ -1350,29 +1354,29 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array(
 # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
 # hogError = ch.SumOfSquares(hogE_raw)
 
-modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+# modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+#
+# pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
-pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
+robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
 
-models = [negLikModel, negLikModelRobust, modelLogLikelihoodRobustRegionCh]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustRegionCh]
+models = [negLikModel, negLikModelRobust, robPyrSum]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
 modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
 
 errorFun = models[model]
 
 
-testPrefix = 'train4_occlusion_shapemodel_10k_background_POSESHAPESH-ALL'
+testPrefix = 'train4_occlusion_shapemodel_10k_background_VC-PYRSHAPEPOSE-ALL'
 
 testPrefixBase = testPrefix
-
-stds[:] = 0.1
-errorFunTest = negLikModelRobust
 
 runExp = True
 shapePenaltyTests = [0]
 stdsTests = [0.03]
 modelTests = len(stdsTests)*[1]
-modelTests = [1]
+modelTests = [2]
 methodTests = len(stdsTests)*[1]
 
 for testSetting, model in enumerate(modelTests):
@@ -1448,12 +1452,15 @@ for testSetting, model in enumerate(modelTests):
             negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
             negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
 
-            modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+            # modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+            #
+            # pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
-            pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+            robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
+            robPyrSum = -ch.sum(ch.log(0.9*ch.exp(-0.5*robPyr**2/0.5) + 0.1))
 
-            models = [negLikModel, negLikModelRobust, modelLogLikelihoodRobustRegionCh]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustRegionCh]
+            models = [negLikModel, negLikModelRobust, robPyrSum]
+            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
             modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
 
             stdsSmall = ch.Ch([0.01])
@@ -1664,7 +1671,7 @@ for testSetting, model in enumerate(modelTests):
                     # method = 6
                     #
                     # stds[:] = 0.05
-                    errorFun = models[model]
+                    errorFun = models[1]
 
                     # if useShapeModel:
                     #     bestRobustSmallStdError = negLikModelRobustSmallStd.r.copy()
@@ -1678,32 +1685,32 @@ for testSetting, model in enumerate(modelTests):
                     #
                     #
 
-                    # stds[:] =  0.01
-                    # #
-                    # free_variables = [chVColors]
+                    stds[:] =  0.01
                     #
-                    # shapePenalty = 0.000
-                    # # free_variables = [chShapeParams ]
-                    # minimizingShape = True
-                    #
-                    # options={'disp':False, 'maxiter':10}
-                    #
-                    # ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                    #
-                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    free_variables = [chVColors, chLightSHCoeffs]
+
+                    shapePenalty = 0.000
+                    # free_variables = [chShapeParams ]
+                    minimizingShape = True
+
+                    options={'disp':False, 'maxiter':1}
+
+                    ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
                     #
 
                     stds[:] = stdsTests[testSetting]
                     #
-                    free_variables = [chShapeParams,chAz, chEl, chLightSHCoeffs]
+                    free_variables = [chShapeParams,chAz, chEl]
 
                     shapePenalty = 0.0001
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
 
-                    options={'disp':False, 'maxiter':40}
+                    options={'disp':False, 'maxiter':15}
 
-                    ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                    ch.minimize({'raw': models[model]  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                     maxShapeSize = 2.5
                     largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
@@ -1711,7 +1718,7 @@ for testSetting, model in enumerate(modelTests):
                         print("Warning: found large shape parameters to fix!")
                     chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
                     #
-                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
                     #
                     # stds[:] = stdsTests[testSetting]
                     # #
@@ -1756,7 +1763,7 @@ for testSetting, model in enumerate(modelTests):
                     free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
                     stds[:] = 0.01
                     shapePenalty = 0.0000
-                    options={'disp':False, 'maxiter':50}
+                    options={'disp':False, 'maxiter':1}
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
