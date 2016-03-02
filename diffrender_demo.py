@@ -865,7 +865,7 @@ def refreshSubplots():
 
     global model
 
-    if model != 3:
+    if model != 2:
 
         diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt1, 0.1)
         diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)

@@ -4,8 +4,122 @@ import skimage
 import skimage.io
 import h5py
 import ipdb
+import scipy.spatial.distance.cdist
+import image_processing
 
 __author__ = 'pol'
+import recognition_models
+
+def euclidean(X,Y):
+    """
+    x: matrix (N,D), each row is an datapoint
+    y: matrix (M,D), each row is an datapoint
+    A MxN matrix of Euclidean distances is returned
+    """
+    return scipy.spatial.distance.cdist(X, Y, 'euclidean').T
+
+def one_nn(x_train, x_test, distance_f=euclidean):
+    """
+    """
+    distances = distance_f(x_train, x_test)
+    nn_indices = np.argmin(distances, 1)
+    return nn_indices
+
+
+def shapeVertexErrors(chShapeParams, chVertices, testShapeParamsGT, shapeParamsPred):
+    oldShapeParams = chShapeParams.r.copy()
+
+    errorsShapeVertices = np.array([])
+    for test_i in range(len(testShapeParamsGT)):
+
+        chShapeParams[:] = testShapeParamsGT[test_i].copy()
+        vertsGT = chVertices.r.copy()
+        chShapeParams[:] = shapeParamsPred[test_i].copy()
+        vertsPred = chVertices.r.copy()
+        errorShapeVertices = np.sqrt(np.sum((vertsPred - vertsGT)**2))
+        errorsShapeVertices = np.append(errorsShapeVertices,errorShapeVertices)
+
+    chShapeParams[:] = oldShapeParams
+    return errorsShapeVertices
+
+def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColors, vColorsGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel=False, chShapeParams=None, chVertices=None):
+
+    errorsPosePredList = []
+    errorsLightCoeffsList = []
+    errorsShapeParamsList = []
+    errorsShapeVerticesList = []
+    errorsEnvMapList = []
+    errorsLightCoeffsCList = []
+    errorsVColorsEList = []
+    errorsVColorsCList = []
+    meanAbsErrAzsList = []
+    meanAbsErrElevsList = []
+    medianAbsErrAzsList = []
+    medianAbsErrElevsList = []
+    meanErrorsLightCoeffsList = []
+    meanErrorsShapeParamsList = []
+    meanErrorsShapeVerticesList = []
+    meanErrorsLightCoeffsCList = []
+    meanErrorsEnvMapList = []
+    meanErrorsVColorsEList = []
+    meanErrorsVColorsCList = []
+
+    for method in range(len(azimuths)):
+
+        azsPred = azimuths[method]
+        elevsPred = elevations[method]
+        vColorsPred = vColors[method]
+        relLightCoefficientsPred = lightCoeffs[method]
+        approxProjectionsPred = approxProjections[method]
+
+        if useShapeModel:
+            shapeParamsPred = shapeParams[method]
+
+        errorsPosePred = recognition_models.evaluatePrediction(testAzsRel[:setTest], testElevsGT[:setTest], azsPred[:setTest], elevsPred[:setTest])
+        errorsPosePredList = errorsPosePredList + [errorsPosePred]
+
+        errorsLightCoeffs = (testLightCoefficientsGTRel[:setTest] - relLightCoefficientsPred[:setTest]) ** 2
+        errorsLightCoeffsList = errorsLightCoeffsList + [errorsLightCoeffs]
+
+        if useShapeModel:
+            errorsShapeParams = (testShapeParamsGT[:setTest] - shapeParamsPred[:setTest]) ** 2
+            errorsShapeParamsList = errorsShapeParamsList + [errorsShapeParams]
+
+            errorsShapeVertices = shapeVertexErrors(chShapeParams, chVertices, testShapeParamsGT[:setTest], shapeParamsPred[:setTest])
+            errorsShapeVerticesList = errorsShapeVerticesList + [errorsShapeVertices]
+
+        envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsPred.reshape([len(approxProjectionsPred), -1])[:setTest], approxProjectionsGT.reshape([len(approxProjectionsPred), -1])[:setTest])
+        errorsEnvMap = approxProjectionsGT[:setTest] -  envMapProjScaling[:,None, None]*approxProjectionsPred[:setTest])**2
+        errorsEnvMapList=  errorsEnvMapList + [errorsEnvMap]
+
+        envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred[:setTest], testLightCoefficientsGTRel[:setTest])
+        errorsLightCoeffsC = (testLightCoefficientsGTRel[:setTest] - envMapScaling[:,None]* relLightCoefficientsPred[:setTest]) ** 2
+        errorsLightCoeffsCList = errorsLightCoeffsCList + [errorsLightCoeffsC]
+
+        errorsVColorsE = image_processing.eColourDifference(testVColorGT[:setTest], vColorsPred[:setTest])
+        errorsVColorsEList = errorsVColorsEList + [errorsVColorsE]
+
+        errorsVColorsC = image_processing.cColourDifference(testVColorGT[:setTest], vColorsPred[:setTest])
+        errorsVColorsCList = errorsVColorsCList + [errorsVColorsC]
+
+        meanAbsErrAzsList = meanAbsErrAzsList + [np.mean(np.abs(errorsPosePred[0]))]
+        meanAbsErrElevsList = meanAbsErrElevsList + [np.mean(np.abs(errorsPosePred[1]))]
+
+        medianAbsErrAzsList = medianAbsErrAzsList + [np.median(np.abs(errorsPosePred[0]))]
+        medianAbsErrElevsList = medianAbsErrElevsList + [np.median(np.abs(errorsPosePred[1]))]
+
+        meanErrorsLightCoeffsList = meanErrorsLightCoeffsList + [np.mean(np.mean(errorsLightCoeffs,axis=1), axis=0)]
+
+        if useShapeModel:
+            meanErrorsShapeParamsList = meanErrorsShapeParamsList + [np.mean(np.mean(errorsShapeParams,axis=1), axis=0)]
+            meanErrorsShapeVerticesList = meanErrorsShapeVerticesList + [np.mean(errorsShapeVertices, axis=0)]
+
+        meanErrorsLightCoeffsCList = meanErrorsLightCoeffsCList + [np.mean(np.mean(errorsLightCoeffsC,axis=1), axis=0)]
+        meanErrorsEnvMapList = meanErrorsEnvMapList + [np.mean(errorsEnvMap)]
+        meanErrorsVColorsEList = meanErrorsVColorsEList + [np.mean(errorsVColorsE, axis=0)]
+        meanErrorsVColorsCList = meanErrorsVColorsCList + [np.mean(errorsVColorsC, axis=0)]
+
+    return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList
 
 from numpy.core.umath_tests import matrix_multiply
 def scaleInvariantMSECoeff(x_pred, x_target):
