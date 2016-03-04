@@ -87,6 +87,9 @@ allDataIds = gtDataFile[gtPrefix]['trainIds']
 #     print("There are bad images!")
 #     plt.imsave('tmp/check/badImage' + str(badImages[id]) + '.png', np.tile(badImage[:,:,None], [1,1,3]))
 #
+
+ipdb.set_trace()
+
 size = len(allDataIds)
 if not os.path.isfile(experimentDir + 'train.npy'):
     np.random.seed(seed)
