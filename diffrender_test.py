@@ -684,7 +684,7 @@ if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.np
         sinAzsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelSinAzs.estimators_])
 
     if 'randForestElevs' in parameterRecognitionModels:
-        with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
+        with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', sp'rb') as pfile:
             randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
         cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
 
