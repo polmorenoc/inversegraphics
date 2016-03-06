@@ -371,6 +371,7 @@ def loadSavedScene(sceneDicFile, tex_srgb2lin):
         haveTextures_list = sceneDic['haveTextures_list']
         vn = sceneDic['vn']
         textures_list = sceneDic['textures_list']
+
         if tex_srgb2lin:
             textures_listflat = [item for sublist in textures_list for item in sublist]
             for texture_list in textures_listflat:

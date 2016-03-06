@@ -529,7 +529,7 @@ if useShapeModel:
     smNormals = [chNormals]
     smFaces = [[faces]]
     smVColors = [chVColors*np.ones(chVertices.shape)]
-    smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
+    smUVs = [ch.Ch(np.zeros([chVertices.shape[0],2]))]
     smHaveTextures = [[False]]
     smTexturesList = [[None]]
 

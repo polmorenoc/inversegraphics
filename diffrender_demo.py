@@ -463,7 +463,7 @@ if useShapeModel:
     smNormalsGT = [chNormalsGT]
     smFacesGT = [[faces]]
     smVColorsGT = [chVColorsGT*np.ones(chVerticesGT.shape)]
-    smUVsGT = ch.Ch(np.zeros([chVerticesGT.shape[0],2]))
+    smUVsGT = [ch.Ch(np.zeros([chVerticesGT.shape[0],2]))]
     smHaveTexturesGT = [[False]]
     smTexturesListGT = [[None]]
 

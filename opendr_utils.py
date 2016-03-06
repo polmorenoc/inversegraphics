@@ -572,6 +572,7 @@ def computeGlobalAndPointLighting(v, vn, vc, light_pos, globalConstant, light_co
 
 def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, haveTextures_list, textures_list, camera, frustum, sharedWin=None):
 
+
     f = []
     f_listflat = [item for sublist in f_list for item in sublist]
     lenMeshes = 0
@@ -613,6 +614,7 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
         texture_stack = texturesch[0].ravel()
     else:
         texture_stack = ch.concatenate([tex.ravel() for tex in texturesch])
+
 
     haveTextures_listflat = [item for sublist in haveTextures_list for item in sublist]
 

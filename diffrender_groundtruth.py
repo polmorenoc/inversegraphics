@@ -28,7 +28,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_fixed'
+prefix = 'train4_occlusion_shapemodel_tmp'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
@@ -36,32 +36,33 @@ renderFromPreviousGT = True
 useShapeModel = True
 
 useOpenDR = True
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
-groundTruthBlender = False
+groundTruthBlender = True
 useCycles = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 glModes = ['glfw','mesa']
-glMode = glModes[1]
+glMode = glModes[0]
 
 width, height = (150, 150)
 win = -1
 
-if glMode == 'glfw':
-    import glfw
+if useOpenDR:
+    if glMode == 'glfw':
+        import glfw
 
-    #Initialize base GLFW context for the Demo and to share context among all renderers.
-    glfw.init()
-    glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
-    glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-    # glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
-    glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-    glfw.window_hint(glfw.DEPTH_BITS,32)
-    glfw.window_hint(glfw.VISIBLE, GL.GL_FALSE)
-    # win = glfw.create_window(width, height, "Demo",  None, None)
-    # glfw.make_context_current(win)
+        #Initialize base GLFW context for the Demo and to share context among all renderers.
+        glfw.init()
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+        # glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
+        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+        glfw.window_hint(glfw.DEPTH_BITS,32)
+        glfw.window_hint(glfw.VISIBLE, GL.GL_FALSE)
+        # win = glfw.create_window(width, height, "Demo",  None, None)
+        # glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
 clip_start = 0.05
@@ -97,7 +98,6 @@ for teapotIdx, teapotName in enumerate(selection):
     teapot.layers[2] = True
     targetModels = targetModels + [teapot]
     blender_teapots = blender_teapots + [teapot]
-
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
@@ -200,13 +200,16 @@ currentTeapotModel = 0
 addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
 center = center_teapots[currentTeapotModel]
-rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
 
-vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
-vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
+if useOpenDR:
+    rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
 
-shapeIm = vis_gt.shape
-numPixels = shapeIm[0] * shapeIm[1]
+    vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
+    vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
+
+    shapeIm = vis_gt.shape
+
+numPixels = height * width
 
 def imageGT():
     global groundTruthBlender
@@ -254,7 +257,7 @@ if useShapeModel:
     smNormalsGT = [chNormalsGT]
     smFacesGT = [[faces]]
     smVColorsGT = [chVColorsGT*np.ones(chVerticesGT.shape)]
-    smUVsGT = ch.Ch(np.zeros([chVerticesGT.shape[0],2]))
+    smUVsGT = [ch.Ch(np.zeros([chVerticesGT.shape[0],2]))]
     smHaveTexturesGT = [[False]]
     smTexturesListGT = [[None]]
 
@@ -392,6 +395,8 @@ renderOcclusions = False
 scenesToRenderOcclusions = []
 scenes = []
 lenScenes = 0
+
+#Compute how many different locations can the teapot be instantiated across all scenes.
 for sceneIdx in scenesToRender:
 
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -618,7 +623,7 @@ for gtIdx in rangeGT:
             scene.render.resolution_y = height
             scene.render.tile_x = height/numTileAxis
             scene.render.tile_y = width
-            scene.cycles.samples = 2000
+            scene.cycles.samples = 3000
             bpy.context.screen.scene = scene
             addEnvironmentMapWorld(scene)
             scene.render.image_settings.file_format = 'OPEN_EXR'
@@ -642,6 +647,7 @@ for gtIdx in rangeGT:
             bpy.context.user_preferences.system.compute_device_type = 'CUDA'
 
             bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
+            bpy.context.user_preferences.system.compute_device = 'CUDA_1'
             bpy.ops.wm.save_userpref()
 
             scene.world.horizon_color = mathutils.Color((1.0,1.0,1.0))
@@ -673,12 +679,14 @@ for gtIdx in rangeGT:
         teapot_i = -1
 
     if sceneIdx != currentScene or targetIndex != currentTargetIndex or teapot_i != currentTeapot:
-        rendererGT.makeCurrentContext()
-        rendererGT.clear()
-        contextdata.cleanupContext(contextdata.getContext())
-        if glMode == 'glfw':
-            glfw.destroy_window(rendererGT.win)
-        del rendererGT
+
+        if useOpenDR:
+            rendererGT.makeCurrentContext()
+            rendererGT.clear()
+            contextdata.cleanupContext(contextdata.getContext())
+            if glMode == 'glfw':
+                glfw.destroy_window(rendererGT.win)
+            del rendererGT
 
         currentTeapotModel = teapot_i
         center = center_teapots[teapot_i]
@@ -688,13 +696,13 @@ for gtIdx in rangeGT:
 
         if useShapeModel:
             center = smCenterGT
-
             addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
 
         else:
             addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
-        rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
+        if useOpenDR:
+            rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
 
         print("Ground truth on new teapot" + str(teapot_i))
 
@@ -703,13 +711,32 @@ for gtIdx in rangeGT:
                 if teapot.name in scene.objects:
                     scene.objects.unlink(teapot)
 
-            teapot = blender_teapots[currentTeapotModel]
+                    if useShapeModel:
+                        deleteInstance(teapot)
 
-            teapotGT = blender_teapots[currentTeapotModel]
+            if not useShapeModel:
+                teapot = blender_teapots[currentTeapotModel]
+            else:
+                teapotMesh = createMeshFromData('teapotShapeModelMesh', chVerticesGT.r.tolist(), faces.astype(np.int32).tolist())
+                teapotMesh.layers[0] = True
+                teapotMesh.layers[1] = True
+                teapotMesh.pass_index = 1
+
+                targetGroup = bpy.data.groups.new('teapotShapeModelGroup')
+                targetGroup.objects.link(teapotMesh)
+                teapot = bpy.data.objects.new('teapotShapeModel', None)
+                teapot.dupli_type = 'GROUP'
+                teapot.dupli_group = targetGroup
+                teapot.pass_index = 1
+
+                mat = makeMaterial('teapotMat', (0,0,0), (0,0,0), 1)
+                setMaterial(teapotMesh, mat)
+
             # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
 
             placeNewTarget(scene, teapot, targetPosition[:].copy())
             teapot.layers[1]=True
+            teapot.layers[0]=True
             original_matrix_world = teapot.matrix_world.copy()
 
     hdridx = groundTruthToRender['trainEnvMaps'][gtIdx]
@@ -731,11 +758,15 @@ for gtIdx in rangeGT:
         ipdb.set_trace()
 
     if useBlender:
-        tm = cv2.createTonemapDrago(gamma=2.2)
-        tmEnvMap = tm.process(envMapTexture)
-        # cv2.imwrite(gtDir + 'sphericalharmonics/envMap' + str(hdridx) + '.jpeg' , 255*tmEnvMap[:,:,[2,1,0]])
+
+        envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,180))
+
+        tmOr = cv2.createTonemapDrago(gamma=2.2)
+        tmEnvMapOr = tmOr.process(envMapTexture)
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapOr' + str(train_i) + '.jpeg' , 255*tmEnvMapOr[:,:,[2,1,0]])
 
         updateEnviornmentMap(envMapFilename, scene)
+
 
         envMapMean = np.mean(envMapTexture,axis=(0,1))[None,None,:]
         envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
@@ -743,18 +774,73 @@ for gtIdx in rangeGT:
         envMapTexture = envMapTexture/envMapGrayMean
         setEnviornmentMapStrength(1./envMapGrayMean, scene)
 
-        # pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
+        pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
 
-        # approxProjection = np.sum(pEnvMap, axis=3)
-        # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjection' + str(hdridx) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
-        # pathFilename = os.path.split(envMapFilename)
+        approxProjection = np.sum(pEnvMap, axis=3)
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
+        pathFilename = os.path.split(envMapFilename)
+
 
         # envMapFilename = hdrFile
         # updateEnviornmentMap(gtDir + 'sphericalharmonics/envMapProjection' + str(hdridx) + '.jpeg', scene)
         # envMapGray = 0.3*approxProjection[:,:,0] + 0.59*approxProjection[:,:,1] + 0.11*approxProjection[:,:,2]
         # envMapGrayMean = np.mean(envMapGray, axis=(0,1))
         # setEnviornmentMapStrength(1./envMapGrayMean, scene)
+                # scene.layers[0] = False
+        # scene.layers[1] = True
 
+        scene.world.cycles_visibility.camera = True
+        scene.camera.data.type ='PANO'
+        scene.camera.data.cycles.panorama_type = 'EQUIRECTANGULAR'
+        scene.render.resolution_x = 360#perhaps set resolution in code
+        scene.render.resolution_y = 180
+        roomInstance = scene.objects[str(roomInstanceNum)]
+        roomInstance.cycles_visibility.camera = False
+        roomInstance.cycles_visibility.shadow = False
+        teapot.cycles_visibility.camera = False
+        teapot.cycles_visibility.shadow = True
+
+        # image = cv2.imread(scene.render.filepath)
+        # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+
+        scene.render.image_settings.file_format = 'OPEN_EXR'
+        scene.render.filepath = gtDir + 'sphericalharmonics/envMap' + str(train_i) + '.exr'
+
+        # bpy.context.user_preferences.system.compute_device_type = 'NONE'
+        # bpy.context.user_preferences.system.compute_device = 'CPU'
+
+        scene.cycles.samples = 500
+        scene.camera.up_axis = 'Z'
+        # placeCamera(scene.camera, 0, 0, 1, )
+
+        scene.camera.location = center[:].copy() + targetPosition[:].copy()
+        look_at(scene.camera, center[:].copy() + targetPosition[:].copy() + mathutils.Vector((1,0,0)))
+
+        scene.update()
+        bpy.ops.render.render( write_still=True )
+
+
+        imageEnvMap = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
+        # tm = cv2.createTonemapDrago(gamma=2.2)
+        # tmEnvMap = tm.process(imageEnvMap)
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMap' + str(train_i) + '.jpeg' , 255*imageEnvMap[:,:,[2,1,0]])
+
+        envMapCoeffs = light_probes.getEnvironmentMapCoefficients(imageEnvMap, 1, 0, 'equirectangular')
+        pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
+        approxProjection = np.sum(pEnvMap, axis=3)
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjection' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
+
+        scene.cycles.samples = 3000
+        scene.render.filepath = 'opendr_blender.exr'
+        roomInstance.cycles_visibility.camera = True
+        scene.render.image_settings.file_format = 'OPEN_EXR'
+        scene.render.resolution_x = width#perhaps set resolution in code
+        scene.render.resolution_y = height
+        scene.camera.data.type ='PERSP'
+        scene.world.cycles_visibility.camera = False
+        scene.camera.data.cycles.panorama_type = 'FISHEYE_EQUISOLID'
+        teapot.cycles_visibility.camera = True
+        teapot.cycles_visibility.shadow = True
         # updateEnviornmentMap(envMapFilename, scene)
 
     print("Render " + str(gtIdx) + "of " + str(len(groundTruthToRender)))
@@ -787,29 +873,37 @@ for gtIdx in rangeGT:
     # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
     # approxProjection = np.sum(pEnvMap, axis=3)
     # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
-    occlusion = getOcclusionFraction(rendererGT)
 
-    vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
-    vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+    if useOpenDR:
+        occlusion = getOcclusionFraction(rendererGT)
 
-    if occlusion > 0.9:
-        ignore = True
+        vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
+        vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+
+        if occlusion > 0.9:
+            ignore = True
 
     if useBlender and not ignore:
 
         rotateEnviornmentMap(-totalOffset.r.copy(), scene)
+        #Now we must do that!!
 
         azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
 
         teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
         placeCamera(scene.camera, -chAzGT.r[:].copy()*180/np.pi, chElGT.r[:].copy()*180/np.pi, chDistGT.r[0].copy(), center[:].copy() + targetPosition[:].copy())
 
+
         setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
+
+        if useShapeModel:
+            mesh = teapot.dupli_group.objects[0]
+            for vertex_i, vertex in enumerate(mesh.data.vertices):
+                vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
+        # ipdb.set_trace()
 
         scene.update()
 
-        # scene.layers[0] = False
-        # scene.layers[1] = True
         bpy.ops.render.render( write_still=True )
 
         # image = cv2.imread(scene.render.filepath)
@@ -829,7 +923,7 @@ for gtIdx in rangeGT:
         image = rendererGT.r[:].copy()
         lin2srgb(image)
 
-    if useBlender and not ignore and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
+    if useBlender and not ignore and useOpenDR and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
         ignore = True
 
     if not ignore:
@@ -837,12 +931,13 @@ for gtIdx in rangeGT:
         # illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
         if useBlender:
             cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        elif useOpenDR:
+        if useOpenDR:
             cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
 
         # cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        np.save(gtDir + 'masks_occlusion/mask' + str(train_i)+ '.npy', vis_occluded)
+        if useOpenDR:
+            np.save(gtDir + 'masks_occlusion/mask' + str(train_i)+ '.npy', vis_occluded)
 
         # cv2.imwrite(gtDir + 'masks/)
 

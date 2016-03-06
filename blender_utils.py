@@ -22,6 +22,17 @@ from collision import instancesIntersect
 
 inchToMeter = 0.0254
 
+def createMeshFromData(name, verts, faces):
+    # Create mesh and object
+    me = bpy.data.meshes.new(name+'Mesh')
+    ob = bpy.data.objects.new(name, me)
+
+    # Create mesh from given verts, faces.
+    me.from_pydata(verts, [], faces)
+    # Update mesh with new data
+    me.update()
+    return ob
+
 def addLamp(scene, lightAz, lightEl, lightDist, center, lightIntensity):
         #Add directional light to match spherical harmonics
     lamp_data = bpy.data.lamps.new(name="point", type='POINT')
@@ -158,6 +169,17 @@ def look_at(obj_camera, point):
     direction = vecPoint - loc_camera
     # point the cameras '-Z' and use its 'Y' as up
     rot_quat = direction.to_track_quat('-Z', 'Y')
+
+    # assume we're using euler rotation
+    obj_camera.rotation_euler = rot_quat.to_euler()
+
+
+def look_atZ(obj_camera, point):
+    loc_camera = obj_camera.location
+    vecPoint = mathutils.Vector((point[0],point[1],point[2]))
+    direction = vecPoint - loc_camera
+    # point the cameras '-Z' and use its 'Y' as up
+    rot_quat = direction.to_track_quat('Y', 'Z')
 
     # assume we're using euler rotation
     obj_camera.rotation_euler = rot_quat.to_euler()
@@ -375,11 +397,11 @@ def placeNewTarget(scene, target, targetPosition):
     target.layers[2] = True
     scene.objects.link(target)
     target.matrix_world = mathutils.Matrix.Translation(targetPosition)
-    center = centerOfGeometry(target.dupli_group.objects, target.matrix_world)
-    original_matrix_world = target.matrix_world.copy()
-    camera = scene.camera
-    scene.update()
-    look_at(camera, center)
+    # center = centerOfGeometry(target.dupli_group.objects, target.matrix_world)
+    # original_matrix_world = target.matrix_world.copy()
+    # camera = scene.camera
+    # scene.update()
+    # look_at(camera, center)
     scene.update()
 
 def placeCamera(camera, azimuth, elevation, camDistance, center):
@@ -415,6 +437,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
             bpy.context.scene.cycles.device = 'GPU'
             bpy.context.user_preferences.system.compute_device_type = 'CUDA'
             bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
+
 
         scene.use_nodes = True
 

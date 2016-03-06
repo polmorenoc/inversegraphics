@@ -28,8 +28,6 @@ FAILSAFE_OFFSET = 0.00001
 
 import cv2
 
-
-
 def processSphericalEnvironmentMap(envMapTexture):
     mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
     mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
@@ -137,8 +135,6 @@ def get_coeff_prop(ob):
     data = json.loads(coeffs)
     return data
     
-
-
 def setup_material(ob):
 
     scene = bpy.context.scene
@@ -180,8 +176,6 @@ def setup_material(ob):
     
     ob.data.materials.append(mat)
         
-
-
 @contextmanager
 def no_interfere_ctx():
     old_selected_objects = bpy.context.selected_objects
@@ -207,7 +201,6 @@ def override_ctx(**kwargs):
     ctx.update(kwargs)
     return ctx
 
-
 def create_lightmap_image(ob, width, height):
     name = ob.name
     bpy.ops.image.new(override_ctx(object=ob), name=name, width=width,
@@ -216,7 +209,6 @@ def create_lightmap_image(ob, width, height):
 
 def get_lightmap(ob):
     return bpy.data.images[ob.name]
-
 
 def add_lightprobe():
     with no_interfere_ctx():
@@ -260,14 +252,11 @@ def bake(ob):
         cycles.samples = old_samples
 
 
-
 def get_lightprobe_coefficients(probe, theta_res, phi_res):
     probe.data.calc_tessface()
     bake(probe)
     lightmap = get_lightmap(probe)
     return get_all_coefficients(probe, lightmap, theta_res, phi_res)
-
-
 
 
 def sample_image(channels, width, height, pixel_data, loc):
@@ -280,8 +269,6 @@ def sample_image(channels, width, height, pixel_data, loc):
     b = pixel_data[pix_loc + 2]
      
     return mathutils.Color((r, g, b))
-    
-    
 
 def bilinear_interpolate(image, uv):
     """ performs bilinear interpolation of a blender image using texture-space
