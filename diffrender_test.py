@@ -425,19 +425,19 @@ trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
 trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
 trainIds = groundTruthTrain['trainIds']
 
-#
+
 ipdb.set_trace()
-latexify(columns=2)
+
 resultDir = 'tmp/'
 directory = resultDir + 'trainHistogram'
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.hist(trainOcclusions*100, bins=30)
+ax.hist(trainOcclusions, bins=30)
 ax.set_xlabel('Occlusion level')
 ax.set_ylabel('Counts')
 x1, x2 = ax.get_xlim()
 y1, y2 = ax.get_ylim()
-ax.set_xlim((x1, x2))
+ax.set_xlim((100, 0))
 ax.set_ylim((y1, y2))
 ax.set_title('Occlusion histogram')
 fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
@@ -529,7 +529,7 @@ if useShapeModel:
     smNormals = [chNormals]
     smFaces = [[faces]]
     smVColors = [chVColors*np.ones(chVertices.shape)]
-    smUVs = [ch.Ch(np.zeros([chVertices.shape[0],2]))]
+    smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
     smHaveTextures = [[False]]
     smTexturesList = [[None]]
 
@@ -684,7 +684,7 @@ if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.np
         sinAzsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelSinAzs.estimators_])
 
     if 'randForestElevs' in parameterRecognitionModels:
-        with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', sp'rb') as pfile:
+        with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
             randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
         cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
 

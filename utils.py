@@ -56,11 +56,264 @@ def latexify(fig_width=None, fig_height=None, columns=1):
 
     matplotlib.rcParams.update(params)
 
-def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr):
+def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC):
 
     latexify(columns=2)
 
-    directory = resultDir + 'predictionMeanError-Azimuth'
+    directory = resultDir + 'pred-azimuth-errors_fitted-azimuth-error'
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(abs(errorsPosePred[0]), abs(errorsPoseFitted[0]), s=20, vmin=0, vmax=100,
+                      c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted elevation errors')
+    ax.set_ylabel('Fitted elevation errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted azimuth errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
+    directory = resultDir + 'pred-elevation-errors_fitted-elevation-error'
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(abs(errorsPosePred[1]), abs(errorsPoseFitted[1]), s=20, vmin=0, vmax=100,
+                      c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted elevation errors')
+    ax.set_ylabel('Fitted elevation errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted azimuth errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'shcoeffsserrorsC_fitted-shcoeffsserrorsC'
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(np.mean(errorsLightCoeffsC, axis=1), np.mean(errorsFittedLightCoeffsC, axis=1), s=20,
+                      vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted SH coefficients errors')
+    ax.set_ylabel('Fitted SH coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted SH coefficients errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'shcoeffsserrorsC_fitted-shEnvMap'
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(np.mean(errorsEnvMap, axis=(1, 2)), np.mean(errorsFittedEnvMap, axis=(1, 2)), s=20,
+                      vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted SH coefficients errors')
+    ax.set_ylabel('Fitted SH coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted SH Environment map errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'shcoeffsserrors_fitted-shcoeffsserrors'
+    # Show scatter correlations with occlusions.
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(np.mean(errorsLightCoeffs, axis=1), np.mean(errorsFittedLightCoeffs, axis=1), s=20,
+                      vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted SH coefficients errors')
+    ax.set_ylabel('Fitted SH coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted SH coefficients errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    if useShapeModel:
+        directory = resultDir + 'shapeparamserrors_fitted-shapeparamserrors'
+        # Show scatter correlations with occlusions.
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+        scat = ax.scatter(np.mean(errorsShapeParams, axis=1), np.mean(errorsFittedShapeParams, axis=1), s=20,
+                          vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+        cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+        cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+        ax.set_xlabel('Predicted shape parameters errors')
+        ax.set_ylabel('Fitted shape parameters errors')
+        x1, x2 = ax.get_xlim()
+        y1, y2 = ax.get_ylim()
+        ax.set_xlim((0, max(x2,y2)))
+        ax.set_ylim((0, max(x2,y2)))
+        ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+        ax.set_title('Reconition vs fitted Shape parameters errors')
+        fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+        plt.close(fig)
+
+        directory = resultDir + 'shapeverticeserrors_fitted-shapeverticesserrors'
+        # Show scatter correlations with occlusions.
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+        scat = ax.scatter(errorsShapeVertices, errorsFittedShapeVertices, s=20, vmin=0, vmax=100,
+                          c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+        cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+        cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+        ax.set_xlabel('Predicted shape vertices errors')
+        ax.set_ylabel('Fitted shape vertices errors')
+        x1, x2 = ax.get_xlim()
+        y1, y2 = ax.get_ylim()
+        ax.set_xlim((0, max(x2,y2)))
+        ax.set_ylim((0, max(x2,y2)))
+        ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+        ax.set_title('Reconition vs fitted Shape parameters errors')
+        fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+        plt.close(fig)
+
+    directory = resultDir + 'vColorsE_fitted-vColorsE'
+
+    # Show scatter correlations with occlusions.
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(errorsVColorsE, errorsFittedVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted VColor E coefficients errors')
+    ax.set_ylabel('Fitted VColor E coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted vertex color errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'vColorsC_fitted-vColorsC'
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(errorsVColorsC, errorsFittedVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted VColor C coefficients errors')
+    ax.set_ylabel('Fitted VColor C coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Reconition vs fitted vertex color errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
+def saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMethodsIndices, meanLikelihoodArr):
+
+    latexify(columns=2)
+    directory = resultDir + 'predictionLikelihood-FitLikelihood'
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(occlusions, meanLikelihoodArr[0], c='b', label='Ground-truth NLL')
+    ax.plot(occlusions, meanLikelihoodArr[1], c='r', label='Robust Fit NLL')
+    legend = ax.legend()
+    ax.set_xlabel('Occlusion (\%)')
+    ax.set_ylabel('Angular error')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    # ax.set_xlim((min(x1), 100))
+    # ax.set_ylim((-0.0, y2))
+    ax.set_title('Cumulative prediction per occlusion level')
+    fig.savefig(directory + '-plot.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'predictionLikelihoodGaussian-FitLikelihoodGaussian'
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(occlusions, meanLikelihoodArr[2], c='b', label='Groundtruth NLL')
+    ax.plot(occlusions, meanLikelihoodArr[3], c='r', label='Robust Fit NLL')
+    legend = ax.legend()
+    ax.set_xlabel('Occlusion (\%)')
+    ax.set_ylabel('Angular error')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    # ax.set_xlim((min(x1), 100))
+    # ax.set_ylim((-0.0, y2))
+    ax.set_title('Cumulative prediction per occlusion level')
+    fig.savefig(directory + '-plot.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likelihoods):
+    # Show scatter correlations with occlusions.
+
+    directory = resultDirOcclusion + 'robustLikelihood_fitted-robustLikelihood'
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(likelihoods[0][testSet], likelihoods[1][testSet], s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Ground-truth avg likelihood')
+    ax.set_ylabel('Fitted Ground-truth avg likelihood')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((min(x1,y1), max(x2,y2)))
+    ax.set_ylim((min(x1,y1), max(x2,y2)))
+    ax.plot([min(x1,y1), max(x2,y2)], [min(x1,y1), max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted Robust likelihood')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
+    directory = resultDirOcclusion + 'gaussianLikelihood_fitted-gaussianLikelihood'
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(likelihoods[2][testSet], likelihoods[3][testSet], s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Ground-truth avg likelihood')
+    ax.set_ylabel('Fitted Ground-truth avg likelihood')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition  vs fitted Gaussian likelihood')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
+def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr):
+
+    latexify(columns=2)
+
+    directory = resultDir + prefix + 'predictionMeanError-Azimuth'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -76,7 +329,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDir + 'predictionMeanError-Elev'
+    directory = resultDir + prefix +'predictionMeanError-Elev'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -92,7 +345,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDir + 'predictionMeanError-VColors-C'
+    directory = resultDir + prefix +'predictionMeanError-VColors-C'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -108,7 +361,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDir + 'predictionMeanError-VColors-E'
+    directory = resultDir + prefix +'predictionMeanError-VColors-E'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -124,7 +377,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDir + 'predictionMeanError-SH'
+    directory = resultDir + prefix +'predictionMeanError-SH'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -141,7 +394,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     plt.close(fig)
 
     if useShapeModel:
-        directory = resultDir + 'predictionMeanError-ShapeParams'
+        directory = resultDir + prefix +'predictionMeanError-ShapeParams'
         fig = plt.figure()
         ax = fig.add_subplot(111)
         for method_i in plotMethodsIndices:
@@ -158,7 +411,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
         plt.close(fig)
 
-        directory = resultDir + 'predictionMeanError-ShapeVertices'
+        directory = resultDir + prefix +'predictionMeanError-ShapeVertices'
         fig = plt.figure()
         ax = fig.add_subplot(111)
         for method_i in plotMethodsIndices:
@@ -175,7 +428,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
         plt.close(fig)
 
-    directory = resultDir + 'predictionMeanError-SH-C'
+    directory = resultDir + prefix +'predictionMeanError-SH-C'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -191,7 +444,7 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDir + 'predictionMeanError-SH-EnvMap'
+    directory = resultDir + prefix +'predictionMeanError-SH-EnvMap'
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
@@ -206,6 +459,8 @@ def saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, plotMetho
     ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
+
+
 
 from numpy.core.umath_tests import matrix_multiply
 def scaleInvariantMSECoeff(x_pred, x_target):

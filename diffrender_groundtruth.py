@@ -28,15 +28,15 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_tmp'
+prefix = 'train4_shapemodel'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
-
+renderOcclusions = False
 useOpenDR = True
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -322,7 +322,7 @@ replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 
-trainSize = 10000
+trainSize = 45000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -389,8 +389,6 @@ train_i = nextId
 if train_i == 0:
     np.random.seed(1)
 unlinkedObj = None
-
-renderOcclusions = False
 
 scenesToRenderOcclusions = []
 scenes = []
@@ -880,7 +878,7 @@ for gtIdx in rangeGT:
         vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
         vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
 
-        if occlusion > 0.9:
+        if occlusion > 0.001:
             ignore = True
 
     if useBlender and not ignore:
