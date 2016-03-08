@@ -67,17 +67,16 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
                       c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-    ax.set_xlabel('Predicted elevation errors')
-    ax.set_ylabel('Fitted elevation errors')
+    ax.set_xlabel('Predicted azimuth errors')
+    ax.set_ylabel('Fitted azimuth errors')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted azimuth errors')
+    ax.set_title('Recognition vs fitted azimuth errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
-
 
     directory = resultDir + 'pred-elevation-errors_fitted-elevation-error'
     fig = plt.figure()
@@ -93,7 +92,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted azimuth errors')
+    ax.set_title('Recognition vs fitted azimuth errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -112,7 +111,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted SH coefficients errors')
+    ax.set_title('Recognition vs fitted SH coefficients errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -131,7 +130,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted SH Environment map errors')
+    ax.set_title('Recognition vs fitted SH Environment map errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -150,7 +149,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted SH coefficients errors')
+    ax.set_title('Recognition vs fitted SH coefficients errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -170,7 +169,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
         ax.set_xlim((0, max(x2,y2)))
         ax.set_ylim((0, max(x2,y2)))
         ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-        ax.set_title('Reconition vs fitted Shape parameters errors')
+        ax.set_title('Recognition vs fitted Shape parameters errors')
         fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
         plt.close(fig)
 
@@ -189,7 +188,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
         ax.set_xlim((0, max(x2,y2)))
         ax.set_ylim((0, max(x2,y2)))
         ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-        ax.set_title('Reconition vs fitted Shape parameters errors')
+        ax.set_title('Recognition vs fitted Shape parameters errors')
         fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
         plt.close(fig)
 
@@ -209,7 +208,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted vertex color errors')
+    ax.set_title('Recognition vs fitted vertex color errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -228,7 +227,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Reconition vs fitted vertex color errors')
+    ax.set_title('Recognition vs fitted vertex color errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -243,7 +242,7 @@ def saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMeth
     ax.plot(occlusions, meanLikelihoodArr[1], c='r', label='Robust Fit NLL')
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Angular error')
+    ax.set_ylabel('Mean Likelihood')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     # ax.set_xlim((min(x1), 100))
@@ -259,7 +258,7 @@ def saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMeth
     ax.plot(occlusions, meanLikelihoodArr[3], c='r', label='Robust Fit NLL')
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Angular error')
+    ax.set_ylabel('Mean likelihood')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     # ax.set_xlim((min(x1), 100))
@@ -279,16 +278,15 @@ def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likeliho
     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
     ax.set_xlabel('Ground-truth avg likelihood')
-    ax.set_ylabel('Fitted Ground-truth avg likelihood')
+    ax.set_ylabel('Recognition+Fit avg likelihood')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((min(x1,y1), max(x2,y2)))
     ax.set_ylim((min(x1,y1), max(x2,y2)))
     ax.plot([min(x1,y1), max(x2,y2)], [min(x1,y1), max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Recognition vs fitted Robust likelihood')
+    ax.set_title('GT vs Recognition+Robust Fit likelihood')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
-
 
     directory = resultDirOcclusion + 'gaussianLikelihood_fitted-gaussianLikelihood'
     fig = plt.figure()
@@ -298,16 +296,15 @@ def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likeliho
     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
     ax.set_xlabel('Ground-truth avg likelihood')
-    ax.set_ylabel('Fitted Ground-truth avg likelihood')
+    ax.set_ylabel('Fitted avg likelihood')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, max(x2,y2)))
     ax.set_ylim((0, max(x2,y2)))
     ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Recognition  vs fitted Gaussian likelihood')
+    ax.set_title('GT vs Recognition+Gaussian Fit likelihood')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
-
 
 def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr):
 
@@ -460,8 +457,6 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
-
-
 from numpy.core.umath_tests import matrix_multiply
 def scaleInvariantMSECoeff(x_pred, x_target):
     #Rows: test samples
@@ -469,7 +464,6 @@ def scaleInvariantMSECoeff(x_pred, x_target):
     scales = (matrix_multiply(x_pred[:,None,:],x_target[:,:,None])/matrix_multiply(x_pred[:,None,:],x_pred[:,:,None])).ravel()
 
     return scales
-
 
 def euclidean(X,Y):
     """
@@ -503,7 +497,7 @@ def shapeVertexErrors(chShapeParams, chVertices, testShapeParamsGT, shapeParamsP
     chShapeParams[:] = oldShapeParams
     return errorsShapeVertices
 
-def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel=False, chShapeParams=None, chVertices=None):
+def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, posteriors, masksGT):
 
     errorsPosePredList = []
     errorsLightCoeffsList = []
@@ -513,6 +507,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
     errorsLightCoeffsCList = []
     errorsVColorsEList = []
     errorsVColorsCList = []
+    errorsSegmentation = []
 
     for method in range(len(azimuths)):
 
@@ -521,6 +516,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
         vColorsPred = vColors[method]
         relLightCoefficientsPred = lightCoeffs[method]
         approxProjectionsPred = approxProjections[method]
+        posteriorsPred = posteriors[method]
 
         if useShapeModel:
             shapeParamsPred = shapeParams[method]
@@ -553,10 +549,15 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
         errorsVColorsC = image_processing.cColourDifference(testVColorGT[setTest], vColorsPred[setTest])
         errorsVColorsCList = errorsVColorsCList + [errorsVColorsC]
 
-    return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList
 
+        masksCat = np.concatenate([masksGT[:,None], posteriorsPred[:,None]], axis=3)
+        errorSegmentation = np.all(masksCat, axis=3) / np.any(masksCat, axis=3)
 
-def computeErrorMeans(testSet, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList):
+        errorsSegmentation = errorsSegmentation + [errorSegmentation]
+
+    return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation
+
+def computeErrorMeans(testSet, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation):
     meanAbsErrAzsList = []
     meanAbsErrElevsList = []
     medianAbsErrAzsList = []
@@ -568,6 +569,7 @@ def computeErrorMeans(testSet, useShapeModel, errorsPosePredList, errorsLightCoe
     meanErrorsEnvMapList = []
     meanErrorsVColorsEList = []
     meanErrorsVColorsCList = []
+    meanErrorsSegmentation = []
 
     for method_i in range(len(errorsPosePredList)):
         meanAbsErrAzsList = meanAbsErrAzsList + [np.mean(np.abs(errorsPosePredList[method_i][0][testSet]))]
@@ -587,7 +589,10 @@ def computeErrorMeans(testSet, useShapeModel, errorsPosePredList, errorsLightCoe
         meanErrorsVColorsEList = meanErrorsVColorsEList + [np.mean(errorsVColorsEList[method_i][testSet], axis=0)]
         meanErrorsVColorsCList = meanErrorsVColorsCList + [np.mean(errorsVColorsCList[method_i][testSet], axis=0)]
 
-    return meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList
+        meanErrorsSegmentation = meanErrorsSegmentation + [np.mean(errorsSegmentation[method_i][testSet], axis=0)]
+
+
+    return meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentation
 
 
 def writeImagesHdf5(imagesDir, writeDir, imageSet, writeGray=False ):

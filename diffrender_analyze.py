@@ -116,7 +116,6 @@ currentTeapotModel = 0
 
 center = center_teapots[currentTeapotModel]
 
-
 if useShapeModel:
     import shape_model
     #%% Load data
@@ -479,64 +478,67 @@ errorsLightCoeffsCList = experimentDic['errorsLightCoeffsCList']
 errorsVColorsEList = experimentDic['errorsVColorsEList']
 errorsVColorsCList = experimentDic['errorsVColorsCList']
 likelihoods = experimentDic['likelihoods']
-
-meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList \
-= computeErrorMeans(np.arange(len(rangeTests)), useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList)
-
+# posteriors = experimentDic['posteriors']
+# errorsSegmentation = experimentDic['errorsSegmentation']
 
 ## Get likelihood function values:
+posteriors = []
+errorsSegmentation = []
+#
+#
+for test_i in range(len(testAzsRel)):
 
-# likelihoods = [np.array([]), np.array([]), np.array([]),np.array([])]
+    testId = dataIds[test_i]
+    print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
+    image = skimage.transform.resize(images[test_i], [height,width])
+    imageSrgb = image.copy()
+    rendererGT[:] = srgb2lin(image)
+
+    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+    models = [negLikModel, negLikModelRobust]
+
+    errorFun = models[1]
+
+    stds[:] = 0.01
+
+    modelsDescr = ["Gaussian Model", "Outlier model"]
+
+    color = testVColorGT[test_i]
+    az = testAzsRel[test_i]
+    el = testElevsGT[test_i]
+    lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+
+
+    chAz[:] = az
+    chEl[:] = el
+    chVColors[:] = color
+    chLightSHCoeffs[:] = lightCoefficientsRel
+    if useShapeModel:
+        chShapeParams[:] = testShapeParamsGT[test_i]
+
+
+    chAz[:] = azimuths[4][test_i]
+    chEl[:] = elevations[4][test_i]
+    chVColors[:] = vColors[4][test_i]
+    chLightSHCoeffs[:] = lightCoeffs[4][test_i]
+    if useShapeModel:
+        chShapeParams[:] = shapeParams[4][test_i]
+
+
+
+errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation \
+        = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, posteriors, masksGT)
+
+
+meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentation \
+    = computeErrorMeans(np.arange(len(rangeTests)), useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation)
+
+
+experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'approxProjections':approxProjections, 'shapeParams':shapeParams, 'approxProjectionsGT':approxProjectionsGT, 'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList}
 #
-#
-# for test_i in range(len(testAzsRel)):
-#
-#     testId = dataIds[test_i]
-#     print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
-#     image = skimage.transform.resize(images[test_i], [height,width])
-#     imageSrgb = image.copy()
-#     rendererGT[:] = srgb2lin(image)
-#
-#     negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-#     negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-#     models = [negLikModel, negLikModelRobust]
-#
-#     errorFun = models[1]
-#
-#     stds[:] = 0.01
-#
-#     modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
-#
-#     color = testVColorGT[test_i]
-#     az = testAzsRel[test_i]
-#     el = testElevsGT[test_i]
-#     lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
-#
-#
-#     chAz[:] = az
-#     chEl[:] = el
-#     chVColors[:] = color
-#     chLightSHCoeffs[:] = lightCoefficientsRel
-#     if useShapeModel:
-#         chShapeParams[:] = testShapeParamsGT[test_i]
-#
-#     likelihoods[0] = np.append(likelihoods[0], negLikModelRobust.r)
-#     likelihoods[2] = np.append(likelihoods[2], negLikModel.r)
-#
-#     chAz[:] = azimuths[4][test_i]
-#     chEl[:] = elevations[4][test_i]
-#     chVColors[:] = vColors[4][test_i]
-#     chLightSHCoeffs[:] = lightCoeffs[4][test_i]
-#     if useShapeModel:
-#         chShapeParams[:] = shapeParams[4][test_i]
-#
-#     likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
-#     likelihoods[3] = np.append(likelihoods[3], negLikModel.r)
-#
-# experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'approxProjections':approxProjections, 'shapeParams':shapeParams, 'approxProjectionsGT':approxProjectionsGT, 'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList}
-# #
-# with open(resultDir + 'experiment.pickle', 'wb') as pfile:
-#     pickle.dump(experimentDic, pfile)
+with open(resultDir + 'experiment.pickle', 'wb') as pfile:
+    pickle.dump(experimentDic, pfile)
 
 #Set lists of methods.
 
@@ -547,11 +549,11 @@ if 'Nearest Neighbours' in set(methodsPred):
 plotColors = ['k']
 if nearestNeighbours:
     # methodsPred = methodsPred + ["Nearest Neighbours"]
-    plotColors = plotColors + ['g']
+    plotColors = plotColors + ['m']
 
 plotColors = plotColors + ['b']
 
-plotColors = plotColors + ['y']
+plotColors = plotColors + ['g']
 
 plotColors = plotColors + ['r']
 
@@ -560,137 +562,136 @@ recognitionIdx = 2
 robustIdx = 4
 
 #
-# print("Printing occlusin-likelihood plots!")
-# meanLikelihoodArr = [np.array([]), np.array([]), np.array([]), np.array([])]
-# occlusions = []
-# for occlusionLevel in range(100):
-#
-#     setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
-#
-#     if np.any(setUnderOcclusionLevel):
-#         occlusions = occlusions + [occlusionLevel]
-#         testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-#
-#         meanLikelihoodArr[0] = np.append(meanLikelihoodArr[0], np.mean(likelihoods[0][setUnderOcclusionLevel]))
-#         meanLikelihoodArr[1] = np.append(meanLikelihoodArr[1], np.mean(likelihoods[1][setUnderOcclusionLevel]))
-#
-#         meanLikelihoodArr[2] = np.append(meanLikelihoodArr[2], np.mean(likelihoods[2][setUnderOcclusionLevel]))
-#         meanLikelihoodArr[3] = np.append(meanLikelihoodArr[3], np.mean(likelihoods[3][setUnderOcclusionLevel]))
-#
-# saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMethodsIndices, meanLikelihoodArr)
+print("Printing occlusin-likelihood plots!")
+meanLikelihoodArr = [np.array([]), np.array([]), np.array([]), np.array([])]
+occlusions = []
+for occlusionLevel in range(100):
+
+    setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
+
+    if np.any(setUnderOcclusionLevel):
+        occlusions = occlusions + [occlusionLevel]
+        testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
+
+        meanLikelihoodArr[0] = np.append(meanLikelihoodArr[0], np.mean(likelihoods[0][setUnderOcclusionLevel]))
+        meanLikelihoodArr[1] = np.append(meanLikelihoodArr[1], np.mean(likelihoods[1][setUnderOcclusionLevel]))
+
+        meanLikelihoodArr[2] = np.append(meanLikelihoodArr[2], np.mean(likelihoods[2][setUnderOcclusionLevel]))
+        meanLikelihoodArr[3] = np.append(meanLikelihoodArr[3], np.mean(likelihoods[3][setUnderOcclusionLevel]))
+
+saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMethodsIndices, meanLikelihoodArr)
 #
 # print("Computing means!")
 #
-#
-# meanAbsErrAzsArr = []
-# meanAbsErrElevsArr = []
-# meanErrorsLightCoeffsArr = []
-# meanErrorsEnvMapArr = []
-# meanErrorsShapeParamsArr = []
-# meanErrorsShapeVerticesArr = []
-# meanErrorsLightCoeffsCArr = []
-# meanErrorsVColorsEArr = []
-# meanErrorsVColorsCArr = []
-#
-# for method_i in range(len(methodsPred)):
-#     meanAbsErrAzsArr = meanAbsErrAzsArr + [np.array([])]
-#     meanAbsErrElevsArr = meanAbsErrElevsArr + [np.array([])]
-#     meanErrorsLightCoeffsArr = meanErrorsLightCoeffsArr + [np.array([])]
-#     meanErrorsShapeParamsArr = meanErrorsShapeParamsArr + [np.array([])]
-#     meanErrorsShapeVerticesArr = meanErrorsShapeVerticesArr + [np.array([])]
-#     meanErrorsLightCoeffsCArr = meanErrorsLightCoeffsCArr + [np.array([])]
-#     meanErrorsVColorsEArr = meanErrorsVColorsEArr + [np.array([])]
-#     meanErrorsVColorsCArr = meanErrorsVColorsCArr + [np.array([])]
-#     meanErrorsEnvMapArr = meanErrorsEnvMapArr + [np.array([])]
-# occlusions = []
-#
-# print("Printing occlusin-error plots!")
-#
-# for occlusionLevel in range(100):
-#
-#     setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
-#
-#     if np.any(setUnderOcclusionLevel):
-#         occlusions = occlusions + [occlusionLevel]
-#         testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-#
-#         colors = matplotlib.cm.plasma(testOcclusions)
-#
-#         for method_i in range(len(methodsPred)):
-#
-#             meanAbsErrAzsArr[method_i] = np.append(meanAbsErrAzsArr[method_i], np.mean(np.abs(errorsPosePredList[method_i][0][setUnderOcclusionLevel])))
-#             meanAbsErrElevsArr[method_i] = np.append(meanAbsErrElevsArr[method_i], np.mean(np.abs(errorsPosePredList[method_i][1][setUnderOcclusionLevel])))
-#
-#             meanErrorsLightCoeffsArr[method_i] = np.append(meanErrorsLightCoeffsArr[method_i],np.mean(np.mean(errorsLightCoeffsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-#             meanErrorsLightCoeffsCArr[method_i] = np.append(meanErrorsLightCoeffsCArr[method_i],np.mean(np.mean(errorsLightCoeffsCList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-#
-#             if useShapeModel:
-#                 meanErrorsShapeParamsArr[method_i] = np.append(meanErrorsShapeParamsArr[method_i],np.mean(np.mean(errorsShapeParamsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-#                 meanErrorsShapeVerticesArr[method_i] = np.append(meanErrorsShapeVerticesArr[method_i], np.mean(errorsShapeVerticesList[method_i][setUnderOcclusionLevel], axis=0))
-#
-#             meanErrorsEnvMapArr[method_i] = np.append(meanErrorsEnvMapArr[method_i], np.mean(errorsEnvMapList[method_i][setUnderOcclusionLevel]))
-#             meanErrorsVColorsEArr[method_i] = np.append(meanErrorsVColorsEArr[method_i], np.mean(errorsVColorsEList[method_i][setUnderOcclusionLevel], axis=0))
-#             meanErrorsVColorsCArr[method_i] = np.append(meanErrorsVColorsCArr[method_i], np.mean(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
-#
-# print("Printing occlusin-error plots - median!")
-# saveOcclusionPlots(resultDir, 'mean',occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr)
-#
-# medianAbsErrAzsArr = []
-# medianAbsErrElevsArr = []
-# medianErrorsLightCoeffsArr = []
-# medianErrorsEnvMapArr = []
-# medianErrorsShapeParamsArr = []
-# medianErrorsShapeVerticesArr = []
-# medianErrorsLightCoeffsCArr = []
-# medianErrorsVColorsEArr = []
-# medianErrorsVColorsCArr = []
-#
-# for method_i in range(len(methodsPred)):
-#     medianAbsErrAzsArr = medianAbsErrAzsArr + [np.array([])]
-#     medianAbsErrElevsArr = medianAbsErrElevsArr + [np.array([])]
-#     medianErrorsLightCoeffsArr = medianErrorsLightCoeffsArr + [np.array([])]
-#     medianErrorsShapeParamsArr = medianErrorsShapeParamsArr + [np.array([])]
-#     medianErrorsShapeVerticesArr = medianErrorsShapeVerticesArr + [np.array([])]
-#     medianErrorsLightCoeffsCArr = medianErrorsLightCoeffsCArr + [np.array([])]
-#     medianErrorsVColorsEArr = medianErrorsVColorsEArr + [np.array([])]
-#     medianErrorsVColorsCArr = medianErrorsVColorsCArr + [np.array([])]
-#     medianErrorsEnvMapArr = medianErrorsEnvMapArr + [np.array([])]
-#
-# occlusions = []
-#
-# print("Printing occlusin-error plots!")
-#
-# for occlusionLevel in range(100):
-#
-#     setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
-#
-#     if np.any(setUnderOcclusionLevel):
-#         occlusions = occlusions + [occlusionLevel]
-#         testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-#
-#         colors = matplotlib.cm.plasma(testOcclusions)
-#
-#         for method_i in range(len(methodsPred)):
-#
-#             medianAbsErrAzsArr[method_i] = np.append(medianAbsErrAzsArr[method_i], np.median(np.abs(errorsPosePredList[method_i][0][setUnderOcclusionLevel])))
-#             medianAbsErrElevsArr[method_i] = np.append(medianAbsErrElevsArr[method_i], np.median(np.abs(errorsPosePredList[method_i][1][setUnderOcclusionLevel])))
-#
-#             medianErrorsLightCoeffsArr[method_i] = np.append(medianErrorsLightCoeffsArr[method_i],np.median(np.median(errorsLightCoeffsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-#             medianErrorsLightCoeffsCArr[method_i] = np.append(medianErrorsLightCoeffsCArr[method_i],np.median(np.median(errorsLightCoeffsCList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-#
-#             if useShapeModel:
-#                 medianErrorsShapeParamsArr[method_i] = np.append(medianErrorsShapeParamsArr[method_i],np.median(np.median(errorsShapeParamsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-#                 medianErrorsShapeVerticesArr[method_i] = np.append(medianErrorsShapeVerticesArr[method_i], np.median(errorsShapeVerticesList[method_i][setUnderOcclusionLevel], axis=0))
-#
-#             medianErrorsEnvMapArr[method_i] = np.append(medianErrorsEnvMapArr[method_i], np.median(errorsEnvMapList[method_i][setUnderOcclusionLevel]))
-#             medianErrorsVColorsEArr[method_i] = np.append(medianErrorsVColorsEArr[method_i], np.median(errorsVColorsEList[method_i][setUnderOcclusionLevel], axis=0))
-#             medianErrorsVColorsCArr[method_i] = np.append(medianErrorsVColorsCArr[method_i], np.median(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
-#
-# saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plotMethodsIndices, useShapeModel, medianAbsErrAzsArr, medianAbsErrElevsArr, medianErrorsVColorsCArr, medianErrorsVColorsEArr, medianErrorsLightCoeffsArr, medianErrorsShapeParamsArr, medianErrorsShapeVerticesArr, medianErrorsLightCoeffsCArr, medianErrorsEnvMapArr)
+meanAbsErrAzsArr = []
+meanAbsErrElevsArr = []
+meanErrorsLightCoeffsArr = []
+meanErrorsEnvMapArr = []
+meanErrorsShapeParamsArr = []
+meanErrorsShapeVerticesArr = []
+meanErrorsLightCoeffsCArr = []
+meanErrorsVColorsEArr = []
+meanErrorsVColorsCArr = []
+
+for method_i in range(len(methodsPred)):
+    meanAbsErrAzsArr = meanAbsErrAzsArr + [np.array([])]
+    meanAbsErrElevsArr = meanAbsErrElevsArr + [np.array([])]
+    meanErrorsLightCoeffsArr = meanErrorsLightCoeffsArr + [np.array([])]
+    meanErrorsShapeParamsArr = meanErrorsShapeParamsArr + [np.array([])]
+    meanErrorsShapeVerticesArr = meanErrorsShapeVerticesArr + [np.array([])]
+    meanErrorsLightCoeffsCArr = meanErrorsLightCoeffsCArr + [np.array([])]
+    meanErrorsVColorsEArr = meanErrorsVColorsEArr + [np.array([])]
+    meanErrorsVColorsCArr = meanErrorsVColorsCArr + [np.array([])]
+    meanErrorsEnvMapArr = meanErrorsEnvMapArr + [np.array([])]
+occlusions = []
+
+print("Printing occlusin-error plots!")
+
+for occlusionLevel in range(100):
+
+    setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
+
+    if np.any(setUnderOcclusionLevel):
+        occlusions = occlusions + [occlusionLevel]
+        testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
+
+        colors = matplotlib.cm.plasma(testOcclusions)
+
+        for method_i in range(len(methodsPred)):
+
+            meanAbsErrAzsArr[method_i] = np.append(meanAbsErrAzsArr[method_i], np.mean(np.abs(errorsPosePredList[method_i][0][setUnderOcclusionLevel])))
+            meanAbsErrElevsArr[method_i] = np.append(meanAbsErrElevsArr[method_i], np.mean(np.abs(errorsPosePredList[method_i][1][setUnderOcclusionLevel])))
+
+            meanErrorsLightCoeffsArr[method_i] = np.append(meanErrorsLightCoeffsArr[method_i],np.mean(np.mean(errorsLightCoeffsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
+            meanErrorsLightCoeffsCArr[method_i] = np.append(meanErrorsLightCoeffsCArr[method_i],np.mean(np.mean(errorsLightCoeffsCList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
+
+            if useShapeModel:
+                meanErrorsShapeParamsArr[method_i] = np.append(meanErrorsShapeParamsArr[method_i],np.mean(np.mean(errorsShapeParamsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
+                meanErrorsShapeVerticesArr[method_i] = np.append(meanErrorsShapeVerticesArr[method_i], np.mean(errorsShapeVerticesList[method_i][setUnderOcclusionLevel], axis=0))
+
+            meanErrorsEnvMapArr[method_i] = np.append(meanErrorsEnvMapArr[method_i], np.mean(errorsEnvMapList[method_i][setUnderOcclusionLevel]))
+            meanErrorsVColorsEArr[method_i] = np.append(meanErrorsVColorsEArr[method_i], np.mean(errorsVColorsEList[method_i][setUnderOcclusionLevel], axis=0))
+            meanErrorsVColorsCArr[method_i] = np.append(meanErrorsVColorsCArr[method_i], np.mean(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
+
+print("Printing occlusin-error plots - median!")
+saveOcclusionPlots(resultDir, 'mean',occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr)
+
+medianAbsErrAzsArr = []
+medianAbsErrElevsArr = []
+medianErrorsLightCoeffsArr = []
+medianErrorsEnvMapArr = []
+medianErrorsShapeParamsArr = []
+medianErrorsShapeVerticesArr = []
+medianErrorsLightCoeffsCArr = []
+medianErrorsVColorsEArr = []
+medianErrorsVColorsCArr = []
+
+for method_i in range(len(methodsPred)):
+    medianAbsErrAzsArr = medianAbsErrAzsArr + [np.array([])]
+    medianAbsErrElevsArr = medianAbsErrElevsArr + [np.array([])]
+    medianErrorsLightCoeffsArr = medianErrorsLightCoeffsArr + [np.array([])]
+    medianErrorsShapeParamsArr = medianErrorsShapeParamsArr + [np.array([])]
+    medianErrorsShapeVerticesArr = medianErrorsShapeVerticesArr + [np.array([])]
+    medianErrorsLightCoeffsCArr = medianErrorsLightCoeffsCArr + [np.array([])]
+    medianErrorsVColorsEArr = medianErrorsVColorsEArr + [np.array([])]
+    medianErrorsVColorsCArr = medianErrorsVColorsCArr + [np.array([])]
+    medianErrorsEnvMapArr = medianErrorsEnvMapArr + [np.array([])]
+
+occlusions = []
+
+print("Printing occlusin-error plots!")
+
+for occlusionLevel in range(100):
+
+    setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
+
+    if np.any(setUnderOcclusionLevel):
+        occlusions = occlusions + [occlusionLevel]
+        testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
+
+        colors = matplotlib.cm.plasma(testOcclusions)
+
+        for method_i in range(len(methodsPred)):
+
+            medianAbsErrAzsArr[method_i] = np.append(medianAbsErrAzsArr[method_i], np.median(np.abs(errorsPosePredList[method_i][0][setUnderOcclusionLevel])))
+            medianAbsErrElevsArr[method_i] = np.append(medianAbsErrElevsArr[method_i], np.median(np.abs(errorsPosePredList[method_i][1][setUnderOcclusionLevel])))
+
+            medianErrorsLightCoeffsArr[method_i] = np.append(medianErrorsLightCoeffsArr[method_i],np.median(np.median(errorsLightCoeffsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
+            medianErrorsLightCoeffsCArr[method_i] = np.append(medianErrorsLightCoeffsCArr[method_i],np.median(np.median(errorsLightCoeffsCList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
+
+            if useShapeModel:
+                medianErrorsShapeParamsArr[method_i] = np.append(medianErrorsShapeParamsArr[method_i],np.median(np.median(errorsShapeParamsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
+                medianErrorsShapeVerticesArr[method_i] = np.append(medianErrorsShapeVerticesArr[method_i], np.median(errorsShapeVerticesList[method_i][setUnderOcclusionLevel], axis=0))
+
+            medianErrorsEnvMapArr[method_i] = np.append(medianErrorsEnvMapArr[method_i], np.median(errorsEnvMapList[method_i][setUnderOcclusionLevel]))
+            medianErrorsVColorsEArr[method_i] = np.append(medianErrorsVColorsEArr[method_i], np.median(errorsVColorsEList[method_i][setUnderOcclusionLevel], axis=0))
+            medianErrorsVColorsCArr[method_i] = np.append(medianErrorsVColorsCArr[method_i], np.median(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
+
+saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plotMethodsIndices, useShapeModel, medianAbsErrAzsArr, medianAbsErrElevsArr, medianErrorsVColorsCArr, medianErrorsVColorsEArr, medianErrorsLightCoeffsArr, medianErrorsShapeParamsArr, medianErrorsShapeVerticesArr, medianErrorsLightCoeffsCArr, medianErrorsEnvMapArr)
 
 SHModel = ""
 
-for occlusionLevel in [25, 100]:
+for occlusionLevel in [100]:
 
     resultDirOcclusion = 'results/' + testPrefix + '/occlusion' + str(occlusionLevel) + '/'
     if not os.path.exists(resultDirOcclusion):

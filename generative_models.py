@@ -223,6 +223,7 @@ class LogRobustModelRegion(Ch):
 
         return ch.log(pixelLikelihoodRobustRegionCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
+
 class LogGaussianModel(Ch):
     dterms = ['renderer', 'groundtruth', 'variances']
 

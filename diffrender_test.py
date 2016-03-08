@@ -381,18 +381,6 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 ##Read Training set labels
 
 trainSet = np.load(experimentDir + 'train.npy')
-# testSet = np.load(experimentDir + 'test.npy')[:numTests][[4,8, 13, 39,44,49,75]]
-# testSet = np.load(experimentDir + 'test.npy')[:numTests][[49]]
-# testSet = np.load(experimentDir + 'test.npy')[:numTests][[75]]
-# testSet = np.load(experimentDir + 'test.npy')[:numTests][[4,49]]
-# testSet = np.load(experimentDir + 'test.npy')[:numTests]
-# testSet = np.load(experimentDir + 'test.npy')[[ 3,  5, 14, 21, 35, 36, 54, 56, 59, 60, 68, 70, 72, 79, 83, 85, 89,94]]
-# [13:14]
-
-#Bad samples for data set train5 out normal.
-# testSet = np.array([162371, 410278, 132297, 350815, 104618, 330181,  85295,  95047,
-#        410233, 393785, 228626, 452094, 117242,  69433,  35352,  31030,
-#        268444, 147111, 117287, 268145, 478618, 334784])
 
 shapeGT = gtDataFile[gtPrefix].shape
 boolTrainSet = np.zeros(shapeGT).astype(np.bool)
@@ -403,7 +391,6 @@ groundTruthTrain[boolTrainSet] = trainGroundTruth
 groundTruthTrain = groundTruthTrain[trainSet]
 dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
 train = np.arange(len(trainSet))
-
 
 testSet = testSet[test]
 
@@ -425,24 +412,6 @@ trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
 trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
 trainIds = groundTruthTrain['trainIds']
 
-
-ipdb.set_trace()
-
-resultDir = 'tmp/'
-directory = resultDir + 'trainHistogram'
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.hist(trainOcclusions, bins=30)
-ax.set_xlabel('Occlusion level')
-ax.set_ylabel('Counts')
-x1, x2 = ax.get_xlim()
-y1, y2 = ax.get_ylim()
-ax.set_xlim((100, 0))
-ax.set_ylim((y1, y2))
-ax.set_title('Occlusion histogram')
-fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
-plt.close(fig)
-
 if useShapeModel:
     trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
 
@@ -450,21 +419,6 @@ trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensit
 
 trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
-
-# loadHogFeatures = True
-# loadZernikeFeatures = False
-#
-# if loadHogFeatures:
-#     hogfeatures = np.load(featuresDir  +  'hog' + synthPrefix + '.npy')
-#
-# if loadZernikeFeatures:
-#     numCoeffs=100
-#     win=40
-#     zernikefeatures = np.load(featuresDir  + 'zernike_numCoeffs' + str(numCoeffs) + '_win' + str(win) + synthPrefix + '.npy')
-#
-# testHogfeatures = hogfeatures[testSet]
-# testZernikefeatures = zernikefeatures[testSet]
-# testIllumfeatures = illumfeatures[testSet]
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
@@ -478,9 +432,7 @@ model = 1
 maxiter = 100
 numSamples = 1
 
-# free_variables = [ chAz, chEl]
 free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
-# free_variables = [ chAz, chEl]
 
 mintime = time.time()
 boundEl = (-np.pi, np.pi)
@@ -497,9 +449,7 @@ shCoeffsVar = 0.01
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chLightSHCoeffs.r.shape)])
 options = {'disp':False, 'maxiter':maxiter, 'df_vars':df_vars}
 
-# options={'disp':False, 'maxiter':maxiter}
-# testRenderer = np.int(dataTeapotIds[testSet][0])
-# testRenderer = np.int(dataTeapotIds[0])
+
 testRenderer = 0
 
 # testRenderer = 2
@@ -565,42 +515,37 @@ nearGTOffsetVColor = np.zeros(3)
 #Load trained recognition models
 nnBatchSize = 100
 
-# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-#
-# hogE_raw = hogGT - hogRenderer
-# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-# hogError = ch.SumOfSquares(hogE_raw)
-
 azsPredictions = np.array([])
 
 recomputeMeans = False
+includeMeanBaseline = True
 
 recomputePredictions = False
 
-meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
-meanTrainElevation = np.repeat(np.mean(trainElevsGT, axis=0), numTests,  axis=0)
-meanTrainAzimuthRel = np.repeat(0, numTests, axis=0)
-meanTrainShapeParams = np.repeat(np.zeros([latentDim])[None,:], numTests, axis=0)
-meanTrainVColors = np.repeat(np.mean(trainVColorGT, axis=0)[None,:], numTests, axis=0)
-chShapeParams[:] = np.zeros([10])
-meanTrainShapeVertices = np.repeat(chVertices.r.copy()[None,:], numTests, axis=0)
+if includeMeanBaseline:
+    meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
+    meanTrainElevation = np.repeat(np.mean(trainElevsGT, axis=0), numTests,  axis=0)
+    meanTrainAzimuthRel = np.repeat(0, numTests, axis=0)
+    meanTrainShapeParams = np.repeat(np.zeros([latentDim])[None,:], numTests, axis=0)
+    meanTrainVColors = np.repeat(np.mean(trainVColorGT, axis=0)[None,:], numTests, axis=0)
+    chShapeParams[:] = np.zeros([10])
+    meanTrainShapeVertices = np.repeat(chVertices.r.copy()[None,:], numTests, axis=0)
 
-if recomputeMeans or not os.path.isfile(experimentDir + "meanTrainEnvMapProjections.npy"):
-    envMapTexture = np.zeros([180,360,3])
-    approxProjectionsPredList = []
-    for train_i in range(len(trainSet)):
-        pEnvMap = SHProjection(envMapTexture, np.concatenate([trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None]], axis=1))
-        approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
+    if recomputeMeans or not os.path.isfile(experimentDir + "meanTrainEnvMapProjections.npy"):
+        envMapTexture = np.zeros([180,360,3])
+        approxProjectionsPredList = []
+        for train_i in range(len(trainSet)):
+            pEnvMap = SHProjection(envMapTexture, np.concatenate([trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None]], axis=1))
+            approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
 
-        approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
-    approxProjections = np.vstack(approxProjectionsPredList)
-    meanTrainEnvMapProjections = np.mean(approxProjections, axis=0)
-    np.save(experimentDir + 'meanTrainEnvMapProjections.npy', meanTrainEnvMapProjections)
-else:
-    meanTrainEnvMapProjections = np.load(experimentDir + 'meanTrainEnvMapProjections.npy')
+            approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
+        approxProjections = np.vstack(approxProjectionsPredList)
+        meanTrainEnvMapProjections = np.mean(approxProjections, axis=0)
+        np.save(experimentDir + 'meanTrainEnvMapProjections.npy', meanTrainEnvMapProjections)
+    else:
+        meanTrainEnvMapProjections = np.load(experimentDir + 'meanTrainEnvMapProjections.npy')
 
-meanTrainEnvMapProjections = np.repeat(meanTrainEnvMapProjections[None,:], numTests, axis=0)
+    meanTrainEnvMapProjections = np.repeat(meanTrainEnvMapProjections[None,:], numTests, axis=0)
 
 if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.npy"):
     if 'neuralNetPose' in parameterRecognitionModels:
@@ -672,71 +617,9 @@ if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.np
         #
         # azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
 
-    if 'randForestAzs' in parameterRecognitionModels:
-        with open(trainModelsDirPose + 'randForestModelCosAzs.pickle', 'rb') as pfile:
-            randForestModelCosAzs = pickle.load(pfile)['randForestModelCosAzs']
-        cosAzsPred = recognition_models.testRandomForest(randForestModelCosAzs, testHogfeatures)
-        cosAzsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelCosAzs.estimators_])
-
-        with open(trainModelsDirPose + 'randForestModelSinAzs.pickle', 'rb') as pfile:
-            randForestModelSinAzs = pickle.load(pfile)['randForestModelSinAzs']
-        sinAzsPred = recognition_models.testRandomForest(randForestModelSinAzs, testHogfeatures)
-        sinAzsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelSinAzs.estimators_])
-
-    if 'randForestElevs' in parameterRecognitionModels:
-        with open(trainModelsDirPose + 'randForestModelCosElevs.pickle', 'rb') as pfile:
-            randForestModelCosElevs = pickle.load(pfile)['randForestModelCosElevs']
-        cosElevsPred = recognition_models.testRandomForest(randForestModelCosElevs, testHogfeatures)
-
-        cosElevsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelCosElevs.estimators_])
-
-        with open(trainModelsDirPose + 'randForestModelSinElevs.pickle', 'rb') as pfile:
-            randForestModelSinElevs = pickle.load(pfile)['randForestModelSinElevs']
-        sinElevsPred = recognition_models.testRandomForest(randForestModelSinElevs, testHogfeatures)
-        sinElevsPredictions = np.vstack([estimator.predict(testHogfeatures) for estimator in randForestModelSinElevs.estimators_])
 else:
     elevsPred = np.load(trainModelsDirPose + 'elevsPred.npy')[rangeTests]
     azsPred = np.load(trainModelsDirPose + 'azsPred.npy')[rangeTests]
-
-#
-# if 'neuralNetApperanceAndLight' in parameterRecognitionModels:
-#     nnModel = ""
-#     with open(trainModelsDirAppLight + 'neuralNetModelAppLight.pickle', 'rb') as pfile:
-#         neuralNetModelAppLight = pickle.load(pfile)
-#
-#     meanImage = neuralNetModelAppLight['mean']
-#     modelType = neuralNetModelAppLight['type']
-#     param_values = neuralNetModelAppLight['params']
-#
-#     testImages = images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
-#
-#     network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-#     appLightPredictionFun = lasagne_nn.get_prediction_fun(network)
-#
-#     appLightPredictions = np.zeros([len(testImages), 12])
-#     for start_idx in range(0, len(testImages),nnBatchSize):
-#         appLightPredictions[start_idx:start_idx + nnBatchSize] = appLightPredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-#
-#     # appLightPredictions = appLightPredictionFun(testImages.astype(np.float32))
-#     relLightCoefficientsPred = appLightPredictions[:, :9]
-#     vColorsPred = appLightPredictions[:,9:]
-#
-#     #Samples:
-#     vColorsPredSamples = []
-#     appLightPredictionNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-#
-#     for i in range(100):
-#         appLightPredictionsSample = np.zeros([len(testImages), 12])
-#         for start_idx in range(0, len(testImages), nnBatchSize):
-#             appLightPredictionsSample[start_idx:start_idx + nnBatchSize] = appLightPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-#
-#         # appLightPredictions = appLightPredictionFun(testImages.astype(np.float32))
-#         # relLightCoefficientsGTPred = appLightPredictions[:,:9]
-#         # vColorsPred =
-#
-#         vColorsPredSamples = vColorsPredSamples + [appLightPredictionsSample[:,9:][:,:,None]]
-#
-#     vColorsPredSamples = np.concatenate(vColorsPredSamples, axis=2)
 
 
 if recomputePredictions or not os.path.isfile(trainModelsDirVColor + "vColorsPred.npy"):
@@ -874,33 +757,8 @@ if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLi
         np.save(trainModelsDirLightCoeffs + 'relLightCoefficientsPred.npy', relLightCoefficientsPred)
 
 
-    #     if 'randomForestSHZernike' in parameterRecognitionModels:
-    #
-    #     SHModel = 'randomForestSHZernike'
-    #     with open(trainModelsDirLightCoeffs  + 'randomForestModelZernike' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'rb') as pfile:
-    #         randForestModelLightCoeffs = pickle.load(pfile)
-    #
-    #     relLightCoefficientsPred = recognition_models.testRandomForest(randForestModelLightCoeffs, testZernikefeatures)
-    #
-    # if 'meanSHLight' in parameterRecognitionModels:
-    #     SHModel = 'meanSHLight'
-    #     relLightCoefficientsPred = np.tile(np.array([7.85612876e-01, -8.33688916e-03, 2.42002031e-01,
-    #                                                  6.63450677e-03, -7.45523901e-04, 2.82965294e-03,
-    #                                                  3.09943249e-01, -1.15105810e-03, -3.26439948e-03])[None, :], [testLightCoefficientsGTRel.shape[0],1])
-    #
-    # if 'constantSHLight' in parameterRecognitionModels:
-    #     SHModel = 'Constant'
-    #     relLightCoefficientsPred = np.tile(np.array([0.75, 0, 0.15, 0, 0, 0, 0, 0, 0])[None, :], [testLightCoefficientsGTRel.shape[0], 1])
-    #
-    # if 'linRegModelSHZernike' in parameterRecognitionModels:
-    #     with open(trainModelsDirLightCoeffs  + 'linRegModelZernike' + str(numCoeffs) + '_win' + str(win) + '.pickle', 'rb') as pfile:
-    #         linearRegressionModelLightCoeffs = pickle.load(pfile)
-    #
-    #     relLightCoefficientsPred = recognition_models.testLinearRegression(linearRegressionModelLightCoeffs, testZernikefeatures)
-
 else:
     relLightCoefficientsPred = np.load(trainModelsDirLightCoeffs + 'relLightCoefficientsPred.npy')[rangeTests]
-
 
 if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "shapeParamsPred.npy"):
     if 'neuralNetModelShape' in parameterRecognitionModels and useShapeModel:
@@ -987,6 +845,11 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "neura
         #     masksGT = loadMasks(masksDir, testSet)
 else:
     maskPredictions = np.load(trainModelsDirShapeParams + 'maskPredictions.npy')[rangeTests]
+
+
+loadMask = True
+if loadMask:
+    masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
 print("Finished loading and compiling recognition models")
 
@@ -1295,12 +1158,12 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array(
 #
 # pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
-robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
-robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
+# robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
+# robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
 
-models = [negLikModel, negLikModelRobust, robPyrSum]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
-modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+modelsDescr = ["Gaussian Model", "Outlier model" ]
 
 errorFun = models[model]
 
@@ -1316,23 +1179,28 @@ modelTests = len(stdsTests)*[1]
 modelTests = [0]
 methodTests = len(stdsTests)*[1]
 
-nearestNeighbours = True
+nearestNeighbours = False
 
 if nearestNeighbours:
     trainImages = readImages(imagesDir, trainIds, loadFromHdf5)
     trainImagesR = trainImages.reshape([len(trainImages), -1])
 
-methodsPred = ["Mean Baseline"]
-plotColors = ['k']
+if includeMeanBaseline:
+    methodsPred = ["Mean Baseline"]
+    plotColors = ['k']
+
 if nearestNeighbours:
     methodsPred = methodsPred + ["Nearest Neighbours"]
     plotColors = plotColors + ['g']
 
 methodsPred = methodsPred + ["Recognition"]
+
 plotColors = plotColors + ['b']
+
 if optimizationTypeDescr[optimizationType] != 'predict':
     methodsPred = methodsPred + ["Fit"]
     plotColors = plotColors + ['r']
+
 
 for testSetting, model in enumerate(modelTests):
     model = modelTests[testSetting]
@@ -1359,6 +1227,16 @@ for testSetting, model in enumerate(modelTests):
     if not os.path.exists(resultDir + 'hue_samples/'):
         os.makedirs(resultDir + 'hue_samples/')
 
+
+    azimuths = []
+    elevations = []
+    vColors = []
+    lightCoeffs = []
+    approxProjections = []
+    likelihoods = []
+    shapeParams = []
+    posteriors = []
+
     startTime = time.time()
     samplingMode = False
 
@@ -1368,24 +1246,35 @@ for testSetting, model in enumerate(modelTests):
     approxProjectionsFittedList = []
     approxProjectionsGTList = []
     approxProjectionsPredList = []
-    approxProjectionsNearestNeighbourList = []
 
     fittedAzs = np.array([])
     fittedElevs = np.array([])
     fittedRelLightCoeffs = []
     fittedShapeParamsList = []
     fittedVColors = []
+    fittedPosteriorsList = []
 
-    azimuthNearestNeighboursList = []
-    elevationNearestNeighboursList = []
-    vColorNearestNeighboursList = []
-    shapeParamsNearestNeighboursList = []
-    lightCoeffsNearestNeighboursList = []
+    if nearestNeighbours:
+        azimuthNearestNeighboursList = []
+        elevationNearestNeighboursList = []
+        vColorNearestNeighboursList = []
+        shapeParamsNearestNeighboursList = []
+        lightCoeffsNearestNeighboursList = []
+        nearestNeighboursErrorFuns = np.array([])
+        approxProjectionsNearestNeighbourList = []
+
+        nearestNeighboursPosteriorsList = []
 
     errorsShapeVerticesSoFar = np.array([])
-    errorsFittedShapeVertices = np.array([])
 
     predictedErrorFuns = np.array([])
+    predictedPosteriorsList = []
+
+    if includeMeanBaseline:
+        meanBaselineErrorFuns = np.array([])
+        meanBaselinePosteriorList = []
+
+    errorsFittedShapeVertices = np.array([])
     fittedErrorFuns = np.array([])
     fittedShapeParams = np.array([])
 
@@ -1404,13 +1293,20 @@ for testSetting, model in enumerate(modelTests):
             if useShapeModel:
                 bestShapeParams = chShapeParams.r
 
-
             testId = dataIds[test_i]
             print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
             image = skimage.transform.resize(images[test_i], [height,width])
             imageSrgb = image.copy()
             rendererGT[:] = srgb2lin(image)
+
+            negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
+            negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+
+            models = [negLikModel, negLikModelRobust]
+
+            stds[:] = stdsTests
+
             if nearestNeighbours:
                 onenn_i = one_nn(trainImagesR, imageSrgb.ravel())
                 nearesTrainImage = trainImages[onenn_i]
@@ -1428,45 +1324,46 @@ for testSetting, model in enumerate(modelTests):
                 shapeParamsNearestNeighboursList = shapeParamsNearestNeighboursList + [shapeParamsNearestNeighbour]
                 lightCoeffsNearestNeighboursList = lightCoeffsNearestNeighboursList + [lightCoeffsNearestNeighbour]
 
-            negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
-            negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+                chAz[:] = azimuthNearestNeighbour
+                chEl[:] = elevationNearestNeighbour
+                chVColors[:] = vColorNearestNeighbour
+                chLightSHCoeffs[:] = lightCoeffsNearestNeighbour
+                if useShapeModel:
+                    chShapeParams[:] = shapeParamsNearestNeighbour
 
-            # modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-            #
-            # pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+                nearestNeighboursErrorFuns = np.append(nearestNeighboursErrorFuns, errorFun.r)
 
-            robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
-            robPyrSum = -ch.sum(ch.log(0.9*ch.exp(-0.5*robPyr**2/0.5) + 0.1))
+                nearestNeighboursPosteriorsList = nearestNeighboursPosteriorsList + [np.array(renderer.indices_image==1).copy().astype(np.bool)]
 
-            models = [negLikModel, negLikModelRobust, robPyrSum]
-            pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
-            modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust" ]
+
+            if includeMeanBaseline:
+                chAz[:] = meanTrainAzimuthRel[test_i]
+                chEl[:] = meanTrainElevation[test_i]
+                chVColors[:] = meanTrainVColors[test_i]
+                chLightSHCoeffs[:] = meanTrainLightCoefficientsGTRel[test_i]
+                if useShapeModel:
+                    chShapeParams[:] = meanTrainShapeParams[test_i]
+
+                meanBaselinePosteriorList = meanBaselinePosteriorList + [np.array(renderer.indices_image==1).copy().astype(np.bool)[None,:]]
+                meanBaselineErrorFuns = np.append(meanBaselineErrorFuns, errorFun.r)
 
             stdsSmall = ch.Ch([0.01])
             variancesSmall = stdsSmall ** 2
             negLikModelRobustSmallStd = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variancesSmall))/numPixels
 
-            # models = [negLikModel, negLikModelRobust]
-
-            # hogGT, hogImGT, _ = image_processing.diffHog(rendererGT, drconv)
-            # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-            #
-            # hogE_raw = hogGT - hogRenderer
-            # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-            # hogError = ch.SumOfSquares(hogE_raw)
-
             if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/'):
                 os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/')
 
             if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/SH/'):
-                        os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/SH/')
+                os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/SH/')
 
             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth' + '.png', cv2.cvtColor(np.uint8(lin2srgb(rendererGT.r.copy())*255), cv2.COLOR_RGB2BGR))
 
             for sample in range(testSamples):
-                from numpy.random import choice
+
                 if recognitionType == 0:
                     #Prediction from (near) ground truth.
+
                     color = testVColorGT[test_i] + nearGTOffsetVColor
                     az = testAzsRel[test_i] + nearGTOffsetRelAz
                     el = testElevsGT[test_i] + nearGTOffsetEl
@@ -1475,21 +1372,12 @@ for testSetting, model in enumerate(modelTests):
                     if useShapeModel:
                         shapeParams = testShapeParamsGT[test_i]
                 elif recognitionType == 1 or recognitionType == 2:
-                    #Point (mean) estimate:
+
+                    #Recognition estimate:
                     az = azsPred[test_i]
                     el = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
-                    # el = testElevsGT[test_i]
-
-                    # az = testAzsRel[test_i]
-                    # el = testElevsGT[test_i]
-
                     color = vColorsPred[test_i]
-                    #
-                    # color = testVColorGT[test_i]
-
                     lightCoefficientsRel = relLightCoefficientsPred[test_i]
-                    #
-                    # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
                     if useShapeModel:
                         shapeParams = shapeParamsPred[test_i]
 
@@ -1503,18 +1391,22 @@ for testSetting, model in enumerate(modelTests):
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                 hdridx = dataEnvMaps[test_i]
+
+                envMapTexture = np.zeros([360,180,3])
+                envMapFound = False
                 for hdrFile, hdrValues in hdritems:
                     if hdridx == hdrValues[0]:
 
                         envMapCoeffsGT = hdrValues[1]
                         envMapFilename = hdrFile
 
-                    # envMapCoeffs[:] = np.array([[0.5,0,0.0,1,0,0,0,0,0], [0.5,0,0.0,1,0,0,0,0,0],[0.5,0,0.0,1,0,0,0,0,0]]).T
-
-                        # updateEnviornmentMap(envMapFilename, scene)
                         envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
-                        envMapTexture = np.zeros([180,360,3])
+                        envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,180))
+                        envMapFound = True
                         break
+
+                if not envMapFound:
+                    ipdb.set_trace()
 
                 pEnvMap = SHProjection(envMapTexture, np.concatenate([testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None]], axis=1))
                 approxProjectionGT = np.sum(pEnvMap, axis=(2,3))
@@ -1527,17 +1419,17 @@ for testSetting, model in enumerate(modelTests):
 
                 approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
 
-                if nearestNeighbours:
+                predictedPosteriorsList = predictedPosteriorsList + [np.array(renderer.indices_image==1).copy().astype(np.bool)[None,:]]
 
+                if nearestNeighbours:
                     pEnvMap = SHProjection(envMapTexture, np.concatenate([lightCoeffsNearestNeighbour.ravel()[:,None], lightCoeffsNearestNeighbour.ravel()[:,None], lightCoeffsNearestNeighbour.ravel()[:,None]], axis=1))
                     approxProjectionNearestNeighbour = np.sum(pEnvMap, axis=(2,3))
                     approxProjectionsNearestNeighbourList = approxProjectionsNearestNeighbourList + [approxProjectionNearestNeighbour[None,:]]
                     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_NearestNeighbour.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
+
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Pred.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
-                # totalOffset = phiOffset + chObjAzGT
-                # np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-
+                ## RecognitionType =2 : Use samples from neural net to explore the space better.
                 if recognitionType == 2:
                     errorFunAzSamples = []
                     errorFunAzSamplesPred = []
@@ -1553,7 +1445,6 @@ for testSetting, model in enumerate(modelTests):
                     # stds[:] = 0.1
                     #
                     # azSampleStdev = np.std(azsPredictions[test_i])
-
                     azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
                     predAz = chAz.r
                     numSamples = max(int(np.ceil(azSampleStdev*180./(np.pi*25.))),1)
@@ -1598,8 +1489,6 @@ for testSetting, model in enumerate(modelTests):
                         errorFunAzSamplesPred = errorFunAzSamplesPred + [errorFun.r]
                         errorFunGaussianAzSamplesPred = errorFunGaussianAzSamplesPred + [models[0].r]
 
-
-
                         # analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum), rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
 
                         if models[1].r.copy() < bestPredModelLik:
@@ -1640,7 +1529,6 @@ for testSetting, model in enumerate(modelTests):
                     chShapeParams[:] = shapeParams
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_sample' + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/id' + str(testId) +'_groundtruth_drAz' + '.png', z.squeeze(),cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
 
                 predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
@@ -1650,109 +1538,20 @@ for testSetting, model in enumerate(modelTests):
                 sampleAzNum = 0
 
                 sys.stdout.flush()
+
+                ## finally: Do Fitting!
+
                 if optimizationTypeDescr[optimizationType] == 'optimize':
                     print("** Minimizing from initial predicted parameters. **")
                     globalPrior[:] = 0.9
-                    # errorFun = chThError
-                    # method = 6
-                    #
-                    # stds[:] = 0.05
-                    errorFun = models[1]
 
-                    # if useShapeModel:
-                    #     bestRobustSmallStdError = negLikModelRobustSmallStd.r.copy()
-                    #     bestShapeParamsSmallStd = chShapeParams.r.copy()
-                    #
-                    # if useShapeModel:
-                    #     free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
-                    #     # free_variables = [chShapeParams]
-                    # else:
-                    #     free_variables = [chAz, chEl, chVColors, chLightSHCoeffs]
-                    #
-                    #
-                    #
-                    # stds[:] =  0.01
-                    # #
-                    # free_variables = [chVColors, chLightSHCoeffs]
-                    #
-                    # shapePenalty = 0.000
-                    # # free_variables = [chShapeParams ]
-                    # minimizingShape = True
-                    #
-                    # options={'disp':False, 'maxiter':1}
-                    #
-                    # ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                    #
-                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                    # #
-                    #
-                    # stds[:] = stdsTests[testSetting]
-                    # #
-                    # free_variables = [chShapeParams,chAz, chEl]
-                    #
-                    # shapePenalty = 0.0001
-                    # # free_variables = [chShapeParams ]
-                    # minimizingShape = True
-                    #
-                    # options={'disp':False, 'maxiter':15}
-                    #
-                    # ch.minimize({'raw': models[model]  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                    #
-                    # maxShapeSize = 2.5
-                    # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    # if np.any(largeShapeParams):
-                    #     print("Warning: found large shape parameters to fix!")
-                    # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
-                    # #
-                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                    # #
-                    # stds[:] = stdsTests[testSetting]
-                    # #
-                    # free_variables = [chAz, chEl, chShapeParams, chVColors, chLightSHCoeffs]
-                    #
-                    # shapePenalty = 0.0
-                    # # free_variables = [chShapeParams ]
-                    # minimizingShape = True
-                    #
-                    # options={'disp':False, 'maxiter':40}
-                    #
-                    # ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                    #
-                    # maxShapeSize = 2.5
-                    # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    # if np.any(largeShapeParams):
-                    #     print("Warning: found large shape parameters to fix!")
-                    # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
-                    #
-                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it3'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                    errorFun = models[modelTests[testSetting]]
 
-                    #####
-
-                    # free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
-                    # stds[:] = 0.05
-                    # shapePenalty = 0.00
-                    # options={'disp':False, 'maxiter':10}
-                    # # free_variables = [chShapeParams ]
-                    # minimizingShape = True
-                    # ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                    #
-                    # maxShapeSize = 2.5
-                    # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    # if np.any(largeShapeParams):
-                    #     print("Warning: found large shape parameters to fix!")
-                    # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
-                    #
-                    # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                    #
-                    # #######
-                    #
-
-                    errorFun = models[0]
-                    free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
-                    stds[:] = 0.1
+                    free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs]
+                    stds[:] = 0.03
                     shapePenalty = 0.0001
-                    options={'disp':False, 'maxiter':200}
-                    # free_variables = [chShapeParams ]
+                    options={'disp':False, 'iter':50}
+
                     minimizingShape = True
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -1763,24 +1562,21 @@ for testSetting, model in enumerate(modelTests):
                     chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
 
 
+                    free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
+                    stds[:] = stdsTests[testSetting]
+                    shapePenalty = 0.0
+                    options={'disp':False, 'iter':50}
+                    # free_variables = [chShapeParams ]
+                    minimizingShape = True
+                    ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                    maxShapeSize = 2.5
+                    largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                    if np.any(largeShapeParams):
+                        print("Warning: found large shape parameters to fix!")
+                    chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
+
                     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it4'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-
-                    # #
-                    # free_variables = [chShapeParams, chAz, chEl, chVColors, chLightSHCoeffs]
-                    # stds[:] = 0.01
-                    # shapePenalty = 0.0000
-                    # options={'disp':False, 'maxiter':30}
-                    # # free_variables = [chShapeParams ]
-                    # minimizingShape = True
-                    # ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                    #
-                    # maxShapeSize = 2.5
-                    # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    # if np.any(largeShapeParams):
-                    #     print("Warning: found large shape parameters to fix!")
-                    # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
-
-                    # chShapeParams[:] = bestShapeParamsSmallStd.copy()
 
                 if errorFun.r < bestModelLik:
                     bestModelLik = errorFun.r.copy()
@@ -1790,9 +1586,11 @@ for testSetting, model in enumerate(modelTests):
                     bestLightSHCoeffs = chLightSHCoeffs.r.copy()
                     if useShapeModel:
                         bestShapeParams = chShapeParams.r.copy()
+
                     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
                 else:
-                    bestFittedAz = bestPredAz.copy()
+                    pass
+                    # bestFittedAz = bestPredAz.copy()
                     # bestFittedEl = min(max(bestPredEl.copy(),radians(1)), np.pi/2-radians(1))
                     # bestVColors = bestPredVColors.copy()
                     # bestLightSHCoeffs = bestPredLightSHCoeffs.copy()
@@ -1803,14 +1601,6 @@ for testSetting, model in enumerate(modelTests):
                 chLightSHCoeffs[:] = bestLightSHCoeffs
                 if useShapeModel:
                     chShapeParams[:] = bestShapeParams
-
-                # model=1
-                # errorFun = models[model]
-                # method=1
-                # stds[:] = 0.1
-                # options={'disp':False, 'maxiter':5}
-                # free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
-                # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
@@ -1828,18 +1618,25 @@ for testSetting, model in enumerate(modelTests):
                 approxProjectionsFittedList = approxProjectionsFittedList + [approxProjectionFitted[None,:]]
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Fitted.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
-                vis_im = np.array(renderer.indices_image!=1).copy().astype(np.bool)
-                post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
+                stds[:] = stdsTests[testSetting]
+                vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+                post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0]>0.5
+                fittedPosteriorsList = fittedPosteriorsList + [post[None,:]]
+                ipdb.set_trace()
+
                 plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-            #Every now and then, produce plots to keep track of work accross different levels of occlusion.
+            #Every now and then (or after the final test case), produce plots to keep track of work accross different levels of occlusion.
             if np.mod(test_i+1,100) == 0 or test_i + 1 >= len(testSet):
                 if approxProjectionsPredList:
                     approxProjectionsPred = np.vstack(approxProjectionsPredList)
                 if approxProjectionsGTList:
                     approxProjectionsGT = np.vstack(approxProjectionsGTList)
 
-                if approxProjectionsNearestNeighbourList:
+                if predictedPosteriorsList:
+                    predictedPosteriors = np.vstack(predictedPosteriorsList)
+
+                if nearestNeighbours:
                     approxProjectionsNearestNeighbours = np.vstack(approxProjectionsNearestNeighbourList)
 
                 if optimizationTypeDescr[optimizationType] != 'predict':
@@ -1852,6 +1649,8 @@ for testSetting, model in enumerate(modelTests):
 
                     if fittedShapeParamsList and useShapeModel:
                         fittedShapeParams = np.vstack(fittedShapeParamsList)
+                    if fittedPosteriorsList:
+                        fittedPosteriors = np.vstack(fittedPosteriorsList)
 
                 if nearestNeighbours:
                     azimuthNearestNeighbours = np.concatenate(azimuthNearestNeighboursList)
@@ -1859,17 +1658,23 @@ for testSetting, model in enumerate(modelTests):
                     vColorNearestNeighbours = np.vstack(vColorNearestNeighboursList)
                     shapeParamsNearestNeighbours = np.vstack(shapeParamsNearestNeighboursList)
                     lightCoeffsNearestNeighbours = np.vstack(lightCoeffsNearestNeighboursList)
+                    nearestNeighboursPosteriors = np.vstack(nearestNeighboursPosteriorsList)
 
                 if optimizationTypeDescr[optimizationType] != 'predict':
                     numFitted = range(len(fittedAzs))
                 else:
                     numFitted = range(len(approxProjectionsPred))
 
-                azimuths = [meanTrainAzimuthRel]
-                elevations= [meanTrainElevation]
-                vColors= [meanTrainVColors]
-                lightCoeffs= [meanTrainLightCoefficientsGTRel]
-                approxProjections= [meanTrainEnvMapProjections]
+                if includeMeanBaseline:
+                    meanBaselinePosteriors = np.vstack(meanBaselinePosteriorList)
+
+                    azimuths = [meanTrainAzimuthRel]
+                    elevations= [meanTrainElevation]
+                    vColors= [meanTrainVColors]
+                    lightCoeffs= [meanTrainLightCoefficientsGTRel]
+                    approxProjections= [meanTrainEnvMapProjections]
+                    likelihoods = [meanBaselineErrorFuns]
+                    posteriors = [meanBaselinePosteriors]
 
                 if useShapeModel:
                     shapeParams= [meanTrainShapeParams]
@@ -1887,11 +1692,17 @@ for testSetting, model in enumerate(modelTests):
                     else:
                         shapeParams = shapeParams + [None]
 
+                    likelihoods = likelihoods + [nearestNeighboursErrorFuns]
+                    posteriors = posteriors + [nearestNeighboursPosteriors]
+
                 azimuths = azimuths + [azsPred]
                 elevations = elevations + [elevsPred]
                 vColors = vColors + [vColorsPred]
                 lightCoeffs = lightCoeffs + [relLightCoefficientsPred]
                 approxProjections = approxProjections + [approxProjectionsPred]
+                likelihoods = likelihoods + [predictedErrorFuns]
+                posteriors = posteriors + [predictedPosteriors]
+
                 if useShapeModel:
                     shapeParams  = shapeParams + [shapeParamsPred]
                 else:
@@ -1908,777 +1719,58 @@ for testSetting, model in enumerate(modelTests):
                     else:
                         shapeParams = shapeParams + [None]
 
-                errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, \
-                    = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices)
+                    likelihoods = likelihoods + [fittedErrorFuns]
+                    posteriors = posteriors + [fittedPosteriors]
 
-                meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList \
-                = computeErrorMeans(numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList)
+                errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation \
+                    = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, posteriors, masksGT)
 
+                meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentation \
+                    = computeErrorMeans(numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation)
 
                 #Write statistics to file.
                 with open(resultDir + 'performance.txt', 'w') as expfile:
                     for method_i in range(len(azimuths)):
                         # expfile.write(str(z))
-                        expfile.write("Avg Pred NLL    :" +  str(np.mean(predictedErrorFuns))+ '\n')
-                        expfile.write("Avg Fitt NLL    :" +  str(np.mean(fittedErrorFuns))+ '\n\n')
-
+                        expfile.write("Avg" + methodsPred[method_i] + "NLL    :" +  str(np.mean(likelihoods[method_i]))+ '\n')
                         expfile.write("Mean Azimuth Error " + methodsPred[method_i] + " " +  str(meanAbsErrAzsList) + '\n')
-                        expfile.write("Mean Elevation Error " + methodsPred[method_i] + " " +  str(meanAbsErrElevsList[method])+ '\n')
-                        expfile.write("Median Azimuth Error " + methodsPred[method_i] + " " +  str(medianAbsErrAzsList[method]) + '\n')
-                        expfile.write("Median Elevation Error " + methodsPred[method_i] + " " +  str(medianAbsErrElevsList[method])+ '\n\n')
-                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsList[method])+ '\n')
-                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsCList[method])+ '\n')
-                        expfile.write("Mean Vertex Colors Error E " + methodsPred[method_i] + " " +  str(meanErrorsVColorsEList[method])+ '\n')
-                        expfile.write("Mean Vertex Colors Error C " + methodsPred[method_i] + " " +  str(meanErrorsVColorsCList[method])+ '\n')
-                        expfile.write("Mean Shape Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeParamsList[method])+ '\n')
-                        expfile.write("Mean Shape Vertices Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeVerticesList[method])+ '\n\n')
+                        expfile.write("Mean Elevation Error " + methodsPred[method_i] + " " +  str(meanAbsErrElevsList[method_i])+ '\n')
+                        expfile.write("Median Azimuth Error " + methodsPred[method_i] + " " +  str(medianAbsErrAzsList[method_i]) + '\n')
+                        expfile.write("Median Elevation Error " + methodsPred[method_i] + " " +  str(medianAbsErrElevsList[method_i])+ '\n\n')
+                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsList[method_i])+ '\n')
+                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsCList[method_i])+ '\n')
+                        expfile.write("Mean Vertex Colors Error E " + methodsPred[method_i] + " " +  str(meanErrorsVColorsEList[method_i])+ '\n')
+                        expfile.write("Mean Vertex Colors Error C " + methodsPred[method_i] + " " +  str(meanErrorsVColorsCList[method_i])+ '\n')
+                        expfile.write("Mean Shape Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeParamsList[method_i])+ '\n')
+                        expfile.write("Mean Shape Vertices Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeVerticesList[method_i])+ '\n\n')
 
                 if not os.path.exists(resultDir + 'stats/'):
                     os.makedirs(resultDir + 'stats/')
 
                 with open(resultDir + 'stats/' + 'performance' + str(test_i) + '.txt', 'w') as expfile:
                     # expfile.write(str(z))
-                    expfile.write("Avg Pred NLL    :" +  str(np.mean(predictedErrorFuns))+ '\n')
-                    expfile.write("Avg Fitt NLL    :" +  str(np.mean(fittedErrorFuns))+ '\n\n')
+                    expfile.write("Avg" + methodsPred[method_i] + "NLL    :" +  str(np.mean(likelihoods[method_i]))+ '\n')
                     for method_i in range(len(azimuths)):
                         expfile.write("Mean Azimuth Error " + methodsPred[method_i] + " " +  str(meanAbsErrAzsList) + '\n')
-                        expfile.write("Mean Elevation Error " + methodsPred[method_i] + " " +  str(meanAbsErrElevsList[method])+ '\n')
-                        expfile.write("Median Azimuth Error " + methodsPred[method_i] + " " +  str(medianAbsErrAzsList[method]) + '\n')
-                        expfile.write("Median Elevation Error " + methodsPred[method_i] + " " +  str(medianAbsErrElevsList[method])+ '\n\n')
-                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsList[method])+ '\n')
-                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsCList[method])+ '\n')
-                        expfile.write("Mean Vertex Colors Error E " + methodsPred[method_i] + " " +  str(meanErrorsVColorsEList[method])+ '\n')
-                        expfile.write("Mean Vertex Colors Error C " + methodsPred[method_i] + " " +  str(meanErrorsVColorsCList[method])+ '\n')
-                        expfile.write("Mean Shape Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeParamsList[method])+ '\n')
-                        expfile.write("Mean Shape Vertices Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeVerticesList[method])+ '\n\n')
-
+                        expfile.write("Mean Elevation Error " + methodsPred[method_i] + " " +  str(meanAbsErrElevsList[method_i])+ '\n')
+                        expfile.write("Median Azimuth Error " + methodsPred[method_i] + " " +  str(medianAbsErrAzsList[method_i]) + '\n')
+                        expfile.write("Median Elevation Error " + methodsPred[method_i] + " " +  str(medianAbsErrElevsList[method_i])+ '\n\n')
+                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsList[method_i])+ '\n')
+                        expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsCList[method_i])+ '\n')
+                        expfile.write("Mean Vertex Colors Error E " + methodsPred[method_i] + " " +  str(meanErrorsVColorsEList[method_i])+ '\n')
+                        expfile.write("Mean Vertex Colors Error C " + methodsPred[method_i] + " " +  str(meanErrorsVColorsCList[method_i])+ '\n')
+                        expfile.write("Mean Shape Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeParamsList[method_i])+ '\n')
+                        expfile.write("Mean Shape Vertices Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeVerticesList[method_i])+ '\n\n')
 
                 # ipdb.set_trace()
                 totalTime = time.time() - startTime
-                print("Took " + str(totalTime/len(testSet)) + " time per instance.")
+                print("Took " + str(totalTime/test_i) + " time per instance.")
 
-                azimuths = [meanTrainAzimuthRel]
-                elevations= [meanTrainElevation]
-                vColors= [meanTrainVColors]
-                lightCoeffs= [meanTrainLightCoefficientsGTRel]
-                approxProjections= [meanTrainEnvMapProjections]
-
-                if useShapeModel:
-                    shapeParams= [meanTrainShapeParams]
-                else:
-                    shapeParams = [None]
-
-                if nearestNeighbours:
-                    azimuths = azimuths + [azimuthNearestNeighbours]
-                    elevations = elevations + [elevationNearestNeighbours]
-                    vColors = vColors + [vColorNearestNeighbours]
-                    lightCoeffs = lightCoeffs + [lightCoeffsNearestNeighbours]
-                    approxProjections = approxProjections + [approxProjectionsNearestNeighbours]
-                    if useShapeModel:
-                        shapeParams  = shapeParams + [shapeParamsNearestNeighbours]
-                    else:
-                        shapeParams = shapeParams + [None]
-
-                azimuths = azimuths + [azsPred]
-                elevations = elevations + [elevsPred]
-                vColors = vColors + [vColorsPred]
-                lightCoeffs = lightCoeffs + [relLightCoefficientsPred]
-                approxProjections = approxProjections + [approxProjectionsPred]
-                if useShapeModel:
-                    shapeParams  = shapeParams + [shapeParamsPred]
-                else:
-                    shapeParams = shapeParams + [None]
-
-                if optimizationTypeDescr[optimizationType] != 'predict':
-                    azimuths = azimuths + [fittedAzs]
-                    elevations = elevations + [fittedElevs]
-                    vColors = vColors + [fittedVColors]
-                    lightCoeffs = lightCoeffs + [fittedRelLightCoeffs]
-                    approxProjections = approxProjections + [approxProjectionFitted]
-                    if useShapeModel:
-                        shapeParams  = shapeParams + [fittedShapeParams]
-                    else:
-                        shapeParams = shapeParams + [None]
-
-                errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, \
-                    = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices)
-
-                meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList \
-                = computeErrorMeans(numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList)
-
-
-                experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'approxProjections':approxProjections, 'shapeParams':shapeParams, 'approxProjectionsGT':approxProjectionsGT, 'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList}
+                experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'testPrefixBase':testPrefixBase, 'likelihoods':likelihoods, 'posteriors':posteriors, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'approxProjections':approxProjections, 'shapeParams':shapeParams, 'approxProjectionsGT':approxProjectionsGT, 'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsSegmentation':errorsSegmentation}
 
                 with open(resultDir + 'experiment.pickle', 'wb') as pfile:
                     pickle.dump(experimentDic, pfile)
 
-                # if not useShapeModel:
-                #     np.savez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errorsPosePred[0], predErrorElevs=errorsPosePred[1], errorsLightCoeffs=errorsLightCoeffs, errorsLightCoeffsC=errorsLightCoeffsC,errorsEnvMap=errorsEnvMap, errorsVColorsE=errorsVColorsE, errorsVColorsC=errorsVColorsC, errorsFittedAzs=errorsPoseFitted[0], errorsFittedElevs=errorsPoseFitted[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedLightCoeffsC=errorsFittedLightCoeffsC, errorsFittedEnvMap=errorsFittedEnvMap, errorsFittedVColorsE=errorsFittedVColorsE, errorsFittedVColorsC=errorsFittedVColorsC, testOcclusions=testOcclusions)
-                #     np.savez(resultDir + 'samples.npz', testSet = testSet, azsPred= azsPred, elevsPred=elevsPred, fittedAzs=fittedAzs, fittedElevs=fittedElevs, vColorsPred=vColorsPred, fittedVColors=fittedVColors, relLightCoefficientsGTPred=relLightCoefficientsPred, fittedRelLightCoeffs=fittedRelLightCoeffs)
-                # else:
-                #     np.savez(resultDir + 'performance_samples.npz', predictedErrorFuns=predictedErrorFuns, fittedErrorFuns= fittedErrorFuns, predErrorAzs=errorsPosePred[0], predErrorElevs=errorsPosePred[1], errorsLightCoeffs=errorsLightCoeffs, errorsShapeParams=errorsShapeParams,errorsShapeVertices=errorsShapeVertices, errorsLightCoeffsC=errorsLightCoeffsC,errorsEnvMap=errorsEnvMap, errorsVColorsE=errorsVColorsE, errorsVColorsC=errorsVColorsC, errorsFittedAzs=errorsPoseFitted[0], errorsFittedElevs=errorsPoseFitted[1], errorsFittedLightCoeffs=errorsFittedLightCoeffs, errorsFittedLightCoeffsC=errorsFittedLightCoeffsC, errorsFittedEnvMap=errorsFittedEnvMap, errorsFittedVColorsE=errorsFittedVColorsE, errorsFittedVColorsC=errorsFittedVColorsC, errorsFittedShapeParams=errorsFittedShapeParams,errorsFittedShapeVertices=errorsFittedShapeVertices, testOcclusions=testOcclusions)
-                #     np.savez(resultDir + 'samples.npz', testSet = testSet, azsPred= azsPred, elevsPred=elevsPred, fittedAzs=fittedAzs, fittedElevs=fittedElevs, vColorsPred=vColorsPred, fittedVColors=fittedVColors, relLightCoefficientsGTPred=relLightCoefficientsPred, shapeParamsPred=shapeParamsPred, fittedRelLightCoeffs=fittedRelLightCoeffs, fittedShapeParams=fittedShapeParams)
-
-                if optimizationTypeDescr[optimizationType] != 'predict':
-                    print("Avg Likelihood improvement per second of: " + str(np.mean(fittedErrorFuns - predictedErrorFuns)/ totalTime))
-                ##Print and plotting results now:
-
-                plt.ioff()
-                # # import seaborn
-                # font = {'family' : 'normal',
-                #         'size'   : 60}
-
-                # matplotlib.rc('font', **font)
-
-                latexify(columns=1)
-
-                testOcclusions = testOcclusions[numFitted]
-                colors = matplotlib.cm.plasma(testOcclusions)
-
-                # if len(stdevs) > 0:
-                #     #Show scatter correlations with occlusions.
-                #     directory = resultDir + 'occlusion_nnazsamplesstdev'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, stdevs[:numFitted]*180/np.pi, s=20, vmin=0, vmax=100, c='b')
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('NN Az samples stdev')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((0,180))
-                #     ax.set_title('Occlusion vs az predictions correlations')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                # directory = resultDir + 'occlusion_vcolorserrorsE'
-                # #Show scatter correlations with occlusions.
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, errorsVColorsE, s=20, vmin=0, vmax=100, c='b')
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('Vertex Colors errors')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-0.0,1))
-                # ax.set_title('Occlusion - vertex color prediction errors')
-                #
-                # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                #
-                # directory = resultDir + 'occlusion_vcolorserrorsC'
-                # #Show scatter correlations with occlusions.
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, errorsVColorsC, s=20, vmin=0, vmax=100, c='b')
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('Vertex Colors errors')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-0.0,1))
-                # ax.set_title('Occlusion - vertex color prediction errors')
-                # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                # #Show scatter correlations with occlusions.
-                #
-                #
-                # directory = resultDir + 'occlusion_shcoeffsserrors'
-                # #Show scatter correlations with occlusions.
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsLightCoeffs,axis=1), s=20, vmin=0, vmax=100, c='b', )
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('SH coefficient errors')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-0.0,1))
-                # ax.set_title('Occlusion - SH coefficients predicted errors')
-                # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                #
-                # if useShapeModel:
-                #     directory = resultDir + 'occlusion_shapeparams'
-                #     #Show scatter correlations with occlusions.
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsShapeParams,axis=1), s=20, vmin=0, vmax=100, c='b', )
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Shape parameters errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - Shape parameters predicted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                #     directory = resultDir + 'occlusion_shapevertices'
-                #     #Show scatter correlations with occlusions.
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, errorsShapeVertices, s=20, vmin=0, vmax=100, c='b', )
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Shape vertices errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - Shape vertices predicted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                # directory = resultDir + 'occlusion_shcoeffsserrorsC'
-                # #Show scatter correlations with occlusions.
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsLightCoeffsC,axis=1), s=20, vmin=0, vmax=100, c='b')
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('SH coefficient errors')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-0.0,1))
-                # ax.set_title('Occlusion - SH coefficients predicted errors')
-                # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                #
-                # directory = resultDir + 'occlusion_shEnvMap'
-                # #Show scatter correlations with occlusions.
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsEnvMap,axis=(1,2)), s=20, vmin=0, vmax=100, c='b')
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('SH Environment map errors')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-0.0,1))
-                # ax.set_title('Occlusion - SH Environment Map predicted errors')
-                # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                #
-                #
-                # # Show scatter correlations of occlusion with predicted and fitted color.
-                # if not optimizationTypeDescr[optimizationType] == 'predict':
-                #     directory = resultDir + 'fitted-occlusion_vcolorserrorsE'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, errorsFittedVColorsE, s=20, vmin=0, vmax=100)
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Vertex Colors errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - vertex color fitted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                #
-                #     directory = resultDir + 'fitted-occlusion_vcolorserrorsC'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, errorsFittedVColorsC, s=20, vmin=0, vmax=100)
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Vertex Colors errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - vertex color fitted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #     #Show scatter correlations with occlusions.
-                #
-                #     directory = resultDir + 'fitted-occlusion_shcoeffsserrors'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedLightCoeffs,axis=1), s=20, vmin=0, vmax=100)
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Fitted SH coefficients errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - SH coefficients fitted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #     #Show scatter correlations with occlusions.
-                #
-                #     if useShapeModel:
-                #         directory = resultDir + 'fitted-occlusion_shapeparams'
-                #         fig = plt.figure()
-                #         ax = fig.add_subplot(111)
-                #         scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedShapeParams,axis=1), s=20, vmin=0, vmax=100)
-                #         ax.set_xlabel('Occlusion (%)')
-                #         ax.set_ylabel('Fitted shape parameters errors')
-                #         x1,x2 = ax.get_xlim()
-                #         y1,y2 = ax.get_ylim()
-                #         ax.set_xlim((0,100))
-                #         ax.set_ylim((-0.0,1))
-                #         ax.set_title('Occlusion - Shape parameters fitted errors')
-                #         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #         plt.close(fig)
-                #         #Show scatter correlations with occlusions.
-                #
-                #         directory = resultDir + 'fitted-occlusion_shapevertices'
-                #         fig = plt.figure()
-                #         ax = fig.add_subplot(111)
-                #         scat = ax.scatter(testOcclusions * 100.0, errorsFittedShapeVertices, s=20, vmin=0, vmax=100)
-                #         ax.set_xlabel('Occlusion (%)')
-                #         ax.set_ylabel('Fitted shape vertices errors')
-                #         x1,x2 = ax.get_xlim()
-                #         y1,y2 = ax.get_ylim()
-                #         ax.set_xlim((0,100))
-                #         ax.set_ylim((-0.0,1))
-                #         ax.set_title('Occlusion - Shape vertices fitted errors')
-                #         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #         plt.close(fig)
-                #         #Show scatter correlations with occlusions.
-                #
-                #     directory = resultDir + 'fitted-occlusion_shcoeffsserrorsC'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedLightCoeffsC,axis=1), s=20, vmin=0, vmax=100)
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Fitted SH coefficients errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - SH coefficients fitted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                #     directory = resultDir + 'fitted-occlusion_SHenvMap'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, np.mean(errorsFittedEnvMap,axis=(1,2)), s=20, vmin=0, vmax=100)
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Fitted SH coefficients errors')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-0.0,1))
-                #     ax.set_title('Occlusion - SH Environment Map fitted errors')
-                #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                # directory = resultDir + 'azimuth-pose-prediction'
-                #
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[0], s=20, vmin=0, vmax=100)
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('Angular error')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-180,180))
-                # ax.set_title('Performance scatter plot')
-                # fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                #
-                # directory = resultDir + 'elevation-pose-prediction'
-                # fig = plt.figure()
-                # ax = fig.add_subplot(111)
-                # scat = ax.scatter(testOcclusions * 100.0, errorsPosePred[1], s=20, vmin=0, vmax=100)
-                # ax.set_xlabel('Occlusion (%)')
-                # ax.set_ylabel('Angular error')
-                # x1,x2 = ax.get_xlim()
-                # y1,y2 = ax.get_ylim()
-                # ax.set_xlim((0,100))
-                # ax.set_ylim((-90.0,90))
-                # ax.set_title('Performance scatter plot')
-                # fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
-                # plt.close(fig)
-                #
-                # if not optimizationTypeDescr[optimizationType] == 'predict':
-                #     directory = resultDir + 'fitted-azimuth-prediction'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, errorsPoseFitted[0], s=20, vmin=0, vmax=100)
-                #
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Angular error')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-180.0,180))
-                #     ax.set_title('Performance scatter plot')
-                #     fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-                #
-                #     directory = resultDir + 'fitted-elevation-pose-prediction'
-                #     fig = plt.figure()
-                #     ax = fig.add_subplot(111)
-                #     scat = ax.scatter(testOcclusions * 100.0, errorsPoseFitted[1], s=20, vmin=0, vmax=100)
-                #     ax.set_xlabel('Occlusion (%)')
-                #     ax.set_ylabel('Angular error')
-                #     x1,x2 = ax.get_xlim()
-                #     y1,y2 = ax.get_ylim()
-                #     ax.set_xlim((0,100))
-                #     ax.set_ylim((-90.0,90))
-                #     ax.set_title('Performance scatter plot')
-                #     fig.savefig(directory + '_occlusion-performance-scatter.png', bbox_inches='tight')
-                #     plt.close(fig)
-
-                testOcclusionsFull = testOcclusions.copy()
-                # stdevsFull = stdevs.copy()
-                meanAbsErrAzsArr = []
-                meanAbsErrElevsArr = []
-                medianAbsErrAzsArr = []
-                medianAbsErrElevsArr = []
-                meanErrorsLightCoeffsArr = []
-                meanErrorsEnvMapArr = []
-                meanErrorsShapeParamsArr = []
-                meanErrorsShapeVerticesArr = []
-                meanErrorsLightCoeffsCArr = []
-                meanErrorsVColorsEArr = []
-                meanErrorsVColorsCArr = []
-
-                for method_i in range(len(methodsPred)):
-                    meanAbsErrAzsArr = meanAbsErrAzsArr + [np.array([])]
-                    meanAbsErrElevsArr = meanAbsErrElevsArr + [np.array([])]
-                    medianAbsErrAzsArr = medianAbsErrAzsArr + [np.array([])]
-                    medianAbsErrElevsArr = medianAbsErrElevsArr + [np.array([])]
-                    meanErrorsLightCoeffsArr = meanErrorsLightCoeffsArr + [np.array([])]
-                    meanErrorsShapeParamsArr = meanErrorsShapeParamsArr + [np.array([])]
-                    meanErrorsShapeVerticesArr = meanErrorsShapeVerticesArr + [np.array([])]
-                    meanErrorsLightCoeffsCArr = meanErrorsLightCoeffsCArr + [np.array([])]
-                    meanErrorsVColorsEArr = meanErrorsVColorsEArr + [np.array([])]
-                    meanErrorsVColorsCArr = meanErrorsVColorsCArr + [np.array([])]
-                    meanErrorsEnvMapArr = meanErrorsEnvMapArr + [np.array([])]
-                occlusions = []
-
-                for occlusionLevel in range(100):
-
-                    setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
-
-                    if np.any(setUnderOcclusionLevel):
-                        occlusions = occlusions + [occlusionLevel]
-                        testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-
-                        try:
-                            if len(stdevsFull) > 0:
-                                stdevs = stdevsFull[setUnderOcclusionLevel]
-                        except:
-                            stdevs = np.array([])
-
-                        colors = matplotlib.cm.plasma(testOcclusions)
-
-
-                        for method_i in range(len(methodsPred)):
-
-                            meanAbsErrAzsArr[method_i] = np.append(meanAbsErrAzsArr[method_i], np.mean(np.abs(errorsPosePredList[method_i][0][setUnderOcclusionLevel])))
-                            meanAbsErrElevsArr[method_i] = np.append(meanAbsErrElevsArr[method_i], np.mean(np.abs(errorsPosePredList[method_i][1][setUnderOcclusionLevel])))
-
-                            medianAbsErrAzsArr[method_i] = np.append(medianAbsErrAzsArr[method_i], np.median(np.abs(errorsPosePredList[method_i][0][setUnderOcclusionLevel])))
-                            medianAbsErrElevsArr[method_i] = np.append(medianAbsErrElevsArr[method_i], np.median(np.abs(errorsPosePredList[method_i][1][setUnderOcclusionLevel])))
-
-                            meanErrorsLightCoeffsArr[method_i] = np.append(meanErrorsLightCoeffsArr[method_i],np.mean(np.mean(errorsLightCoeffsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-                            meanErrorsLightCoeffsCArr[method_i] = np.append(meanErrorsLightCoeffsCArr[method_i],np.mean(np.mean(errorsLightCoeffsCList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-
-                            if useShapeModel:
-                                meanErrorsShapeParamsArr[method_i] = np.append(meanErrorsShapeParamsArr[method_i],np.mean(np.mean(errorsShapeParamsList[method_i][setUnderOcclusionLevel], axis=1), axis=0))
-                                meanErrorsShapeVerticesArr[method_i] = np.append(meanErrorsShapeVerticesArr[method_i], np.mean(errorsShapeVerticesList[method_i][setUnderOcclusionLevel], axis=0))
-
-                            meanErrorsEnvMapArr[method_i] = np.append(meanErrorsEnvMapArr[method_i], np.mean(errorsEnvMapList[method_i][setUnderOcclusionLevel]))
-                            meanErrorsVColorsEArr[method_i] = np.append(meanErrorsVColorsEArr[method_i], np.mean(errorsVColorsEList[method_i][setUnderOcclusionLevel], axis=0))
-                            meanErrorsVColorsCArr[method_i] = np.append(meanErrorsVColorsCArr[method_i], np.mean(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
-
-
-                saveOcclusionPlots(resultDir, occlusions, methodsPred, plotColors, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr)
-
-                for occlusionLevel in [25, 50, 75, 100]:
-
-                    resultDirOcclusion = 'results/' + testPrefix + '/occlusion' + str(occlusionLevel) + '/'
-                    if not os.path.exists(resultDirOcclusion):
-                        os.makedirs(resultDirOcclusion)
-
-                    setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
-                    testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-
-                    # if len(stdevsFull) > 0:
-                    #     stdevs = stdevsFull[setUnderOcclusionLevel]
-
-                    colors = matplotlib.cm.plasma(testOcclusions)
-
-                    meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList \
-                    = computeErrorMeans(setUnderOcclusionLevel, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList)
-
-                    # if not optimizationTypeDescr[optimizationType] == 'predict':
-                    #
-                    #
-                    #     directory = resultDir + 'pred-elevation-errors_fitted-elevation-error'
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111, aspect='equal')
-                    #     scat = ax.scatter(abs(errorsPosePred[1]), abs(errorsPoseFitted[1]), s=20, vmin=0, vmax=100,
-                    #                       c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-                    #     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #     ax.set_xlabel('Predicted elevation errors')
-                    #     ax.set_ylabel('Fitted elevation errors')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((0, 90))
-                    #     ax.set_ylim((0, 90))
-                    #     ax.plot([0, 90], [0, 90], ls="--", c=".3")
-                    #     ax.set_title('Predicted vs fitted azimuth errors')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    #     directory = resultDir + 'shcoeffsserrorsC_fitted-shcoeffsserrorsC'
-                    #
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111, aspect='equal')
-                    #     scat = ax.scatter(np.mean(errorsLightCoeffsC, axis=1), np.mean(errorsFittedLightCoeffsC, axis=1), s=20,
-                    #                       vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-                    #     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #     ax.set_xlabel('Predicted SH coefficients errors')
-                    #     ax.set_ylabel('Fitted SH coefficients errors')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((0, 1))
-                    #     ax.set_ylim((0, 1))
-                    #     ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #     ax.set_title('Predicted vs fitted SH coefficients errors')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    #     directory = resultDir + 'shcoeffsserrorsC_fitted-shEnvMap'
-                    #
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111, aspect='equal')
-                    #     scat = ax.scatter(np.mean(errorsEnvMap, axis=(1, 2)), np.mean(errorsFittedEnvMap, axis=(1, 2)), s=20,
-                    #                       vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-                    #     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #     ax.set_xlabel('Predicted SH coefficients errors')
-                    #     ax.set_ylabel('Fitted SH coefficients errors')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((0, 1))
-                    #     ax.set_ylim((0, 1))
-                    #     ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #     ax.set_title('Predicted vs fitted SH Environment map errors')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    #     directory = resultDir + 'shcoeffsserrors_fitted-shcoeffsserrors'
-                    #     # Show scatter correlations with occlusions.
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111, aspect='equal')
-                    #     scat = ax.scatter(np.mean(errorsLightCoeffs, axis=1), np.mean(errorsFittedLightCoeffs, axis=1), s=20,
-                    #                       vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-                    #     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #     ax.set_xlabel('Predicted SH coefficients errors')
-                    #     ax.set_ylabel('Fitted SH coefficients errors')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((0, 1))
-                    #     ax.set_ylim((0, 1))
-                    #     ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #     ax.set_title('Predicted vs fitted SH coefficients errors')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    #     if useShapeModel:
-                    #         directory = resultDir + 'shapeparamserrors_fitted-shapeparamserrors'
-                    #         # Show scatter correlations with occlusions.
-                    #         fig = plt.figure()
-                    #         ax = fig.add_subplot(111, aspect='equal')
-                    #         scat = ax.scatter(np.mean(errorsShapeParams, axis=1), np.mean(errorsFittedShapeParams, axis=1), s=20,
-                    #                           vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-                    #         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #         ax.set_xlabel('Predicted shape parameters errors')
-                    #         ax.set_ylabel('Fitted shape parameters errors')
-                    #         x1, x2 = ax.get_xlim()
-                    #         y1, y2 = ax.get_ylim()
-                    #         ax.set_xlim((0, 1))
-                    #         ax.set_ylim((0, 1))
-                    #         ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #         ax.set_title('Predicted vs fitted Shape parameters errors')
-                    #         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #         plt.close(fig)
-                    #
-                    #         directory = resultDir + 'shapeverticeserrors_fitted-shapeverticesserrors'
-                    #         # Show scatter correlations with occlusions.
-                    #         fig = plt.figure()
-                    #         ax = fig.add_subplot(111, aspect='equal')
-                    #         scat = ax.scatter(errorsShapeVertices, errorsFittedShapeVertices, s=20, vmin=0, vmax=100,
-                    #                           c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-                    #         cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #         cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #         ax.set_xlabel('Predicted shape vertices errors')
-                    #         ax.set_ylabel('Fitted shape vertices errors')
-                    #         x1, x2 = ax.get_xlim()
-                    #         y1, y2 = ax.get_ylim()
-                    #         ax.set_xlim((0, 1))
-                    #         ax.set_ylim((0, 1))
-                    #         ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #         ax.set_title('Predicted vs fitted Shape parameters errors')
-                    #         fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #         plt.close(fig)
-                    #
-                    #     directory = resultDir + 'vColorsE_fitted-vColorsE'
-                    #
-                    #     # Show scatter correlations with occlusions.
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111, aspect='equal')
-                    #     scat = ax.scatter(errorsVColorsE, errorsFittedVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
-                    #                       cmap=matplotlib.cm.plasma)
-                    #     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #     ax.set_xlabel('Predicted VColor E coefficients errors')
-                    #     ax.set_ylabel('Fitted VColor E coefficients errors')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((0, 1))
-                    #     ax.set_ylim((0, 1))
-                    #     ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #     ax.set_title('Predicted vs fitted vertex color errors')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    #     directory = resultDir + 'vColorsC_fitted-vColorsC'
-                    #
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111, aspect='equal')
-                    #     scat = ax.scatter(errorsVColorsC, errorsFittedVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
-                    #                       cmap=matplotlib.cm.plasma)
-                    #     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-                    #     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-                    #     ax.set_xlabel('Predicted VColor C coefficients errors')
-                    #     ax.set_ylabel('Fitted VColor C coefficients errors')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((0, 1))
-                    #     ax.set_ylim((0, 1))
-                    #     ax.plot([0, 1], [0, 1], ls="--", c=".3")
-                    #     ax.set_title('Predicted vs fitted vertex color errors')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    # directory = resultDir + 'predicted-azimuth-error'
-                    # fig = plt.figure()
-                    # ax = fig.add_subplot(111)
-                    # ax.hist(errorsPosePred[0], bins=18)
-                    # ax.set_xlabel('Angular error')
-                    # ax.set_ylabel('Counts')
-                    # x1, x2 = ax.get_xlim()
-                    # y1, y2 = ax.get_ylim()
-                    # ax.set_xlim((-180, 180))
-                    # ax.set_ylim((y1, y2))
-                    # ax.set_title('Error histogram')
-                    # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    # plt.close(fig)
-                    #
-                    # directory = resultDir + 'predicted-elevation-error'
-                    # fig = plt.figure()
-                    # ax = fig.add_subplot(111)
-                    # ax.hist(errorsPosePred[1], bins=18)
-                    # ax.set_xlabel('Angular error')
-                    # ax.set_ylabel('Counts')
-                    # x1, x2 = ax.get_xlim()
-                    # y1, y2 = ax.get_ylim()
-                    # ax.set_xlim((-90, 90))
-                    # ax.set_ylim((y1, y2))
-                    # ax.set_title('Error histogram')
-                    # fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    # plt.close(fig)
-                    #
-                    # # Fitted predictions plots:
-                    #
-                    # directory = resultDir + 'fitted-azimuth-error'
-                    # if not optimizationTypeDescr[optimizationType] == 'predict':
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111)
-                    #     ax.hist(errorsPoseFitted[0], bins=18)
-                    #     ax.set_xlabel('Angular error')
-                    #     ax.set_ylabel('Counts')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((-180, 180))
-                    #     ax.set_ylim((y1, y2))
-                    #     ax.set_title('Error histogram')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-                    #
-                    #     directory = resultDir + 'fitted-elevation-error'
-                    #     fig = plt.figure()
-                    #     ax = fig.add_subplot(111)
-                    #     ax.hist(errorsPoseFitted[1], bins=18)
-                    #     ax.set_xlabel('Angular error')
-                    #     ax.set_ylabel('Counts')
-                    #     x1, x2 = ax.get_xlim()
-                    #     y1, y2 = ax.get_ylim()
-                    #     ax.set_xlim((-90, 90))
-                    #     ax.set_ylim((y1, y2))
-                    #     ax.set_title('Error histogram')
-                    #     fig.savefig(directory + '-performance-scatter.png', bbox_inches='tight')
-                    #     plt.close(fig)
-
-                    # Write statistics to file.
-
-                    import tabulate
-
-                    headers = ["Errors"] + methodsPred
-
-                    table = [["Azimuth"] +  meanAbsErrAzsList,
-                             ["Elevation"] + meanAbsErrElevsList,
-                             ["VColor C"] + meanErrorsVColorsCList,
-                             ["SH Light"] + meanErrorsLightCoeffsList,
-                             ["SH Light C"] + meanErrorsLightCoeffsCList,
-                             ["SH Env Map"] + meanErrorsEnvMapList,
-                             ["Shape Params"] + meanErrorsShapeParamsList,
-                             ["Shape Vertices"] + meanErrorsShapeVerticesList
-                             ]
-                    performanceTable = tabulate.tabulate(table, headers=headers, tablefmt="latex", floatfmt=".3f")
-                    with open(resultDirOcclusion + 'performance.tex', 'w') as expfile:
-                        expfile.write(performanceTable)
-
-                    headers = ["", "l=0", "SH $l=0,m=-1$", "SH $l=1,m=0$", "SH $l=1,m=1$", "SH $l=1,m=-2$", "SH $l=2,m=-1$",
-                               "SH $l=2,m=0$", "SH $l=2,m=1$", "SH $l=2,m=2$"]
-
-
-                    for method_i in range(len(azimuths)):
-
-                        SMSE_SH = np.mean(errorsLightCoeffsList[method_i][setUnderOcclusionLevel], axis=0)
-                        table = [
-                            [SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2], SMSE_SH[3], SMSE_SH[4], SMSE_SH[5], SMSE_SH[6], SMSE_SH[7],
-                             SMSE_SH[8]],
-                        ]
-                        performanceTable = tabulate.tabulate(table, headers=headers, tablefmt="latex", floatfmt=".3f")
-                        with open(resultDir + 'performance_SH_' + methodsPred[method_i] + '.tex', 'w') as expfile:
-                            expfile.write(performanceTable)
-
-                        #     expfile.write(performanceTable)
-
-                        SMSE_SH = np.mean(errorsLightCoeffsCList[method_i][setUnderOcclusionLevel], axis=0)
-                        table = [
-                            [SHModel, SMSE_SH[0], SMSE_SH[1], SMSE_SH[2], SMSE_SH[3], SMSE_SH[4], SMSE_SH[5], SMSE_SH[6], SMSE_SH[7],
-                             SMSE_SH[8]],
-                        ]
-                        performanceTable = tabulate.tabulate(table, headers=headers, tablefmt="latex", floatfmt=".3f")
-                        with open(resultDir + 'performance_SH_C_' + methodsPred[method_i] + '.tex', 'w') as expfile:
-                            expfile.write(performanceTable)
-
-
-                        if useShapeModel:
-                            SMSE_SHAPE_PARAMS = np.mean(errorsShapeParamsList[method_i][setUnderOcclusionLevel], axis=0)
-                            table = [[SHModel, SMSE_SHAPE_PARAMS[0], SMSE_SHAPE_PARAMS[1], SMSE_SHAPE_PARAMS[2], SMSE_SHAPE_PARAMS[3],
-                                      SMSE_SHAPE_PARAMS[4], SMSE_SHAPE_PARAMS[5], SMSE_SHAPE_PARAMS[6], SMSE_SHAPE_PARAMS[7],
-                                      SMSE_SHAPE_PARAMS[8], SMSE_SHAPE_PARAMS[9]]]
-                            performanceTable = tabulate.tabulate(table, headers=headers, tablefmt="latex", floatfmt=".3f")
-                            with open(resultDir + 'performance_ShapeParams_' + methodsPred[method_i] + '.tex', 'w') as expfile:
-                                expfile.write(performanceTable)
-
-                plt.ion()
-                print("Finished backprojecting and fitting estimates.")
+                # if optimizationTypeDescr[optimizationType] != 'predict':
+                #     print("Avg Likelihood improvement per second of: " + str(np.mean(fittedErrorFuns - predictedErrorFuns)/ totalTime))
+                    ##Print and plotting results now:
