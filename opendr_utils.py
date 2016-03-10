@@ -27,7 +27,6 @@ class TheanoFunOnOpenDR(Ch):
 
     initialized = False
 
-
     def compileFunctions(self, theano_output, theano_input, dim_output, theano_input_gt, theano_output_gt):
         import theano
         import theano.tensor as T

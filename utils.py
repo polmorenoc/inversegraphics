@@ -115,24 +115,25 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDir + 'shcoeffsserrorsC_fitted-shEnvMap'
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, aspect='equal')
-    scat = ax.scatter(np.mean(errorsEnvMap, axis=(1, 2)), np.mean(errorsFittedEnvMap, axis=(1, 2)), s=20,
-                      vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-    ax.set_xlabel('Predicted SH coefficients errors')
-    ax.set_ylabel('Fitted SH coefficients errors')
-    x1, x2 = ax.get_xlim()
-    y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, max(x2,y2)))
-    ax.set_ylim((0, max(x2,y2)))
-    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('Recognition vs fitted SH Environment map errors')
-    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
-    plt.close(fig)
+    if errorsEnvMap is not None and  errorsFittedEnvMap is not None:
+        directory = resultDir + 'shcoeffsserrorsC_fitted-shEnvMap'
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+        scat = ax.scatter(errorsEnvMap, errorsFittedEnvMap, s=20,
+                          vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+        cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+        cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+        ax.set_xlabel('Predicted SH coefficients errors')
+        ax.set_ylabel('Fitted SH coefficients errors')
+        x1, x2 = ax.get_xlim()
+        y1, y2 = ax.get_ylim()
+        ax.set_xlim((0, max(x2,y2)))
+        ax.set_ylim((0, max(x2,y2)))
+        ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+        ax.set_title('Recognition vs fitted SH Environment map errors')
+        fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+        plt.close(fig)
 
     directory = resultDir + 'shcoeffsserrors_fitted-shcoeffsserrors'
     # Show scatter correlations with occlusions.
@@ -173,24 +174,25 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
         fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
         plt.close(fig)
 
-        directory = resultDir + 'shapeverticeserrors_fitted-shapeverticesserrors'
-        # Show scatter correlations with occlusions.
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
-        scat = ax.scatter(errorsShapeVertices, errorsFittedShapeVertices, s=20, vmin=0, vmax=100,
-                          c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
-        cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-        cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-        ax.set_xlabel('Predicted shape vertices errors')
-        ax.set_ylabel('Fitted shape vertices errors')
-        x1, x2 = ax.get_xlim()
-        y1, y2 = ax.get_ylim()
-        ax.set_xlim((0, max(x2,y2)))
-        ax.set_ylim((0, max(x2,y2)))
-        ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-        ax.set_title('Recognition vs fitted Shape parameters errors')
-        fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
-        plt.close(fig)
+        if errorsShapeVertices is not None and  errorsFittedShapeVertices is not None:
+            directory = resultDir + 'shapeverticeserrors_fitted-shapeverticesserrors'
+            # Show scatter correlations with occlusions.
+            fig = plt.figure()
+            ax = fig.add_subplot(111, aspect='equal')
+            scat = ax.scatter(errorsShapeVertices, errorsFittedShapeVertices, s=20, vmin=0, vmax=100,
+                              c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+            cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+            cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+            ax.set_xlabel('Predicted shape vertices errors')
+            ax.set_ylabel('Fitted shape vertices errors')
+            x1, x2 = ax.get_xlim()
+            y1, y2 = ax.get_ylim()
+            ax.set_xlim((0, max(x2,y2)))
+            ax.set_ylim((0, max(x2,y2)))
+            ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+            ax.set_title('Recognition vs fitted Shape parameters errors')
+            fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+            plt.close(fig)
 
     directory = resultDir + 'vColorsE_fitted-vColorsE'
 
@@ -267,6 +269,7 @@ def saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMeth
     fig.savefig(directory + '-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
+
 def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likelihoods):
     # Show scatter correlations with occlusions.
 
@@ -306,9 +309,27 @@ def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likeliho
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
-def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr):
+def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr,meanErrorsSegmentationArr):
 
     latexify(columns=2)
+
+    directory = resultDir + prefix + 'predictionMeanError-Segmentation'
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for method_i in plotMethodsIndices:
+        if meanErrorsSegmentationArr[method_i] is not None:
+            ax.plot(occlusions, meanErrorsSegmentationArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+    legend = ax.legend(loc=4)
+    ax.set_xlabel('Occlusion (\%)')
+    ax.set_ylabel('Segmentation IoU')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, 100))
+    ax.set_ylim((-0.0, y2))
+    ax.set_title('Cumulative segmentation IoU per occlusion level')
+    fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
+    plt.close(fig)
+
 
     directory = resultDir + prefix + 'predictionMeanError-Azimuth'
     fig = plt.figure()
@@ -514,54 +535,79 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
         azsPred = azimuths[method]
         elevsPred = elevations[method]
         vColorsPred = vColors[method]
-        relLightCoefficientsPred = lightCoeffs[method]
-        approxProjectionsPred = approxProjections[method]
         posteriorsPred = posteriors[method]
+        relLightCoefficientsPred = lightCoeffs[method]
+        if approxProjectionsGT is not None:
+            approxProjectionsPred = approxProjections[method]
 
         if useShapeModel:
             shapeParamsPred = shapeParams[method]
 
-        errorsPosePred = recognition_models.evaluatePrediction(testAzsRel[setTest], testElevsGT[setTest], azsPred[setTest], elevsPred[setTest])
-        errorsPosePredList = errorsPosePredList + [errorsPosePred]
+        if azsPred is not None:
+            errorsPosePred = recognition_models.evaluatePrediction(testAzsRel[setTest], testElevsGT[setTest], azsPred[setTest], elevsPred[setTest])
+            errorsPosePredList = errorsPosePredList + [errorsPosePred]
+        else:
+            errorsPosePredList = errorsPosePredList + [None]
 
-        errorsLightCoeffs = (testLightCoefficientsGTRel[setTest] - relLightCoefficientsPred[setTest]) ** 2
-        errorsLightCoeffsList = errorsLightCoeffsList + [errorsLightCoeffs]
+        if relLightCoefficientsPred is not None:
+            errorsLightCoeffs = (testLightCoefficientsGTRel[setTest] - relLightCoefficientsPred[setTest]) ** 2
+            errorsLightCoeffsList = errorsLightCoeffsList + [errorsLightCoeffs]
+        else:
+            errorsLightCoeffsList = errorsLightCoeffsList + [None]
 
-        if useShapeModel:
+        if useShapeModel and shapeParamsPred is not None:
             errorsShapeParams = (testShapeParamsGT[setTest] - shapeParamsPred[setTest]) ** 2
             errorsShapeParamsList = errorsShapeParamsList + [errorsShapeParams]
 
             errorsShapeVertices = shapeVertexErrors(chShapeParams, chVertices, testShapeParamsGT[setTest], shapeParamsPred[setTest])
             errorsShapeVerticesList = errorsShapeVerticesList + [errorsShapeVertices]
+        else:
+            errorsShapeParamsList = errorsShapeParamsList + [None]
+            errorsShapeVerticesList = errorsShapeVerticesList + [None]
 
 
-        envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsPred.reshape([len(approxProjectionsPred), -1])[setTest], approxProjectionsGT.reshape([len(approxProjectionsGT), -1])[setTest])
-        errorsEnvMap = (approxProjectionsGT[setTest] -  envMapProjScaling[:,None, None]*approxProjectionsPred[setTest])**2
-        errorsEnvMapList=  errorsEnvMapList + [errorsEnvMap]
+        if approxProjectionsGT is not None and approxProjectionsPred is not None:
 
-        envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred[setTest], testLightCoefficientsGTRel[setTest])
-        errorsLightCoeffsC = (testLightCoefficientsGTRel[setTest] - envMapScaling[:,None]* relLightCoefficientsPred[setTest]) ** 2
-        errorsLightCoeffsCList = errorsLightCoeffsCList + [errorsLightCoeffsC]
+            envMapProjScaling = scaleInvariantMSECoeff(approxProjectionsPred.reshape([len(approxProjectionsPred), -1])[setTest], approxProjectionsGT.reshape([len(approxProjectionsGT), -1])[setTest])
+            errorsEnvMap = np.mean((approxProjectionsGT[setTest] -  envMapProjScaling[:,None, None]*approxProjectionsPred[setTest])**2, axis=(1,2))
 
-        errorsVColorsE = image_processing.eColourDifference(testVColorGT[setTest], vColorsPred[setTest])
-        errorsVColorsEList = errorsVColorsEList + [errorsVColorsE]
+            errorsEnvMapList=  errorsEnvMapList + [errorsEnvMap]
+        else:
+            errorsEnvMapList = errorsEnvMapList + [None]
 
-        errorsVColorsC = image_processing.cColourDifference(testVColorGT[setTest], vColorsPred[setTest])
-        errorsVColorsCList = errorsVColorsCList + [errorsVColorsC]
+        if relLightCoefficientsPred is not None:
+            envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred[setTest], testLightCoefficientsGTRel[setTest])
+            errorsLightCoeffsC = (testLightCoefficientsGTRel[setTest] - envMapScaling[:,None]* relLightCoefficientsPred[setTest]) ** 2
+
+            errorsLightCoeffsCList = errorsLightCoeffsCList + [errorsLightCoeffsC]
+        else:
+            errorsLightCoeffsCList = errorsLightCoeffsCList + [None]
+
+        if vColorsPred is not None:
+            errorsVColorsE = image_processing.eColourDifference(testVColorGT[setTest], vColorsPred[setTest])
+            errorsVColorsEList = errorsVColorsEList + [errorsVColorsE]
+
+            errorsVColorsC = image_processing.cColourDifference(testVColorGT[setTest], vColorsPred[setTest])
+            errorsVColorsCList = errorsVColorsCList + [errorsVColorsC]
+        else:
+            errorsVColorsEList = errorsVColorsEList + [None]
+            errorsVColorsCList = errorsVColorsCList + [None]
+
+        if posteriorsPred is not None:
+            masksCat = np.concatenate([masksGT[:,:,:,None], posteriorsPred[:,:,:,None]], axis=3)
+            errorSegmentation = np.sum(np.all(masksCat, axis=3), axis=(1,2)) / np.sum(np.any(masksCat, axis=3), axis=(1,2))
+            errorsSegmentation = errorsSegmentation + [errorSegmentation]
+
+        else:
+            errorsSegmentation = errorsSegmentation + [None]
 
 
-        masksCat = np.concatenate([masksGT[:,None], posteriorsPred[:,None]], axis=3)
-        errorSegmentation = np.all(masksCat, axis=3) / np.any(masksCat, axis=3)
-
-        errorsSegmentation = errorsSegmentation + [errorSegmentation]
 
     return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation
 
-def computeErrorMeans(testSet, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation):
+def computeErrorAverages(averageFun, testSet, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation):
     meanAbsErrAzsList = []
     meanAbsErrElevsList = []
-    medianAbsErrAzsList = []
-    medianAbsErrElevsList = []
     meanErrorsLightCoeffsList = []
     meanErrorsShapeParamsList = []
     meanErrorsShapeVerticesList = []
@@ -572,27 +618,59 @@ def computeErrorMeans(testSet, useShapeModel, errorsPosePredList, errorsLightCoe
     meanErrorsSegmentation = []
 
     for method_i in range(len(errorsPosePredList)):
-        meanAbsErrAzsList = meanAbsErrAzsList + [np.mean(np.abs(errorsPosePredList[method_i][0][testSet]))]
-        meanAbsErrElevsList = meanAbsErrElevsList + [np.mean(np.abs(errorsPosePredList[method_i][1][testSet]))]
+        if errorsPosePredList[method_i] is not None:
+            meanAbsErrAzsList = meanAbsErrAzsList + [averageFun(np.abs(errorsPosePredList[method_i][0][testSet]))]
+        else:
+            meanAbsErrAzsList = meanAbsErrAzsList + [None]
 
-        medianAbsErrAzsList = medianAbsErrAzsList + [np.median(np.abs(errorsPosePredList[method_i][0][testSet]))]
-        medianAbsErrElevsList = medianAbsErrElevsList + [np.median(np.abs(errorsPosePredList[method_i][1][testSet]))]
+        if errorsPosePredList[method_i] is not None:
+            meanAbsErrElevsList = meanAbsErrElevsList + [averageFun(np.abs(errorsPosePredList[method_i][1][testSet]))]
+        else:
+            meanAbsErrElevsList  = meanAbsErrElevsList  + [None]
 
-        meanErrorsLightCoeffsList = meanErrorsLightCoeffsList + [np.mean(np.mean(errorsLightCoeffsList[method_i][testSet],axis=1), axis=0)]
+        if errorsLightCoeffsList[method_i] is not None:
+            meanErrorsLightCoeffsList = meanErrorsLightCoeffsList + [averageFun(averageFun(errorsLightCoeffsList[method_i][testSet],axis=1), axis=0)]
+        else:
+            meanErrorsLightCoeffsList = meanErrorsLightCoeffsList + [None]
 
         if useShapeModel:
-            meanErrorsShapeParamsList = meanErrorsShapeParamsList + [np.mean(np.mean(errorsShapeParamsList[method_i][testSet],axis=1), axis=0)]
-            meanErrorsShapeVerticesList = meanErrorsShapeVerticesList + [np.mean(errorsShapeVerticesList[method_i][testSet], axis=0)]
+            if errorsShapeParamsList[method_i] is not None:
+                meanErrorsShapeParamsList = meanErrorsShapeParamsList + [averageFun(np.mean(errorsShapeParamsList[method_i][testSet],axis=1), axis=0)]
+            else:
+                meanErrorsShapeParamsList = meanErrorsShapeParamsList + [None]
 
-        meanErrorsLightCoeffsCList = meanErrorsLightCoeffsCList + [np.mean(np.mean(errorsLightCoeffsCList[method_i][testSet],axis=1), axis=0)]
-        meanErrorsEnvMapList = meanErrorsEnvMapList + [np.mean(errorsEnvMapList[method_i][testSet])]
-        meanErrorsVColorsEList = meanErrorsVColorsEList + [np.mean(errorsVColorsEList[method_i][testSet], axis=0)]
-        meanErrorsVColorsCList = meanErrorsVColorsCList + [np.mean(errorsVColorsCList[method_i][testSet], axis=0)]
+            if errorsShapeVerticesList[method_i] is not None:
+                meanErrorsShapeVerticesList = meanErrorsShapeVerticesList + [averageFun(errorsShapeVerticesList[method_i][testSet], axis=0)]
+            else:
+                meanErrorsShapeVerticesList = meanErrorsShapeVerticesList + [None]
 
-        meanErrorsSegmentation = meanErrorsSegmentation + [np.mean(errorsSegmentation[method_i][testSet], axis=0)]
+        if errorsLightCoeffsCList[method_i] is not None:
+            meanErrorsLightCoeffsCList = meanErrorsLightCoeffsCList + [averageFun(np.mean(errorsLightCoeffsCList[method_i][testSet],axis=1), axis=0)]
+        else:
+            meanErrorsLightCoeffsCList = meanErrorsLightCoeffsCList + [None]
+
+        if errorsEnvMapList[method_i] is not None:
+            meanErrorsEnvMapList = meanErrorsEnvMapList + [averageFun(errorsEnvMapList[method_i][testSet])]
+        else:
+            meanErrorsEnvMapList = meanErrorsEnvMapList + [None]
+
+        if errorsVColorsEList[method_i] is not None:
+            meanErrorsVColorsEList = meanErrorsVColorsEList + [averageFun(errorsVColorsEList[method_i][testSet], axis=0)]
+        else:
+            meanErrorsVColorsEList = meanErrorsVColorsEList + [None]
+
+        if errorsVColorsCList[method_i] is not None:
+            meanErrorsVColorsCList = meanErrorsVColorsCList + [averageFun(errorsVColorsCList[method_i][testSet], axis=0)]
+        else:
+            meanErrorsVColorsCList = meanErrorsVColorsCList + [None]
+
+        if errorsSegmentation[method_i] is not None:
+            meanErrorsSegmentation = meanErrorsSegmentation + [averageFun(errorsSegmentation[method_i][testSet], axis=0)]
+        else:
+            meanErrorsSegmentation = meanErrorsSegmentation + [None]
 
 
-    return meanAbsErrAzsList, meanAbsErrElevsList, medianAbsErrAzsList, medianAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentation
+    return meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentation
 
 
 def writeImagesHdf5(imagesDir, writeDir, imageSet, writeGray=False ):
