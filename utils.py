@@ -10,10 +10,107 @@ import matplotlib
 
 __author__ = 'pol'
 import recognition_models
+import pickle
+
+
+
+
+def joinExperiments(resultDir1, resultDir2):
+    with open(resultDir1 + 'experiment.pickle', 'rb') as pfile:
+        experimentDic = pickle.load(pfile)
+
+    testSet1 = experimentDic['testSet']
+    methodsPred1 = experimentDic['methodsPred']
+    testOcclusions1 = experimentDic[ 'testOcclusions']
+    testPrefixBase1 = experimentDic[ 'testPrefixBase']
+    parameterRecognitionModels1 = experimentDic[ 'parameterRecognitionModels']
+    azimuths1 = experimentDic[ 'azimuths']
+    elevations1 = experimentDic[ 'elevations']
+    vColors1 = experimentDic[ 'vColors']
+    lightCoeffs1 = experimentDic[ 'lightCoeffs']
+    likelihoods1 = experimentDic['likelihoods']
+    shapeParams1 = experimentDic['shapeParams']
+
+    with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
+        experimentDic = pickle.load(pfile)
+
+    methodsPred2 = experimentDic['methodsPred']
+    testSet2 = experimentDic['testSet']
+    testOcclusions2 = experimentDic[ 'testOcclusions']
+    testPrefixBase2 = experimentDic[ 'testPrefixBase']
+    parameterRecognitionModels2 = experimentDic[ 'parameterRecognitionModels']
+    azimuths2 = experimentDic[ 'azimuths']
+    elevations2 = experimentDic[ 'elevations']
+    vColors2 = experimentDic[ 'vColors']
+    lightCoeffs2 = experimentDic[ 'lightCoeffs']
+    likelihoods2 = experimentDic['likelihoods']
+    shapeParams2 = experimentDic['shapeParams']
+
+    testSet = np.append(testSet1, testSet2)
+    parameterRecognitionModels = [parameterRecognitionModels1] + [parameterRecognitionModels2]
+    testPrefixBase = [testPrefixBase1] + [testPrefixBase2]
+    methodsPred = methodsPred1
+    testOcclusions = np.append(testOcclusions1, testOcclusions2)
+
+    import os.path
+    if os.path.isfile(resultDir1 + 'segmentations.pickle'):
+        with open(resultDir1 + 'segmentations.pickle', 'rb') as pfile:
+            segmentationsDic1 = pickle.load(pfile)
+        segmentations1 = segmentationsDic1['segmentations']
+    else:
+        segmentations1 = [None]*len(methodsPred1)
+
+    if os.path.isfile(resultDir2 + 'segmentations.pickle'):
+        with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
+            segmentationsDic2 = pickle.load(pfile)
+        segmentations2 = segmentationsDic2['segmentations']
+    else:
+        segmentations2 = [None]*len(methodsPred1)
+
+    azimuths = []
+    elevations = []
+    vColors = []
+    lightCoeffs = []
+    shapeParams = []
+    likelihoods = []
+    segmentations = []
+
+    for method in range(len(methodsPred)):
+        if azimuths1[method] is not None and azimuths2[method] is not None:
+            azimuths  = azimuths + [np.append(azimuths1[method], azimuths2[method])]
+        else:
+            azimuths  = azimuths + [None]
+        if elevations1[method] is not None and elevations2[method] is not None:
+            elevations = elevations + [np.append(elevations1[method], elevations2[method])]
+        else:
+            elevations = elevations + [None]
+        if vColors1[method] is not None and vColors2[method] is not None:
+            vColors = vColors + [np.vstack([vColors1[method], vColors2[method]])]
+        else:
+            vColors = vColors + [None]
+        if lightCoeffs1[method] is not None and lightCoeffs2[method] is not None:
+            lightCoeffs = lightCoeffs + [np.vstack([lightCoeffs1[method], lightCoeffs2[method]])]
+        else:
+            lightCoeffs = lightCoeffs + [None]
+        if shapeParams1[method] is not None and shapeParams2[method] is not None:
+            shapeParams = shapeParams + [np.vstack([shapeParams1[method], shapeParams2[method]])]
+        else:
+            shapeParams = shapeParams + [None]
+        if likelihoods1[method] is not None and likelihoods2[method] is not None:
+            likelihoods = likelihoods + [np.append(likelihoods1[method], likelihoods2[method])]
+        else:
+            likelihoods = likelihoods + [None]
+
+        if segmentations1[method] is not None and segmentations2[method] is not None:
+            segmentations = segmentations + [np.vstack([segmentations1[method], segmentations2[method]])]
+        else:
+            segmentations = segmentations + [None]
+
+    return testSet, parameterRecognitionModels, testPrefixBase, methodsPred, testOcclusions, azimuths, elevations, vColors, lightCoeffs, shapeParams, likelihoods, segmentations
 
 def latexify(fig_width=None, fig_height=None, columns=1):
     """Set up matplotlib's RC params for LaTeX plotting.
-    Call this before plotting a figure.
+    Call this before plotting a figue.
 
     Parameters
     ----------
@@ -29,8 +126,7 @@ def latexify(fig_width=None, fig_height=None, columns=1):
 
     assert(columns in [1,2])
 
-    if fig_width is None:
-        fig_width = 3.39 if columns==1 else 6.9 # width in inches
+    if fig_width is None:        fig_width = 3.39 if columns==1 else 6.9 # width in inches
 
     if fig_height is None:
         golden_mean = (np.sqrt(5)-1.0)/2.0    # Aesthetic ratio
@@ -594,7 +690,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
             errorsVColorsCList = errorsVColorsCList + [None]
 
         if posteriorsPred is not None:
-            masksCat = np.concatenate([masksGT[:,:,:,None], posteriorsPred[:,:,:,None]], axis=3)
+            masksCat = np.concatenate([masksGT[:,:,:,None][setTest], posteriorsPred[:,:,:,None][setTest]], axis=3)
             errorSegmentation = np.sum(np.all(masksCat, axis=3), axis=(1,2)) / np.sum(np.any(masksCat, axis=3), axis=(1,2))
             errorsSegmentation = errorsSegmentation + [errorSegmentation]
 

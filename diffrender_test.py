@@ -267,7 +267,7 @@ rangeTests = np.arange(100,1100)[[807,  23, 635, 674, 697, 792, 253, 594, 628, 9
        903, 382, 856, 615, 679, 485, 320, 803, 952, 891, 899, 512, 702,
         65, 762, 239, 581, 454, 188, 501, 151, 851]][[9, 10, 11, 13, 16, 18, 20]]
 
-rangeTests = np.arange(100,1100)
+rangeTests = np.arange(1100,1433)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -396,7 +396,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = True
 
 method = 1
@@ -1141,7 +1141,8 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 
 errorFun = models[model]
 
-testDescription = 'ECCV2-DETECTFIX-POSESHAPESH'
+testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
+testDescription = 'ECCVNEW-segment' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1162,6 +1163,10 @@ if nearestNeighbours:
 methodsPred = ["Mean Baseline", "Nearest Neighbours", "Recognition", "Fit" ]
 plotColors = ['k', 'm', 'b', 'r']
 
+segmentVColorError = np.array([])
+useSegmentation = True
+
+segmentVColors = []
 for testSetting, model in enumerate(modelTests):
     model = modelTests[testSetting]
     method = methodTests[testSetting]
@@ -1307,6 +1312,7 @@ for testSetting, model in enumerate(modelTests):
                 # meanBaselinePosteriorList = meanBaselinePosteriorList + [np.array(renderer.indices_image==1).copy().astype(np.bool)[None,:]]
                 meanBaselineErrorFuns = np.append(meanBaselineErrorFuns, errorFun.r)
 
+
             stdsSmall = ch.Ch([0.01])
             variancesSmall = stdsSmall ** 2
             negLikModelRobustSmallStd = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variancesSmall))/numPixels
@@ -1346,6 +1352,33 @@ for testSetting, model in enumerate(modelTests):
                 chLightSHCoeffs[:] = lightCoefficientsRel
                 if useShapeModel:
                     chShapeParams[:] = shapeParams
+
+                # from skimage.segmentation import slic
+                # import skimage.segmentation
+                # from skimage.segmentation import mark_boundaries
+                # from skimage.util import img_as_float
+                #
+                #
+                # segments = skimage.segmentation.quickshift(rendererGT.r, ratio=1, max_dist=20, convert2lab=True)
+                # bestVColor = np.array([])
+                # bestVColorIOU = -1000000
+                # bestGlobalVColor = np.array([])
+                # for seg_i in np.arange(np.max(segments)):
+                #     currentSegment = segments == seg_i
+                #     vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+                #     masksCat = np.concatenate([vis_im[:,:,None], currentSegment[:,:,None]], axis=2)
+                #     segmentationIOU = np.sum(np.all(masksCat, axis=2)) / np.sum(np.any(masksCat, axis=2))
+                #     if segmentationIOU > bestVColorIOU:
+                #         if np.sum(np.all(masksCat, axis=2))/np.sum(currentSegment) > 0.6:
+                #             bestVColorIOU = segmentationIOU
+                #             bestVColor = np.median(rendererGT.r[currentSegment].reshape([-1, 3]), axis=0)
+                #
+                #         bestGlobalVColor = np.median(rendererGT.r[currentSegment].reshape([-1, 3]), axis=0)
+
+                # if len(bestVColor!=0):
+                #     segmentVColors = segmentVColors + [bestVColor[None,:]]
+                # else:
+                #     segmentVColors = segmentVColors + [bestGlobalVColor[None,:]]
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
@@ -1499,6 +1532,7 @@ for testSetting, model in enumerate(modelTests):
                 sys.stdout.flush()
 
                 ## Finally: Do Fitting!
+                reverted = False
 
                 if optimizationTypeDescr[optimizationType] == 'optimize':
                     print("** Minimizing from initial predicted parameters. **")
@@ -1512,13 +1546,13 @@ for testSetting, model in enumerate(modelTests):
                     options={'disp':False, 'maxiter':40}
 
                     minimizingShape = True
-                    reverted = False
+
 
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                     maxShapeSize = 4
                     largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    if np.any(largeShapeParams) or chEl.r > np.pi/2 or chEl.r < 0 or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
+                    if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
                         print("Warning: found large shape parameters to fix!")
                         reverted = True
                     # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
@@ -1545,7 +1579,7 @@ for testSetting, model in enumerate(modelTests):
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                     largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                    if np.any(largeShapeParams) or chEl.r >= np.pi/2-0.05 or chEl.r <= 0.05 or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
+                    if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
                         print("Warning: found large shape parameters to fix!")
                         reverted = True
                         cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
@@ -1602,10 +1636,8 @@ for testSetting, model in enumerate(modelTests):
 
                 plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
-
-
             #Every now and then (or after the final test case), produce plots to keep track of work accross different levels of occlusion.
-            if np.mod(test_i+1,10) == 0 or test_i + 1 >= len(testSet):
+            if np.mod(test_i+1,100) == 0 or test_i + 1 >= len(testSet):
                 if approxProjectionsPredList:
                     approxProjectionsPred = np.vstack(approxProjectionsPredList)
                 if approxProjectionsGTList:
@@ -1725,8 +1757,13 @@ for testSetting, model in enumerate(modelTests):
                     segmentations = segmentations + [None]
                     shapeParams = shapeParams + [None]
 
+
+                # segmentVColors = np.vstack(segmentVColors)
+                # errorsVColorsCSegment = image_processing.cColourDifference(testVColorGT[numFitted], segmentVColors)
+
                 errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList \
                     = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
+
 
                 meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentationList \
                     = computeErrorAverages(np.mean, numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)

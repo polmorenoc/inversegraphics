@@ -26,6 +26,33 @@ useShapeModel = True
 # OpenDR Initialization starts here
 #########################################
 
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCVNEW-JOINED'
+resultDir = 'results/' + testPrefix + '/'
+
+testPrefix1 = 'train4_occlusion_shapemodel_10k_ECCV_detection2'
+resultDir1= 'results/' + testPrefix1 + '/'
+
+testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV_detection3'
+resultDir2= 'results/' + testPrefix1 + '/'
+
+testSet, parameterRecognitionModels, testPrefixBase, methodsPred, testOcclusions, azimuths, elevations, vColors, lightCoeffs, shapeParams, likelihoods, segmentations \
+    = joinExperiments(resultDir1, resultDir2)
+
+ipdb.set_trace()
+
+rangeTests = np.arange(len(azimuths[0]))
+
+segmentationsDic = {'segmentations':segmentations}
+with open(resultDir + 'segmentations.pickle', 'wb') as pfile:
+    pickle.dump(segmentationsDic, pfile)
+
+experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
+
+with open(resultDir + 'experiment.pickle', 'wb') as pfile:
+    pickle.dump(experimentDic, pfile)
+
+ipdb.set_trace()
+
 #Main script options:
 
 glModes = ['glfw','mesa']
@@ -588,26 +615,27 @@ if not os.path.exists(resultDir +  'imgs/samples/'):
 
 SHModel = ""
 
-testi = 0
-badShapes = np.array([],dtype=np.bool)
-for testCase in range(len(testSet)):
-    badShape = False
-    shapeVals = shapeParams[4][testCase]
-    chShapeParams[:] = shapeVals
-    shapeNorm = np.linalg.norm(chVertices.r - chVerticesMean)
-    if np.linalg.norm(chVertices.r - chVerticesMean) >= 3:
-        badShape = True
-    badShapes = np.append(badShapes, badShape)
-    testi = testi + 1
+# testi = 0
+# badShapes = np.array([],dtype=np.bool)
+# for testCase in range(len(testSet)):
+#     badShape = False
+#     shapeVals = shapeParams[4][testCase]
+#     chShapeParams[:] = shapeVals
+#     shapeNorm = np.linalg.norm(chVertices.r - chVerticesMean)
+#     if np.linalg.norm(chVertices.r - chVerticesMean) >= 3:
+#         badShape = True
+#     badShapes = np.append(badShapes, badShape)
+#     testi = testi + 1
+#
+# detected = np.logical_or.reduce([np.any(shapeParams[4] >= 4, axis=1), elevations[4] >= np.pi/2 - 0.05, elevations[4] <= 0.05, badShapes])
+# robustIdx = 4
+#
+# azimuths[robustIdx][detected] = azimuths[2][detected]
+# elevations[robustIdx][detected] = elevations[2][detected]
+# vColors[robustIdx][detected] = vColors[2][detected]
+# lightCoeffs[robustIdx][detected] = lightCoeffs[2][detected]
+# shapeParams[robustIdx][detected] = shapeParams[2][detected]
 
-detected = np.logical_or.reduce([np.any(shapeParams[4] >= 4, axis=1), elevations[4] >= np.pi/2 - 0.05, elevations[4] <= 0.05, badShapes])
-robustIdx = 4
-
-azimuths[robustIdx][detected] = azimuths[2][detected]
-elevations[robustIdx][detected] = elevations[2][detected]
-vColors[robustIdx][detected] = vColors[2][detected]
-lightCoeffs[robustIdx][detected] = lightCoeffs[2][detected]
-shapeParams[robustIdx][detected] = shapeParams[2][detected]
 
 errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, _, _, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList \
         = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, None,  None, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
