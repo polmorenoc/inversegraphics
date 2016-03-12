@@ -42,7 +42,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
-gtPrefix = 'train4_occlusion_shapemodel'
+gtPrefix = 'train4_occlusion_shapemodel_tmp'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
 trainPrefixVColor = 'train4_occlusion_shapemodel_10k'
@@ -267,9 +267,11 @@ rangeTests = np.arange(100,1100)[[807,  23, 635, 674, 697, 792, 253, 594, 628, 9
        903, 382, 856, 615, 679, 485, 320, 803, 952, 891, 899, 512, 702,
         65, 762, 239, 581, 454, 188, 501, 151, 851]][[9, 10, 11, 13, 16, 18, 20]]
 
-rangeTests = np.arange(1100,1433)
+rangeTests = np.arange(0,1000)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
+
+testSet = np.array([539])
 
 numTests = len(testSet)
 
@@ -350,46 +352,47 @@ testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 
+
 ##Read Training set labels
 
-trainSet = np.load(experimentDir + 'train.npy')
-
-shapeGT = gtDataFile[gtPrefix].shape
-boolTrainSet = np.zeros(shapeGT).astype(np.bool)
-boolTrainSet[trainSet] = True
-trainGroundTruth = gtDataFile[gtPrefix][boolTrainSet]
-groundTruthTrain = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
-groundTruthTrain[boolTrainSet] = trainGroundTruth
-groundTruthTrain = groundTruthTrain[trainSet]
-dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
-train = np.arange(len(trainSet))
-
-testSet = testSet[test]
-
-print("Reading experiment.")
-trainAzsGT = groundTruthTrain['trainAzsGT']
-trainObjAzsGT = groundTruthTrain['trainObjAzsGT']
-trainElevsGT = groundTruthTrain['trainElevsGT']
-trainLightAzsGT = groundTruthTrain['trainLightAzsGT']
-trainLightElevsGT = groundTruthTrain['trainLightElevsGT']
-trainLightIntensitiesGT = groundTruthTrain['trainLightIntensitiesGT']
-trainVColorGT = groundTruthTrain['trainVColorGT']
-trainScenes = groundTruthTrain['trainScenes']
-trainTeapotIds = groundTruthTrain['trainTeapotIds']
-trainEnvMaps = groundTruthTrain['trainEnvMaps']
-trainOcclusions = groundTruthTrain['trainOcclusions']
-trainTargetIndices = groundTruthTrain['trainTargetIndices']
-trainLightCoefficientsGT = groundTruthTrain['trainLightCoefficientsGT']
-trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
-trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
-trainIds = groundTruthTrain['trainIds']
-
-if useShapeModel:
-    trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
-
-trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None]
-
-trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
+# trainSet = np.load(experimentDir + 'train.npy')
+#
+# shapeGT = gtDataFile[gtPrefix].shape
+# boolTrainSet = np.zeros(shapeGT).astype(np.bool)
+# boolTrainSet[trainSet] = True
+# trainGroundTruth = gtDataFile[gtPrefix][boolTrainSet]
+# groundTruthTrain = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
+# groundTruthTrain[boolTrainSet] = trainGroundTruth
+# groundTruthTrain = groundTruthTrain[trainSet]
+# dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
+# train = np.arange(len(trainSet))
+#
+# testSet = testSet[test]
+#
+# print("Reading experiment.")
+# trainAzsGT = groundTruthTrain['trainAzsGT']
+# trainObjAzsGT = groundTruthTrain['trainObjAzsGT']
+# trainElevsGT = groundTruthTrain['trainElevsGT']
+# trainLightAzsGT = groundTruthTrain['trainLightAzsGT']
+# trainLightElevsGT = groundTruthTrain['trainLightElevsGT']
+# trainLightIntensitiesGT = groundTruthTrain['trainLightIntensitiesGT']
+# trainVColorGT = groundTruthTrain['trainVColorGT']
+# trainScenes = groundTruthTrain['trainScenes']
+# trainTeapotIds = groundTruthTrain['trainTeapotIds']
+# trainEnvMaps = groundTruthTrain['trainEnvMaps']
+# trainOcclusions = groundTruthTrain['trainOcclusions']
+# trainTargetIndices = groundTruthTrain['trainTargetIndices']
+# trainLightCoefficientsGT = groundTruthTrain['trainLightCoefficientsGT']
+# trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
+# trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
+# trainIds = groundTruthTrain['trainIds']
+#
+# if useShapeModel:
+#     trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
+#
+# trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None]
+#
+# trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
@@ -479,6 +482,14 @@ if useShapeModel:
 
 else:
     renderer = renderer_teapots[testRenderer]
+
+chAz[:] =testAzsRel
+chEl[:] = testElevsGT
+chVColors[:] =testVColorGT
+chShapeParams[:] =testShapeParamsGT
+chLightSHCoeffs[:] = testLightCoefficientsGTRel
+
+ipdb.set_trace()
 
 nearGTOffsetRelAz = 0
 nearGTOffsetEl = 0

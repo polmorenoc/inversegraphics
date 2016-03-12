@@ -15,57 +15,13 @@ import pickle
 
 
 
-def joinExperiments(resultDir1, resultDir2):
-    with open(resultDir1 + 'experiment.pickle', 'rb') as pfile:
-        experimentDic = pickle.load(pfile)
-
-    testSet1 = experimentDic['testSet']
-    methodsPred1 = experimentDic['methodsPred']
-    testOcclusions1 = experimentDic[ 'testOcclusions']
-    testPrefixBase1 = experimentDic[ 'testPrefixBase']
-    parameterRecognitionModels1 = experimentDic[ 'parameterRecognitionModels']
-    azimuths1 = experimentDic[ 'azimuths']
-    elevations1 = experimentDic[ 'elevations']
-    vColors1 = experimentDic[ 'vColors']
-    lightCoeffs1 = experimentDic[ 'lightCoeffs']
-    likelihoods1 = experimentDic['likelihoods']
-    shapeParams1 = experimentDic['shapeParams']
-
-    with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
-        experimentDic = pickle.load(pfile)
-
-    methodsPred2 = experimentDic['methodsPred']
-    testSet2 = experimentDic['testSet']
-    testOcclusions2 = experimentDic[ 'testOcclusions']
-    testPrefixBase2 = experimentDic[ 'testPrefixBase']
-    parameterRecognitionModels2 = experimentDic[ 'parameterRecognitionModels']
-    azimuths2 = experimentDic[ 'azimuths']
-    elevations2 = experimentDic[ 'elevations']
-    vColors2 = experimentDic[ 'vColors']
-    lightCoeffs2 = experimentDic[ 'lightCoeffs']
-    likelihoods2 = experimentDic['likelihoods']
-    shapeParams2 = experimentDic['shapeParams']
+def joinExperiments(testSet1,methodsPred1,testOcclusions1,testPrefixBase1,parameterRecognitionModels1,azimuths1,elevations1,vColors1,lightCoeffs1,likelihoods1,shapeParams1,segmentations1,testSet2,methodsPred2,testOcclusions2,testPrefixBase2,parameterRecognitionModels2,azimuths2,elevations2,vColors2,lightCoeffs2,likelihoods2,shapeParams2,segmentations2):
 
     testSet = np.append(testSet1, testSet2)
     parameterRecognitionModels = [parameterRecognitionModels1] + [parameterRecognitionModels2]
     testPrefixBase = [testPrefixBase1] + [testPrefixBase2]
     methodsPred = methodsPred1
     testOcclusions = np.append(testOcclusions1, testOcclusions2)
-
-    import os.path
-    if os.path.isfile(resultDir1 + 'segmentations.pickle'):
-        with open(resultDir1 + 'segmentations.pickle', 'rb') as pfile:
-            segmentationsDic1 = pickle.load(pfile)
-        segmentations1 = segmentationsDic1['segmentations']
-    else:
-        segmentations1 = [None]*len(methodsPred1)
-
-    if os.path.isfile(resultDir2 + 'segmentations.pickle'):
-        with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
-            segmentationsDic2 = pickle.load(pfile)
-        segmentations2 = segmentationsDic2['segmentations']
-    else:
-        segmentations2 = [None]*len(methodsPred1)
 
     azimuths = []
     elevations = []
@@ -118,7 +74,6 @@ def latexify(fig_width=None, fig_height=None, columns=1):
     fig_height : float,  optional, inches
     columns : {1, 2}
     """
-
     # code adapted from http://www.scipy.org/Cookbook/Matplotlib/LaTeX_Examples
 
     # Width and max height in inches for IEEE journals taken from
@@ -210,7 +165,6 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     ax.set_title('Recognition vs fitted SH coefficients errors')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
-
 
     if errorsEnvMap is not None and  errorsFittedEnvMap is not None:
         directory = resultDir + 'shcoeffsserrorsC_fitted-shEnvMap'
@@ -417,12 +371,12 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
             ax.plot(occlusions, meanErrorsSegmentationArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend(loc=4)
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Segmentation IoU')
+    ax.set_ylabel('Segmentation Accuracy')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative segmentation IoU per occlusion level')
+    # ax.set_title('Cumulative segmentation accuracy per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -432,14 +386,14 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
         ax.plot(occlusions, meanAbsErrAzsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-    legend = ax.legend()
+    legend = ax.legend(loc=7)
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Angular error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -455,7 +409,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -464,14 +418,14 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
         ax.plot(occlusions, meanErrorsVColorsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-    legend = ax.legend()
+    legend = ax.legend(loc=7)
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('VColor Error')
+    ax.set_ylabel('Appearance Error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -482,12 +436,12 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         ax.plot(occlusions, meanErrorsVColorsEArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Vertex Color error')
+    ax.set_ylabel('Appearance error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -496,14 +450,14 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
         ax.plot(occlusions, meanErrorsLightCoeffsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-    legend = ax.legend()
+    legend = ax.legend(loc=4)
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Mean SH coefficients error')
+    ax.set_ylabel('Illumination error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -515,13 +469,13 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
             ax.plot(occlusions, meanErrorsShapeParamsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
         legend = ax.legend()
         ax.set_xlabel('Occlusion (\%)')
-        ax.set_ylabel('Mean Shape Parameters error')
+        ax.set_ylabel('Shape Parameters error')
 
         x1, x2 = ax.get_xlim()
         y1, y2 = ax.get_ylim()
         ax.set_xlim((0, 100))
         ax.set_ylim((-0.0, y2))
-        ax.set_title('Cumulative prediction per occlusion level')
+        # ax.set_title('Cumulative prediction per occlusion level')
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
         plt.close(fig)
 
@@ -530,7 +484,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         ax = fig.add_subplot(111)
         for method_i in plotMethodsIndices:
             ax.plot(occlusions, meanErrorsShapeVerticesArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-        legend = ax.legend()
+        legend = ax.legend(loc=4)
         ax.set_xlabel('Occlusion (\%)')
         ax.set_ylabel('Shape vertices error')
 
@@ -538,7 +492,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         y1, y2 = ax.get_ylim()
         ax.set_xlim((0, 100))
         ax.set_ylim((-0.0, y2))
-        ax.set_title('Cumulative prediction per occlusion level')
+        # ax.set_title('Cumulative prediction per occlusion level')
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
         plt.close(fig)
 
@@ -549,7 +503,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         ax.plot(occlusions, meanErrorsLightCoeffsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('SH coefficients error')
+    ax.set_ylabel('Illumination error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
@@ -563,14 +517,14 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
         ax.plot(occlusions, meanErrorsEnvMapArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-    legend = ax.legend()
+    legend = ax.legend(loc=4)
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('SH Environment Map error change')
+    ax.set_ylabel('Illumination error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 
@@ -628,6 +582,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
 
     for method in range(len(azimuths)):
 
+        print("Computing errors for method " + str(method))
         azsPred = azimuths[method]
         elevsPred = elevations[method]
         vColorsPred = vColors[method]
