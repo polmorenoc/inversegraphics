@@ -94,12 +94,12 @@ def latexify(fig_width=None, fig_height=None, columns=1):
         fig_height = MAX_HEIGHT_INCHES
 
     params = {'backend': 'pdf',
-              'axes.labelsize': 10, # fontsize for x and y labels (was 10)
-              'axes.titlesize': 10,
-              'text.fontsize': 10, # was 10
-              'legend.fontsize': 10, # was 10
-              'xtick.labelsize': 10,
-              'ytick.labelsize': 10,
+              'axes.labelsize': 16, # fontsize for x and y labels (was 10)
+              'axes.titlesize': 14,
+              'font.size': 14, # was 10
+              'legend.fontsize': 14, # was 10
+              'xtick.labelsize': 14,
+              'ytick.labelsize': 14,
               'text.usetex': True,
               'figure.figsize': [fig_width,fig_height],
               'font.family': 'serif'
@@ -359,6 +359,86 @@ def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likeliho
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
+def saveHistograms():
+    pass
+    # latexify(columns=2)
+
+    # directory = resultDir + 'reconition-azimuth'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.hist(errorsPosePredList[2][0], bins=40)
+    # ax.set_xlabel('Azimuth errors')
+    # ax.set_ylabel('Counts')
+    # ax.set_title('Azimuth errors histogram')
+    # ax.set_xlim((-180, 180))
+    # fig.savefig(directory + '-histogram.pdf', bbox_inches='tight')
+    # plt.close(fig)
+    #
+    # directory = resultDir + 'robust-azimuth'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.hist(errorsPosePredList[4][0], bins=40)
+    # ax.set_xlabel('Azimuth errors')
+    # ax.set_ylabel('Counts')
+    # ax.set_xlim((-180, 180))
+    # ax.set_title('Azimuth errors histogram')
+    # fig.savefig(directory + '-histogram.pdf', bbox_inches='tight')
+    # plt.close(fig)
+    #
+    # directory = resultDir + 'robust-elevation'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.hist(errorsPosePredList[4][1], bins=100)
+    # ax.set_xlabel('Elevation errors')
+    # ax.set_ylabel('Counts')
+    # x1, x2 = ax.get_xlim()
+    # y1, y2 = ax.get_ylim()
+    # ax.set_xlim((-90, 90))
+    # ax.set_title('Elevation errors histogram')
+    # fig.savefig(directory + '-histogram.pdf', bbox_inches='tight')
+    # plt.close(fig)
+    #
+    #
+    # directory = resultDir + 'recognition-elevation'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.hist(errorsPosePredList[2][1], bins=30)
+    # ax.set_xlabel('Elevation errors')
+    # ax.set_ylabel('Counts')
+    # ax.set_title('Elevation errors histogram')
+    # ax.set_xlim((-90, 90))
+    # ax.set_ylim((y1, y2))
+    # fig.savefig(directory + '-histogram.pdf', bbox_inches='tight')
+    # plt.close(fig)
+
+    # directory = resultDir + 'robust-elevation-occlusion'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # scat = ax.scatter(testOcclusions*100, abs(errorsPosePredList[4][1]), s=20, vmin=0, vmax=100)
+    # ax.set_xlabel('Occlusion level (\%)')
+    # ax.set_ylabel('Robust fit elevation errors')
+    # x1, x2 = ax.get_xlim()
+    # y1, y2 = ax.get_ylim()
+    # ax.set_xlim((0, max(x2,y2)))
+    # ax.set_ylim((0, max(x2,y2)))
+    # ax.set_title('Fitted azimuth errors')
+    # fig.savefig(directory + '-scatter.pdf', bbox_inches='tight')
+    # plt.close(fig)
+    #
+    # directory = resultDir + 'recognition-elevation-occlusion'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # scat = ax.scatter(testOcclusions*100, abs(errorsPosePredList[2][1]), s=20, vmin=0, vmax=100)
+    # ax.set_ylabel('Robust fit elevation errors')
+    # ax.set_xlabel('Occlusion level (\%)')
+    # x1, x2 = ax.get_xlim()
+    # y1, y2 = ax.get_ylim()
+    # ax.set_xlim((0, max(x2,y2)))
+    # ax.set_ylim((0, max(x2,y2)))
+    # ax.set_title('Fitted azimuth errors')
+    # fig.savefig(directory + '-scatter.pdf', bbox_inches='tight')
+    # plt.close(fig)
+
 def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr,meanErrorsSegmentationArr):
 
     latexify(columns=2)
@@ -371,7 +451,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
             ax.plot(occlusions, meanErrorsSegmentationArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend(loc=4)
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Segmentation Accuracy')
+    ax.set_ylabel('Segmentation accuracy')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
@@ -385,14 +465,14 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanAbsErrAzsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-    legend = ax.legend(loc=7)
+        ax.semilogy(occlusions, meanAbsErrAzsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+    legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Angular error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
-    ax.set_ylim((-0.0, y2))
+    ax.set_ylim((y1, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
@@ -420,7 +500,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         ax.plot(occlusions, meanErrorsVColorsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend(loc=7)
     ax.set_xlabel('Occlusion (\%)')
-    ax.set_ylabel('Appearance Error')
+    ax.set_ylabel('Appearance error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
@@ -469,7 +549,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
             ax.plot(occlusions, meanErrorsShapeParamsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
         legend = ax.legend()
         ax.set_xlabel('Occlusion (\%)')
-        ax.set_ylabel('Shape Parameters error')
+        ax.set_ylabel('Shape parameters error')
 
         x1, x2 = ax.get_xlim()
         y1, y2 = ax.get_ylim()
@@ -483,15 +563,15 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         fig = plt.figure()
         ax = fig.add_subplot(111)
         for method_i in plotMethodsIndices:
-            ax.plot(occlusions, meanErrorsShapeVerticesArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
-        legend = ax.legend(loc=4)
+            ax.semilogy(occlusions, meanErrorsShapeVerticesArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        legend = ax.legend()
         ax.set_xlabel('Occlusion (\%)')
         ax.set_ylabel('Shape vertices error')
 
         x1, x2 = ax.get_xlim()
         y1, y2 = ax.get_ylim()
         ax.set_xlim((0, 100))
-        ax.set_ylim((-0.0, y2))
+        ax.set_ylim((y1, y2))
         # ax.set_title('Cumulative prediction per occlusion level')
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
         plt.close(fig)

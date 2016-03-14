@@ -5,6 +5,103 @@ from skimage import data, color, exposure
 import numpy as np
 import ipdb
 
+import skimage.color
+
+# def xyz2labCh(xyz, illuminant="D65", observer="2"):
+#     """XYZ to CIE-LAB color space conversion.
+#     Parameters
+#     ----------
+#     xyz : array_like
+#         The image in XYZ format, in a 3- or 4-D array of shape
+#         ``(.., ..,[ ..,] 3)``.
+#     illuminant : {"A", "D50", "D55", "D65", "D75", "E"}, optional
+#         The name of the illuminant (the function is NOT case sensitive).
+#     observer : {"2", "10"}, optional
+#         The aperture angle of the observer.
+#     Returns
+#     -------
+#     out : ndarray
+#         The image in CIE-LAB format, in a 3- or 4-D array of shape
+#         ``(.., ..,[ ..,] 3)``.
+#     Raises
+#     ------
+#     ValueError
+#         If `xyz` is not a 3-D array of shape ``(.., ..,[ ..,] 3)``.
+#     ValueError
+#         If either the illuminant or the observer angle is unsupported or
+#         unknown.
+#     Notes
+#     -----
+#     By default Observer= 2A, Illuminant= D65. CIE XYZ tristimulus values
+#     x_ref=95.047, y_ref=100., z_ref=108.883. See function `get_xyz_coords` for
+#     a list of supported illuminants.
+#     References
+#     ----------
+#     .. [1] http://www.easyrgb.com/index.php?X=MATH&H=07#text7
+#     .. [2] http://en.wikipedia.org/wiki/Lab_color_space
+#     Examples
+#     --------
+#
+#     """
+#     arr = xyz
+#
+#     xyz_ref_white = skimage.color.get_xyz_coords(illuminant, observer)
+#
+#     # scale by CIE XYZ tristimulus values of the reference white point
+#     arr = arr / xyz_ref_white
+#
+#     # Nonlinear distortion and linear transformation
+#     mask = arr > 0.008856
+#     notmask = arr <= 0.008856
+#     arr[mask] = ch.power(arr[mask], 1. / 3.)
+#     arr[notmask] = 7.787 * arr[notmask] + 16. / 116.
+#
+#     x, y, z = arr[..., 0], arr[..., 1], arr[..., 2]
+#
+#     # Vector scaling
+#     L = (116. * y) - 16.
+#     a = 500.0 * (x - y)
+#     b = 200.0 * (y - z)
+#
+#     return ch.concatenate([x[..., np.newaxis] for x in [L, a, b]], axis=-1)
+#
+# def rgb2xyz(rgb):
+#     """RGB to XYZ color space conversion.
+#     Parameters
+#     ----------
+#     rgb : array_like
+#         The image in RGB format, in a 3- or 4-D array of shape
+#         ``(.., ..,[ ..,] 3)``.
+#     Returns
+#     -------
+#     out : ndarray
+#         The image in XYZ format, in a 3- or 4-D array of shape
+#         ``(.., ..,[ ..,] 3)``.
+#     Raises
+#     ------
+#     ValueError
+#         If `rgb` is not a 3- or 4-D array of shape ``(.., ..,[ ..,] 3)``.
+#     Notes
+#     -----
+#     The CIE XYZ color space is derived from the CIE RGB color space. Note
+#     however that this function converts from sRGB.
+#     References
+#     ----------
+#     .. [1] http://en.wikipedia.org/wiki/CIE_1931_color_space
+#     Examples
+#     --------
+#
+#     """
+#     # Follow the algorithm from http://www.easyrgb.com/index.php
+#     # except we don't multiply/divide by 100 in the conversion
+#     arr = rgb
+#     mask = arr > 0.04045
+#     notmask = arr <= 0.04045
+#     arr[mask] = ch.power((arr[mask] + 0.055) / 1.055, 2.4)
+#     arr[notmask] /= 12.92
+#     return _convert(xyz_from_rgb, arr)
+
+
 def cColourDifference(rgb1, rgb2):
     lab1 = cv2.cvtColor(np.uint8(rgb1.reshape([-1,1,3])*255), cv2.COLOR_RGB2LAB)/255
     lab2 = cv2.cvtColor(np.uint8(rgb2.reshape([-1,1,3])*255), cv2.COLOR_RGB2LAB)/255

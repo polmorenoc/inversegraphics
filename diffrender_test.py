@@ -59,7 +59,7 @@ trainModelsDirAppLight = 'train4_occlusion_shapemodel_10k'
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
-width, height = (150, 150)
+width, height = (1000, 1000)
 win = -1
 
 if glMode == 'glfw':
@@ -172,7 +172,7 @@ negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, 
 pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
 pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
 
-post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
+post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'MASK', globalPrior, variances)[0]
 
 
 models = [negLikModel, negLikModelRobust]
@@ -256,16 +256,6 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-rangeTests = [[4,49,75,72,15,43, 88]]
-rangeTests = [[4,49,75, 72]]
-rangeTests = np.arange(100,1100)[[807,  23, 635, 674, 697, 792, 253, 594, 628, 922, 691, 921, 460,
-       311, 636, 682, 261, 541, 568, 689, 705, 209, 917, 941, 227, 551,
-       547, 412, 428, 904,  66, 332, 155, 806, 683, 888, 268, 436, 939,
-       836, 973, 109, 719, 818, 733, 933, 407, 859, 216, 402, 354, 130,
-       298, 840, 804, 656, 424, 821, 348, 288, 847, 414, 789, 842, 912,
-       134, 355, 315, 834, 278, 828, 232,  73, 974,  83, 763, 776, 718,
-       903, 382, 856, 615, 679, 485, 320, 803, 952, 891, 899, 512, 702,
-        65, 762, 239, 581, 454, 188, 501, 151, 851]][[9, 10, 11, 13, 16, 18, 20]]
 
 rangeTests = np.arange(0,1000)
 
@@ -308,6 +298,7 @@ dataIds = groundTruth['trainIds']
 if useShapeModel:
     dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
+
 gtDtype = groundTruth.dtype
 
 testSetFixed = testSet
@@ -319,6 +310,7 @@ for test_it, test_id in enumerate(testSet):
         whereBad = whereBad + [bad]
 
 # testSet = testSetFixed
+
 
 loadFromHdf5 = False
 
@@ -395,6 +387,20 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 # trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
 
+# latexify(columns=2)
+#
+# directory = 'tmp/occlusions'
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# ax.hist(trainOcclusions*100, bins=40)
+# ax.set_xlabel('Occlusion level (\%)')
+# ax.set_ylabel('Counts')
+# ax.set_title('Occlusion histogram')
+# ax.set_xlim(0,100)
+# fig.savefig(directory + '-histogram.pdf', bbox_inches='tight')
+# plt.close(fig)
+
+
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
@@ -437,8 +443,8 @@ if useShapeModel:
 
     #%% Sample random shape Params
     latentDim = np.shape(teapotModel['ppcaW'])[1]
-    shapeParams = np.random.randn(latentDim)
-    chShapeParams = ch.Ch(shapeParams)
+    shapeParams = testShapeParamsGT.ravel()
+    chShapeParams = ch.Ch(shapeParams.copy())
 
     meshLinearTransform=teapotModel['meshLinearTransform']
     W=teapotModel['ppcaW']
@@ -477,7 +483,7 @@ if useShapeModel:
     renderer.msaa = True
     renderer.overdraw = True
 
-    chShapeParams[:] = np.zeros([latentDim])
+    # chShapeParams[:] = np.zeros([latentDim])
     chVerticesMean = chVertices.r.copy()
 
 else:
@@ -486,10 +492,34 @@ else:
 chAz[:] =testAzsRel
 chEl[:] = testElevsGT
 chVColors[:] =testVColorGT
-chShapeParams[:] =testShapeParamsGT
+# chShapeParams[:] = testShapeParamsGT
 chLightSHCoeffs[:] = testLightCoefficientsGTRel
 
+stds[:] = 0.1
+
+loadMask = True
+if loadMask:
+    masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
+
+
+vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.
+rendererGT[:] = srgb2lin(im.copy())
+post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.05
+render = renderer.r.copy()
+render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+
+render[renderer.boundarybool_image.astype(np.bool)] = renderer.r[renderer.boundarybool_image.astype(np.bool)]
+
+cv2.imwrite('renderer' + '.jpeg' , 255*lin2srgb(render[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+cv2.imwrite('rendererGT' + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+# plt.imsave('renderered.png', lin2srgb(render))
+
+
 ipdb.set_trace()
+
+import skimage.color
 
 nearGTOffsetRelAz = 0
 nearGTOffsetEl = 0

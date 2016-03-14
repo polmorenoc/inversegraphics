@@ -35,22 +35,22 @@ useShapeModel = True
 datasetGroundtruth = False
 syntheticGroundtruth = True
 useCycles = True
-demoMode = True
-showSubplots = True
+demoMode = False
+showSubplots = False
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 useGTasBackground = False
 refreshWhileMinimizing = True
-computePerformance = True
-savePerformance = True
+computePerformance = False
+savePerformance = False
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 sphericalMap = False
 
 np.random.seed(1)
 
-width, height = (150, 150)
+width, height = (1000, 1000)
 win = -1
 
 if glMode == 'glfw':
@@ -69,13 +69,13 @@ if glMode == 'glfw':
     glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.01
+clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
 
 gtPrefix = 'train4_occlusion_shapemodel'
-gtDirPref = 'train4_occlusions_shapemodel_test'
+gtDirPref = 'train4_occlusion_shapemodel'
 gtDir = 'groundtruth/' + gtDirPref + '/'
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
@@ -100,7 +100,7 @@ dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
 
-readDataId = 1
+readDataId = 16383
 import shape_model
 
 if useShapeModel:
@@ -331,7 +331,6 @@ if useBlender:
     setEnviornmentMapStrength(1./envMapGrayMean, scene)
     rotateEnviornmentMap(-totalOffset, scene)
 
-
 chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
 chScale = ch.Ch([1.0,1.0,1.0])
@@ -389,7 +388,6 @@ if useShapeModel:
     # chNormals= ch.dot(np.array(rot)[0:3, 0:3], chNormals.T).T
     # chNormals2 = ch.array(shape_model.shapeParamsToNormals(shapeParams, teapotModel))
     chNormals = shape_model.chGetNormals(chVertices, faces)
-
 
     smNormals = [chNormals]
     smFaces = [[faces]]
@@ -493,6 +491,12 @@ rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCen
 
 rendererGT.msaa = True
 rendererGT.overdraw = True
+
+cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+ipdb.set_trace()
+
+
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
