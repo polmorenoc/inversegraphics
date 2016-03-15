@@ -348,14 +348,19 @@ def addEnvironmentMapWorld(scene):
     links.new(texCoordNode.outputs[0],mappingNode.inputs[0])
     # mathNode = treeNodes.nodes.new('ShaderNodeMath')
     # links.new(envTextureNode.outputs[0],mathNode.inputs[0])
+
     rgbToBWNode = treeNodes.nodes.new('ShaderNodeRGBToBW')
+
+
     # links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
-    links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
-    links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+    # links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
+    # links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+
+    links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+
     # mathNode.inputs[1].default_value = 1
 
     envTextureNode.color_space="NONE"
-
 
 def setEnviornmentMapStrength(strength, scene):
     backgroundNode = scene.world.node_tree.nodes['Background']

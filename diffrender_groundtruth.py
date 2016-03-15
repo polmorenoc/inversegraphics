@@ -28,15 +28,15 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_shapemodel'
+prefix = 'train4_occlusion_shapemodel_cycles'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
-renderFromPreviousGT = False
+renderFromPreviousGT = True
 useShapeModel = True
 renderOcclusions = False
 useOpenDR = True
-useBlender = False
+useBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -619,7 +619,7 @@ for gtIdx in rangeGT:
         if useBlender:
             scene.render.resolution_x = width #perhaps set resolution in code
             scene.render.resolution_y = height
-            scene.render.tile_x = height/numTileAxis
+            scene.render.tile_x = height
             scene.render.tile_y = width
             scene.cycles.samples = 3000
             bpy.context.screen.scene = scene
@@ -757,35 +757,47 @@ for gtIdx in rangeGT:
 
     if useBlender:
 
-        envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,180))
+        envMapTexture = cv2.resize(src=envMapTexture, dsize=(720,360))
 
-        tmOr = cv2.createTonemapDrago(gamma=2.2)
-        tmEnvMapOr = tmOr.process(envMapTexture)
-        cv2.imwrite(gtDir + 'sphericalharmonics/envMapOr' + str(train_i) + '.jpeg' , 255*tmEnvMapOr[:,:,[2,1,0]])
-
-        updateEnviornmentMap(envMapFilename, scene)
-
-
-        envMapMean = np.mean(envMapTexture,axis=(0,1))[None,None,:]
         envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
         envMapGrayMean = np.mean(envMapGray, axis=(0,1))
-        envMapTexture = envMapTexture/envMapGrayMean
-        setEnviornmentMapStrength(1./envMapGrayMean, scene)
 
-        pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
+        envMapGrayRGB = np.concatenate([envMapGray[...,None], envMapGray[...,None], envMapGray[...,None]], axis=2)/envMapGrayMean
 
-        approxProjection = np.sum(pEnvMap, axis=3)
+        envMapCoeffsNew = light_probes.getEnvironmentMapCoefficients(envMapGrayRGB, 1, 0, 'equirectangular')
+        pEnvMap = SHProjection(envMapTexture, envMapCoeffsNew)
+        # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
+        approxProjection = np.sum(pEnvMap, axis=3).astype(np.float32)
+
+        envMapCoeffsNewRE = light_probes.getEnvironmentMapCoefficients(approxProjection, 1, 0, 'equirectangular')
+        pEnvMapRE = SHProjection(envMapTexture, envMapCoeffsNewRE)
+        # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
+        approxProjectionRE = np.sum(pEnvMapRE, axis=3).astype(np.float32)
+
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOrRE' + str(train_i) + '.jpeg' , 255*approxProjectionRE[:,:,[2,1,0]])
+
+        envMapCoeffsNewRE2 = light_probes.getEnvironmentMapCoefficients(approxProjectionRE, 1, 0, 'equirectangular')
+        pEnvMapRE2 = SHProjection(envMapTexture, envMapCoeffsNewRE2)
+        # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
+        approxProjectionRE2 = np.sum(pEnvMapRE2, axis=3).astype(np.float32)
+
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOrRE2' + str(train_i) + '.jpeg' , 255*approxProjectionRE2[:,:,[2,1,0]])
+
+        # envMapCoeffsNewRE = light_probes.getEnvironmentMapCoefficients(approxProjectionRE, 1, 0, 'equirectangular')
+        # pEnvMapRE = SHProjection(envMapTexture, envMapCoeffsNewRE)
+        # # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
+        # approxProjectionRE = np.sum(pEnvMapRE, axis=3).astype(np.float32)
+
+        # approxProjection[approxProjection<0] = 0
+
+        cv2.imwrite(gtDir + 'im.exr',approxProjection)
+
+        # updateEnviornmentMap(envMapFilename, scene)
+        updateEnviornmentMap(gtDir + 'im.exr', scene)
+
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
-        pathFilename = os.path.split(envMapFilename)
-
-
-        # envMapFilename = hdrFile
-        # updateEnviornmentMap(gtDir + 'sphericalharmonics/envMapProjection' + str(hdridx) + '.jpeg', scene)
-        # envMapGray = 0.3*approxProjection[:,:,0] + 0.59*approxProjection[:,:,1] + 0.11*approxProjection[:,:,2]
-        # envMapGrayMean = np.mean(envMapGray, axis=(0,1))
-        # setEnviornmentMapStrength(1./envMapGrayMean, scene)
-                # scene.layers[0] = False
-        # scene.layers[1] = True
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOrRE' + str(train_i) + '.jpeg' , 255*approxProjectionRE[:,:,[2,1,0]])
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapGrayOr' + str(train_i) + '.jpeg' , 255*envMapGrayRGB[:,:,[2,1,0]])
 
         scene.world.cycles_visibility.camera = True
         scene.camera.data.type ='PANO'
@@ -807,20 +819,18 @@ for gtIdx in rangeGT:
         # bpy.context.user_preferences.system.compute_device_type = 'NONE'
         # bpy.context.user_preferences.system.compute_device = 'CPU'
 
-        scene.cycles.samples = 500
+        scene.cycles.samples = 5000
         scene.camera.up_axis = 'Z'
         # placeCamera(scene.camera, 0, 0, 1, )
 
-        scene.camera.location = center[:].copy() + targetPosition[:].copy()
-        look_at(scene.camera, center[:].copy() + targetPosition[:].copy() + mathutils.Vector((1,0,0)))
+        scene.camera.location = np.array([100,0,0])  + center[:].copy() + targetPosition[:].copy()
+        look_at(scene.camera, np.array([100,0,0]) + center[:].copy() + targetPosition[:].copy() + mathutils.Vector((1,0,0)))
 
         scene.update()
         bpy.ops.render.render( write_still=True )
 
-
         imageEnvMap = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
-        # tm = cv2.createTonemapDrago(gamma=2.2)
-        # tmEnvMap = tm.process(imageEnvMap)
+
         cv2.imwrite(gtDir + 'sphericalharmonics/envMap' + str(train_i) + '.jpeg' , 255*imageEnvMap[:,:,[2,1,0]])
 
         envMapCoeffs = light_probes.getEnvironmentMapCoefficients(imageEnvMap, 1, 0, 'equirectangular')
@@ -828,7 +838,9 @@ for gtIdx in rangeGT:
         approxProjection = np.sum(pEnvMap, axis=3)
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjection' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
 
-        scene.cycles.samples = 3000
+        ipdb.set_trace()
+
+        scene.cycles.samples = 100
         scene.render.filepath = 'opendr_blender.exr'
         roomInstance.cycles_visibility.camera = True
         scene.render.image_settings.file_format = 'OPEN_EXR'
