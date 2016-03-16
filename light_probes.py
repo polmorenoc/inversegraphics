@@ -477,18 +477,18 @@ def getEnvironmentMapCoefficients(envMap, normalize, phiOffset, type):
 
     L = np.zeros([9,3])
     # ipdb.set_trace()
-    L[0] = np.sum(envMap * spherical_harmonics_coeffs[0] , axis=(0,1))
-    L[1] = np.sum(envMap *spherical_harmonics_coeffs[1]*np.sin(thetas) * np.cos(phis), axis=(0,1))
-    L[2] = np.sum(envMap *spherical_harmonics_coeffs[2]*np.cos(thetas), axis=(0,1))
-    L[3] = np.sum(envMap *spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(phis), axis=(0,1))
-    L[4] = np.sum(envMap *spherical_harmonics_coeffs[4]*np.sin(thetas) * np.cos(phis)  * np.sin(phis)* np.sin(thetas), axis=(0,1))
-    L[5] = np.sum(envMap *spherical_harmonics_coeffs[5]*np.sin(thetas) * np.sin(phis) * np.cos(thetas) , axis=(0,1))
-    L[6] = np.sum(envMap *spherical_harmonics_coeffs[6]*(3 * np.cos(thetas)**2 - 1), axis=(0,1))
-    L[7] = np.sum(envMap *spherical_harmonics_coeffs[7] * np.cos(phis) * np.cos(thetas)* np.sin(thetas), axis=(0,1))
-    L[8] = np.sum(envMap *spherical_harmonics_coeffs[8]*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2)), axis=(0,1))
+    L[0] = np.sum(envMap * spherical_harmonics_coeffs[0] *np.sin(thetas) , axis=(0,1))
+    L[1] = np.sum(envMap *spherical_harmonics_coeffs[1]*np.sin(thetas)*np.sin(thetas) * np.cos(phis), axis=(0,1))
+    L[2] = np.sum(envMap *spherical_harmonics_coeffs[2]*np.sin(thetas)*np.cos(thetas), axis=(0,1))
+    L[3] = np.sum(envMap *spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(thetas)*np.sin(phis), axis=(0,1))
+    L[4] = np.sum(envMap *spherical_harmonics_coeffs[4]*np.sin(thetas)*np.sin(thetas) * np.cos(phis)  * np.sin(phis)* np.sin(thetas), axis=(0,1))
+    L[5] = np.sum(envMap *spherical_harmonics_coeffs[5]*np.sin(thetas)*np.sin(thetas) * np.sin(phis) * np.cos(thetas) , axis=(0,1))
+    L[6] = np.sum(envMap *spherical_harmonics_coeffs[6]*np.sin(thetas)*(3 * np.cos(thetas)**2 - 1), axis=(0,1))
+    L[7] = np.sum(envMap *spherical_harmonics_coeffs[7]*np.sin(thetas) * np.cos(phis) * np.cos(thetas)* np.sin(thetas), axis=(0,1))
+    L[8] = np.sum(envMap *spherical_harmonics_coeffs[8]*np.sin(thetas)*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2)), axis=(0,1))
 
 
-    L = L*4*np.pi/(envMap.shape[0]*envMap.shape[1]*normalize)
+    L = 2*np.pi*L*np.pi/(envMap.shape[0]*envMap.shape[1]*normalize)
     return L
 
 

@@ -130,7 +130,7 @@ def SHProjection(envMap, shCoefficients):
     normalize = 1
     spherical_harmonics_coeffs = light_probes.spherical_harmonics_coeffs
 
-    pEnvMap = np.zeros([envMap.shape[0],envMap.shape[1], 3, 9] )
+    pEnvMap = np.zeros([envMap.shape[0],envMap.shape[1], 3, 9])
     pEnvMap[:,:,:,0] = shCoefficients[0].reshape([1,1,3]) *  spherical_harmonics_coeffs[0]  * normalize
     pEnvMap[:,:,:,1] = shCoefficients[1].reshape([1,1,3]) * spherical_harmonics_coeffs[1]*np.sin(thetas) * np.cos(phis) * normalize
     pEnvMap[:,:,:,2] = shCoefficients[2].reshape([1,1,3]) * spherical_harmonics_coeffs[2]*np.cos(thetas) * normalize
