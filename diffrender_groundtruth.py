@@ -150,7 +150,7 @@ chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([0.025])
+chAmbientIntensityGT = ch.Ch([1])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 
@@ -755,9 +755,36 @@ for gtIdx in rangeGT:
     if envMapFilename == "":
         ipdb.set_trace()
 
+
+
+    print("Render " + str(gtIdx) + "of " + str(len(groundTruthToRender)))
+    ignore = False
+    # chAmbientIntensityGT[:] = groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
+    chAmbientIntensityGT[:] = 1
+
+    phiOffset[:] = groundTruthToRender['trainEnvMapPhiOffsets'][gtIdx]
+
+    chObjAzGT[:] = groundTruthToRender['trainObjAzsGT'][gtIdx]
+
+    chAzGT[:] = groundTruthToRender['trainAzsGT'][gtIdx]
+
+    chElGT[:] = groundTruthToRender['trainElevsGT'][gtIdx]
+
+    chLightAzGT[:] = groundTruthToRender['trainLightAzsGT'][gtIdx]
+    chLightElGT[:] = groundTruthToRender['trainLightElevsGT'][gtIdx]
+
+    # chLightIntensityGT[:] = np.random.uniform(5,10, 1)
+
+    chVColorsGT[:] = groundTruthToRender['trainVColorGT'][gtIdx]
+    try:
+        chShapeParamsGT[:] =  groundTruthToRender['trainShapeModelCoeffsGT'][gtIdx]
+    except:
+        chShapeParamsGT[:] = np.random.randn(latentDim)
+
     if useBlender:
 
-        # envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,720))
+        envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,180))
+        # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
 
         envMapGray = 0.3*envMapTexture[:,:,0] + 0.59*envMapTexture[:,:,1] + 0.11*envMapTexture[:,:,2]
         envMapGrayMean = np.mean(envMapGray, axis=(0,1))
@@ -783,8 +810,13 @@ for gtIdx in rangeGT:
         # updateEnviornmentMap(envMapFilename, scene)
         updateEnviornmentMap(gtDir + 'im.exr', scene)
 
+        rotateEnviornmentMap(totalOffset.r.copy(), scene)
+
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapGrayOr' + str(train_i) + '.jpeg' , 255*envMapGrayRGB[:,:,[2,1,0]])
+
+        # envMapCoeffsRotatedTest = np.dot(light_probes.chSphericalHarmonicsZRotation(np.pi*3/2), envMapCoeffsNew[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+        # rotateEnviornmentMap(np.pi*3/2, scene)
 
         scene.world.cycles_visibility.camera = True
         scene.camera.data.type ='PANO'
@@ -818,14 +850,16 @@ for gtIdx in rangeGT:
 
         imageEnvMap = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
 
-        cv2.imwrite(gtDir + 'sphericalharmonics/envMap' + str(train_i) + '.jpeg' , 255*imageEnvMap[:,:,[2,1,0]])
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapCycles' + str(train_i) + '.jpeg' , 255*imageEnvMap[:,:,[2,1,0]])
 
         envMapCoeffs = light_probes.getEnvironmentMapCoefficients(imageEnvMap, 1, 0, 'equirectangular')
         pEnvMap = SHProjection(envMapTexture, envMapCoeffs)
         approxProjection = np.sum(pEnvMap, axis=3)
-        cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjection' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
+        cv2.imwrite(gtDir + 'sphericalharmonics/envMapCyclesProjection' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
 
-        ipdb.set_trace()
+        # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotatedTest)
+        # approxProjectionRotatedTest = np.sum(pEnvMap, axis=3)
+        # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRotated' + str(train_i) + '.jpeg' , 255*approxProjectionRotatedTest[:,:,[2,1,0]])
 
         scene.cycles.samples = 100
         scene.render.filepath = 'opendr_blender.exr'
@@ -840,32 +874,11 @@ for gtIdx in rangeGT:
         teapot.cycles_visibility.shadow = True
         # updateEnviornmentMap(envMapFilename, scene)
 
-    print("Render " + str(gtIdx) + "of " + str(len(groundTruthToRender)))
-    ignore = False
-    chAmbientIntensityGT[:] = groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
 
-    phiOffset[:] = groundTruthToRender['trainEnvMapPhiOffsets'][gtIdx]
-
-    chObjAzGT[:] = groundTruthToRender['trainObjAzsGT'][gtIdx]
-
-    chAzGT[:] = groundTruthToRender['trainAzsGT'][gtIdx]
-
-    chElGT[:] = groundTruthToRender['trainElevsGT'][gtIdx]
-
-    chLightAzGT[:] = groundTruthToRender['trainLightAzsGT'][gtIdx]
-    chLightElGT[:] = groundTruthToRender['trainLightElevsGT'][gtIdx]
-
-    # chLightIntensityGT[:] = np.random.uniform(5,10, 1)
-
-    chVColorsGT[:] = groundTruthToRender['trainVColorGT'][gtIdx]
-
-    envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-
-    try:
-        chShapeParamsGT[:] =  groundTruthToRender['trainShapeModelCoeffsGT'][gtIdx]
-    except:
-        chShapeParamsGT[:] = np.random.randn(latentDim)
+    # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(chObjAzGT.r), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
     # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
     # approxProjection = np.sum(pEnvMap, axis=3)
@@ -877,13 +890,12 @@ for gtIdx in rangeGT:
         vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
         vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
 
-        if occlusion > 0.001:
-            ignore = True
+        # if occlusion > 0.001:
+        #     ignore = True
 
     if useBlender and not ignore:
 
-        rotateEnviornmentMap(-totalOffset.r.copy(), scene)
-        #Now we must do that!!
+       #Now we must do that!!
 
         azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
 
