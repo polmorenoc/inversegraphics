@@ -791,12 +791,10 @@ for gtIdx in rangeGT:
 
         envMapGrayRGB = np.concatenate([envMapGray[...,None], envMapGray[...,None], envMapGray[...,None]], axis=2)/envMapGrayMean
 
-
         envMapCoeffsNew = light_probes.getEnvironmentMapCoefficients(envMapGrayRGB, 1, 0, 'equirectangular')
         pEnvMap = SHProjection(envMapTexture, envMapCoeffsNew)
         # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
         approxProjection = np.sum(pEnvMap, axis=3).astype(np.float32)
-
 
         # envMapCoeffsNewRE = light_probes.getEnvironmentMapCoefficients(approxProjectionRE, 1, 0, 'equirectangular')
         # pEnvMapRE = SHProjection(envMapTexture, envMapCoeffsNewRE)
@@ -874,11 +872,10 @@ for gtIdx in rangeGT:
         teapot.cycles_visibility.shadow = True
         # updateEnviornmentMap(envMapFilename, scene)
 
-
     # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
     # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
     envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(chObjAzGT.r), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(-chObjAzGT.r), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
     # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
     # approxProjection = np.sum(pEnvMap, axis=3)
@@ -901,7 +898,6 @@ for gtIdx in rangeGT:
 
         teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
         placeCamera(scene.camera, -chAzGT.r[:].copy()*180/np.pi, chElGT.r[:].copy()*180/np.pi, chDistGT.r[0].copy(), center[:].copy() + targetPosition[:].copy())
-
 
         setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
 
@@ -928,12 +924,15 @@ for gtIdx in rangeGT:
         chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale
         lin2srgb(blenderRender)
 
+
     if useOpenDR:
         image = rendererGT.r[:].copy()
         lin2srgb(image)
 
+
     if useBlender and not ignore and useOpenDR and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
         ignore = True
+
 
     if not ignore:
         # hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]

@@ -42,7 +42,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
-gtPrefix = 'train4_occlusion_shapemodel_tmp'
+gtPrefix = 'train4_occlusion_shapemodel_cycles'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
 trainPrefixVColor = 'train4_occlusion_shapemodel_10k'
@@ -261,7 +261,7 @@ rangeTests = np.arange(0,1000)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
-testSet = np.array([539])
+testSet = np.array([0])
 
 numTests = len(testSet)
 
@@ -502,22 +502,20 @@ if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
 
-vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
-im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.
-rendererGT[:] = srgb2lin(im.copy())
-post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.05
-render = renderer.r.copy()
-render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
-
-render[renderer.boundarybool_image.astype(np.bool)] = renderer.r[renderer.boundarybool_image.astype(np.bool)]
-
-cv2.imwrite('renderer' + '.jpeg' , 255*lin2srgb(render[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-cv2.imwrite('rendererGT' + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+# vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+# im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.
+# rendererGT[:] = srgb2lin(im.copy())
+# post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.05
+# render = renderer.r.copy()
+# render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+#
+# render[renderer.boundarybool_image.astype(np.bool)] = renderer.r[renderer.boundarybool_image.astype(np.bool)]
+#
+# cv2.imwrite('renderer' + '.jpeg' , 255*lin2srgb(render[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+# cv2.imwrite('rendererGT' + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
 # plt.imsave('renderered.png', lin2srgb(render))
 
-
-ipdb.set_trace()
 
 import skimage.color
 
@@ -1306,6 +1304,7 @@ for testSetting, model in enumerate(modelTests):
             image = skimage.transform.resize(images[test_i], [height,width])
             imageSrgb = image.copy()
             rendererGT[:] = srgb2lin(image)
+
 
             negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
             negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels

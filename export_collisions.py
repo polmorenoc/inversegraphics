@@ -11,17 +11,17 @@ numpy.random.seed(1)
 inchToMeter = 0.0254
 outputDir = 'data/'
 
-width = 300
-height = 300
+width = 150
+height = 150
 
-numSamples = 1024
+numSamples = 100
 useCycles = False
 distance = 0.75
 
 scene_io_utils.loadTargetsBlendData()
 
 sceneCollisions = {}
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
@@ -31,7 +31,7 @@ scaleY = 0.18
 scaleX = 0.35
 cubeScale = mathutils.Matrix([[scaleX/2, 0,0,0], [0,scaleY/2,0 ,0] ,[0,0,scaleZ/2,0],[0,0,0,1]])
 
-for sceneIdx in range(len(sceneLines))[7:8]:
+for sceneIdx in range(len(sceneLines))[:]:
     sceneLine = sceneLines[sceneIdx]
     sceneParts = sceneLine.split(' ')
     sceneFile = sceneParts[0]
@@ -83,7 +83,7 @@ for sceneIdx in range(len(sceneLines))[7:8]:
         placeCamera(scene.camera, -90, 25, 0.75, targetParentPosition)
         bpy.ops.render.render(write_still=True)
 
-        collisionInterval = 10
+        collisionInterval = 5
         for objAzimuth in numpy.arange(0,360,collisionInterval):
             azimuthRot = mathutils.Matrix.Rotation(radians(-objAzimuth), 4, 'Z')
             cubeTarget.matrix_world = translationMat * azimuthRot * cubeScale * mathutils.Matrix.Translation(mathutils.Vector((0,0,1)))
@@ -124,12 +124,10 @@ for sceneIdx in range(len(sceneLines))[7:8]:
             else:
                 intervals = intervals + [[initInterval, endInterval]]
 
-
-
         targetCollisions[targetParentIndex] = (targetParentPosition, intervals)
 
     sceneCollisions[sceneNumber] = targetCollisions
-    with open('data/collisions/collisionScene' + str(sceneNumber) + '.pickle', 'wb') as pfile:
+    with open('data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle', 'wb') as pfile:
         pickle.dump(targetCollisions, pfile)
 
 

@@ -65,7 +65,7 @@ camDistance = 0.4
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -216,7 +216,7 @@ def imageGT():
 # Initialization ends here
 #########################################
 
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 lenScenes = 0
@@ -225,7 +225,7 @@ for sceneIdx in scenesToRender:
     sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 
     lenScenes += len(targetIndices)
-    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
+    collisionSceneFile = 'data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle'
     with open(collisionSceneFile, 'rb') as pfile:
         collisions = pickle.load(pfile)
 
@@ -245,7 +245,7 @@ for sceneIdx in scenesToRender:
     import copy
     v2, f_list2, vc2, vn2, uv2, haveTextures_list2, textures_list2 = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
 
-    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
+    collisionSceneFile = 'data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle'
     with open(collisionSceneFile, 'rb') as pfile:
         collisions = pickle.load(pfile)
 
@@ -330,7 +330,7 @@ for sceneIdx in scenesToRender:
 
 
     sceneOcclusions[sceneNumber] = targetOcclusions
-    with open('data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle', 'wb') as pfile:
+    with open('data/occlusions_new/occlusionScene' + str(sceneNumber) + '.pickle', 'wb') as pfile:
         pickle.dump(targetOcclusions, pfile)
 
 
