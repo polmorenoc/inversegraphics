@@ -57,7 +57,7 @@ if glMode == 'glfw':
     # glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.05
+clip_start = 0.01
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
@@ -235,7 +235,7 @@ for sceneIdx in scenesToRender:
 
 sceneOcclusions = {}
 
-for sceneIdx in scenesToRender:
+for sceneIdx in scenesToRender[:]:
 
     print("Rendering scene: " + str(sceneIdx))
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -253,80 +253,84 @@ for sceneIdx in scenesToRender:
     targetOcclusions = {}
     for targetidx, targetIndex in enumerate(targetIndices):
         targetPosition = targetPositions[targetidx]
-        collisionProbs = np.zeros(len(collisions[targetIndex][1]))
-        import copy
 
-        rendererGT.makeCurrentContext()
-        rendererGT.clear()
-        contextdata.cleanupContext(contextdata.getContext())
-        glfw.destroy_window(rendererGT.win)
-        del rendererGT
+        if collisions[targetIndex][1]:
 
-        v, f_list, vc, vn, uv, haveTextures_list, textures_list = copy.deepcopy(v2), copy.deepcopy(f_list2), copy.deepcopy(vc2), copy.deepcopy(vn2), copy.deepcopy(uv2), copy.deepcopy(haveTextures_list2),  copy.deepcopy(textures_list2)
+            collisionProbs = np.zeros(len(collisions[targetIndex][1]))
+            import copy
 
-        removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+            rendererGT.makeCurrentContext()
+            rendererGT.clear()
+            contextdata.cleanupContext(contextdata.getContext())
+            glfw.destroy_window(rendererGT.win)
+            del rendererGT
 
-        addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+            v, f_list, vc, vn, uv, haveTextures_list, textures_list = copy.deepcopy(v2), copy.deepcopy(f_list2), copy.deepcopy(vc2), copy.deepcopy(vn2), copy.deepcopy(uv2), copy.deepcopy(haveTextures_list2),  copy.deepcopy(textures_list2)
 
-        rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
-        # removeObjectData(int(targetIndex-1), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+            removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
-        for intervalIdx, interval in enumerate(collisions[targetIndex][1]):
-            collisionProbs[intervalIdx] = collisions[targetIndex][1][intervalIdx][1] - collisions[targetIndex][1][intervalIdx][0]
+            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
-        collisionsProbs = collisionProbs / np.sum(collisionProbs)
+            rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
+            # removeObjectData(int(targetIndex-1), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
-        teapot = None
+            for intervalIdx, interval in enumerate(collisions[targetIndex][1]):
+                collisionProbs[intervalIdx] = collisions[targetIndex][1][intervalIdx][1] - collisions[targetIndex][1][intervalIdx][0]
 
-        intersections = []
+            collisionsProbs = collisionProbs / np.sum(collisionProbs)
 
-        cameraInterval = 5
-        for azimuth in np.mod(numpy.arange(270,270+180,cameraInterval), 360):
+            teapot = None
 
-            occludes = False
+            intersections = []
 
-            from numpy.random import choice
-            objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
+            cameraInterval = 5
+            for azimuth in np.mod(numpy.arange(270,270+180,cameraInterval), 360):
 
-            chAzGT[:] = azimuth*np.pi/180
+                occludes = False
 
-            for elevation in numpy.arange(0,90,cameraInterval):
-                chElGT[:] = elevation*np.pi/180
-                #occludes =
-                occlusion = getOcclusionFraction(rendererGT)
-                if occlusion > 0.01 and occlusion < 0.95:
-                    occludes = True
-                    print("Found occlusion!")
-                    # cv2.imwrite('tmp/imOcclusion_scene'  + str(sceneNumber) + '_tgIndex' + str(targetIndex) + '_az' + str(int(azimuth)) + '.jpeg' , 255*rendererGT.r[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-                    break
+                from numpy.random import choice
 
-            intersections = intersections + [[azimuth, occludes]]
+                objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
 
-        startInterval = True
-        intervals = []
-        initInterval = 0
-        endInterval = 0
+                chAzGT[:] = azimuth*np.pi/180
 
-        for idx, intersection in enumerate(intersections):
+                for elevation in numpy.arange(0,90,cameraInterval):
+                    chElGT[:] = elevation*np.pi/180
+                    #occludes =
+                    occlusion = getOcclusionFraction(rendererGT)
+                    if occlusion > 0.01 and occlusion < 0.95:
+                        occludes = True
+                        print("Found occlusion!")
+                        # cv2.imwrite('tmp/imOcclusion_scene'  + str(sceneNumber) + '_tgIndex' + str(targetIndex) + '_az' + str(int(azimuth)) + '.jpeg' , 255*rendererGT.r[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                        break
+
+                intersections = intersections + [[azimuth, occludes]]
+
+            startInterval = True
+            intervals = []
+            initInterval = 0
+            endInterval = 0
+
+            for idx, intersection in enumerate(intersections):
+                if intersection[1]:
+                    if startInterval:
+                        initInterval = intersection[0]
+                        startInterval = False
+                else:
+                    if not startInterval:
+                        if idx >= 1 and intersections[idx-1][0] != initInterval:
+                            endInterval = intersection[0] - cameraInterval
+                            intervals = intervals + [[initInterval, endInterval]]
+                        startInterval = True
+
             if intersection[1]:
-                if startInterval:
-                    initInterval = intersection[0]
-                    startInterval = False
-            else:
-                if not startInterval:
-                    if idx >= 1 and intersections[idx-1][0] != initInterval:
-                        endInterval = intersection[0] - cameraInterval
-                        intervals = intervals + [[initInterval, endInterval]]
-                    startInterval = True
+                endInterval = intersection[0]
+                if intersections[0][1]:
+                    intervals = intervals + [[initInterval, endInterval+cameraInterval]]
+                else:
+                    intervals = intervals + [[initInterval, endInterval]]
 
-        if intersection[1]:
-            endInterval = intersection[0]
-            if intersections[0][1]:
-                intervals = intervals + [[initInterval, endInterval+cameraInterval]]
-            else:
-                intervals = intervals + [[initInterval, endInterval]]
-
-        targetOcclusions[targetIndex] = (targetParentPosition, intervals)
+            targetOcclusions[targetIndex] = (targetParentPosition, intervals)
 
 
     sceneOcclusions[sceneNumber] = targetOcclusions

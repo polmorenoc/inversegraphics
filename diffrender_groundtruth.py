@@ -28,11 +28,11 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_cycles'
+prefix = 'train4_occlusion_shapemodel_cycles_newscenes_seed1'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
 renderOcclusions = False
 useOpenDR = True
@@ -65,7 +65,7 @@ if useOpenDR:
         # glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.05
+clip_start = 0.01
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
@@ -73,7 +73,7 @@ camDistance = 0.4
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -150,7 +150,7 @@ chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
 
-chAmbientIntensityGT = ch.Ch([1])
+chAmbientIntensityGT = ch.Ch([0.1])
 clampedCosCoeffs = clampedCosineCoefficients()
 chAmbientSHGT = ch.zeros([9])
 
@@ -318,11 +318,10 @@ if not os.path.exists(gtDir + 'masks_occlusion/'):
 
 print("Generating renders")
 
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 
-trainSize = 45000
+trainSize = 20000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -386,6 +385,7 @@ except:
 train_i = nextId
 
 #Re-producible groundtruth generation.
+
 if train_i == 0:
     np.random.seed(1)
 unlinkedObj = None
@@ -413,7 +413,7 @@ for sceneIdx in scenesToRender:
                 targetIndicesNew = targetIndicesNew + [targetIndex]
         targetIndices = targetIndicesNew
 
-    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
+    collisionSceneFile = 'data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle'
     scenes = scenes + [targetIndices]
     with open(collisionSceneFile, 'rb') as pfile:
         collisions = pickle.load(pfile)
@@ -438,12 +438,12 @@ if not renderFromPreviousGT:
 
         sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 
-        collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
+        collisionSceneFile = 'data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle'
         with open(collisionSceneFile, 'rb') as pfile:
             collisions = pickle.load(pfile)
 
         if renderOcclusions:
-            occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
+            occlusionSceneFile = 'data/occlusions_new/occlusionScene' + str(sceneNumber) + '.pickle'
             with open(occlusionSceneFile, 'rb') as pfile:
                 occlusions = pickle.load(pfile)
 
@@ -452,6 +452,9 @@ if not renderFromPreviousGT:
 
         for targetidx, targetIndex in enumerate(targetIndices):
             targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
+
+            if not collisions[targetIndex][1]:
+                continue
 
             collisionProbs = np.zeros(len(collisions[targetIndex][1]))
 
@@ -492,7 +495,7 @@ if not renderFromPreviousGT:
 
                     for numTeapotTrain in range(max(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))),1)):
 
-                        print("Generating groundtruth. Iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
+
                         ignore = False
                         chAmbientIntensityGTVals = 0.75/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
                         phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
@@ -560,6 +563,10 @@ if not renderFromPreviousGT:
 
                         train_i = train_i + 1
 
+                        if np.mod(train_i, 100) == 0:
+                            print("Generated " + str(train_i) + " GT instances.")
+                            print("Generating groundtruth. Iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
+
 
 if renderFromPreviousGT:
 
@@ -578,9 +585,9 @@ currentTargetIndex = -1
 teapot = None
 
 if renderFromPreviousGT:
-    rangeGT = range(0, len(groundTruthToRender))
+    rangeGT = np.arange(0, len(groundTruthToRender))
 else:
-    rangeGT = range(len(groundTruthToRender))
+    rangeGT = np.arange(len(groundTruthToRender))
 
 teapot_i = 0
 
@@ -588,7 +595,7 @@ if useShapeModel:
     teapot_i = -1
     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
-for gtIdx in rangeGT:
+for gtIdx in rangeGT[21:]:
 
     sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
 
@@ -645,11 +652,13 @@ for gtIdx in rangeGT:
             bpy.context.user_preferences.system.compute_device_type = 'CUDA'
 
             bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
-            bpy.context.user_preferences.system.compute_device = 'CUDA_1'
+            bpy.context.user_preferences.system.compute_device = 'CUDA_0'
             bpy.ops.wm.save_userpref()
 
             scene.world.horizon_color = mathutils.Color((1.0,1.0,1.0))
-            scene.camera.data.clip_start = 0.05
+            scene.camera.data.clip_start = clip_start
+            treeNodes=scene.world.node_tree
+            links = treeNodes.links
 
     unlinkedObj = None
     envMapFilename = None
@@ -755,8 +764,6 @@ for gtIdx in rangeGT:
     if envMapFilename == "":
         ipdb.set_trace()
 
-
-
     print("Render " + str(gtIdx) + "of " + str(len(groundTruthToRender)))
     ignore = False
     # chAmbientIntensityGT[:] = groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
@@ -781,7 +788,23 @@ for gtIdx in rangeGT:
     except:
         chShapeParamsGT[:] = np.random.randn(latentDim)
 
-    if useBlender:
+    if useOpenDR:
+        occlusion = getOcclusionFraction(rendererGT)
+
+        vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
+        vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+
+    if occlusion > 0.9:
+        ignore = True
+
+    if not ignore:
+        #Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
+        cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0,0,0,1]])])[0:3,3]
+        vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
+        if np.min(np.linalg.norm(vDists,axis=1) <= clip_start):
+            ignore = True
+
+    if not ignore and useBlender:
 
         envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,180))
         # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
@@ -813,8 +836,8 @@ for gtIdx in rangeGT:
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapGrayOr' + str(train_i) + '.jpeg' , 255*envMapGrayRGB[:,:,[2,1,0]])
 
-        # envMapCoeffsRotatedTest = np.dot(light_probes.chSphericalHarmonicsZRotation(np.pi*3/2), envMapCoeffsNew[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-        # rotateEnviornmentMap(np.pi*3/2, scene)
+
+        links.remove(treeNodes.nodes['lightPathNode'].outputs[0].links[0])
 
         scene.world.cycles_visibility.camera = True
         scene.camera.data.type ='PANO'
@@ -836,7 +859,7 @@ for gtIdx in rangeGT:
         # bpy.context.user_preferences.system.compute_device_type = 'NONE'
         # bpy.context.user_preferences.system.compute_device = 'CPU'
 
-        scene.cycles.samples = 1000
+        scene.cycles.samples = 100
         scene.camera.up_axis = 'Z'
         # placeCamera(scene.camera, 0, 0, 1, )
 
@@ -855,10 +878,7 @@ for gtIdx in rangeGT:
         approxProjection = np.sum(pEnvMap, axis=3)
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapCyclesProjection' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
 
-        # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotatedTest)
-        # approxProjectionRotatedTest = np.sum(pEnvMap, axis=3)
-        # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRotated' + str(train_i) + '.jpeg' , 255*approxProjectionRotatedTest[:,:,[2,1,0]])
-
+        links.new(treeNodes.nodes['lightPathNode'].outputs[0], treeNodes.nodes['mixShaderNode'].inputs[0])
         scene.cycles.samples = 100
         scene.render.filepath = 'opendr_blender.exr'
         roomInstance.cycles_visibility.camera = True
@@ -866,7 +886,7 @@ for gtIdx in rangeGT:
         scene.render.resolution_x = width#perhaps set resolution in code
         scene.render.resolution_y = height
         scene.camera.data.type ='PERSP'
-        scene.world.cycles_visibility.camera = False
+        scene.world.cycles_visibility.camera = True
         scene.camera.data.cycles.panorama_type = 'FISHEYE_EQUISOLID'
         teapot.cycles_visibility.camera = True
         teapot.cycles_visibility.shadow = True
@@ -874,21 +894,16 @@ for gtIdx in rangeGT:
 
     # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
     # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(-chObjAzGT.r), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    if useBlender:
+        envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+        envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(-chObjAzGT.r), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    else:
+        envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+        envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
     # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
     # approxProjection = np.sum(pEnvMap, axis=3)
     # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
-
-    if useOpenDR:
-        occlusion = getOcclusionFraction(rendererGT)
-
-        vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
-        vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
-
-        # if occlusion > 0.001:
-        #     ignore = True
 
     if useBlender and not ignore:
 
@@ -919,20 +934,44 @@ for gtIdx in rangeGT:
 
         blenderRenderGray = 0.3*blenderRender[:,:,0] + 0.59*blenderRender[:,:,1] + 0.11*blenderRender[:,:,2]
         rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
-        meanIntensityScale = np.mean(blenderRenderGray,axis=(0,1))/np.mean(rendererGTGray,axis=(0,1)).copy()
+
+        #For some unkown (yet) reason I need to correct average intensity in OpenDR a few times before it gets it right:
+        meanIntensityScale = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
 
         chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale
-        lin2srgb(blenderRender)
 
+        rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+
+        meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+
+        chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale2
+
+        rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+
+        meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+
+        chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale3
+
+        rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+
+        meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+
+        chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale4
+
+        rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+
+        meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+
+        chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale5
+
+        lin2srgb(blenderRender)
 
     if useOpenDR:
         image = rendererGT.r[:].copy()
         lin2srgb(image)
 
-
     if useBlender and not ignore and useOpenDR and np.mean(rendererGTGray,axis=(0,1)) < 0.01:
         ignore = True
-
 
     if not ignore:
         # hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
@@ -942,12 +981,9 @@ for gtIdx in rangeGT:
         if useOpenDR:
             cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-
         # cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
         if useOpenDR:
             np.save(gtDir + 'masks_occlusion/mask' + str(train_i)+ '.npy', vis_occluded)
-
-        # cv2.imwrite(gtDir + 'masks/)
 
         #Add groundtruth to arrays
         trainAzsGT = chAzGT.r

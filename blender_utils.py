@@ -343,7 +343,6 @@ def addEnvironmentMapWorld(scene):
     links = treeNodes.links
     links.new(mappingNode.outputs[0],envTextureNode.inputs[0])
 
-
     texCoordNode = treeNodes.nodes.new('ShaderNodeTexCoord')
     links.new(texCoordNode.outputs[0],mappingNode.inputs[0])
     # mathNode = treeNodes.nodes.new('ShaderNodeMath')
@@ -351,14 +350,26 @@ def addEnvironmentMapWorld(scene):
 
     rgbToBWNode = treeNodes.nodes.new('ShaderNodeRGBToBW')
 
-
     # links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
     # links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
     # links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
 
     links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
 
-    # mathNode.inputs[1].default_value = 1
+    colorBackgroundNode = treeNodes.nodes.new('ShaderNodeBackground')
+
+    colorBackgroundNode.inputs[0].default_value[0:3] = (1.0,1.0,1.0)
+
+    mixShaderNode = treeNodes.nodes.new('ShaderNodeMixShader')
+    mixShaderNode.name = 'mixShaderNode'
+    light_pathNode = treeNodes.nodes.new('ShaderNodeLightPath')
+    light_pathNode.name = 'lightPathNode'
+
+    links.new(treeNodes.nodes['Background'].outputs[0],mixShaderNode.inputs[1])
+    links.new(colorBackgroundNode.outputs[0],mixShaderNode.inputs[2])
+    links.new(light_pathNode.outputs[0],mixShaderNode.inputs[0])
+
+    mixShaderNode.inputs[0].default_value = 0
 
     envTextureNode.color_space="NONE"
 
@@ -463,7 +474,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
         cycles.transparent_min_bounces = 2
         cycles.transparent_max_bounces = 2
 
-        world.cycles_visibility.camera = False
+        world.cycles_visibility.camera = True
         world.use_nodes = True
 
         world.cycles.sample_as_light = True
