@@ -100,7 +100,7 @@ dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
 
-readDataId = 16383
+readDataId = 0
 import shape_model
 
 if useShapeModel:
@@ -494,14 +494,14 @@ rendererGT.overdraw = True
 
 cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-ipdb.set_trace()
+ipdb.set_trace()                                                                                                                                                                            
 
 
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
         renderer = renderer_teapots[teapot_i]
         renderer.set(background_image=rendererGT.r)
-
+                                                                                                                                                                            
 currentTeapotModel = 0
 if not useShapeModel:
     renderer = renderer_teapots[currentTeapotModel]
@@ -662,7 +662,7 @@ iterat = 0
 changedGT = False
 refresh = True
 drawSurf = False
-makeVideo = False
+makeVideo = True
 updateErrorFunctions = True
 pendingCyclesRender = True
 performance = {}

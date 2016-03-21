@@ -1,7 +1,9 @@
 test__author__ = 'pol'
 
 import matplotlib
-matplotlib.use('Qt4Agg')
+matplotlib.use('QT4Agg')
+import matplotlib.pyplot as plt
+plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
 import scene_io_utils
 import mathutils
 from math import radians
@@ -16,7 +18,6 @@ import cv2
 import glfw
 import generative_models
 import recognition_models
-import matplotlib.pyplot as plt
 from opendr_utils import *
 from utils import *
 import OpenGL.GL as GL
@@ -42,7 +43,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 
-gtPrefix = 'train4_occlusion_shapemodel_cycles'
+gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
 trainPrefixVColor = 'train4_occlusion_shapemodel_10k'
@@ -59,7 +60,7 @@ trainModelsDirAppLight = 'train4_occlusion_shapemodel_10k'
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
-width, height = (1000, 1000)
+width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
@@ -186,46 +187,6 @@ iterat = 0
 
 t = time.time()
 
-def cb(_):
-    global t
-    global samplingMode
-    elapsed_time = time.time() - t
-    print("Ended interation in  " + str(elapsed_time))
-    # if samplingMode:
-    #     analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
-    # else:
-    #     analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/min_azNum' + str(sampleAzNum) +  '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
-    global pixelErrorFun
-    global errorFun
-    global iterat
-    iterat = iterat + 1
-    print("Callback! " + str(iterat))
-    print("Sq Error: " + str(errorFun.r))
-
-    global negLikModelRobustSmallStd
-    global bestShapeParamsSmallStd
-    global bestRobustSmallStdError
-    # if minimizingShape and useShapeModel:
-    #     # if negLikModelRobustSmallStd.r  < bestRobustSmallStdError:
-    #     #     bestRobustSmallStdError = negLikModelRobustSmallStd.r.copy()
-    #     #     bestShapeParamsSmallStd = chShapeParams.r.copy()
-    #     maxShapeSize = 2.5
-    #     largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-    #     if np.any(largeShapeParams):
-    #         print("Warning: found large shape parameters to fix!")
-    #     chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
-
-
-    global imagegt
-    global renderer
-    global gradAz
-    global gradEl
-    global performance
-    global azimuths
-    global elevations
-    global shapeParams
-
-    t = time.time()
 
 #########################################
 # Generative model setup ends here.
@@ -234,7 +195,6 @@ def cb(_):
 #########################################
 # Test code starts here:
 #########################################
-
 
 gtDir = 'groundtruth/' + gtPrefix + '/'
 featuresDir = gtDir
@@ -247,6 +207,7 @@ trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/'
 trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
 useShapeModel = True
+makeVideo = True
 
 ignoreGT = True
 ignore = []
@@ -255,13 +216,17 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
-
-
-rangeTests = np.arange(0,1000)
+# [190, 477, 213, 226,  34, 417, 468, 272, 435, 211, 383, 214, 518,
+#        189, 194,  16, 505,  41, 191,  13, 484, 491,  55, 415, 239, 302,
+#          2, 508, 201,  92, 142, 501, 231, 282, 160, 384, 299, 341,  51,
+#        523, 335, 515, 121,  43,   6, 511, 307, 353,  89, 493]
+rangeTests = np.arange(100,1100)[[390, 250, 434, 883, 698, 64, 18, 732, 219,  258,  102, 343]]
+rangeTests = np.arange(100,1100)[[131, 388, 496, 146, 182,  43, 517,  26, 184, 130, 368, 498, 300,
+       505, 287, 174, 209,  57,  93, 308,  74, 123, 347, 275, 191, 341,
+       290, 432, 225, 492, 272, 507, 371,  84, 448, 461, 187, 289, 403,
+       101, 222, 379, 515, 479, 165, 270, 400, 516, 419, 276]]
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
-
-testSet = np.array([0])
 
 numTests = len(testSet)
 
@@ -343,8 +308,6 @@ testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT
 
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
-
-
 ##Read Training set labels
 
 # trainSet = np.load(experimentDir + 'train.npy')
@@ -405,7 +368,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 0
+optimizationType = 1
 computePredErrorFuns = True
 
 method = 1
@@ -443,7 +406,7 @@ if useShapeModel:
 
     #%% Sample random shape Params
     latentDim = np.shape(teapotModel['ppcaW'])[1]
-    shapeParams = testShapeParamsGT.ravel()
+    shapeParams = np.zeros(latentDim)
     chShapeParams = ch.Ch(shapeParams.copy())
 
     meshLinearTransform=teapotModel['meshLinearTransform']
@@ -489,14 +452,6 @@ if useShapeModel:
 else:
     renderer = renderer_teapots[testRenderer]
 
-chAz[:] =testAzsRel
-chEl[:] = testElevsGT
-chVColors[:] =testVColorGT
-# chShapeParams[:] = testShapeParamsGT
-chLightSHCoeffs[:] = testLightCoefficientsGTRel
-
-stds[:] = 0.1
-
 loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
@@ -533,7 +488,7 @@ nnBatchSize = 100
 azsPredictions = np.array([])
 
 recomputeMeans = False
-includeMeanBaseline = True
+includeMeanBaseline = False
 
 recomputePredictions = False
 
@@ -1160,19 +1115,6 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 
-# hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
-# hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
-#
-# hogE_raw = hogGT - hogRenderer
-# hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
-# hogError = ch.SumOfSquares(hogE_raw)
-
-# modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-#
-# pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
-
-# robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization='size')
-# robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
 
 models = [negLikModel, negLikModelRobust]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
@@ -1181,7 +1123,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCVNEW-segment' + testRangeStr
+testDescription = 'ECCV-video-shape' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1192,6 +1134,49 @@ stdsTests = [0.01]
 modelTests = len(stdsTests)*[1]
 modelTests = [1]
 methodTests = len(stdsTests)*[1]
+
+
+if makeVideo:
+    plt.ioff()
+    import matplotlib.animation as animation
+    Writer = animation.writers['ffmpeg']
+
+    writer = Writer(fps=1, metadata=dict(title='Fitting process', artist=''), bitrate=1800)
+    figvid, ((vax1, vax2, vax3, vax4), (vax5, vax6, vax7, vax8)) = plt.subplots(2, 4, figsize=(12, 5))
+
+    figvid.delaxes(vax8)
+
+    vax1.axes.get_xaxis().set_visible(False)
+    vax1.axes.get_yaxis().set_visible(False)
+    vax1.set_title("Ground truth")
+
+    vax2.axes.get_xaxis().set_visible(False)
+    vax2.axes.get_yaxis().set_visible(False)
+    vax2.set_title("Recognition")
+
+    vax3.axes.get_xaxis().set_visible(False)
+    vax3.axes.get_yaxis().set_visible(False)
+    vax3.set_title("Fit")
+
+    vax4.axes.get_xaxis().set_visible(False)
+    vax4.axes.get_yaxis().set_visible(False)
+    vax4.set_title("Posterior")
+
+    vax5.axes.get_xaxis().set_visible(False)
+    vax5.axes.get_yaxis().set_visible(False)
+    vax5.set_title("Env Map GT")
+
+    vax6.axes.get_xaxis().set_visible(False)
+    vax6.axes.get_yaxis().set_visible(False)
+    vax6.set_title("Env Map Recognition")
+
+    vax7.axes.get_xaxis().set_visible(False)
+    vax7.axes.get_yaxis().set_visible(False)
+    vax7.set_title("Env Map Fit")
+
+    plt.tight_layout()
+    vidImgs = []
+
 
 nearestNeighbours = False
 
@@ -1206,6 +1191,123 @@ segmentVColorError = np.array([])
 useSegmentation = True
 
 segmentVColors = []
+annot_t = None
+def cb(_):
+    global t
+    global samplingMode
+    elapsed_time = time.time() - t
+    print("Ended interation in  " + str(elapsed_time))
+    # if samplingMode:
+    #     analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/azNum' + str(sampleAzNum) + '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+    # else:
+    #     analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/min_azNum' + str(sampleAzNum) +  '_it' + str(iterat)  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+    global pixelErrorFun
+    global errorFun
+    global iterat
+    iterat = iterat + 1
+    print("Callback! " + str(iterat))
+    print("Sq Error: " + str(errorFun.r))
+
+    global negLikModelRobustSmallStd
+    global bestShapeParamsSmallStd
+    global bestRobustSmallStdError
+    # if minimizingShape and useShapeModel:
+    #     # if negLikModelRobustSmallStd.r  < bestRobustSmallStdError:
+    #     #     bestRobustSmallStdError = negLikModelRobustSmallStd.r.copy()
+    #     #     bestShapeParamsSmallStd = chShapeParams.r.copy()
+    #     maxShapeSize = 2.5
+    #     largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+    #     if np.any(largeShapeParams):
+    #         print("Warning: found large shape parameters to fix!")
+    #     chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
+    if makeVideo:
+
+        global im1
+        global im2
+        global rendererGT
+        global vidImgs
+        global writer
+        global writer_i
+        global renderer
+        global rendererRecognition
+        global annot_t
+
+        plt.figure(figvid.number)
+        im1 = vax1.imshow(lin2srgb(rendererGT.r.copy()))
+        bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.8)
+        im2 = vax2.imshow(lin2srgb(rendererRecognition.copy()))
+
+        im3 = vax3.imshow(lin2srgb(renderer.r.copy()))
+
+        stdsOld = stds.r
+        stds[:] = 0.05
+        vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+        post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.5
+        stds[:] = stdsOld
+
+        im4 = vax4.imshow(post)
+        # plt.colorbar(im4, ax=vax4, use_gridspec=True)
+
+        pEnvMap = SHProjection(envMapTexture, np.concatenate([chLightSHCoeffs.r[:,None], chLightSHCoeffs.r[:,None], chLightSHCoeffs.r[:,None]], axis=1))
+        approxProjectionFitted = np.sum(pEnvMap, axis=(2,3))
+        # approxProjectionFitted[approxProjectionFitted<0] = 0
+        #
+        # approxProjectionGT[approxProjectionGT<0] = 0
+        # approxProjectionPred[approxProjectionPred<0] = 0
+
+        # cv2.imwrite(resultDir + 'approxProjectionGT.jpeg' , 255*np.concatenate([approxProjectionGT[...,None], approxProjectionGT[...,None], approxProjectionGT[...,None]], axis=2)[:,:,[2,1,0]])
+        # cv2.imwrite(resultDir + 'approxProjectionPred.jpeg' , 255*np.concatenate([approxProjectionPred[...,None], approxProjectionPred[...,None], approxProjectionPred[...,None]], axis=2)[:,:,[2,1,0]])
+        # cv2.imwrite(resultDir + 'approxProjectionFitted.jpeg' , 255*np.concatenate([approxProjectionFitted[...,None], approxProjectionFitted[...,None], approxProjectionFitted[...,None]], axis=2)[:,:,[2,1,0]])
+
+        cv2.imwrite(resultDir + 'approxProjectionGT.jpeg' , 255*np.sum(pEnvMapGT, axis=3)[:,:,[2,1,0]])
+        cv2.imwrite(resultDir + 'approxProjectionPred.jpeg' , 255*np.sum(pEnvMapPred, axis=3)[:,:,[2,1,0]])
+        cv2.imwrite(resultDir + 'approxProjectionFitted.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
+
+        approxProjectionGTlocal = skimage.io.imread(resultDir +'approxProjectionGT.jpeg').astype(np.float32)/255.
+        approxProjectionPredlocal = skimage.io.imread(resultDir +'approxProjectionPred.jpeg').astype(np.float32)/255.
+        approxProjectionFittedlocal = skimage.io.imread(resultDir +'approxProjectionFitted.jpeg').astype(np.float32)/255.
+
+        approxProjectionGTlocal = skimage.transform.resize(approxProjectionGTlocal, [75,150])
+        approxProjectionPredlocal = skimage.transform.resize(approxProjectionPredlocal, [75,150])
+        approxProjectionFittedlocal = skimage.transform.resize(approxProjectionFittedlocal, [75,150])
+
+        im5 = vax5.imshow(approxProjectionGTlocal.copy())
+
+        im6 = vax6.imshow(approxProjectionPredlocal.copy())
+
+        im7 = vax7.imshow(approxProjectionFittedlocal.copy())
+
+        # if annot_t is not None:
+        #     annot_t.remove()
+        annot_t = vax3.annotate("Fitting iter: " + str(iterat), xy=(1, 0), xycoords='axes fraction', fontsize=16,
+                     xytext=(-20, 5), textcoords='offset points', ha='right', va='bottom', bbox=bbox_props)
+
+
+        im4 = vax4.imshow(post)
+
+        plt.tight_layout()
+
+        vidImgs.append([im1,im2, im3,im4, im5, im6, im7, annot_t])
+
+        if iterat == 1:
+            vidImgs.append([im1,im2, im3,im4, im5, im6, im7, annot_t])
+            vidImgs.append([im1,im2, im3,im4, im5, im6, im7, annot_t])
+
+        # figvid.savefig(resultDir + 'videos/' + 'lastFig.png')
+
+        # writer_i.grab_frame()
+
+    global imagegt
+    global gradAz
+    global gradEl
+    global performance
+    global azimuths
+    global elevations
+    global shapeParams
+
+    t = time.time()
+
+
 for testSetting, model in enumerate(modelTests):
     model = modelTests[testSetting]
     method = methodTests[testSetting]
@@ -1230,6 +1332,10 @@ for testSetting, model in enumerate(modelTests):
 
     if not os.path.exists(resultDir + 'hue_samples/'):
         os.makedirs(resultDir + 'hue_samples/')
+
+    if makeVideo:
+        if not os.path.exists(resultDir + 'videos/'):
+            os.makedirs(resultDir + 'videos/')
 
     azimuths = []
     elevations = []
@@ -1313,6 +1419,12 @@ for testSetting, model in enumerate(modelTests):
 
             stds[:] = stdsTests
 
+            if makeVideo:
+                writer_i = Writer(fps=1, metadata=dict(title='', artist=''), bitrate=1800)
+                writer_i.setup(figvid, resultDir + 'videos/vid_'+ str(test_i) + '.mp4', dpi=70)
+                vidImgs = []
+
+
             if nearestNeighbours:
                 onenn_i = one_nn(trainImagesR, imageSrgb.ravel())
                 nearesTrainImage = trainImages[onenn_i]
@@ -1393,6 +1505,8 @@ for testSetting, model in enumerate(modelTests):
                 if useShapeModel:
                     chShapeParams[:] = shapeParams
 
+                rendererRecognition = renderer.r.copy()
+
                 # from skimage.segmentation import slic
                 # import skimage.segmentation
                 # from skimage.segmentation import mark_boundaries
@@ -1440,14 +1554,14 @@ for testSetting, model in enumerate(modelTests):
                 if not envMapFound:
                     ipdb.set_trace()
 
-                pEnvMap = SHProjection(envMapTexture, np.concatenate([testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None]], axis=1))
-                approxProjectionGT = np.sum(pEnvMap, axis=(2,3))
+                pEnvMapGT = SHProjection(envMapTexture, np.concatenate([testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None], testLightCoefficientsGTRel[test_i][:,None]], axis=1))
+                approxProjectionGT = np.sum(pEnvMapGT, axis=(2,3))
                 approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT[None,:]]
 
-                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_GT.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
+                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_GT.jpeg' , 255*np.sum(pEnvMapGT, axis=3)[:,:,[2,1,0]])
 
-                pEnvMap = SHProjection(envMapTexture, np.concatenate([relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None]], axis=1))
-                approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
+                pEnvMapPred = SHProjection(envMapTexture, np.concatenate([relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None], relLightCoefficientsPred[test_i][:,None]], axis=1))
+                approxProjectionPred = np.sum(pEnvMapPred, axis=(2,3))
 
                 approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
 
@@ -1459,7 +1573,7 @@ for testSetting, model in enumerate(modelTests):
                     approxProjectionsNearestNeighbourList = approxProjectionsNearestNeighbourList + [approxProjectionNearestNeighbour[None,:]]
                     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_NearestNeighbour.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
 
-                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Pred.jpeg' , 255*np.sum(pEnvMap, axis=3)[:,:,[2,1,0]])
+                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/SH/' + str(hdridx) + '_Pred.jpeg' , 255*np.sum(pEnvMapPred, axis=3)[:,:,[2,1,0]])
 
                 ## RecognitionType =2 : Use samples from neural net to explore the space better.
                 if recognitionType == 2:
@@ -1584,9 +1698,9 @@ for testSetting, model in enumerate(modelTests):
                     stds[:] = 0.03
                     shapePenalty = 0.0001
                     options={'disp':False, 'maxiter':40}
+                    # options={'disp':False, 'maxiter':2}
 
                     minimizingShape = True
-
 
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -1614,6 +1728,7 @@ for testSetting, model in enumerate(modelTests):
                     stds[:] = 0.01
                     shapePenalty = 0.0
                     options={'disp':False, 'maxiter':100}
+                    # options={'disp':False, 'maxiter':2}
                     # free_variables = [chShapeParams ]
                     minimizingShape = True
                     ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
@@ -1648,6 +1763,12 @@ for testSetting, model in enumerate(modelTests):
                 chLightSHCoeffs[:] = bestLightSHCoeffs
                 if useShapeModel:
                     chShapeParams[:] = bestShapeParams
+
+                if makeVideo:
+                    im_ani = animation.ArtistAnimation(figvid, vidImgs, interval=2000, repeat_delay=5000, repeat=True, blit=False)
+                    im_ani.save(resultDir + 'videos/fitting_'+ str(testSet[test_i]) + '.mp4', fps=None, writer=writer, codec='mp4')
+                    writer_i.finish()
+                    vidImgs[-1][7].remove()
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 

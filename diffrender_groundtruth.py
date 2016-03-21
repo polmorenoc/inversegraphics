@@ -28,13 +28,13 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_cycles_newscenes_seed1'
+prefix = 'train4_occlusion_shapemodel_cycles'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
-renderFromPreviousGT = False
+renderFromPreviousGT = True
 useShapeModel = True
-renderOcclusions = False
+renderOcclusions = True
 useOpenDR = True
 useBlender = True
 loadBlenderSceneFile = True
@@ -73,7 +73,7 @@ camDistance = 0.4
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -413,7 +413,7 @@ for sceneIdx in scenesToRender:
                 targetIndicesNew = targetIndicesNew + [targetIndex]
         targetIndices = targetIndicesNew
 
-    collisionSceneFile = 'data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle'
+    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
     scenes = scenes + [targetIndices]
     with open(collisionSceneFile, 'rb') as pfile:
         collisions = pickle.load(pfile)
@@ -438,12 +438,12 @@ if not renderFromPreviousGT:
 
         sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 
-        collisionSceneFile = 'data/collisions_new/collisionScene' + str(sceneNumber) + '.pickle'
+        collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
         with open(collisionSceneFile, 'rb') as pfile:
             collisions = pickle.load(pfile)
 
         if renderOcclusions:
-            occlusionSceneFile = 'data/occlusions_new/occlusionScene' + str(sceneNumber) + '.pickle'
+            occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
             with open(occlusionSceneFile, 'rb') as pfile:
                 occlusions = pickle.load(pfile)
 
@@ -836,7 +836,6 @@ for gtIdx in rangeGT[21:]:
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapGrayOr' + str(train_i) + '.jpeg' , 255*envMapGrayRGB[:,:,[2,1,0]])
 
-
         links.remove(treeNodes.nodes['lightPathNode'].outputs[0].links[0])
 
         scene.world.cycles_visibility.camera = True
@@ -859,7 +858,7 @@ for gtIdx in rangeGT[21:]:
         # bpy.context.user_preferences.system.compute_device_type = 'NONE'
         # bpy.context.user_preferences.system.compute_device = 'CPU'
 
-        scene.cycles.samples = 100
+        scene.cycles.samples = 1000
         scene.camera.up_axis = 'Z'
         # placeCamera(scene.camera, 0, 0, 1, )
 
@@ -879,7 +878,7 @@ for gtIdx in rangeGT[21:]:
         cv2.imwrite(gtDir + 'sphericalharmonics/envMapCyclesProjection' + str(train_i) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
 
         links.new(treeNodes.nodes['lightPathNode'].outputs[0], treeNodes.nodes['mixShaderNode'].inputs[0])
-        scene.cycles.samples = 100
+        scene.cycles.samples = 3000
         scene.render.filepath = 'opendr_blender.exr'
         roomInstance.cycles_visibility.camera = True
         scene.render.image_settings.file_format = 'OPEN_EXR'
@@ -892,8 +891,6 @@ for gtIdx in rangeGT[21:]:
         teapot.cycles_visibility.shadow = True
         # updateEnviornmentMap(envMapFilename, scene)
 
-    # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
     if useBlender:
         envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
         envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(-chObjAzGT.r), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
@@ -901,13 +898,7 @@ for gtIdx in rangeGT[21:]:
         envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
         envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
-    # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
-    # approxProjection = np.sum(pEnvMap, axis=3)
-    # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
-
     if useBlender and not ignore:
-
-       #Now we must do that!!
 
         azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
 
@@ -926,8 +917,6 @@ for gtIdx in rangeGT[21:]:
 
         bpy.ops.render.render( write_still=True )
 
-        # image = cv2.imread(scene.render.filepath)
-        # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
         image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
         image[image>1]=1
         blenderRender = image
