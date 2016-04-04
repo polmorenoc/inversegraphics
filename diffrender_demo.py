@@ -745,7 +745,6 @@ if showSubplots:
     # extent = ax1.get_window_extent().transformed(f.dpi_scale_trans.inverted())
     # f.savefig('ax1_figure.png', bbox_inches=extent)
 
-
     # ax3.set_title("Pixel negative log probabilities")
     # pim3 = ax3.imshow(-pixelErrorFun.r)
     # cb3 = plt.colorbar(pim3, ax=ax3,use_gridspec=True)
