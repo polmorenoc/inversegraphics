@@ -207,7 +207,7 @@ trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/'
 trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
 useShapeModel = True
-makeVideo = True
+makeVideo = False
 
 ignoreGT = True
 ignore = []
@@ -1123,7 +1123,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-video-shape' + testRangeStr
+testDescription = 'ECCV-CRF-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1498,6 +1498,7 @@ for testSetting, model in enumerate(modelTests):
                     lightCoefficientsRel = relLightCoefficientsPred[test_i]
                     if useShapeModel:
                         shapeParams = shapeParamsPred[test_i]
+
                 chAz[:] = az
                 chEl[:] = el
                 chVColors[:] = color
@@ -1507,11 +1508,17 @@ for testSetting, model in enumerate(modelTests):
 
                 rendererRecognition = renderer.r.copy()
 
+
+                # Dense CRF prediction of labels:
+
+                vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+
+                import densecrf_model
+
                 # from skimage.segmentation import slic
                 # import skimage.segmentation
                 # from skimage.segmentation import mark_boundaries
                 # from skimage.util import img_as_float
-                #
                 #
                 # segments = skimage.segmentation.quickshift(rendererGT.r, ratio=1, max_dist=20, convert2lab=True)
                 # bestVColor = np.array([])

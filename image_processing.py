@@ -123,7 +123,7 @@ def computeHoG(image):
 
     hog_descr, hog_image = hog(image, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(1, 1), visualise=True)
 
-    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+    # fig, ( ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
     #
     # ax1.axis('off')
     # ax1.imshow(image, cmap=plt.cm.gray)

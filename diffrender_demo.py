@@ -35,8 +35,8 @@ useShapeModel = True
 datasetGroundtruth = False
 syntheticGroundtruth = True
 useCycles = True
-demoMode = False
-showSubplots = False
+demoMode = True
+showSubplots = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -50,7 +50,7 @@ sphericalMap = False
 
 np.random.seed(1)
 
-width, height = (1000, 1000)
+width, height = (150, 150)
 win = -1
 
 if glMode == 'glfw':
@@ -494,8 +494,6 @@ rendererGT.overdraw = True
 
 cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-ipdb.set_trace()                                                                                                                                                                            
-
 
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
@@ -614,6 +612,21 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
+
+vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+
+import densecrf_model
+import skimage.color
+
+segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im.ravel(), [0.8,0.2,0.01])
+
+plt.imshow(segmentation)
+plt.clim(0,2)
+plt.show()
+
+sys.exit()
+
+
 # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
 # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)
 #
@@ -621,17 +634,17 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, '
 # hogCellErrors = ch.sum(hogE_raw*hogE_raw, axis=2)
 # hogError = -ch.dot(hogGT.ravel(),hogRenderer.ravel())/(ch.sqrt(ch.SumOfSquares(hogGT))*ch.sqrt(ch.SumOfSquares(hogGT)))
 
-import opendr.filters
-robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization=None)/numPixels
-robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
-
+# import opendr.filters
+# robPyr = opendr.filters.gaussian_pyramid(renderer - rendererGT, n_levels=6, normalization=None)/numPixels
+# robPyrSum = -ch.sum(ch.log(ch.exp(-0.5*robPyr**2/variances) + 1))
+#
 
 # edgeErrorPixels = generative_models.EdgeFilter(rendererGT=rendererGT, renderer=renderer)**2
 # edgeError = ch.sum(edgeErrorPixels)
 
-models = [negLikModel, negLikModelRobust,  robPyrSum]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, robPyr]
-modelsDescr = ["Gaussian Model", "Outlier model", "Region Robust", "Pyr Error" ]
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+modelsDescr = ["Gaussian Model", "Outlier model"]
 
 # , negLikModelPyr, negLikModelRobustPyr, SSqE_raw
 

@@ -94,9 +94,9 @@ def latexify(fig_width=None, fig_height=None, columns=1):
         fig_height = MAX_HEIGHT_INCHES
 
     params = {'backend': 'pdf',
-              'axes.labelsize': 16, # fontsize for x and y labels (was 10)
-              'axes.titlesize': 14,
-              'font.size': 14, # was 10
+              'axes.labelsize': 12, # fontsize for x and y labels (was 10)
+              'axes.titlesize': 12,
+              'font.size': 12, # was 10
               'legend.fontsize': 14, # was 10
               'xtick.labelsize': 14,
               'ytick.labelsize': 14,
@@ -330,34 +330,34 @@ def saveLikelihoodScatter(resultDirOcclusion, testSet, testOcclusions,  likeliho
                       cmap=matplotlib.cm.plasma)
     cbar = fig.colorbar(scat, ticks=[0, 50, 100])
     cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-    ax.set_xlabel('Ground-truth avg likelihood')
-    ax.set_ylabel('Recognition+Fit avg likelihood')
+    ax.set_xlabel('Ground-truth NLL (avg)')
+    ax.set_ylabel('Recognition+Fit NLL (avg)')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
     ax.set_xlim((min(x1,y1), max(x2,y2)))
     ax.set_ylim((min(x1,y1), max(x2,y2)))
     ax.plot([min(x1,y1), max(x2,y2)], [min(x1,y1), max(x2,y2)], ls="--", c=".3")
-    ax.set_title('GT vs Recognition+Robust Fit likelihood')
+    ax.set_title('GT vs Recognition+Robust fit negative log-likelihood')
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
-    directory = resultDirOcclusion + 'gaussianLikelihood_fitted-gaussianLikelihood'
-    fig = plt.figure()
-    ax = fig.add_subplot(111, aspect='equal')
-    scat = ax.scatter(likelihoods[2][testSet], likelihoods[3][testSet], s=20, vmin=0, vmax=100, c=testOcclusions * 100,
-                      cmap=matplotlib.cm.plasma)
-    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
-    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
-    ax.set_xlabel('Ground-truth avg likelihood')
-    ax.set_ylabel('Fitted avg likelihood')
-    x1, x2 = ax.get_xlim()
-    y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, max(x2,y2)))
-    ax.set_ylim((0, max(x2,y2)))
-    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
-    ax.set_title('GT vs Recognition+Gaussian Fit likelihood')
-    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
-    plt.close(fig)
+    # directory = resultDirOcclusion + 'gaussianLikelihood_fitted-gaussianLikelihood'
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, aspect='equal')
+    # scat = ax.scatter(likelihoods[2][testSet], likelihoods[3][testSet], s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+    #                   cmap=matplotlib.cm.plasma)
+    # cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    # cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    # ax.set_xlabel('Ground-truth avg likelihood')
+    # ax.set_ylabel('Fitted avg likelihood')
+    # x1, x2 = ax.get_xlim()
+    # y1, y2 = ax.get_ylim()
+    # ax.set_xlim((0, max(x2,y2)))
+    # ax.set_ylim((0, max(x2,y2)))
+    # ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    # ax.set_title('GT vs Recognition+Gaussian Fit likelihood')
+    # fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    # plt.close(fig)
 
 def saveHistograms():
     pass
