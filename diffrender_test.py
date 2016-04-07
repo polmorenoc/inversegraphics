@@ -1,5 +1,7 @@
 test__author__ = 'pol'
 
+from damascene import damascene
+
 import matplotlib
 matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
@@ -175,7 +177,6 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'MASK', globalPrior, variances)[0]
 
-
 models = [negLikModel, negLikModelRobust]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 modelsDescr = ["Gaussian Model", "Outlier model" ]
@@ -221,10 +222,7 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 #          2, 508, 201,  92, 142, 501, 231, 282, 160, 384, 299, 341,  51,
 #        523, 335, 515, 121,  43,   6, 511, 307, 353,  89, 493]
 rangeTests = np.arange(100,1100)[[390, 250, 434, 883, 698, 64, 18, 732, 219,  258,  102, 343]]
-rangeTests = np.arange(100,1100)[[131, 388, 496, 146, 182,  43, 517,  26, 184, 130, 368, 498, 300,
-       505, 287, 174, 209,  57,  93, 308,  74, 123, 347, 275, 191, 341,
-       290, 432, 225, 492, 272, 507, 371,  84, 448, 461, 187, 289, 403,
-       101, 222, 379, 515, 479, 165, 270, 400, 516, 419, 276]]
+rangeTests = np.arange(100,1100)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -262,7 +260,6 @@ dataIds = groundTruth['trainIds']
 
 if useShapeModel:
     dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
-
 
 gtDtype = groundTruth.dtype
 
@@ -470,7 +467,6 @@ if loadMask:
 # cv2.imwrite('rendererGT' + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
 # plt.imsave('renderered.png', lin2srgb(render))
-
 
 import skimage.color
 
@@ -813,6 +809,9 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "neura
         #     masksGT = loadMasks(masksDir, testSet)
 else:
     maskPredictions = np.load(trainModelsDirShapeParams + 'maskPredictions.npy')[rangeTests]
+
+
+
 
 
 loadMask = True
@@ -1508,38 +1507,16 @@ for testSetting, model in enumerate(modelTests):
 
                 rendererRecognition = renderer.r.copy()
 
-
                 # Dense CRF prediction of labels:
 
                 vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+                bound_im = renderer.boundarybool_image.astype(np.bool)
 
                 import densecrf_model
 
-                # from skimage.segmentation import slic
-                # import skimage.segmentation
-                # from skimage.segmentation import mark_boundaries
-                # from skimage.util import img_as_float
-                #
-                # segments = skimage.segmentation.quickshift(rendererGT.r, ratio=1, max_dist=20, convert2lab=True)
-                # bestVColor = np.array([])
-                # bestVColorIOU = -1000000
-                # bestGlobalVColor = np.array([])
-                # for seg_i in np.arange(np.max(segments)):
-                #     currentSegment = segments == seg_i
-                #     vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
-                #     masksCat = np.concatenate([vis_im[:,:,None], currentSegment[:,:,None]], axis=2)
-                #     segmentationIOU = np.sum(np.all(masksCat, axis=2)) / np.sum(np.any(masksCat, axis=2))
-                #     if segmentationIOU > bestVColorIOU:
-                #         if np.sum(np.all(masksCat, axis=2))/np.sum(currentSegment) > 0.6:
-                #             bestVColorIOU = segmentationIOU
-                #             bestVColor = np.median(rendererGT.r[currentSegment].reshape([-1, 3]), axis=0)
-                #
-                #         bestGlobalVColor = np.median(rendererGT.r[currentSegment].reshape([-1, 3]), axis=0)
+                segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.8,0.2,0.01])
 
-                # if len(bestVColor!=0):
-                #     segmentVColors = segmentVColors + [bestVColor[None,:]]
-                # else:
-                #     segmentVColors = segmentVColors + [bestGlobalVColor[None,:]]
+                ipdb.set_trace()
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 

@@ -612,7 +612,6 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
-
 vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
 
 import densecrf_model
@@ -622,10 +621,16 @@ segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im.ravel(), [0.8
 
 plt.imshow(segmentation)
 plt.clim(0,2)
-plt.show()
+
+plt.figure()
+
+plt.imshow(Q.swapaxes(0,1).reshape([150,150,3]))
+
+plt.figure()
+
+plt.imshow(rendererGT.r)
 
 sys.exit()
-
 
 # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
 # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)

@@ -12,9 +12,6 @@ __author__ = 'pol'
 import recognition_models
 import pickle
 
-
-
-
 def joinExperiments(testSet1,methodsPred1,testOcclusions1,testPrefixBase1,parameterRecognitionModels1,azimuths1,elevations1,vColors1,lightCoeffs1,likelihoods1,shapeParams1,segmentations1,testSet2,methodsPred2,testOcclusions2,testPrefixBase2,parameterRecognitionModels2,azimuths2,elevations2,vColors2,lightCoeffs2,likelihoods2,shapeParams2,segmentations2):
 
     testSet = np.append(testSet1, testSet2)
