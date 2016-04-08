@@ -1,6 +1,6 @@
 test__author__ = 'pol'
 
-from damascene import damascene
+# from damascene import damascene
 
 import matplotlib
 matplotlib.use('QT4Agg')
@@ -222,7 +222,7 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 #          2, 508, 201,  92, 142, 501, 231, 282, 160, 384, 299, 341,  51,
 #        523, 335, 515, 121,  43,   6, 511, 307, 353,  89, 493]
 rangeTests = np.arange(100,1100)[[390, 250, 434, 883, 698, 64, 18, 732, 219,  258,  102, 343]]
-rangeTests = np.arange(100,1100)
+rangeTests = np.arange(104,1100)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -365,7 +365,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = True
 
 method = 1
@@ -1514,7 +1514,9 @@ for testSetting, model in enumerate(modelTests):
 
                 import densecrf_model
 
-                segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.8,0.2,0.01])
+                plt.imsave('renderer', renderer.r)
+
+                segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.75,0.25,0.01])
 
                 ipdb.set_trace()
 

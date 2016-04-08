@@ -4,7 +4,7 @@ Adapted from the dense_inference.py to demonstate the usage of the util
 functions.
 """
 
-from damascene import damascene
+# from damascene import damascene
 import pydensecrf.densecrf as dcrf
 
 import sys
@@ -34,7 +34,7 @@ def unaryOcclusionModel(img, fgMask, probs):
     fg_energy = -np.log(probs[0])
     occ_energy = -np.log(probs[1])
 
-    probBackground = 0.8
+    probBackground = 0.9
 
     U = np.zeros((3, fgMask.size), dtype='float32')
 
@@ -53,6 +53,7 @@ def unaryOcclusionModel(img, fgMask, probs):
 def superpixelUnary(img, U, fgMask, iouProb):
 
     segments = skimage.segmentation.quickshift(img, ratio=1, max_dist=10, convert2lab=True)
+    plt.imsave('superpixelsegments',mark_boundaries(img, segments))
 
     # plt.imshow(segments)
 
@@ -63,7 +64,7 @@ def superpixelUnary(img, U, fgMask, iouProb):
         masksCat = np.concatenate([fgMaskReshaped[:,:,None], currentSegment[:,:,None]], axis=2)
         segmentationIOU = np.sum(np.all(masksCat, axis=2)) / np.sum(currentSegment)
 
-        if segmentationIOU > 0.05 and segmentationIOU < 0.95:
+        if segmentationIOU > 0.1 and segmentationIOU < 0.75:
             U[0, currentSegment.ravel()*fgMask] = -np.log(1 - iouProb)
             U[1, currentSegment.ravel()*fgMask] = -np.log(iouProb)
 
@@ -90,30 +91,40 @@ def superpixelUnary(img, U, fgMask, iouProb):
 
 def boundaryUnary(img, U, fgMask, fgBoundary, fgBoundProb):
 
-    from damascene import damascene
-
     #img must be uint8 0-255
-    borders, textons, orientations = damascene(np.uint8(img[:,:,0:3]*255), device_num=0)
+    # borders, textons, orientations = damascene(np.uint8(img[:,:,0:3]*255), device_num=0)
+    from skimage import feature
+
+    borders= feature.canny(skimage.color.rgb2gray(img), sigma=3)
 
     gtBorders = borders > 0.5
 
+    plt.imsave('cannyedges', gtBorders)
+
     maskDistTransform = cv2.distanceTransform(np.uint8(~fgBoundary.reshape([150,150])), cv2.DIST_L2, 3)
 
-    maskEdgesDistance =  maskDistTransform.ravel()[gtBorders.ravel() * fgMask]
+    closeEdges = maskDistTransform.ravel() < 5
 
-    fgEdges = maskEdgesDistance < 5
+    imCloseEdges = np.zeros([150,150])
+    imCloseEdges.ravel()[closeEdges * gtBorders.ravel() * fgMask] = 1
+    plt.imsave('closeEdges', imCloseEdges)
 
-    U[0, fgEdges.ravel()] = -np.log(fgBoundProb)
-    U[1, fgEdges.ravel()] = -np.log(1 - fgBoundProb)
+    U[0, closeEdges * gtBorders.ravel() * fgMask] = -np.log(fgBoundProb)
+    U[1, closeEdges * gtBorders.ravel() * fgMask] = -np.log(1 - fgBoundProb)
 
-    plt.imshow(U.reshape([150,150,3]))
+    z = np.argmin(U.swapaxes(0,1).reshape([150,150,3]), axis=2)
+    Urgb = np.concatenate([np.array(z==0)[:,:,None], np.array(z==1)[:,:,None], np.array(z==2)[:,:,None]], axis=2)
+    plt.imshow(Urgb)
+
     plt.savefig('boundaryEdges.png')
 
-    occlusionEdges = maskEdgesDistance > 15
+    farEdges = maskDistTransform.ravel() > 10
+    imfarEdges = np.zeros([150,150])
+    imfarEdges.ravel()[farEdges* gtBorders.ravel() * fgMask] = 1
+    plt.imsave('farEdges', imfarEdges)
 
-    U[0, occlusionEdges.ravel()] = -np.log(1-fgBoundProb)
-    U[1, occlusionEdges.ravel()] = -np.log(fgBoundProb)
-
+    U[0, farEdges * gtBorders.ravel() * fgMask] = -np.log(1-fgBoundProb)
+    U[1, farEdges * gtBorders.ravel() * fgMask] = -np.log(fgBoundProb)
 
     return U
 
@@ -139,31 +150,62 @@ def crfInference(imageGT, fgMask, fgBoundary,  probs):
     U = unaryOcclusionModel(img, fgMask.ravel(), probs)
 
     plt.figure()
-    plt.imshow(U.reshape([150,150,3]))
+    z = np.argmin(U.swapaxes(0,1).reshape([150,150,3]), axis=2)
+    Urgb = np.concatenate([np.array(z==0)[:,:,None], np.array(z==1)[:,:,None], np.array(z==2)[:,:,None]], axis=2)
+    plt.imshow(Urgb)
     plt.savefig('unary.png')
 
-    U = superpixelUnary(imageGT, U, fgMask.ravel(), 0.9)
-    plt.imshow(U.reshape([150,150,3]))
+    U = superpixelUnary(imageGT, U, fgMask.ravel(), 0.65)
+    z = np.argmin(U.swapaxes(0,1).reshape([150,150,3]), axis=2)
+    Urgb = np.concatenate([np.array(z==0)[:,:,None], np.array(z==1)[:,:,None], np.array(z==2)[:,:,None]], axis=2)
+    plt.imshow(Urgb)
     plt.savefig('superpixel.png')
 
     U = boundaryUnary(imageGT, U, fgMask.ravel(), fgBoundary.ravel(), 0.9)
-    plt.imshow(U.reshape([150,150,3]))
+    z = np.argmin(U.swapaxes(0,1).reshape([150,150,3]), axis=2)
+    Urgb = np.concatenate([np.array(z==0)[:,:,None], np.array(z==1)[:,:,None], np.array(z==2)[:,:,None]], axis=2)
+    plt.imshow(Urgb)
     plt.savefig('boundarycomplete.png')
 
     crfmodel.setUnaryEnergy(U)
 
-    # This creates the color-independent features and then add them to the CRF
-    feats = create_pairwise_gaussian(sdims=(3, 3), shape=img.shape[:2])
-    crfmodel.addPairwiseEnergy(feats, compat=3,
+    # # This creates the color-independent features and then add them to the CRF
+    feats = create_pairwise_gaussian(sdims=(10, 10), shape=img.shape[:2])
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[0,3,3], [3,0,3],[3,3,0]], dtype=np.float32),
                         kernel=dcrf.DIAG_KERNEL,
                         normalization=dcrf.NORMALIZE_SYMMETRIC)
 
     # This creates the color-dependent features and then add them to the CRF
-    feats = create_pairwise_bilateral(sdims=(30, 30), schan=(13, 13, 13),
+    feats = create_pairwise_bilateral(sdims=(30, 30), schan=(30., 20., 20.),
                                       img=img, chdim=2)
-    crfmodel.addPairwiseEnergy(feats, compat=10,
+
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[0.,10,10], [10,0,10],[10,10,0]], dtype=np.float32),
                         kernel=dcrf.DIAG_KERNEL,
                         normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+    # This creates the color-dependent features and then add them to the CRF
+    feats = create_pairwise_bilateral(sdims=(-75, -75), schan=(-60., -150., -150.),
+                                      img=img, chdim=2)
+
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[20,0,0], [0,0,0],[0,0,0]], dtype=np.float32),
+                        kernel=dcrf.DIAG_KERNEL,
+                        normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+    # # This creates the color-dependent features and then add them to the CRF
+    # feats = create_pairwise_bilateral(sdims=(-100, -100), schan=(-75., -100., -100.),
+    #                                   img=img, chdim=2)
+    #
+    # crfmodel.addPairwiseEnergy(feats, compat=np.array([[0,0,0], [0,1,0],[0,0,0]], dtype=np.float32),
+    #                     kernel=dcrf.DIAG_KERNEL,
+    #                     normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+    # # This creates the color-dependent features and then add them to the CRF
+    # feats = create_pairwise_bilateral(sdims=(30, 30), schan=(20., 10., 10.),
+    #                                   img=img, chdim=2)
+    #
+    # crfmodel.addPairwiseEnergy(feats, compat=np.array([[0.,0,0], [0,0,0],[0,0,0]], dtype=np.float32),
+    #                     kernel=dcrf.DIAG_KERNEL,
+    #                     normalization=dcrf.NORMALIZE_SYMMETRIC)
 
     ####################################
     ### Do inference and compute map ###

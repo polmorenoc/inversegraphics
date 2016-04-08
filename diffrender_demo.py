@@ -753,7 +753,6 @@ if showSubplots:
     rendererIm = lin2srgb(renderer.r.copy())
     pim2 = ax2.imshow(rendererIm)
 
-
     edges = renderer.boundarybool_image
     gtoverlay = imageGT().copy()
     gtoverlay = lin2srgb(gtoverlay)
@@ -778,7 +777,6 @@ if showSubplots:
     diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)
 
     ax3.set_title("Dr wrt. Azimuth Checkgrad")
-
 
     drazsum = np.sign(-diffAz.reshape(shapeIm[0],shapeIm[1],1))*pixelErrorFun.dr_wrt(paramWrt1).reshape(shapeIm[0],shapeIm[1],1)
 
