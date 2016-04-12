@@ -1189,7 +1189,7 @@ plotColors = ['k', 'm', 'b', 'r']
 segmentVColorError = np.array([])
 useSegmentation = True
 
-segmentVColors = []
+segmentVColorsList = []
 annot_t = None
 def cb(_):
     global t
@@ -1471,6 +1471,12 @@ for testSetting, model in enumerate(modelTests):
             if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/'):
                 os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/')
 
+            if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/crf/'):
+                os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/crf/')
+
+            if not os.path.exists(resultDir + 'imgs/crf/'):
+                os.makedirs(resultDir + 'imgs/crf/')
+
             if not os.path.exists(resultDir + 'imgs/test'+ str(test_i) + '/SH/'):
                 os.makedirs(resultDir + 'imgs/test'+ str(test_i) + '/SH/')
 
@@ -1514,15 +1520,16 @@ for testSetting, model in enumerate(modelTests):
 
                 import densecrf_model
 
-                plt.imsave('renderer', renderer.r)
+                plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/crf/renderer', renderer.r)
 
-                segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.7,0.3,0.001])
+                segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.75,0.25,0.01], resultDir + 'imgs/crf/Q_' + str(test_i))
                 if np.sum(segmentation==0) == 0:
-                    segmentVColors = segmentVColors + [color]
+                    segmentVColorsList = segmentVColorsList + [color]
                 else:
+
                     segmentRegion = segmentation==0
                     segmentColor = np.median(rendererGT.reshape([-1,3])[segmentRegion.ravel()], axis=0)
-                    segmentVColors = segmentVColors + [segmentColor]
+                    segmentVColorsList = segmentVColorsList + [segmentColor]
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
@@ -1825,7 +1832,7 @@ for testSetting, model in enumerate(modelTests):
                 if optimizationTypeDescr[optimizationType] != 'predict':
                     numFitted = range(len(fittedAzs))
                 else:
-                    numFitted = range(len(approxProjectionsPred))
+                    numFitted = range(test_i+1)
 
                 if includeMeanBaseline:
                     # meanBaselinePosteriors = np.vstack(meanBaselinePosteriorList)
@@ -1909,8 +1916,12 @@ for testSetting, model in enumerate(modelTests):
                     shapeParams = shapeParams + [None]
 
 
-                segmentVColors = np.vstack(segmentVColors)
+                segmentVColors = np.vstack(segmentVColorsList)
                 errorsVColorsCSegment = image_processing.cColourDifference(testVColorGT[numFitted], segmentVColors)
+                errorsVColorsScaleInvSegment = image_processing.scaleInvariantColourDifference(testVColorGT[numFitted], segmentVColors)
+                errorsVColorsScaleInvPred = image_processing.scaleInvariantColourDifference(testVColorGT[numFitted], vColors[2][numFitted])
+
+                ipdb.set_trace()
 
                 errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList \
                     = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
@@ -1920,8 +1931,6 @@ for testSetting, model in enumerate(modelTests):
 
                 medianAbsErrAzsList, medianAbsErrElevsList,medianErrorsLightCoeffsList, medianErrorsShapeParamsList, medianErrorsShapeVerticesList, medianErrorsLightCoeffsCList, medianErrorsEnvMapList, medianErrorsVColorsEList, medianErrorsVColorsCList, medianErrorsSegmentationList \
                     = computeErrorAverages(np.median, numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)
-
-                ipdb.set_trace()
 
                 #Write statistics to file.
                 with open(resultDir + 'performance.txt', 'w') as expfile:

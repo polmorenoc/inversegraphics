@@ -729,8 +729,6 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
         else:
             errorsSegmentation = errorsSegmentation + [None]
 
-
-
     return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation
 
 def computeErrorAverages(averageFun, testSet, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation):
