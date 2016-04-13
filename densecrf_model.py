@@ -218,8 +218,7 @@ def crfInference(imageGT, fgMask, fgBoundary,  probs, figsDir):
     vax5.axis('off')
     vax5.imshow(Urgb)
 
-
-    smoothedU = -np.log(skimage.filters.gaussian(np.exp(-U.swapaxes(0,1).reshape([150,150,3])), 3, output=None, mode='nearest', cval=0, multichannel=True))
+    smoothedU = -np.log(skimage.filters.gaussian(np.exp(-U.swapaxes(0,1).reshape([150,150,3])), 5, output=None, mode='nearest', cval=0, multichannel=True))
     vax6.axis('off')
     vax6.imshow(smoothedU)
 
@@ -228,34 +227,42 @@ def crfInference(imageGT, fgMask, fgBoundary,  probs, figsDir):
     crfmodel.setUnaryEnergy(U)
 
     # # This creates the color-independent features and then add them to the CRF
-    feats = create_pairwise_gaussian(sdims=(10,10), shape=img.shape[:2])
-    crfmodel.addPairwiseEnergy(feats, compat=10,
+    feats = create_pairwise_gaussian(sdims=(5,5), shape=img.shape[:2])
+    crfmodel.addPairwiseEnergy(feats, compat=5,
                         kernel=dcrf.DIAG_KERNEL,
                         normalization=dcrf.NORMALIZE_SYMMETRIC)
 
     # This creates the color-dependent features and then add them to the CRF
-    feats = create_pairwise_bilateral(sdims=(20, 20), schan=(20., 10., 10.),
+    feats = create_pairwise_bilateral(sdims=(30, 30), schan=(5., 5., 5.),
                                       img=img, chdim=2)
 
     crfmodel.addPairwiseEnergy(feats, compat=10,
                         kernel=dcrf.DIAG_KERNEL,
                         normalization=dcrf.NORMALIZE_SYMMETRIC)
 
-    # # # This creates the color-dependent features and then add them to the CRF
-    # feats = create_pairwise_bilateral(sdims=(20, 20), schan=(100., 250., 250.),
+    # # This creates the color-dependent features and then add them to the CRF
+    # feats = create_pairwise_bilateral(sdims=(5, 5), schan=(5., 5., 5.),
     #                                   img=img, chdim=2)
-    # crfmodel.addPairwiseEnergy(feats, compat=np.array([[20,0,0], [0,0,0],[0,0,0]], dtype=np.float32),
+    #
+    # crfmodel.addPairwiseEnergy(feats, compat=10,
     #                     kernel=dcrf.DIAG_KERNEL,
     #                     normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+    # # This creates the color-dependent features and then add them to the CRF
+    feats = create_pairwise_bilateral(sdims=(10, 10), schan=(100., 250., 250.),
+                                      img=img, chdim=2)
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[80,0,0], [0,0,0],[0,0,0]], dtype=np.float32),
+                        kernel=dcrf.DIAG_KERNEL,
+                        normalization=dcrf.NORMALIZE_SYMMETRIC)
     # #
     # #
     # # # This creates the color-dependent features and then add them to the CRF
-    # feats = create_pairwise_bilateral(sdims=(20, 20), schan=(20., 15., 15.),
-    #                                   img=img, chdim=2)
+    feats = create_pairwise_bilateral(sdims=(20, 20), schan=(5., 5., 5.),
+                                      img=img, chdim=2)
     # #
-    # crfmodel.addPairwiseEnergy(feats, compat=np.array([[-20,0,0], [0,0,0],[0,0,0]], dtype=np.float32),
-    #                     kernel=dcrf.DIAG_KERNEL,
-    #                     normalization=dcrf.NORMALIZE_SYMMETRIC)
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[-100,0,0], [0,0,0],[0,0,0]], dtype=np.float32),
+                        kernel=dcrf.DIAG_KERNEL,
+                        normalization=dcrf.NORMALIZE_SYMMETRIC)
     #
     # feats = create_pairwise_bilateral(sdims=(20, 20), schan=(20., 15., 15.),
     #                                   img=img, chdim=2)
@@ -264,13 +271,19 @@ def crfInference(imageGT, fgMask, fgBoundary,  probs, figsDir):
     #                     kernel=dcrf.DIAG_KERNEL,
     #                     normalization=dcrf.NORMALIZE_SYMMETRIC)
 
-    # feats = create_pairwise_bilateral(sdims=(20, 20), schan=(100., 250., 250.),
-    #                                   img=img, chdim=2)
-    #
-    # crfmodel.addPairwiseEnergy(feats, compat=np.array([[0,0,0], [0, 50,0],[0,0,0]], dtype=np.float32),
-    #                     kernel=dcrf.DIAG_KERNEL,
-    #                     normalization=dcrf.NORMALIZE_SYMMETRIC)
+    feats = create_pairwise_bilateral(sdims=(15, 15), schan=(50., 60., 60.),
+                                      img=img, chdim=2)
 
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[0,0,0], [0, -20,0],[0,0,0]], dtype=np.float32),
+                        kernel=dcrf.DIAG_KERNEL,
+                        normalization=dcrf.NORMALIZE_SYMMETRIC)
+
+    feats = create_pairwise_bilateral(sdims=(5, 5), schan=(50., 60., 60.),
+                                      img=img, chdim=2)
+
+    crfmodel.addPairwiseEnergy(feats, compat=np.array([[0,0,0], [0, 0,0],[0,0,-5]], dtype=np.float32),
+                        kernel=dcrf.DIAG_KERNEL,
+                        normalization=dcrf.NORMALIZE_SYMMETRIC)
     # feats = create_pairwise_bilateral(sdims=(20, 20), schan=(20., 15., 15.),
     #                                   img=img, chdim=2)
     #
@@ -342,8 +355,6 @@ def crfInference(imageGT, fgMask, fgBoundary,  probs, figsDir):
     # for i in range(5):
     #     print("KL-divergence at {}: {}".format(i, crfmodel.klDivergence(Q)))
     #     crfmodel.stepInference(Q, tmp1, tmp2)
-
-
 
 
     vax7.axis('off')
