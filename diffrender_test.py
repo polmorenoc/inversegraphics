@@ -184,6 +184,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 model = 1
 pixelErrorFun = pixelModels[model]
 errorFun = models[model]
+
 iterat = 0
 
 t = time.time()
@@ -373,7 +374,6 @@ model = 1
 maxiter = 100
 numSamples = 1
 
-free_variables = [ chAz, chEl, chVColors, chLightSHCoeffs]
 
 mintime = time.time()
 boundEl = (-np.pi, np.pi)
@@ -453,6 +453,26 @@ loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
+
+### Bayesian Optimization tests.
+
+free_variables = [ chAz, chEl, chShapeParams]
+objBounds = [(0, 2*np.pi), (0, np.pi/2)] + [(-3.5, 3.5)]*10
+
+from filterpy.kalman import sigma_points
+z = sigma_points.MerweScaledSigmaPoints(len(objBounds))
+z.sigma_points(10, 4)
+
+
+import diffrender_opt
+# objFun = diffrender_opt.opendrObjectiveFunction(errorFun, free_variables)
+# diffrender_opt.advanced_optimization_2d()
+
+# res = diffrender_opt.bayesOpt(objFun, objBounds)
+
+opendrObjectiveFunctionCRF = (free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds, method)
+
+ipdb.set_trace()
 
 # vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
 # im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.

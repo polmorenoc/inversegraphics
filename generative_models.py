@@ -185,7 +185,6 @@ class EdgeFilter(Ch):
 
 
 
-
 class LogRobustModel(Ch):
     dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
 
