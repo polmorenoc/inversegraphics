@@ -376,6 +376,9 @@ numSamples = 1
 
 
 mintime = time.time()
+
+free_variables = [ chAz, chEl]
+
 boundEl = (-np.pi, np.pi)
 boundAz = (-3*np.pi, 3*np.pi)
 boundscomponents = (0,None)
@@ -453,26 +456,6 @@ loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
-
-### Bayesian Optimization tests.
-
-free_variables = [ chAz, chEl, chShapeParams]
-objBounds = [(0, 2*np.pi), (0, np.pi/2)] + [(-3.5, 3.5)]*10
-
-from filterpy.kalman import sigma_points
-z = sigma_points.MerweScaledSigmaPoints(len(objBounds))
-z.sigma_points(10, 4)
-
-
-import diffrender_opt
-# objFun = diffrender_opt.opendrObjectiveFunction(errorFun, free_variables)
-# diffrender_opt.advanced_optimization_2d()
-
-# res = diffrender_opt.bayesOpt(objFun, objBounds)
-
-opendrObjectiveFunctionCRF = (free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds, method)
-
-ipdb.set_trace()
 
 # vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
 # im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.
@@ -576,32 +559,39 @@ if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.np
         # with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
         #     neuralNetModelPose = pickle.load(pfile)
         #
-        # meanImage = neuralNetModelPose['mean']
-        # modelType = neuralNetModelPose['type']
-        # param_values = neuralNetModelPose['params']
-        # grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
-        # grayTestImages = grayTestImages[:,None, :,:]
-        # grayTestImages = grayTestImages - meanImage.reshape([1,1, grayTestImages.shape[2],grayTestImages.shape[3]])
+        meanImage = neuralNetModelPose['mean']
+        modelType = neuralNetModelPose['type']
+        param_values = neuralNetModelPose['params']
+        grayTestImages =  0.3*images[:,:,:,0] +  0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+        grayTestImages = grayTestImages[:,None, :,:]
+        grayTestImages = grayTestImages - meanImage.reshape([1,1, grayTestImages.shape[2],grayTestImages.shape[3]])
+
+        # network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+        nonDetPosePredictionFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
+        posePredictionsSamples = []
+        cosAzsPredSamples = []
+        sinAzsPredSamples = []
+        for i in range(100):
+            posePredictionsSample = np.zeros([len(grayTestImages), 4])
+            for start_idx in range(0, len(grayTestImages), nnBatchSize):
+                posePredictionsSample[start_idx:start_idx + nnBatchSize] = nonDetPosePredictionFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+
+            cosAzsPredSample = posePredictionsSample[:,0]
+            sinAzsPredSample = posePredictionsSample[:,1]
+            cosAzsPredSamples = cosAzsPredSamples + [cosAzsPredSample[:,None]]
+            sinAzsPredSamples = sinAzsPredSamples + [sinAzsPredSample[:,None]]
+
+        cosAzsPredSamples = np.hstack(cosAzsPredSamples)
+        sinAzsPredSamples = np.hstack(sinAzsPredSamples)
+
+        azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
+
+        # ##Get predictions with dropout on to get samples.
+        # with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+        #     neuralNetModelPose = pickle.load(pfile)
         #
-        # # network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-        # nonDetPosePredictionFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-        # posePredictionsSamples = []
-        # cosAzsPredSamples = []
-        # sinAzsPredSamples = []
-        # for i in range(100):
-        #     posePredictionsSample = np.zeros([len(grayTestImages), 4])
-        #     for start_idx in range(0, len(grayTestImages), nnBatchSize):
-        #         posePredictionsSample[start_idx:start_idx + nnBatchSize] = nonDetPosePredictionFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-        #
-        #     cosAzsPredSample = posePredictionsSample[:,0]
-        #     sinAzsPredSample = posePredictionsSample[:,1]
-        #     cosAzsPredSamples = cosAzsPredSamples + [cosAzsPredSample[:,None]]
-        #     sinAzsPredSamples = sinAzsPredSamples + [sinAzsPredSample[:,None]]
-        #
-        # cosAzsPredSamples = np.hstack(cosAzsPredSamples)
-        # sinAzsPredSamples = np.hstack(sinAzsPredSamples)
-        #
-        # azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
+
+
 
 else:
     elevsPred = np.load(trainModelsDirPose + 'elevsPred.npy')[rangeTests]
@@ -774,6 +764,21 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "shape
         shapeParamsPred = shapePredictions
 
         np.save(trainModelsDirShapeParams + 'shapeParamsPred.npy', shapeParamsPred)
+
+
+        #Samples:
+        shapeParamsPredSamples = []
+        shapeParamsNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
+
+        for i in range(1000):
+            shapeParamsPredictionsSample = np.zeros([len(testImages), 3])
+            for start_idx in range(0, len(testImages), nnBatchSize):
+                shapeParamsPredictionsSample[start_idx:start_idx + nnBatchSize] = shapeParamsNonDetFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+
+            shapeParamsPredSamples = shapeParamsPredSamples + [shapeParamsPredictionsSample[:,:][:,:,None]]
+
+        shapeParamsPredSamples = np.concatenate(shapeParamsPredSamples, axis=2)
+
 else:
     shapeParamsPred = np.load(trainModelsDirShapeParams + 'shapeParamsPred.npy')[rangeTests]
 
@@ -1552,6 +1557,46 @@ for testSetting, model in enumerate(modelTests):
                     segmentVColorsList = segmentVColorsList + [segmentColor]
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/sample' + str(sample) +  '_predicted'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+
+
+                ## Bayes Optimization
+
+                ### Bayesian Optimization tests.
+
+                free_variables = [ chAz, chEl, chShapeParams]
+                free_variables_app_light = [ chVColors, chLightSHCoeffs]
+
+                azSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinAzsPredSamples[test_i])**2 + np.mean(cosAzsPredSamples[test_i])**2,1])))
+                shapeParamsStdev = np.sqrt(np.sum(shapePredictions) - np.sum(shapePredictions))
+
+                azMean = azsPred[test_i]
+                elMean = elevsPred[test_i]
+
+                elSampleStdev = np.sqrt(-np.log(np.min([np.mean(sinElsPredSamples[test_i])**2 + np.mean(cosElsPredSamples[test_i])**2,1])))
+
+                elMean = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
+
+                shapeStdevs = np.std(shapeParamsPredSamples, axis=1)
+
+                azBound = np.min(2*azSampleStdev, np.pi)
+                optBounds = [(azMean - azBound, azMean + azBound), (min(max(elMean - elSampleStdev,radians(1)), np.pi/2-radians(1)), min(max(elMean + elSampleStdev,radians(1)), np.pi/2-radians(1)))] + [(shapeParams - shapeStdevs[shape_i],shapeParams + shapeStdevs[shape_i]) for shape_i in range(len(shapeStdevs))]
+
+                # from filterpy.kalman import sigma_points
+                # z = sigma_points.MerweScaledSigmaPoints(len(optBounds))
+                # z.sigma_points(meanSamplesShapePose, 4)
+
+
+                import diffrender_opt
+                # objFun = diffrender_opt.opendrObjectiveFunction(errorFun, free_variables)
+                # diffrender_opt.advanced_optimization_2d()
+
+                # res = diffrender_opt.bayesOpt(objFun, objBounds)
+                methodOpt = methods[method]
+                stds[:] = 0.1
+                crfObjFun = diffrender_opt.opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVColors, chLightSHCoeffs, lightCoefficientsRel, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds.r, methodOpt, True)
+                res = diffrender_opt.bayesOpt(crfObjFun, optBounds)
+
+                ipdb.set_trace()
 
                 hdridx = dataEnvMaps[test_i]
 

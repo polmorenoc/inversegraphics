@@ -66,7 +66,7 @@ def opendrObjectiveFunction(obj, free_variables):
     return objFun
 
 
-def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds, method):
+def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds, method, minAppLight=False):
 
     def changevars(vs, free_variables):
         vs = vs.ravel()
@@ -103,7 +103,7 @@ def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVC
             chVColors[:] = vColor
             chSHLightCoeffs[:] = lightCoeffs
 
-            options={'disp':False, 'maxiter':20}
+            options={'disp':False, 'maxiter':5}
 
             variances = stds**2
 
@@ -115,12 +115,13 @@ def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVC
             occProb = np.ones([h,w])
             bgProb = np.ones([h,w])
 
-            errorFun = -ch.log(Q[0]*fgProb.ravel() + Q[1]*occProb.ravel() + Q[2]*bgProb.ravel())/(h*w)
+            errorFun = -ch.sum(ch.log((Q[0].reshape([h,w,1])*fgProb) + (Q[1].reshape([h,w])*occProb)[:,:,None] + (Q[2].reshape([h,w])*bgProb)[:,:,None]))/(h*w)
 
-            def cb(_):
-                print("Error: " + str(errorFun.r))
+            if minAppLight:
+                def cb(_):
+                    print("Error: " + str(errorFun.r))
 
-            ch.minimize({'raw': errorFun}, bounds=None, method=method, x0=free_variables, callback=cb, options=options)
+                ch.minimize({'raw': errorFun}, bounds=None, method=method, x0=free_variables_app_light, callback=cb, options=options)
 
             res = res + [errorFun.r.reshape([1,1])]
 
@@ -177,7 +178,6 @@ def advanced_optimization_2d(plots=True):
     bounds = objective_noisy.bounds                                           # problem constrains
     input_dim = len(bounds)
 
-    ipdb.set_trace()
 
     # Select an specific kernel from GPy
     kernel = GPy.kern.RBF(input_dim, variance=.1, lengthscale=.1) + GPy.kern.Bias(input_dim) # we add a bias kernel
