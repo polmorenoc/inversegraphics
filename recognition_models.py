@@ -8,6 +8,33 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn import mixture
 import ipdb
 
+from chumpy.ch import MatVecMult, Ch
+
+class segmentCRFModel(Ch):
+    dterms = ['renderer', 'groundtruth', 'priorProbs']
+
+    def compute_r(self):
+        return self.segmentation()
+
+    def compute_dr_wrt(self, wrt):
+        return None
+    #     if wrt is self.renderer:
+    #         return self.segmentation().dr_wrt(self.renderer)
+
+    def segmentation(self):
+        import densecrf_model
+
+        vis_im = np.array(self.renderer.indices_image == 1).copy().astype(np.bool)
+        bound_im = self.renderer.boundarybool_image.astype(np.bool)
+
+        #
+        segmentation, Q = densecrf_model.crfInference(self.groundtruth.r, vis_im, bound_im, [self.priorProbs[0], self.priorProbs[1], self.priorProbs[2]],
+                                                      self.resultDir + 'imgs/crf/Q_' + str(self.test_i))
+        return Q
+
+
+
+
 def evaluatePrediction(azsGT, elevsGT, azsPred, elevsPred):
     errazs = np.arctan2(np.sin(azsGT - azsPred), np.cos(azsGT - azsPred))*180/np.pi
     errelevs = np.arctan2(np.sin(elevsGT-elevsPred), np.cos(elevsGT-elevsPred))*180/np.pi

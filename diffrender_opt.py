@@ -65,7 +65,6 @@ def opendrObjectiveFunction(obj, free_variables):
 
     return objFun
 
-
 def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds, method, minAppLight=False):
 
     def changevars(vs, free_variables):
@@ -143,16 +142,18 @@ def bayesOpt(objFun, bounds, plots=True):
                                             kernel = kernel,               # pre-specified model
                                             bounds=bounds,                 # box-constrains of the problem
                                             acquisition='EI',             # Selects the Expected improvement
+                                            numdata_initial_design=10,
                                             type_initial_design='random',   # latin desing of the initial points
                                             normalize = True)              # normalized y
 
     # Run the optimization
-    max_iter = 5
+    max_iter = 10
 
     # --- Run the optimization                                              # evaluation budget
+    ipdb.set_trace()
     BO_model.run_optimization(max_iter,                                   # Number of iterations
-                                acqu_optimize_method = 'DIRECT',       # method to optimize the acq. function
-                                acqu_optimize_restarts = 5,                # number of local optimizers
+                                acqu_optimize_method = 'CMA',       # method to optimize the acq. function
+                                acqu_optimize_restarts = 1,                # number of local optimizers
                                 eps=10e-3,                        # secondary stop criteria (apart from the number of iterations)
                                 true_gradients = True)                     # The gradients of the acquisition function are approximated (faster)
 
@@ -169,8 +170,6 @@ def advanced_optimization_2d(plots=True):
     import GPy
     from numpy.random import seed
     seed(12345)
-
-
 
     # --- Objective function
     objective_true  = GPyOpt.fmodels.experiments2d.sixhumpcamel()             # true function

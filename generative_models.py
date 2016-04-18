@@ -184,6 +184,38 @@ class EdgeFilter(Ch):
         return blurred_diff[rgbEdges]
 
 
+class LogCRFModel(Ch):
+    dterms = ['renderer', 'groundtruth', 'Q', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        visibility = self.renderer.visibility_image
+        visible = visibility != 4294967295
+
+        visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
+
+
+        fgProb = ch.exp(- (self.renderer - self.groundtruth) ** 2 / (2 * self.variances)) * (
+            1. / (ch.sqrt(self.variances)* np.sqrt(2 * np.pi)))
+
+        h = self.renderer.r.shape[0]
+        w = self.renderer.r.shape[1]
+
+        occProb = np.ones([h, w])
+        bgProb = np.ones([h, w])
+
+        errorFun = ch.log((self.Q[0].reshape([h, w, 1]) * fgProb) + (self.Q[1].reshape([h, w]) * occProb)[:, :, None] + (self.Q[2].reshape([h, w]) * bgProb)[:, :, None])
+
+        return errorFun
+
+
+
 
 class LogRobustModel(Ch):
     dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
