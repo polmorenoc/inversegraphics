@@ -65,7 +65,7 @@ def opendrObjectiveFunction(obj, free_variables):
 
     return objFun
 
-def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, vis_im, bound_im, resultDir, test_i, stds, method, minAppLight=False):
+def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVColors, chSHLightCoeffs, lightCoeffs, free_variables_app_light, resultDir, test_i, stds, method, updateColor=False,minAppLight=False):
 
     def changevars(vs, free_variables):
         vs = vs.ravel()
@@ -87,26 +87,29 @@ def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVC
 
         vs = np.array(vs)
         res = []
-        for vs_i in vs:
+        for vs_it, vs_i in enumerate(vs):
             changevars(vs_i, free_variables)
 
             import densecrf_model
 
-            segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.75,0.25,0.01], resultDir + 'imgs/crf/Q_' + str(test_i))
-            if np.sum(segmentation==0) == 0:
-                vColor = color
-            else:
-                segmentRegion = segmentation==0
-                vColor = np.median(rendererGT.reshape([-1,3])[segmentRegion.ravel()], axis=0)
+            vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+            bound_im = renderer.boundarybool_image.astype(np.bool)
+
+            segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.75,0.25,0.01], resultDir + 'imgs/crf/Q_' + str(test_i) + '_it' + str(vs_it))
+            vColor = color
+            if updateColor:
+                if np.sum(segmentation == 0) > 5:
+                    segmentRegion = segmentation == 0
+                    vColor = np.median(rendererGT.reshape([-1, 3])[segmentRegion.ravel()], axis=0) * 1.4
+                    vColor = vColor / max(np.max(vColor), 1.)
 
             chVColors[:] = vColor
             chSHLightCoeffs[:] = lightCoeffs
 
-            options={'disp':False, 'maxiter':5}
-
             variances = stds**2
 
             fgProb = ch.exp( - (renderer - rendererGT)**2 / (2 * variances)) * (1./(stds * np.sqrt(2 * np.pi)))
+
 
             h = renderer.r.shape[0]
             w = renderer.r.shape[1]
@@ -114,9 +117,11 @@ def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVC
             occProb = np.ones([h,w])
             bgProb = np.ones([h,w])
 
-            errorFun = -ch.sum(ch.log((Q[0].reshape([h,w,1])*fgProb) + (Q[1].reshape([h,w])*occProb)[:,:,None] + (Q[2].reshape([h,w])*bgProb)[:,:,None]))/(h*w)
+            errorFun = -ch.sum(ch.log(vis_im[:, :, None]*((Q[0].reshape([h,w,1])*fgProb) + (Q[1].reshape([h,w])*occProb)[:,:,None]) + (1-vis_im[:, :, None])*(Q[2].reshape([h,w])*bgProb)[:,:,None]))/(h*w)
 
             if minAppLight:
+                options = {'disp': False, 'maxiter': 10}
+
                 def cb(_):
                     print("Error: " + str(errorFun.r))
 
@@ -128,7 +133,7 @@ def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVC
 
     return objFun
 
-def bayesOpt(objFun, bounds, plots=True):
+def bayesOpt(objFun, initX, initF, bounds):
 
     seed(12345)
 
@@ -140,9 +145,11 @@ def bayesOpt(objFun, bounds, plots=True):
     # --- Problem definition and optimization
     BO_model = GPyOpt.methods.BayesianOptimization(f=objFun,  # function to optimize
                                             kernel = kernel,               # pre-specified model
+                                            X = initX,
+                                            Y = initF,
                                             bounds=bounds,                 # box-constrains of the problem
                                             acquisition='EI',             # Selects the Expected improvement
-                                            numdata_initial_design=10,
+                                            numdata_initial_design=len(initX),
                                             type_initial_design='random',   # latin desing of the initial points
                                             normalize = True)              # normalized y
 
@@ -151,10 +158,10 @@ def bayesOpt(objFun, bounds, plots=True):
 
     # --- Run the optimization                                              # evaluation budget
     ipdb.set_trace()
-    BO_model.run_optimization(max_iter,                                   # Number of iterations
-                                acqu_optimize_method = 'CMA',       # method to optimize the acq. function
+    BO_model.run_optimization(max_iter,  n_inbatch=10, n_procs=10,                                  # Number of iterations
+                                acqu_optimize_method = 'DIRECT',       # method to optimize the acq. function
                                 acqu_optimize_restarts = 1,                # number of local optimizers
-                                eps=10e-3,                        # secondary stop criteria (apart from the number of iterations)
+                                eps=10e-2,                        # secondary stop criteria (apart from the number of iterations)
                                 true_gradients = True)                     # The gradients of the acquisition function are approximated (faster)
 
     # # --- Plots
