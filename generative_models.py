@@ -212,7 +212,7 @@ class LogCRFModel(Ch):
 
         fgMask = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
 
-        errorFun = ch.log(fgMask[:, :, None]*((self.Q[0].reshape([h, w, 1]) * fgProb) + (self.Q[1].reshape([h, w]) * occProb)[:, :, None]) + (1- fgMask[:, :, None])*(self.Q[2].reshape([h, w]) * bgProb)[:, :, None])
+        errorFun = ch.log(fgMask[:, :, None]*((self.Q[0].reshape([h, w, 1]) * fgProb) + (self.Q[1].reshape([h, w]) * occProb + self.Q[2].reshape([h, w]) * bgProb)[:, :, None])[:, :, None] + (1- fgMask[:, :, None]))
 
         return errorFun
 

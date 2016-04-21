@@ -233,7 +233,9 @@ badAzs = [248, 326, 324, 351, 602, 227, 564, 436, 332, 644, 216,  20, 407,
        144, 677, 669, 556, 590, 113, 585,   0, 497, 183, 131, 567, 447,
        584, 532, 580, 620, 269, 601, 146, 303, 347, 579, 375, 399, 453]
 
-rangeTests = np.arange(100,1100)[badAzs]
+total = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] + badAzs
+
+rangeTests = np.arange(100,1100)[total]
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -1178,7 +1180,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-CRF-2STDPOSEOPTCRF-FIXVCOLOR-' + testRangeStr
+testDescription = 'ECCV-CRF-STDEVCOMPARISON-ROBUSTQNOUPDATE01-NOGTSHAPE-NOGTLIGHT-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1287,6 +1289,11 @@ def cb(_):
             segmentRegion = segmentation == 0
             vColor = np.median(rendererGT.reshape([-1, 3])[segmentRegion.ravel()], axis=0) * 1.4
             vColor = vColor / max(np.max(vColor), 1.)
+            vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+            chVColors[:] = vColor
+            vColor = vColor * np.mean(
+            rendererGT.r.reshape([-1, 3])[segmentRegion.ravel() * vis_im.ravel()] / renderer.r.reshape([-1, 3])[
+                segmentRegion.ravel() * vis_im.ravel()])
 
         chVColors[:] = vColor
 
@@ -1787,6 +1794,10 @@ for testSetting, model in enumerate(modelTests):
                         vColor = np.median(rendererGT.reshape([-1, 3])[segmentRegion.ravel()], axis=0) * 1.4
                         vColor = vColor / max(np.max(vColor), 1.)
 
+                        vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+                        chVColors[:] = vColor
+                        vColor = vColor * np.mean(rendererGT.r.reshape([-1, 3])[segmentRegion.ravel() * vis_im.ravel()] / renderer.r.reshape([-1, 3])[segmentRegion.ravel() * vis_im.ravel()])
+
                     chVColors[:] = vColor
 
                     ## Bayes Optimization
@@ -1813,12 +1824,14 @@ for testSetting, model in enumerate(modelTests):
                     optBounds = [(azMean - azBound, azMean + azBound), (min(max(elMean - elBound,0), np.pi/2), min(max(elMean + elBound,0), np.pi/2))]
 
                     numSamples = max(int(np.ceil(2*azSampleStdev*180./(np.pi*20.))),1)
-                    azSamples = np.linspace(0, 2*azSampleStdev, numSamples)
+                    azSamples = np.linspace(0, azSampleStdev, numSamples)
+                    # azSamples = np.linspace(0, np.pi, 10)
 
                     numSamples = max(int(np.ceil(2*elSampleStdev*180./(np.pi*10.))),1)
                     elSamples = np.linspace(0, 2*elSampleStdev, numSamples)
 
                     elSamples = chEl.r + np.concatenate([elSamples, -elSamples[1:]])
+
 
                     totalAzSamples = chAz.r + np.concatenate([azSamples, -azSamples[1:]])
                     if len(totalAzSamples) == 0:
@@ -1827,6 +1840,13 @@ for testSetting, model in enumerate(modelTests):
                     totalElSamples = np.array([elSample for elSample in elSamples if elSample > 0 and elSample < np.pi/2])
                     if len(totalElSamples) == 0:
                         totalElSamples = np.array([chEl.r])
+
+                    totalElSamples = np.array([testElevsGT[test_i]])
+                    # chShapeParams[:] = testShapeParamsGT[test_i]
+                    # chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
+                    chVColors[:] = testVColorGT[test_i]
+                    vColor = testVColorGT[test_i]
+                    # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
 
                     totalSamples = np.meshgrid(totalAzSamples, totalElSamples)
                     totalSamples = np.hstack([totalSamples[0].reshape([-1,1]),totalSamples[1].reshape([-1,1])])
@@ -1838,13 +1858,23 @@ for testSetting, model in enumerate(modelTests):
                     methodOpt = methods[method]
                     stds[:] = 0.1
 
-                    crfObjFun = diffrender_opt.opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, vColor, chVColors, chLightSHCoeffs, lightCoefficientsRel, free_variables_app_light, resultDir, test_i, stds.r, methodOpt, False, True)
+                    crfObjFun = diffrender_opt.opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, vColor, chVColors, chLightSHCoeffs, lightCoefficientsRel, free_variables_app_light, resultDir, test_i, stds.r, methodOpt, False, False)
 
                     cv2.imwrite(
                         resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_predictedCRF' + '.png',
                         cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
-                    samplesEvals = crfObjFun(totalSamples)
+                    errorFunCRF = -ch.sum(generative_models.LogCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q.r.copy(),
+                                                                        variances=variances)) / numPixels
+                    errorFun = models[1]
+                    samplesEvals = []
+                    for azSample in totalSamples[:,0]:
+                        chAz[:] = azSample
+                        samplesEvals = samplesEvals + [errorFunCRF.r]
+
+                    samplesEvals = np.array(samplesEvals)
+
+                    # samplesEvals = crfObjFun(totalSamples)
 
                     #Start Optimiaztion
 
@@ -1859,13 +1889,14 @@ for testSetting, model in enumerate(modelTests):
 
                     azfig = plt.figure()
                     ax = azfig.add_subplot(111)
-                    ax.plot(totalSamples[:,0], samplesEvals, 'ro')
+                    ax.plot(np.mod(totalSamples[:,0], 2*np.pi), samplesEvals, 'ro')
                     y1, y2 = ax.get_ylim()
                     ax.vlines(testAzsRel[test_i], y1, y2, 'g', label = 'Groundtruth Az')
-                    ax.vlines(optAz, y1, y2, 'r', label = 'Optimum CRF Az')
-                    ax.vlines(az, y1, y2, 'b', label = 'Recognition Az')
+                    ax.vlines(np.mod(optAz, 2*np.pi), y1, y2, 'r', label = 'Optimum CRF Az')
+                    ax.vlines(np.mod(az, 2*np.pi), y1, y2, 'b', label = 'Recognition Az')
+                    ax.set_xlim((0, np.pi*2))
                     legend = ax.legend()
-                    azfig.savefig(resultDir + 'imgs/test' + str(test_i) + '/samplesAzPlot' + '.png')
+                    azfig.savefig(resultDir + 'imgs/test' + str(test_i) + '/samplesAzPlot_' + str(int(azSampleStdev*180/np.pi)) + '.png')
                     plt.close(azfig)
 
                     legend = ax.legend()
@@ -1891,11 +1922,11 @@ for testSetting, model in enumerate(modelTests):
 
                     minimizingShape = True
 
-                    errorFunCRF = -ch.sum(generative_models.LogCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q, variances=variances))/numPixels
+
 
                     method = 1
 
-                    ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                    # ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                     maxShapeSize = 4
                     largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
