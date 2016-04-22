@@ -1178,7 +1178,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-CRF-SEARCHAZ360-' + testRangeStr
+testDescription = 'ECCV-CRF-NOSEARCH-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1877,49 +1877,48 @@ for testSetting, model in enumerate(modelTests):
                         errorFunNLLCRF = generative_models.NLLCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q.r.reshape([3,height, width]),
                                                                             variances=variances) / numPixels
 
-
-                        errorFun = models[1]
-                        samplesEvals = []
-                        for azSample in totalSamples[:,0]:
-                            chAz[:] = azSample
-                            samplesEvals = samplesEvals + [errorFunNLLCRF.r]
-
-                        samplesEvals = np.array(samplesEvals)
-
-                        # samplesEvals = crfObjFun(totalSamples)
-
-                        #Start Optimiaztion
-
-                        # res = diffrender_opt.bayesOpt(crfObjFun, totalSamples, samplesEvals, optBounds)
+                        # errorFun = models[1]
+                        # samplesEvals = []
+                        # for azSample in totalSamples[:,0]:
+                        #     chAz[:] = azSample
+                        #     samplesEvals = samplesEvals + [errorFunNLLCRF.r]
                         #
-                        # optAz = res.x_opt[0]
-                        # optEl = res.x_opt[1]
-                        # # optShapeParams = res.x_opt[2:]
-                        bestSample = np.argmin(samplesEvals)
-                        optAz = totalSamples[bestSample][0]
-                        optEl = totalSamples[bestSample][1]
-
-                        azfig = plt.figure()
-                        ax = azfig.add_subplot(111)
-                        ax.plot(np.mod(totalSamples[:,0], 2*np.pi), samplesEvals, 'ro')
-                        y1, y2 = ax.get_ylim()
-                        ax.vlines(testAzsRel[test_i], y1, y2, 'g', label = 'Groundtruth Az')
-                        ax.vlines(np.mod(optAz, 2*np.pi), y1, y2, 'r', label = 'Optimum CRF Az')
-                        ax.vlines(np.mod(az, 2*np.pi), y1, y2, 'b', label = 'Recognition Az')
-                        ax.set_xlim((0, np.pi*2))
-                        legend = ax.legend()
-                        azfig.savefig(resultDir + 'imgs/test' + str(test_i) + '/samplesAzPlot_' + str(int(azSampleStdev*180/np.pi)) + '.png')
-                        plt.close(azfig)
-
-                        legend = ax.legend()
-
-                        chAz[:] = optAz
-                        chEl[:] = optEl
-                        #### Local search:
-
-                        cv2.imwrite(
-                            resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_optimizedCRFPose' + '.png',
-                            cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
+                        # samplesEvals = np.array(samplesEvals)
+                        #
+                        # # samplesEvals = crfObjFun(totalSamples)
+                        #
+                        # #Start Optimiaztion
+                        #
+                        # # res = diffrender_opt.bayesOpt(crfObjFun, totalSamples, samplesEvals, optBounds)
+                        # #
+                        # # optAz = res.x_opt[0]
+                        # # optEl = res.x_opt[1]
+                        # # # optShapeParams = res.x_opt[2:]
+                        # bestSample = np.argmin(samplesEvals)
+                        # optAz = totalSamples[bestSample][0]
+                        # optEl = totalSamples[bestSample][1]
+                        #
+                        # azfig = plt.figure()
+                        # ax = azfig.add_subplot(111)
+                        # ax.plot(np.mod(totalSamples[:,0], 2*np.pi), samplesEvals, 'ro')
+                        # y1, y2 = ax.get_ylim()
+                        # ax.vlines(testAzsRel[test_i], y1, y2, 'g', label = 'Groundtruth Az')
+                        # ax.vlines(np.mod(optAz, 2*np.pi), y1, y2, 'r', label = 'Optimum CRF Az')
+                        # ax.vlines(np.mod(az, 2*np.pi), y1, y2, 'b', label = 'Recognition Az')
+                        # ax.set_xlim((0, np.pi*2))
+                        # legend = ax.legend()
+                        # azfig.savefig(resultDir + 'imgs/test' + str(test_i) + '/samplesAzPlot_' + str(int(azSampleStdev*180/np.pi)) + '.png')
+                        # plt.close(azfig)
+                        #
+                        # legend = ax.legend()
+                        #
+                        # chAz[:] = optAz
+                        # chEl[:] = optEl
+                        # #### Local search:
+                        #
+                        # cv2.imwrite(
+                        #     resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_optimizedCRFPose' + '.png',
+                        #     cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
                         free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs]
                         #
