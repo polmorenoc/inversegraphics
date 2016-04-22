@@ -117,7 +117,7 @@ def opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, color, chVC
             occProb = np.ones([h,w])
             bgProb = np.ones([h,w])
 
-            errorFun = -ch.sum(ch.log(vis_im[:, :, None]*((Q[0].reshape([h, w, 1]) * fgProb) + (Q[1].reshape([h, w]) * occProb + Q[2].reshape([h, w]) * bgProb)[:, :, None])[:, :, None] + (1- vis_im[:, :, None])))/(h*w)
+            errorFun = -ch.sum(ch.log(vis_im[:, :, None]*((Q[0].reshape([h, w, 1]) * fgProb) + (Q[1].reshape([h, w]) * occProb + Q[2].reshape([h, w]) * bgProb)[:, :, None]) + (1- vis_im[:, :, None])))/(h*w)
 
             if minAppLight:
                 options = {'disp': False, 'maxiter': 10}
