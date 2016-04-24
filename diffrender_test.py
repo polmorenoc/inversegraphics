@@ -190,7 +190,6 @@ iterat = 0
 
 t = time.time()
 
-
 #########################################
 # Generative model setup ends here.
 #########################################
@@ -236,7 +235,7 @@ badAzs = [248, 326, 324, 351, 602, 227, 564, 436, 332, 644, 216,  20, 407,
 
 # total = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] + badAzs
 
-rangeTests = np.arange(100,1100)
+rangeTests = np.arange(100,1100)[980:]
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -1797,7 +1796,10 @@ for testSetting, model in enumerate(modelTests):
                         vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
                         chVColors[:] = vColor
                         colorRegion = np.all(renderer.r != 0,axis=2).ravel() * segmentRegion.ravel() * vis_im.ravel()
-                        vColor = vColor * np.median(rendererGT.r.reshape([-1, 3])[colorRegion] / renderer.r.reshape([-1, 3])[colorRegion])
+                        if colorRegion.sum() == 0:
+                            ignore = True
+                        else:
+                            vColor = vColor * np.median(rendererGT.r.reshape([-1, 3])[colorRegion] / renderer.r.reshape([-1, 3])[colorRegion])
 
                     if not ignore:
                         chVColors[:] = vColor
@@ -2160,7 +2162,7 @@ for testSetting, model in enumerate(modelTests):
                 #
                 # ipdb.set_trace()
 
-                errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList \
+                errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
                     = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
 
                 meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentationList \
@@ -2232,7 +2234,7 @@ for testSetting, model in enumerate(modelTests):
                 with open(resultDir + 'experiment.pickle', 'wb') as pfile:
                     pickle.dump(experimentDic, pfile)
 
-                experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsSegmentationList':errorsSegmentationList}
+                experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsCList':errorsVColorsCList, 'errorsSegmentationList':errorsSegmentationList}
                 #
                 with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
                     pickle.dump(experimentErrorsDic, pfile)

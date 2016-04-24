@@ -12,7 +12,7 @@ __author__ = 'pol'
 import recognition_models
 import pickle
 
-def joinExperiments(testSet1,methodsPred1,testOcclusions1,testPrefixBase1,parameterRecognitionModels1,azimuths1,elevations1,vColors1,lightCoeffs1,likelihoods1,shapeParams1,segmentations1,testSet2,methodsPred2,testOcclusions2,testPrefixBase2,parameterRecognitionModels2,azimuths2,elevations2,vColors2,lightCoeffs2,likelihoods2,shapeParams2,segmentations2):
+def joinExperiments(range1, range2, testSet1,methodsPred1,testOcclusions1,testPrefixBase1,parameterRecognitionModels1,azimuths1,elevations1,vColors1,lightCoeffs1,likelihoods1,shapeParams1,segmentations1, approxProjections1, approxProjectionsGT1, testSet2,methodsPred2,testOcclusions2,testPrefixBase2,parameterRecognitionModels2,azimuths2,elevations2,vColors2,lightCoeffs2,likelihoods2,shapeParams2,segmentations2, approxProjections2, approxProjectionsGT2):
 
     testSet = np.append(testSet1, testSet2)
     parameterRecognitionModels = [parameterRecognitionModels1] + [parameterRecognitionModels2]
@@ -27,39 +27,53 @@ def joinExperiments(testSet1,methodsPred1,testOcclusions1,testPrefixBase1,parame
     shapeParams = []
     likelihoods = []
     segmentations = []
+    approxProjections = []
+    approxProjectionsGT = []
 
     for method in range(len(methodsPred)):
         if azimuths1[method] is not None and azimuths2[method] is not None:
-            azimuths  = azimuths + [np.append(azimuths1[method], azimuths2[method])]
+            azimuths  = azimuths + [np.append(azimuths1[method][range1], azimuths2[method][range2])]
         else:
             azimuths  = azimuths + [None]
         if elevations1[method] is not None and elevations2[method] is not None:
-            elevations = elevations + [np.append(elevations1[method], elevations2[method])]
+            elevations = elevations + [np.append(elevations1[method][range1], elevations2[method][range2])]
         else:
             elevations = elevations + [None]
         if vColors1[method] is not None and vColors2[method] is not None:
-            vColors = vColors + [np.vstack([vColors1[method], vColors2[method]])]
+            vColors = vColors + [np.vstack([vColors1[method][range1], vColors2[method][range2]])]
         else:
             vColors = vColors + [None]
         if lightCoeffs1[method] is not None and lightCoeffs2[method] is not None:
-            lightCoeffs = lightCoeffs + [np.vstack([lightCoeffs1[method], lightCoeffs2[method]])]
+            lightCoeffs = lightCoeffs + [np.vstack([lightCoeffs1[method][range1], lightCoeffs2[method][range2]])]
         else:
             lightCoeffs = lightCoeffs + [None]
         if shapeParams1[method] is not None and shapeParams2[method] is not None:
-            shapeParams = shapeParams + [np.vstack([shapeParams1[method], shapeParams2[method]])]
+            shapeParams = shapeParams + [np.vstack([shapeParams1[method][range1], shapeParams2[method][range2]])]
         else:
             shapeParams = shapeParams + [None]
         if likelihoods1[method] is not None and likelihoods2[method] is not None:
-            likelihoods = likelihoods + [np.append(likelihoods1[method], likelihoods2[method])]
+            likelihoods = likelihoods + [np.append(likelihoods1[method][range1], likelihoods2[method][range2])]
         else:
             likelihoods = likelihoods + [None]
 
         if segmentations1[method] is not None and segmentations2[method] is not None:
-            segmentations = segmentations + [np.vstack([segmentations1[method], segmentations2[method]])]
+            segmentations = segmentations + [np.vstack([segmentations1[method][range1], segmentations2[method][range2]])]
         else:
             segmentations = segmentations + [None]
 
-    return testSet, parameterRecognitionModels, testPrefixBase, methodsPred, testOcclusions, azimuths, elevations, vColors, lightCoeffs, shapeParams, likelihoods, segmentations
+        if approxProjections1 is not None and approxProjections2 is not None:
+            if approxProjections1[method] is not None and approxProjections2[method] is not None:
+                approxProjections = approxProjections + [np.vstack([approxProjections1[method][range1], approxProjections2[method][range2]])]
+            else:
+                approxProjections = approxProjections + [None]
+
+        if approxProjectionsGT1 is not None and approxProjectionsGT2 is not None:
+            if approxProjectionsGT1[method] is not None and approxProjectionsGT2[method] is not None:
+                approxProjectionsGT = approxProjectionsGT + [np.vstack([approxProjectionsGT1[method][range1], approxProjectionsGT2[method][range2]])]
+            else:
+                approxProjectionsGT = approxProjectionsGT + [None]
+
+    return testSet, parameterRecognitionModels, testPrefixBase, methodsPred, testOcclusions, azimuths, elevations, vColors, lightCoeffs, shapeParams, likelihoods, segmentations, approxProjections, approxProjectionsGT
 
 def latexify(fig_width=None, fig_height=None, columns=1):
     """Set up matplotlib's RC params for LaTeX plotting.
@@ -655,6 +669,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
     errorsLightCoeffsCList = []
     errorsVColorsEList = []
     errorsVColorsCList = []
+    errorsVColorsSList = []
     errorsSegmentation = []
 
     for method in range(len(azimuths)):
@@ -717,6 +732,9 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
 
             errorsVColorsC = image_processing.cColourDifference(testVColorGT[setTest], vColorsPred[setTest])
             errorsVColorsCList = errorsVColorsCList + [errorsVColorsC]
+
+            errorsVColorsS = image_processing.scaleInvariantColourDifference(testVColorGT[setTest], vColorsPred[setTest])
+            errorsVColorsSList = errorsVColorsSList + [errorsVColorsS]
         else:
             errorsVColorsEList = errorsVColorsEList + [None]
             errorsVColorsCList = errorsVColorsCList + [None]
@@ -729,7 +747,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
         else:
             errorsSegmentation = errorsSegmentation + [None]
 
-    return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation
+    return errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentation
 
 def computeErrorAverages(averageFun, testSet, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentation):
     meanAbsErrAzsList = []
