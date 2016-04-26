@@ -38,6 +38,41 @@ def loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender
 
     return v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots
 
+def loadMugsOpenDRData(mugFiles, useBlender, unpackModelsFromBlender, mugModels=None):
+    v_mugs = []
+    f_list_mugs = []
+    vc_mugs = []
+    vn_mugs = []
+    uv_mugs = []
+    haveTextures_list_mugs = []
+    textures_list_mugs = []
+    blender_mugs = []
+    center_mugs = []
+    for mugIdx, mugNum in enumerate(mugFiles):
+
+        objectDicFile = 'data/mug' + str(mugNum) + '.pickle'
+        if useBlender:
+            mug = mugModels[mugIdx]
+            mug.layers[1] = True
+            mug.layers[2] = True
+            blender_mugs = blender_mugs + [mug]
+        if unpackModelsFromBlender:
+            vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = unpackBlenderObject(mug, objectDicFile, True)
+        else:
+            vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = loadSavedObject(objectDicFile)
+        v_mugs = v_mugs + [[vmod]]
+        f_list_mugs = f_list_mugs + [[fmod_list]]
+        vc_mugs = vc_mugs + [[vcmod]]
+        vn_mugs = vn_mugs + [[vnmod]]
+        uv_mugs = uv_mugs + [[uvmod]]
+        haveTextures_list_mugs = haveTextures_list_mugs + [[haveTexturesmod_list]]
+        textures_list_mugs = textures_list_mugs + [[texturesmod_list]]
+        vflat = [item for sublist in vmod for item in sublist]
+        varray = np.vstack(vflat)
+        center_mugs = center_mugs + [np.sum(varray, axis=0)/len(varray)]
+
+    return v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat, varray, center_mugs
+
 def getSceneInstancesInfo(sceneFile):
     sceneLines = [line.strip() for line in open(sceneFile)]
 
@@ -141,6 +176,17 @@ def createTargetsBlendFile():
     bpy.ops.wm.save_as_mainfile(filepath='data/targets.blend')
     bpy.ops.wm.read_factory_settings()
 
+def createMugsBlendFile():
+    bpy.ops.wm.read_factory_settings()
+    # bpy.ops.wm.read_homefile(load_ui=False)
+    mugs = [line.strip() for line in open('mugs.txt')]
+    renderMugsList = np.arange(len(mugs))
+    [targetScenes, targetModels, transformations] = loadMugsModels(renderMugsList)
+    # bpy.data.scenes.remove(bpy.data.scenes['Scene'])
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(filepath='data/mugs.blend')
+    bpy.ops.wm.read_factory_settings()
+
 def createSceneBlendFiles(overwrite=True):
     replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
     sceneLines = [line.strip() for line in open(replaceableScenesFile)]
@@ -195,6 +241,14 @@ def loadTargetsBlendData():
 
         return data_to
 
+def loadMugsBlendData():
+    targetsFilename = 'data/mugs.blend'
+    with bpy.data.libraries.load(filepath=targetsFilename) as (data_from, data_to):
+        for attr in dir(data_to):
+            setattr(data_to, attr, getattr(data_from, attr))
+
+        return data_to
+
 def loadTargetModels(experimentTeapots):
 
     teapots = [line.strip() for line in open('teapots.txt')]
@@ -222,12 +276,6 @@ def loadTargetModels(experimentTeapots):
         scene.update()
         # modifySpecular(scene, 0.3)
 
-        #Rotate the object to the azimuth angle we define as 0.
-        # rot = mathutils.Matrix.Rotation(radians(-90), 4, 'X')
-        # rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
-        # rotateMatrixWorld(scene,  rot )
-        # rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
-
         matrix_world = mathutils.Matrix.Identity(4)
         minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
         minY, maxY = modelDepth(scene.objects, mathutils.Matrix.Identity(4))
@@ -237,11 +285,7 @@ def loadTargetModels(experimentTeapots):
 
         ratio =  (maxZ-minZ)/(maxY-minY)
 
-        # scaleZ = 0.265/(maxZ-minZ)
-        # scaleY = 0.18/(maxY-minY)
-        #
-        # scaleZ = 0.265/(maxZ-minZ)
-        # scaleY = 0.18/(maxY-minY)
+
         if ratio > 0.265/0.18:
             scale = scaleZ
         else:
@@ -297,6 +341,97 @@ def loadTargetModels(experimentTeapots):
         blenderTeapots.append(scene)
     # ipdb.set_trace()
     return blenderTeapots, targetInstances, transformations
+
+
+def loadMugsModels(experimentMugs):
+
+    mugs = [line.strip() for line in open('mugs.txt')]
+    targetModels = []
+
+    baseDir = '../databaseFull/models/'
+    targetInstances = []
+    blenderMugs = []
+    transformations = []
+    modelNum = 0
+
+    selection = [ mugs[i] for i in experimentMugs]
+    for mugidx, mug in enumerate(selection):
+        targetGroup = bpy.data.groups.new(mug)
+        fullTeapot = baseDir + mug + '.obj'
+        modelPath = fullTeapot
+        bpy.ops.scene.new()
+        bpy.context.scene.name = mug
+        scene = bpy.context.scene
+        scene.unit_settings.system = 'METRIC'
+        print("Importing " + modelPath)
+        # bpy.utils.collada_import(modelPath)
+
+        bpy.ops.import_scene.obj(filepath=modelPath, split_mode='OFF', use_split_objects=True, use_split_groups=False)
+        scene.update()
+        # modifySpecular(scene, 0.3)
+
+        matrix_world = mathutils.Matrix.Identity(4)
+        minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
+        minY, maxY = modelDepth(scene.objects, mathutils.Matrix.Identity(4))
+
+        scaleZ = 0.1/(maxZ-minZ)
+
+        ratio =  (maxZ-minZ)/(maxY-minY)
+
+        scale = scaleZ
+
+        # scale = min(scaleZ, scaleY)
+
+        scaleMat = mathutils.Matrix.Scale(scale, 4)
+        for mesh in scene.objects:
+            if mesh.type == 'MESH':
+
+                mesh.matrix_world =  scaleMat * mesh.matrix_world
+                mesh.data.update()
+
+        matrix_world = scaleMat * matrix_world
+
+        rot = mathutils.Matrix.Rotation(radians(90), 4, 'Z')
+        rotateMatrixWorld(scene,  rot )
+
+        matrix_world  = rot * matrix_world
+
+        minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
+
+        center = centerOfGeometry(scene.objects, mathutils.Matrix.Identity(4))
+
+        for mesh in scene.objects:
+            if mesh.type == 'MESH':
+                mesh.matrix_world = mathutils.Matrix.Translation(-center) * mesh.matrix_world
+
+        matrix_world = mathutils.Matrix.Translation(-center) * matrix_world
+
+        minZ, maxZ = modelHeight(scene.objects, mathutils.Matrix.Identity(4))
+
+        for mesh in scene.objects:
+            if mesh.type == 'MESH':
+                mesh.matrix_world = mathutils.Matrix.Translation(mathutils.Vector((0,0,-minZ))) * mesh.matrix_world
+
+        matrix_world = mathutils.Matrix.Translation(mathutils.Vector((0,0,-minZ))) * matrix_world
+
+        transformations = transformations + [matrix_world]
+        for mesh in scene.objects:
+            # mesh.update()
+            targetGroup.objects.link(mesh)
+            mesh.pass_index = 1
+
+        targetInstance = bpy.data.objects.new(mug, None)
+        targetInstance.dupli_type = 'GROUP'
+        targetInstance.dupli_group = targetGroup
+        targetInstance.pass_index = 1
+        targetInstances.append(targetInstance)
+        targetInstance.name = 'mugInstance' + str(experimentMugs[mugidx])
+        scene.objects.link(targetInstance)
+        scene.update()
+        blenderMugs.append(scene)
+    # ipdb.set_trace()
+    return blenderMugs, targetInstances, transformations
+
 
 def getSceneInformation(sceneIdx, scenesFile):
     replaceableScenesFile = scenesFile

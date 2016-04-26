@@ -293,6 +293,24 @@ def exportEnvMapSHLightCoefficients():
     with open(SHFilename, 'wb') as pfile:
         pickle.dump(envMapDic, pfile)
 
+def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation):
+
+    scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
+    chRotAzMat = geometry.RotateZ(a=-chObjAz)[0:3,0:3]
+    transformation = ch.dot(chRotAzMat, scaleMat)
+    invTranspModel = ch.transpose(ch.inv(transformation))
+
+    vch = [ch.dot(vflat[mesh], transformation) + targetPosition for mesh in rangeMeshes]
+    vnch = [ch.dot(vnflat[mesh], invTranspModel) for mesh in rangeMeshes]
+
+
+    chCamModelWorld = computeHemisphereTransformation(chObjRotation, 0, chObjDisplacement, objCenter)
+
+    chMVMat = ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(270), 4, 'X')))
+
+
+
+    return v, vn
 
 def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
@@ -307,7 +325,6 @@ def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, cen
     invTranspModel = ch.transpose(ch.inv(transformation))
 
     vch = [ch.dot(vflat[mesh],transformation) + targetPosition for mesh in rangeMeshes]
-
 
     vnflat = [item for sublist in vn for item in sublist]
 
@@ -342,7 +359,6 @@ def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, cen
         haveTextures_list = haveTextures_list + [haveTexturesCube]
         uv = uv + [UVsCube]
 
-
     if len(vch)==1:
         vstack = vch[0]
     else:
@@ -352,6 +368,7 @@ def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, cen
 
     setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
+
 
 
 def createRendererGT(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
@@ -388,6 +405,7 @@ def createRendererGT(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list,
 
     setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
+
 
 #Old method
 def generateSceneImages(width, height, envMapFilename, envMapMean, phiOffset, chAzGT, chElGT, chDistGT, light_colorGT, chComponentGT, glMode):

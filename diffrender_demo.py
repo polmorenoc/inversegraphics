@@ -181,6 +181,13 @@ elif useBlender:
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
+mugs = [line.strip() for line in open('mugs.txt')]
+renderMugsList = np.arange(len(mugs))[:]
+[mugScenes, mugModels, transformations] = scene_io_utils.loadTargetModels(renderMugsList)
+v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat, varray, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, True, True, mugModels)
+
+ipdb.set_trace()
+
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
 chSinAz = ch.Ch([np.sin(azimuth)])

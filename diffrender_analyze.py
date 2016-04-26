@@ -393,8 +393,9 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 ##### Load Results data:
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH'
 resultDir = 'results/' + testPrefix + '/'
+
 with open(resultDir + 'experiment.pickle', 'rb') as pfile:
     experimentDic = pickle.load(pfile)
 testSet = experimentDic['testSet']
@@ -453,29 +454,29 @@ approxProjectionsGT = None
 #
 # ##### Load Results data:
 #
-testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH-6902-17944_optimize_1000samples__method1errorFun1_std0.01_shapePen0'
-resultDir2 = 'results/' + testPrefix2 + '/'
-with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
-    experimentDic2 = pickle.load(pfile)
-testSet2 = experimentDic2['testSet']
-methodsPred2 = experimentDic2['methodsPred']
-testOcclusions2 = experimentDic2[ 'testOcclusions']
-testPrefixBase2 = experimentDic2[ 'testPrefixBase']
-parameterRecognitionModels2 = experimentDic2[ 'parameterRecognitionModels']
-azimuths2 = experimentDic2['azimuths']
-elevations2 = experimentDic2[ 'elevations']
-vColors2 = experimentDic2[ 'vColors']
-lightCoeffs2 = experimentDic2[ 'lightCoeffs']
-likelihoods2 = experimentDic2['likelihoods']
-shapeParams2 = experimentDic2['shapeParams']
-if os.path.isfile(resultDir2 + 'segmentations.pickle'):
-    with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
-        segmentationsDic2 = pickle.load(pfile)
-    segmentations2 = segmentationsDic2['segmentations']
-else:
-    segmentations2 = [None]*len(methodsPred2)
-
-testOcclusionsFull2 = testOcclusions2.copy()
+# testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH-6902-17944_optimize_1000samples__method1errorFun1_std0.01_shapePen0'
+# resultDir2 = 'results/' + testPrefix2 + '/'
+# with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
+#     experimentDic2 = pickle.load(pfile)
+# testSet2 = experimentDic2['testSet']
+# methodsPred2 = experimentDic2['methodsPred']
+# testOcclusions2 = experimentDic2[ 'testOcclusions']
+# testPrefixBase2 = experimentDic2[ 'testPrefixBase']
+# parameterRecognitionModels2 = experimentDic2[ 'parameterRecognitionModels']
+# azimuths2 = experimentDic2['azimuths']
+# elevations2 = experimentDic2[ 'elevations']
+# vColors2 = experimentDic2[ 'vColors']
+# lightCoeffs2 = experimentDic2[ 'lightCoeffs']
+# likelihoods2 = experimentDic2['likelihoods']
+# shapeParams2 = experimentDic2['shapeParams']
+# if os.path.isfile(resultDir2 + 'segmentations.pickle'):
+#     with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
+#         segmentationsDic2 = pickle.load(pfile)
+#     segmentations2 = segmentationsDic2['segmentations']
+# else:
+#     segmentations2 = [None]*len(methodsPred2)
+#
+# testOcclusionsFull2 = testOcclusions2.copy()
 
 # with open(resultDir2 + 'approxProjections.pickle', 'rb') as pfile:
 #     approxProjectionsDic2 = pickle.load(pfile)
@@ -513,17 +514,19 @@ approxProjectionsGT2 = None
 SHModel = ""
 #
 
-methodsPred = methodsPred + ['Occlusion Pred Fit']
-azimuths = azimuths + [azimuths2[3]]
-elevations = elevations + [elevations2[3]]
-vColors = vColors + [vColors2[3]]
-lightCoeffs = lightCoeffs + [lightCoeffs2[3]]
-likelihoods = likelihoods + [likelihoods2[3]]
-shapeParams = shapeParams + [shapeParams2[3]]
-segmentations = segmentations + [segmentations2[3]]
+# methodsPred = methodsPred + ['Occlusion Pred Fit']
+# azimuths = azimuths + [azimuths2[3]]
+# elevations = elevations + [elevations2[3]]
+# vColors = vColors + [vColors2[3]]
+# lightCoeffs = lightCoeffs + [lightCoeffs2[3]]
+# likelihoods = likelihoods + [likelihoods2[3]]
+# shapeParams = shapeParams + [shapeParams2[3]]
+# segmentations = segmentations + [segmentations2[3]]
+#
+# errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
+#         = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
+#
 
-errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
-        = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
 
 # envMapTexture = np.zeros([180,360,3])
 # approxProjectionsFittedList = []
@@ -545,11 +548,12 @@ errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVer
 #
 # with open(resultDir + 'experiment.pickle', 'wb') as pfile:
 #     pickle.dump(experimentDic, pfile)
-
-# experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsSegmentationList':errorsSegmentationList}
+#
+# experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsSList':errorsVColorsSList,'errorsSegmentationList':errorsSegmentationList}
 # #
 # with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
 #     pickle.dump(experimentErrorsDic, pfile)
+
 
 with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
     experimentErrorsDic = pickle.load(pfile)
@@ -562,10 +566,11 @@ errorsEnvMapList  = experimentErrorsDic['errorsEnvMapList']
 errorsLightCoeffsCList  = experimentErrorsDic['errorsLightCoeffsCList']
 errorsVColorsEList  = experimentErrorsDic['errorsVColorsEList']
 errorsVColorsCList  = experimentErrorsDic['errorsVColorsCList']
+errorsVColorsSList  = experimentErrorsDic['errorsVColorsSList']
 errorsSegmentationList = experimentErrorsDic['errorsSegmentationList']
 
-meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentation \
-    = computeErrorAverages(np.mean, np.arange(len(rangeTests)), useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)
+meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsVColorsCList, meanErrorsSegmentation \
+    = computeErrorAverages(np.mean, np.arange(len(rangeTests)), useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList,errorsVColorsSList, errorsSegmentationList)
 
 nearestNeighbours = False
 if 'Nearest Neighbours' in set(methodsPred):
@@ -723,6 +728,7 @@ meanErrorsShapeVerticesArr = []
 meanErrorsLightCoeffsCArr = []
 meanErrorsVColorsEArr = []
 meanErrorsVColorsCArr = []
+meanErrorsVColorsSArr = []
 meanErrorsSegmentationArr = []
 for method_i in range(len(methodsPred)):
     meanAbsErrAzsArr = meanAbsErrAzsArr + [np.array([])]
@@ -733,6 +739,7 @@ for method_i in range(len(methodsPred)):
     meanErrorsLightCoeffsCArr = meanErrorsLightCoeffsCArr + [np.array([])]
     meanErrorsVColorsEArr = meanErrorsVColorsEArr + [np.array([])]
     meanErrorsVColorsCArr = meanErrorsVColorsCArr + [np.array([])]
+    meanErrorsVColorsSArr = meanErrorsVColorsSArr + [np.array([])]
     meanErrorsEnvMapArr = meanErrorsEnvMapArr + [np.array([])]
     meanErrorsSegmentationArr = meanErrorsSegmentationArr + [np.array([])]
 
@@ -777,13 +784,16 @@ for occlusionLevel in range(100):
             if errorsVColorsCList[method_i] is not None:
                 meanErrorsVColorsCArr[method_i] = np.append(meanErrorsVColorsCArr[method_i], np.mean(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
 
+            if errorsVColorsSList[method_i] is not None:
+                meanErrorsVColorsSArr[method_i] = np.append(meanErrorsVColorsSArr[method_i], np.mean(errorsVColorsSList[method_i][setUnderOcclusionLevel], axis=0))
+
             if errorsSegmentationList[method_i] is not None:
                 meanErrorsSegmentationArr[method_i] = np.append(meanErrorsSegmentationArr[method_i], np.mean(errorsSegmentationList[method_i][setUnderOcclusionLevel], axis=0))
             else:
                 meanErrorsSegmentationArr[method_i] = None
 
 print("Printing occlusin-error plots - median!")
-saveOcclusionPlots(resultDir, 'mean',occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr, meanErrorsSegmentationArr)
+saveOcclusionPlots(resultDir, 'mean',occlusions, methodsPred, plotColors, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsVColorsSArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr, meanErrorsSegmentationArr)
 
 medianAbsErrAzsArr = []
 medianAbsErrElevsArr = []
@@ -794,6 +804,7 @@ medianErrorsShapeVerticesArr = []
 medianErrorsLightCoeffsCArr = []
 medianErrorsVColorsEArr = []
 medianErrorsVColorsCArr = []
+medianErrorsVColorsSArr = []
 medianErrorsSegmentationArr = []
 
 for method_i in range(len(methodsPred)):
@@ -805,6 +816,7 @@ for method_i in range(len(methodsPred)):
     medianErrorsLightCoeffsCArr = medianErrorsLightCoeffsCArr + [np.array([])]
     medianErrorsVColorsEArr = medianErrorsVColorsEArr + [np.array([])]
     medianErrorsVColorsCArr = medianErrorsVColorsCArr + [np.array([])]
+    medianErrorsVColorsSArr = medianErrorsVColorsSArr + [np.array([])]
     medianErrorsEnvMapArr = medianErrorsEnvMapArr + [np.array([])]
     medianErrorsSegmentationArr = medianErrorsSegmentationArr + [np.array([])]
 
@@ -849,14 +861,17 @@ for occlusionLevel in range(100):
             if errorsVColorsCList[method_i] is not None:
                 medianErrorsVColorsCArr[method_i] = np.append(medianErrorsVColorsCArr[method_i], np.median(errorsVColorsCList[method_i][setUnderOcclusionLevel], axis=0))
 
+            if errorsVColorsSList[method_i] is not None:
+                medianErrorsVColorsSArr[method_i] = np.append(medianErrorsVColorsSArr[method_i], np.median(errorsVColorsSList[method_i][setUnderOcclusionLevel], axis=0))
+
             if errorsSegmentationList[method_i] is not None:
                 medianErrorsSegmentationArr[method_i] = np.append(medianErrorsSegmentationArr[method_i], np.median(errorsSegmentationList[method_i][setUnderOcclusionLevel], axis=0))
             else:
                 medianErrorsSegmentationArr[method_i] = None
 
-saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plotMethodsIndices, useShapeModel, medianAbsErrAzsArr, medianAbsErrElevsArr, medianErrorsVColorsCArr, medianErrorsVColorsEArr, medianErrorsLightCoeffsArr, medianErrorsShapeParamsArr, medianErrorsShapeVerticesArr, medianErrorsLightCoeffsCArr, medianErrorsEnvMapArr, medianErrorsSegmentationArr)
+saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plotMethodsIndices, useShapeModel, medianAbsErrAzsArr, medianAbsErrElevsArr, medianErrorsVColorsCArr, medianErrorsVColorsEArr, medianErrorsVColorsSArr, medianErrorsLightCoeffsArr, medianErrorsShapeParamsArr, medianErrorsShapeVerticesArr, medianErrorsLightCoeffsCArr, medianErrorsEnvMapArr, medianErrorsSegmentationArr)
 
-for occlusionLevel in [100]:
+for occlusionLevel in [25,75,100]:
 
     resultDirOcclusion = 'results/' + testPrefix + '/occlusion' + str(occlusionLevel) + '/'
     if not os.path.exists(resultDirOcclusion):
@@ -865,38 +880,46 @@ for occlusionLevel in [100]:
     setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
     testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
 
-    # errorsPosePred = [errorsPosePredList[recognitionIdx][0][setUnderOcclusionLevel], errorsPosePredList[recognitionIdx][1][setUnderOcclusionLevel]]
-    # errorsLightCoeffs = errorsLightCoeffsList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsShapeParams = errorsShapeParamsList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsShapeVertices= errorsShapeVerticesList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsEnvMap= errorsEnvMapList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsLightCoeffsC= errorsLightCoeffsCList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsVColorsE= errorsVColorsEList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsVColorsC= errorsVColorsCList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
-    #
-    # errorsPoseFitted =  [errorsPosePredList[robustIdx][0][setUnderOcclusionLevel], errorsPosePredList[robustIdx][1][setUnderOcclusionLevel]]
-    # errorsFittedLightCoeffs = errorsLightCoeffsList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedShapeParams = errorsShapeParamsList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedShapeVertices= errorsShapeVerticesList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedEnvMap= errorsEnvMapList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedLightCoeffsC= errorsLightCoeffsCList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedVColorsE= errorsVColorsEList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedVColorsC= errorsVColorsCList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
-    #
+    errorsPosePred = [errorsPosePredList[recognitionIdx][0][setUnderOcclusionLevel], errorsPosePredList[recognitionIdx][1][setUnderOcclusionLevel]]
+    errorsLightCoeffs = errorsLightCoeffsList[recognitionIdx][setUnderOcclusionLevel]
+    errorsShapeParams = errorsShapeParamsList[recognitionIdx][setUnderOcclusionLevel]
+    errorsShapeVertices= errorsShapeVerticesList[recognitionIdx][setUnderOcclusionLevel]
+    if errorsEnvMapList[recognitionIdx] is not None:
+        errorsEnvMap= errorsEnvMapList[recognitionIdx][setUnderOcclusionLevel]
+    else:
+        errorsEnvMap = None
+    errorsLightCoeffsC= errorsLightCoeffsCList[recognitionIdx][setUnderOcclusionLevel]
+    errorsVColorsE= errorsVColorsEList[recognitionIdx][setUnderOcclusionLevel]
+    errorsVColorsC= errorsVColorsCList[recognitionIdx][setUnderOcclusionLevel]
+    errorsVColorsS= errorsVColorsSList[recognitionIdx][setUnderOcclusionLevel]
+    errorsSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
+
+    errorsPoseFitted =  [errorsPosePredList[robustIdx][0][setUnderOcclusionLevel], errorsPosePredList[robustIdx][1][setUnderOcclusionLevel]]
+    errorsFittedLightCoeffs = errorsLightCoeffsList[robustIdx][setUnderOcclusionLevel]
+    errorsFittedShapeParams = errorsShapeParamsList[robustIdx][setUnderOcclusionLevel]
+    errorsFittedShapeVertices= errorsShapeVerticesList[robustIdx][setUnderOcclusionLevel]
+    if errorsEnvMapList[recognitionIdx] is not None:
+        errorsFittedEnvMap = errorsEnvMapList[robustIdx][setUnderOcclusionLevel]
+    else:
+        errorsFittedEnvMap = None
+    errorsFittedLightCoeffsC= errorsLightCoeffsCList[robustIdx][setUnderOcclusionLevel]
+    errorsFittedVColorsE= errorsVColorsEList[robustIdx][setUnderOcclusionLevel]
+    errorsFittedVColorsC= errorsVColorsCList[robustIdx][setUnderOcclusionLevel]
+    errorsFittedVColorsS= errorsVColorsSList[robustIdx][setUnderOcclusionLevel]
+    errorsFittedSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
+
     # azTop10 = np.argsort(errorsPoseFitted[0] - errorsPosePred[0])[:10]
     # elTop10 = np.argsort(errorsPoseFitted[1] - errorsPosePred[1])[:10]
     # vColorTop10 = np.argsort(errorsFittedVColorsC - errorsVColorsC)[:10]
     # shTop10 = np.argsort(errorsFittedEnvMap - errorsEnvMap)[:50]
-    #
-    #
+
+
     # shapeTop10 = np.argsort(errorsFittedShapeVertices - errorsShapeVertices)[:10]
     # segmentationTop10 = np.argsort(errorsFittedSegmentation - errorsSegmentation)[:10]
     #
     # shapeWorst = np.argsort(errorsFittedShapeVertices)[::-1]
     # chVColors[:] = np.array([0.5,0.5,0.5])
-    #
+
     # testi = 0
     # for testCase in shapeWorst:
     #     shapeVals = shapeParams[4][testCase]
@@ -937,22 +960,21 @@ for occlusionLevel in [100]:
     #     samples.write('Segmentation\n')
     #     samples.write(str(segmentationTop10) + '\n')
 
-    # saveScatterPlots(resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC)
+    saveScatterPlots(resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS)
 
-    saveLikelihoodScatter(resultDirOcclusion, setUnderOcclusionLevel, testOcclusions,  likelihoods)
+    # saveLikelihoodScatter(resultDirOcclusion, setUnderOcclusionLevel, testOcclusions,  likelihoods)
 
-    sys.exit()
 
     # if len(stdevsFull) > 0:
     #     stdevs = stdevsFull[setUnderOcclusionLevel]
 
     colors = matplotlib.cm.plasma(testOcclusions)
 
-    meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentationList \
-        = computeErrorAverages(np.mean, setUnderOcclusionLevel, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)
+    meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsVColorsSList, meanErrorsSegmentationList \
+        = computeErrorAverages(np.mean, setUnderOcclusionLevel, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList)
 
-    medianAbsErrAzsList, medianAbsErrElevsList, medianErrorsLightCoeffsList, medianErrorsShapeParamsList, medianErrorsShapeVerticesList, medianErrorsLightCoeffsCList, medianErrorsEnvMapList, medianErrorsVColorsEList, medianErrorsVColorsCList, medianErrorsSegmentationList  \
-        = computeErrorAverages(np.median, setUnderOcclusionLevel, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)
+    medianAbsErrAzsList, medianAbsErrElevsList, medianErrorsLightCoeffsList, medianErrorsShapeParamsList, medianErrorsShapeVerticesList, medianErrorsLightCoeffsCList, medianErrorsEnvMapList, medianErrorsVColorsEList, medianErrorsVColorsCList, medianErrorsVColorsSList, medianErrorsSegmentationList  \
+        = computeErrorAverages(np.median, setUnderOcclusionLevel, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList)
     # Write statistics to file.
 
     import tabulate
@@ -962,6 +984,7 @@ for occlusionLevel in [100]:
     table = [["Azimuth"] +  meanAbsErrAzsList,
              ["Elevation"] + meanAbsErrElevsList,
              ["VColor C"] + meanErrorsVColorsCList,
+             ["VColor S"] + meanErrorsVColorsSList,
              ["SH Light"] + meanErrorsLightCoeffsList,
              ["SH Light C"] + meanErrorsLightCoeffsCList,
              ["SH Env Map"] + meanErrorsEnvMapList,
@@ -977,6 +1000,7 @@ for occlusionLevel in [100]:
     table = [["Azimuth"] +  medianAbsErrAzsList,
              ["Elevation"] + medianAbsErrElevsList,
              ["VColor C"] + medianErrorsVColorsCList,
+             ["VColor S"] + medianErrorsVColorsSList,
              ["SH Light"] + medianErrorsLightCoeffsList,
              ["SH Light C"] + medianErrorsLightCoeffsCList,
              ["SH Env Map"] + medianErrorsEnvMapList,

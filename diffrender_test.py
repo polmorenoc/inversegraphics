@@ -209,7 +209,7 @@ trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/'
 trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
 useShapeModel = True
-makeVideo = False
+makeVideo = True
 
 ignoreGT = True
 ignore = []
@@ -235,7 +235,7 @@ badAzs = [248, 326, 324, 351, 602, 227, 564, 436, 332, 644, 216,  20, 407,
 
 # total = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] + badAzs
 
-rangeTests = np.arange(100,1100)[980:]
+rangeTests = np.arange(100,1100)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -1177,7 +1177,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-CRF-NOSEARCH-' + testRangeStr
+testDescription = 'ECCV-CRF-NOSEARCH-1ALL005-2APPLIGHT001-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1802,6 +1802,7 @@ for testSetting, model in enumerate(modelTests):
                             vColor = vColor * np.median(rendererGT.r.reshape([-1, 3])[colorRegion] / renderer.r.reshape([-1, 3])[colorRegion])
 
                     if not ignore:
+                        color = vColor
                         chVColors[:] = vColor
 
                         ## Bayes Optimization
@@ -1922,7 +1923,7 @@ for testSetting, model in enumerate(modelTests):
                         #     resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_optimizedCRFPose' + '.png',
                         #     cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
-                        free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs]
+                        free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
                         #
                         # stds[:] = 0.03
                         # shapePenalty = 0.0001
@@ -1937,7 +1938,7 @@ for testSetting, model in enumerate(modelTests):
 
                         method = 1
 
-                        ch.minimize({'raw': errorFunNLLCRF  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                        ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                         maxShapeSize = 4
                         largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
@@ -1959,22 +1960,22 @@ for testSetting, model in enumerate(modelTests):
                         #
                         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
                         #
-                        # free_variables = [chVColors, chLightSHCoeffs]
-                        # stds[:] = 0.1
-                        # shapePenalty = 0.0
-                        # options={'disp':False, 'maxiter':50}
-                        # # options={'disp':False, 'maxiter':2}
-                        # # free_variables = [chShapeParams ]
-                        # minimizingShape = False
-                        # getColorFromCRF = False
-                        # ch.minimize({'raw': errorFun  + shapePenalty*ch.sum(chShapeParams**2)}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
-                        #
+                        free_variables = [chVColors, chLightSHCoeffs]
+                        stds[:] = 0.01
+                        shapePenalty = 0.0
+                        options={'disp':False, 'maxiter':50}
+                        # options={'disp':False, 'maxiter':2}
+                        # free_variables = [chShapeParams ]
+                        minimizingShape = False
+                        getColorFromCRF = False
+                        ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
                         # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
                         # if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
                         #     print("Warning: found large shape parameters to fix!")
                         #     reverted = True
                         #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-
+                        #
                         # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                 if not reverted:
@@ -2165,11 +2166,11 @@ for testSetting, model in enumerate(modelTests):
                 errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
                     = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
 
-                meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsSegmentationList \
-                    = computeErrorAverages(np.mean, numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)
+                meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsVColorsCList, meanErrorsSegmentationList \
+                    = computeErrorAverages(np.mean, numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList)
 
-                medianAbsErrAzsList, medianAbsErrElevsList,medianErrorsLightCoeffsList, medianErrorsShapeParamsList, medianErrorsShapeVerticesList, medianErrorsLightCoeffsCList, medianErrorsEnvMapList, medianErrorsVColorsEList, medianErrorsVColorsCList, medianErrorsSegmentationList \
-                    = computeErrorAverages(np.median, numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsSegmentationList)
+                medianAbsErrAzsList, medianAbsErrElevsList,medianErrorsLightCoeffsList, medianErrorsShapeParamsList, medianErrorsShapeVerticesList, medianErrorsLightCoeffsCList, medianErrorsEnvMapList, medianErrorsVColorsEList, medianErrorsVColorsCList, medianErrorsVColorsCList, medianErrorsSegmentationList \
+                    = computeErrorAverages(np.median, numFitted, useShapeModel, errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList)
 
                 #Write statistics to file.
                 with open(resultDir + 'performance.txt', 'w') as expfile:
@@ -2181,6 +2182,7 @@ for testSetting, model in enumerate(modelTests):
                         expfile.write("Mean SH Components Error " + methodsPred[method_i] + " " +  str(meanErrorsLightCoeffsCList[method_i])+ '\n')
                         expfile.write("Mean Vertex Colors Error E " + methodsPred[method_i] + " " +  str(meanErrorsVColorsEList[method_i])+ '\n')
                         expfile.write("Mean Vertex Colors Error C " + methodsPred[method_i] + " " +  str(meanErrorsVColorsCList[method_i])+ '\n')
+                        expfile.write("Mean Vertex Colors Error S " + methodsPred[method_i] + " " + str(meanErrorsVColorsCList[method_i]) + '\n')
                         expfile.write("Mean Shape Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeParamsList[method_i])+ '\n')
                         expfile.write("Mean Shape Vertices Error " + methodsPred[method_i] + " " +  str(meanErrorsShapeVerticesList[method_i])+ '\n')
                         expfile.write("Mean Segmentation Error " + methodsPred[method_i] + " " +  str(meanErrorsSegmentationList[method_i])+ '\n\n')
@@ -2195,6 +2197,7 @@ for testSetting, model in enumerate(modelTests):
                         expfile.write("Median SH Components Error " + methodsPred[method_i] + " " +  str(medianErrorsLightCoeffsCList[method_i])+ '\n')
                         expfile.write("Median Vertex Colors Error E " + methodsPred[method_i] + " " +  str(medianErrorsVColorsEList[method_i])+ '\n')
                         expfile.write("Median Vertex Colors Error C " + methodsPred[method_i] + " " +  str(medianErrorsVColorsCList[method_i])+ '\n')
+                        expfile.write("Mean Vertex Colors Error S " + methodsPred[method_i] + " " + str(meanErrorsVColorsCList[method_i]) + '\n')
                         expfile.write("Median Shape Error " + methodsPred[method_i] + " " +  str(medianErrorsShapeParamsList[method_i])+ '\n')
                         expfile.write("Median Shape Vertices Error " + methodsPred[method_i] + " " +  str(medianErrorsShapeVerticesList[method_i])+ '\n')
                         expfile.write("Median Segmentation Error " + methodsPred[method_i] + " " +  str(medianErrorsSegmentationList[method_i])+ '\n\n')
