@@ -420,7 +420,7 @@ if useShapeModel:
     smHaveTexturesB = [smHaveTextures]
     smTexturesListB = [smTexturesList]
 
-    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), ch.Ch([10,0,0]))
+    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), targetPosition)
 
     v_mug = v_mugs[0]
     f_list_mug = f_list_mugs[0]
@@ -430,9 +430,8 @@ if useShapeModel:
     haveTextures_list_mug = haveTextures_list_mugs[0]
     textures_list_mug = textures_list_mugs[0]
 
-    verticesMug, normalsMug = transformObject(v_mug, vn_mug, chScale, chObjAz, ch.Ch([0.0]), ch.Ch([0]), targetPosition)
+    verticesMug, normalsMug = transformObject(v_mug, vn_mug, chScale, chObjAz, ch.Ch([0.15]), ch.Ch([0]), targetPosition)
 
-    targetPos = np.mean(verticesMug[0][0].r, axis=0)
 
     VerticesB = [smVertices ] + verticesMug
     NormalsB = [smNormals] + normalsMug
@@ -443,7 +442,7 @@ if useShapeModel:
     TexturesListB = smTexturesListB + textures_list_mug
 
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, targetPos, chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
     renderer.msaa = True
 
