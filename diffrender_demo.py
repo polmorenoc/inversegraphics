@@ -29,7 +29,7 @@ plt.ion()
 
 #Main script options:r
 useBlender = False
-loadBlenderSceneFile = True
+loadBlenderSceneFile = False
 groundTruthBlender = False
 useShapeModel = True
 datasetGroundtruth = False
@@ -121,7 +121,7 @@ if useShapeModel:
 
 
 teapots = [line.strip() for line in open('teapots.txt')]
-renderTeapotsList = np.arange(len(teapots))[27:28]
+renderTeapotsList = np.arange(len(teapots))[0:1]
 
 sceneNumber = dataScenes[readDataId]
 
@@ -183,10 +183,8 @@ v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list
 
 mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(mugs))[:]
-[mugScenes, mugModels, transformations] = scene_io_utils.loadTargetModels(renderMugsList)
-v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat, varray, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, True, True, mugModels)
-
-ipdb.set_trace()
+# [mugScenes, mugModels, transformations] = scene_io_utils.loadMugsModels(renderMugsList)
+v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat, varray, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, False, False, None)
 
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
@@ -371,7 +369,9 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
-    renderer = createRendererTarget(glMode, False, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    vmod, vnmod = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), targetPosition)
+    renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+
     renderer.msaa = True
     renderer.overdraw = True
     renderer.r
@@ -415,14 +415,35 @@ if useShapeModel:
     smVertices = [chVertices]
 
     smFacesB = [smFaces]
-    smVerticesB = [smVertices]
     smVColorsB = [smVColors]
-    smNormalsB = [smNormals]
     smUVsB = [smUVs]
     smHaveTexturesB = [smHaveTextures]
     smTexturesListB = [smTexturesList]
 
-    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, smVerticesB, smVColorsB, smFacesB, smNormalsB, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
+    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), ch.Ch([10,0,0]))
+
+    v_mug = v_mugs[0]
+    f_list_mug = f_list_mugs[0]
+    vc_mug = vc_mugs[0]
+    vn_mug = vn_mugs[0]
+    uv_mug = uv_mugs[0]
+    haveTextures_list_mug = haveTextures_list_mugs[0]
+    textures_list_mug = textures_list_mugs[0]
+
+    verticesMug, normalsMug = transformObject(v_mug, vn_mug, chScale, chObjAz, ch.Ch([0.0]), ch.Ch([0]), targetPosition)
+
+    targetPos = np.mean(verticesMug[0][0].r, axis=0)
+
+    VerticesB = [smVertices ] + verticesMug
+    NormalsB = [smNormals] + normalsMug
+    FacesB = smFacesB + f_list_mug
+    VColorsB = smVColorsB + vc_mug
+    UVsB = smUVsB + uv_mug
+    HaveTexturesB = smHaveTexturesB + haveTextures_list_mug
+    TexturesListB = smTexturesListB + textures_list_mug
+
+    # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, targetPos, chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
     renderer.msaa = True
 
@@ -482,10 +503,10 @@ if useShapeModel:
     zeroZVerts = chVerticesGT[:,2]- chMinZ
     chVerticesGT = ch.hstack([chVerticesGT[:,0:2] , zeroZVerts.reshape([-1,1])])
 
-
     chVerticesGT = chVerticesGT*0.09
     smCenterGT = ch.array([0,0,0.1])
     smVerticesGT = [chVerticesGT]
+    smVerticesGT, smNormalsGT = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
 
 if useShapeModel:
     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
@@ -494,13 +515,12 @@ else:
 
 center = center_teapots[currentTeapotModel]
 
-rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
+rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 
 rendererGT.msaa = True
 rendererGT.overdraw = True
 
 cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-
 
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):
@@ -620,24 +640,6 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'FULL', globalPrior, variances)[0]
 
 vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
-
-import densecrf_model
-import skimage.color
-
-segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im.ravel(), [0.8,0.2,0.01])
-
-plt.imshow(segmentation)
-plt.clim(0,2)
-
-plt.figure()
-
-plt.imshow(Q.swapaxes(0,1).reshape([150,150,3]))
-
-plt.figure()
-
-plt.imshow(rendererGT.r)
-
-sys.exit()
 
 # hogGT, hogImGT, drconv = image_processing.diffHog(rendererGT)
 # hogRenderer, hogImRenderer, _ = image_processing.diffHog(renderer, drconv)

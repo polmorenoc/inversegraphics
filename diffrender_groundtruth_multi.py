@@ -220,6 +220,7 @@ center = center_teapots[currentTeapotModel]
 if useOpenDR:
     rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
 
+
     vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
     vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
 

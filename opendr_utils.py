@@ -293,51 +293,38 @@ def exportEnvMapSHLightCoefficients():
     with open(SHFilename, 'wb') as pfile:
         pickle.dump(envMapDic, pfile)
 
-def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation):
+def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation, targetPosition):
 
     scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
     chRotAzMat = geometry.RotateZ(a=-chObjAz)[0:3,0:3]
     transformation = ch.dot(chRotAzMat, scaleMat)
     invTranspModel = ch.transpose(ch.inv(transformation))
 
-    vch = [ch.dot(vflat[mesh], transformation) + targetPosition for mesh in rangeMeshes]
-    vnch = [ch.dot(vnflat[mesh], invTranspModel) for mesh in rangeMeshes]
+    objDisplacementMat = computeHemisphereTransformation(chObjRotation, 0, chObjDisplacement, np.array([0,0,0]))
 
+    newPos = objDisplacementMat[0:3, 3]
 
-    chCamModelWorld = computeHemisphereTransformation(chObjRotation, 0, chObjDisplacement, objCenter)
+    vtransf = []
+    vntransf = []
+    for mesh_i, mesh in enumerate(v):
+        vtransf = vtransf + [ch.dot(v[mesh_i], transformation) + newPos + targetPosition]
+        vntransf = vntransf + [ch.dot(vn[mesh_i], invTranspModel)]
 
-    chMVMat = ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(270), 4, 'X')))
+    return vtransf, vntransf
 
-
-
-    return v, vn
-
-def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
     renderer.set(glMode=glMode)
 
     vflat = [item for sublist in v for item in sublist]
     rangeMeshes = range(len(vflat))
 
-    scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
-    chRotAzMat = geometry.RotateZ(a=-chObjAz)[0:3,0:3]
-    transformation = ch.dot(chRotAzMat, scaleMat)
-    invTranspModel = ch.transpose(ch.inv(transformation))
-
-    vch = [ch.dot(vflat[mesh],transformation) + targetPosition for mesh in rangeMeshes]
-
     vnflat = [item for sublist in vn for item in sublist]
 
-    vnch = [vnflat[mesh] for mesh in rangeMeshes]
-    # vnch = [ch.dot(ch.array(vnflat[mesh]),invTranspModel) for mesh in rangeMeshes]
-    vnch = [ch.dot(vnflat[mesh],invTranspModel) for mesh in rangeMeshes]
-    # vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcflat = [item for sublist in vc for item in sublist]
     vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
-    # vcch = [ch.array(vcflat[mesh]) for mesh in rangeMeshes]
 
-    vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponent)
-    # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
+    vc_list = computeSphericalHarmonics(vnflat, vcch, light_color, chComponent)
 
     if hasBackground:
         dataCube, facesCube = create_cube(scale=(10,10,10), st=False, rgba=np.array([1.0, 1.0, 1.0, 1.0]), dtype='float32', type='triangles')
@@ -351,40 +338,34 @@ def createRendererTarget(glMode, hasBackground, chAz, chObjAz, chEl, chDist, cen
         texturesListCube = [[None]]
         vColorsCube = ch.Ch(dataCube[:,3:6])
 
-        vch = vch + [verticesCube]
+        vflat = vflat + [verticesCube]
         f_list = f_list + [[[facesCube]]]
-        vnch = vnch + [normalsCube]
+        vnflat = vnflat + [normalsCube]
         vc_list = vc_list + [vColorsCube]
         textures_list = textures_list + [texturesListCube]
         haveTextures_list = haveTextures_list + [haveTexturesCube]
         uv = uv + [UVsCube]
 
-    if len(vch)==1:
-        vstack = vch[0]
+    if len(vflat)==1:
+        vstack = vflat[0]
     else:
-        vstack = ch.vstack(vch)
+        vstack = ch.vstack(vflat)
 
     camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
 
-    setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    setupTexturedRenderer(renderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
 
 
 
-def createRendererGT(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, chScale, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+def createRendererGT(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
     renderer.set(glMode=glMode)
-
-    scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
-    chRotAzMat = geometry.RotateZ(a=-chObjAz)[0:3,0:3]
-    transformation = ch.dot(chRotAzMat, scaleMat)
-    invTranspModel = ch.transpose(ch.inv(transformation))
 
     vflat = [item for sublist in v for item in sublist]
     rangeMeshes = range(len(vflat))
     # vch = [ch.array(vflat[mesh]) for mesh in rangeMeshes]
     vch = vflat
-    vch[0] = ch.dot(vch[0], transformation) + targetPosition
     if len(vch)==1:
         vstack = vch[0]
     else:
@@ -392,18 +373,17 @@ def createRendererGT(glMode, chAz, chObjAz, chEl, chDist, center, v, vc, f_list,
 
     camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
     vnflat = [item for sublist in vn for item in sublist]
-    vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
-    vnch[0] = ch.dot(vnch[0], invTranspModel)
+    # vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
     # vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcflat = [item for sublist in vc for item in sublist]
     vcch = [vcflat[mesh] for mesh in rangeMeshes]
     vcch[0] = np.ones_like(vcflat[0])*chVColors.reshape([1,3])
     # vcch[0] = vcflat[0]
 
-    vc_list = computeSphericalHarmonics(vnch, vcch, light_color, chComponent)
+    vc_list = computeSphericalHarmonics(vnflat, vcch, light_color, chComponent)
     # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
-    setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
 
 

@@ -25,13 +25,13 @@ def loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender
             vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = unpackBlenderObject(teapot, objectDicFile, True)
         else:
             vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = loadSavedObject(objectDicFile)
-        v_teapots = v_teapots + [[vmod]]
-        f_list_teapots = f_list_teapots + [[fmod_list]]
-        vc_teapots = vc_teapots + [[vcmod]]
-        vn_teapots = vn_teapots + [[vnmod]]
-        uv_teapots = uv_teapots + [[uvmod]]
-        haveTextures_list_teapots = haveTextures_list_teapots + [[haveTexturesmod_list]]
-        textures_list_teapots = textures_list_teapots + [[texturesmod_list]]
+        v_teapots = v_teapots + [vmod]
+        f_list_teapots = f_list_teapots + [fmod_list]
+        vc_teapots = vc_teapots + [vcmod]
+        vn_teapots = vn_teapots + [vnmod]
+        uv_teapots = uv_teapots + [uvmod]
+        haveTextures_list_teapots = haveTextures_list_teapots + [haveTexturesmod_list]
+        textures_list_teapots = textures_list_teapots + [texturesmod_list]
         vflat = [item for sublist in vmod for item in sublist]
         varray = np.vstack(vflat)
         center_teapots = center_teapots + [np.sum(varray, axis=0)/len(varray)]
@@ -60,13 +60,13 @@ def loadMugsOpenDRData(mugFiles, useBlender, unpackModelsFromBlender, mugModels=
             vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = unpackBlenderObject(mug, objectDicFile, True)
         else:
             vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = loadSavedObject(objectDicFile)
-        v_mugs = v_mugs + [[vmod]]
-        f_list_mugs = f_list_mugs + [[fmod_list]]
-        vc_mugs = vc_mugs + [[vcmod]]
-        vn_mugs = vn_mugs + [[vnmod]]
-        uv_mugs = uv_mugs + [[uvmod]]
-        haveTextures_list_mugs = haveTextures_list_mugs + [[haveTexturesmod_list]]
-        textures_list_mugs = textures_list_mugs + [[texturesmod_list]]
+        v_mugs = v_mugs + [vmod]
+        f_list_mugs = f_list_mugs + [fmod_list]
+        vc_mugs = vc_mugs + [vcmod]
+        vn_mugs = vn_mugs + [vnmod]
+        uv_mugs = uv_mugs + [uvmod]
+        haveTextures_list_mugs = haveTextures_list_mugs + [haveTexturesmod_list]
+        textures_list_mugs = textures_list_mugs + [texturesmod_list]
         vflat = [item for sublist in vmod for item in sublist]
         varray = np.vstack(vflat)
         center_mugs = center_mugs + [np.sum(varray, axis=0)/len(varray)]
@@ -568,7 +568,7 @@ def loadSavedObject(objectDicFile):
         vn = targetDic['vn']
         textures_list = targetDic['textures_list']
     print("Loaded serialized target!")
-    return v, f_list, vc, vn, uv, haveTextures_list, textures_list
+    return [v], [f_list], [vc], [vn], [uv], [haveTextures_list], [textures_list]
 
 
 def unpackBlenderObject(object, objectDicFile, saveData):

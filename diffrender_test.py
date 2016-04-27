@@ -1177,7 +1177,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-CRF-NOSEARCH-1ALL005-2APPLIGHT001-' + testRangeStr
+testDescription = 'ECCV-CRF-NOSEARCH-1ALL003-2APPLIGHT001-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1928,7 +1928,7 @@ for testSetting, model in enumerate(modelTests):
                         # stds[:] = 0.03
                         # shapePenalty = 0.0001
 
-                        stds[:] = 0.05
+                        stds[:] = 0.03
                         shapePenalty = 0.0001
 
                         options={'disp':False, 'maxiter':50}
@@ -2002,10 +2002,12 @@ for testSetting, model in enumerate(modelTests):
                     chShapeParams[:] = bestShapeParams
 
                 if makeVideo:
-                    im_ani = animation.ArtistAnimation(figvid, vidImgs, interval=2000, repeat_delay=5000, repeat=True, blit=False)
-                    im_ani.save(resultDir + 'videos/fitting_'+ str(testSet[test_i]) + '.mp4', fps=None, writer=writer, codec='mp4')
+                    if len(vidImgs) > 0:
+                        im_ani = animation.ArtistAnimation(figvid, vidImgs, interval=2000, repeat_delay=5000, repeat=True, blit=False)
+                        im_ani.save(resultDir + 'videos/fitting_'+ str(testSet[test_i]) + '.mp4', fps=None, writer=writer, codec='mp4')
+                        vidImgs[-1][7].remove()
+
                     writer_i.finish()
-                    vidImgs[-1][7].remove()
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
