@@ -322,9 +322,9 @@ def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, v
     vnflat = [item for sublist in vn for item in sublist]
 
     vcflat = [item for sublist in vc for item in sublist]
-    vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+    # vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
 
-    vc_list = computeSphericalHarmonics(vnflat, vcch, light_color, chComponent)
+    vc_list = computeSphericalHarmonics(vnflat, vcflat, light_color, chComponent)
 
     if hasBackground:
         dataCube, facesCube = create_cube(scale=(10,10,10), st=False, rgba=np.array([1.0, 1.0, 1.0, 1.0]), dtype='float32', type='triangles')

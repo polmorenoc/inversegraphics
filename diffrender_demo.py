@@ -72,7 +72,7 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-camDistance = 0.4
+camDistance = 0.6
 
 gtPrefix = 'train4_occlusion_shapemodel'
 gtDirPref = 'train4_occlusion_shapemodel'
@@ -98,7 +98,6 @@ dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
-
 
 readDataId = 0
 import shape_model
@@ -240,6 +239,7 @@ for hdrFile, hdrValues in hdritems:
     envMapCoeffs = hdrValues[1]
     if hdridx == dataEnvMaps[readDataId]:
         break
+
 envMapFilename = hdrFile
 
 envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
@@ -369,7 +369,7 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
-    vmod, vnmod = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), targetPosition)
+    vmod, vnmod = transformObject(vmod, vnmod, chScale, np.pi/2, ch.Ch([0]), ch.Ch([0]), targetPosition)
     renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
 
     renderer.msaa = True
@@ -420,18 +420,18 @@ if useShapeModel:
     smHaveTexturesB = [smHaveTextures]
     smTexturesListB = [smTexturesList]
 
-    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), targetPosition)
+    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0.1]), ch.Ch([1]), targetPosition)
 
     v_mug = v_mugs[0]
     f_list_mug = f_list_mugs[0]
-    vc_mug = vc_mugs[0]
+
+    vc_mug = [[np.array([1,0,0])*np.ones(v_mug[0][0].shape)]]
     vn_mug = vn_mugs[0]
     uv_mug = uv_mugs[0]
     haveTextures_list_mug = haveTextures_list_mugs[0]
     textures_list_mug = textures_list_mugs[0]
 
-    verticesMug, normalsMug = transformObject(v_mug, vn_mug, chScale, chObjAz, ch.Ch([0.15]), ch.Ch([0]), targetPosition)
-
+    verticesMug, normalsMug = transformObject(v_mug, vn_mug, chScale, chObjAz - np.pi/2, ch.Ch([0.2]), ch.Ch([0]), targetPosition)
 
     VerticesB = [smVertices ] + verticesMug
     NormalsB = [smNormals] + normalsMug
@@ -514,6 +514,8 @@ else:
 
 center = center_teapots[currentTeapotModel]
 
+if not useShapeModel:
+    smCenterGT = ch.array([0, 0, 0.1])
 rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 
 rendererGT.msaa = True
@@ -587,7 +589,6 @@ def imageGT():
         return blenderRender
     else:
         return np.copy(np.array(rendererGT.r)).astype(np.float64)
-
 
 global datasetGroundtruth
 
@@ -707,13 +708,14 @@ ims = []
 
 # free_variables = [chCosAz, chSinAz, chLogCosEl, chLogSinEl]
 free_variables = [chAz, chEl, chVColors, chShCoeffs]
-free_variables = [chShapeParams]
+# free_variables = [chShapeParams]
 azVar = 1
 elVar = 1
 vColorVar = 0.00001
 shCoeffsVar = 0.00001
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chShCoeffs.r.shape)])
-df_vars = np.concatenate([np.ones(chShapeParams.shape)])
+if useShapeModel:
+    df_vars = np.concatenate([np.ones(chShapeParams.shape)])
 
 maxiter = 20
 method=1
@@ -745,7 +747,8 @@ global chComponentSaved
 chAzSaved = chAz.r[0]
 chElSaved = chEl.r[0]
 # chComponentSaved = chComponent.r[0]
-chShapeParamsSaved = chShapeParams.r[:]
+if useShapeModel:
+    chShapeParamsSaved = chShapeParams.r[:]
 if showSubplots:
     f, ((ax1, ax2), (ax3, ax4), (ax5,ax6)) = plt.subplots(3, 2, subplot_kw={'aspect':'equal'}, figsize=(9, 12))
     pos1 = ax1.get_position()
@@ -779,8 +782,10 @@ if showSubplots:
     # pim4 = ax4.imshow(np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
     # cb4 = plt.colorbar(pim4, ax=ax4,use_gridspec=True)
     paramWrt1 = chAz
-    paramWrt1 = chShapeParams[0]
-    paramWrt2 = chShapeParams[1]
+    paramWrt2 = chEl
+    if useShapeModel:
+        paramWrt1 = chShapeParams[0]
+        paramWrt2 = chShapeParams[1]
     diffAz = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt1, 0.1)
     diffEl = -ch.optimization.gradCheckSimple(pixelErrorFun, paramWrt2, 0.1)
 
@@ -886,8 +891,10 @@ def refreshSubplots():
     pim2.set_data(rendererIm)
 
     paramWrt1 = chAz
-    paramWrt1 = chShapeParams[0]
-    paramWrt2 = chShapeParams[1]
+    paramWrt2 = chEl
+    if useShapeModel:
+        paramWrt1 = chShapeParams[0]
+        paramWrt2 = chShapeParams[1]
 
 
     global model

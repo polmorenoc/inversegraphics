@@ -138,7 +138,9 @@ for teapot_i in range(len(renderTeapotsList)):
     haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
-    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+
+    vmod, vnmod = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.msaa = True
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
@@ -454,7 +456,9 @@ if useShapeModel:
     chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
 
-    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
+
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -1177,7 +1181,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-CRF-NOSEARCH-1ALL003-2APPLIGHT001-' + testRangeStr
+testDescription = 'ECCV-CRF-NOSEARCH-1ALL005-2APPLIGHT001-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1928,7 +1932,7 @@ for testSetting, model in enumerate(modelTests):
                         # stds[:] = 0.03
                         # shapePenalty = 0.0001
 
-                        stds[:] = 0.03
+                        stds[:] = 0.05
                         shapePenalty = 0.0001
 
                         options={'disp':False, 'maxiter':50}

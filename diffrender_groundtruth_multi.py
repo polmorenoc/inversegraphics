@@ -720,14 +720,23 @@ for gtIdx in rangeGT[:]:
 
         if useShapeModel:
             center = smCenterGT
-            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+            vGT, vnGT = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]),
+                                        np.array([0, 0, 0]))
+            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, smVerticesGT, smFacesGT, smVColorsGT,
+                          smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
 
         else:
-            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+            vGT, vnGT = transformObject(v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], chScaleGT,
+                                        chObjAzGT, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
+            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT,
+                          f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vnGT,
+                          uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0],
+                          textures_list_teapots[currentTeapotModel][0])
 
         if useOpenDR:
-            rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
-
+            rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT,
+                                          chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width,
+                                          height, uv, haveTextures_list, textures_list, frustum, None)
         print("Ground truth on new teapot" + str(teapot_i))
 
         if useBlender:
