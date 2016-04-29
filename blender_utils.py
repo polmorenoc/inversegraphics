@@ -444,6 +444,127 @@ def lin2srgb(im):
     im[~cond1] = (im[~cond1]**(1/2.4)*1.055) - 0.055
     return im
 
+
+import light_probes
+import imageio
+
+def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, gtDir='', train_i=0):
+    envMapTexture = cv2.resize(src=envMapTexture, dsize=(360, 180))
+    # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
+
+    envMapGray = 0.3 * envMapTexture[:, :, 0] + 0.59 * envMapTexture[:, :, 1] + 0.11 * envMapTexture[:, :, 2]
+    envMapGrayMean = np.mean(envMapGray, axis=(0, 1))
+
+    envMapGrayRGB = np.concatenate([envMapGray[..., None], envMapGray[..., None], envMapGray[..., None]],
+                                   axis=2) / envMapGrayMean
+
+    envMapCoeffsNew = light_probes.getEnvironmentMapCoefficients(envMapGrayRGB, 1, 0, 'equirectangular')
+    pEnvMap = light_probes.SHProjection(envMapTexture, envMapCoeffsNew)
+    # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
+    approxProjection = np.sum(pEnvMap, axis=3).astype(np.float32)
+
+    # envMapCoeffsNewRE = light_probes.getEnvironmentMapCoefficients(approxProjectionRE, 1, 0, 'equirectangular')
+    # pEnvMapRE = SHProjection(envMapTexture, envMapCoeffsNewRE)
+    # # pEnvMap = SHProjection(envMapGrayRGB, envMapCoeffs)
+    # approxProjectionRE = np.sum(pEnvMapRE, axis=3).astype(np.float32)
+
+    approxProjection[approxProjection < 0] = 0
+
+    cv2.imwrite(gtDir + 'im.exr', approxProjection)
+
+    # updateEnviornmentMap(envMapFilename, scene)
+    updateEnviornmentMap(gtDir + 'im.exr', scene)
+
+    rotateEnviornmentMap(rotationOffset, scene)
+
+    cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg',
+                255 * approxProjection[:, :, [2, 1, 0]])
+    cv2.imwrite(gtDir + 'sphericalharmonics/envMapGrayOr' + str(train_i) + '.jpeg',
+                255 * envMapGrayRGB[:, :, [2, 1, 0]])
+
+    links.remove(treeNodes.nodes['lightPathNode'].outputs[0].links[0])
+
+    scene.world.cycles_visibility.camera = True
+    scene.camera.data.type = 'PANO'
+    scene.camera.data.cycles.panorama_type = 'EQUIRECTANGULAR'
+    scene.render.resolution_x = 360  # perhaps set resolution in code
+    scene.render.resolution_y = 180
+    roomInstance = scene.objects[str(roomInstanceNum)]
+    roomInstance.cycles_visibility.camera = False
+    roomInstance.cycles_visibility.shadow = False
+    teapot.cycles_visibility.camera = False
+    teapot.cycles_visibility.shadow = True
+
+    # image = cv2.imread(scene.render.filepath)
+    # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
+
+    scene.render.image_settings.file_format = 'OPEN_EXR'
+    scene.render.filepath = gtDir + 'sphericalharmonics/envMap' + str(train_i) + '.exr'
+
+    # bpy.context.user_preferences.system.compute_device_type = 'NONE'
+    # bpy.context.user_preferences.system.compute_device = 'CPU'
+
+    scene.cycles.samples = 1000
+    scene.camera.up_axis = 'Z'
+    # placeCamera(scene.camera, 0, 0, 1, )
+
+    scene.camera.location = center[:].copy() + targetPosition[:].copy()
+    look_at(scene.camera, center[:].copy() + targetPosition[:].copy() + mathutils.Vector((1, 0, 0)))
+
+    scene.update()
+    bpy.ops.render.render(write_still=True)
+
+    imageEnvMap = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
+
+    cv2.imwrite(gtDir + 'sphericalharmonics/envMapCycles' + str(train_i) + '.jpeg', 255 * imageEnvMap[:, :, [2, 1, 0]])
+
+    envMapCoeffs = light_probes.getEnvironmentMapCoefficients(imageEnvMap, 1, 0, 'equirectangular')
+    pEnvMap = light_probes.SHProjection(envMapTexture, envMapCoeffs)
+    approxProjection = np.sum(pEnvMap, axis=3)
+    cv2.imwrite(gtDir + 'sphericalharmonics/envMapCyclesProjection' + str(train_i) + '.jpeg',
+                255 * approxProjection[:, :, [2, 1, 0]])
+
+    links.new(treeNodes.nodes['lightPathNode'].outputs[0], treeNodes.nodes['mixShaderNode'].inputs[0])
+    scene.cycles.samples = 3000
+    scene.render.filepath = 'opendr_blender.exr'
+    roomInstance.cycles_visibility.camera = True
+    scene.render.image_settings.file_format = 'OPEN_EXR'
+    scene.render.resolution_x = width  # perhaps set resolution in code
+    scene.render.resolution_y = height
+    scene.camera.data.type = 'PERSP'
+    scene.world.cycles_visibility.camera = True
+    scene.camera.data.cycles.panorama_type = 'FISHEYE_EQUISOLID'
+    teapot.cycles_visibility.camera = True
+    teapot.cycles_visibility.shadow = True
+    # updateEnviornmentMap(envMapFilename, scene)
+
+    return envMapCoeffs
+
+def setupSceneGroundtruth(scene, width, height, clip_start, cyclesSamples, device_type, compute_device):
+    scene.render.resolution_x = width  # perhaps set resolution in code
+    scene.render.resolution_y = height
+    scene.render.tile_x = height
+    scene.render.tile_y = width
+    scene.cycles.samples = cyclesSamples
+    bpy.context.screen.scene = scene
+    addEnvironmentMapWorld(scene)
+    scene.render.image_settings.file_format = 'OPEN_EXR'
+    scene.render.filepath = 'opendr_blender.exr'
+    scene.sequencer_colorspace_settings.name = 'Linear'
+    scene.display_settings.display_device = 'None'
+    bpy.context.user_preferences.filepaths.render_cache_directory = '/disk/scratch1/pol/.cache/'
+
+    scene.cycles.device = 'GPU'
+    bpy.context.user_preferences.system.compute_device_type = device_type
+
+    # bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
+    bpy.context.user_preferences.system.compute_device = compute_device
+    bpy.ops.wm.save_userpref()
+
+    scene.world.horizon_color = mathutils.Color((1.0, 1.0, 1.0))
+    scene.camera.data.clip_start = clip_start
+
+
 def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples, useCycles, useGPU):
 
     if useCycles:

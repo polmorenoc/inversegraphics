@@ -28,6 +28,8 @@ FAILSAFE_OFFSET = 0.00001
 
 import cv2
 
+
+
 def processSphericalEnvironmentMap(envMapTexture):
     mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
     mask[np.int(mask.shape[0]/2), np.int(mask.shape[1]/2)] = 0
@@ -427,6 +429,30 @@ spherical_harmonics = {
     (2, 1): lambda theta, phi: 1.092548 * sin(theta) * cos(phi) * cos(theta),
     (2, 2): lambda theta, phi: 0.546274 * (((sin(theta) * cos(phi)) ** 2) - ((sin(theta) * sin(phi)) ** 2))
 }
+
+
+def SHProjection(envMap, shCoefficients):
+    #Backprojected.
+    phis = 2*ch.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
+    thetas = np.pi*np.tile((np.arange(envMap.shape[0])/envMap.shape[0]).reshape([envMap.shape[0],1,1]), [1,envMap.shape[1],3])
+
+    phis = np.mod(phis, 2*np.pi)
+
+    normalize = 1
+    spherical_harmonics_coeffs = spherical_harmonics_coeffs
+
+    pEnvMap = np.zeros([envMap.shape[0],envMap.shape[1], 3, 9])
+    pEnvMap[:,:,:,0] = shCoefficients[0].reshape([1,1,3]) *  spherical_harmonics_coeffs[0]  * normalize
+    pEnvMap[:,:,:,1] = shCoefficients[1].reshape([1,1,3]) * spherical_harmonics_coeffs[1]*np.sin(thetas) * np.cos(phis) * normalize
+    pEnvMap[:,:,:,2] = shCoefficients[2].reshape([1,1,3]) * spherical_harmonics_coeffs[2]*np.cos(thetas) * normalize
+    pEnvMap[:,:,:,3] = shCoefficients[3].reshape([1,1,3]) * spherical_harmonics_coeffs[3]*np.sin(thetas)*np.sin(phis) * normalize
+    pEnvMap[:,:,:,4] = shCoefficients[4].reshape([1,1,3]) * spherical_harmonics_coeffs[4]*np.sin(thetas) * np.cos(phis) * np.sin(phis)* np.sin(thetas)  * normalize
+    pEnvMap[:,:,:,5] = shCoefficients[5].reshape([1,1,3]) * spherical_harmonics_coeffs[5]*np.sin(thetas) * np.sin(phis) * np.cos(thetas)  * normalize
+    pEnvMap[:,:,:,6] = shCoefficients[6].reshape([1,1,3]) * spherical_harmonics_coeffs[6]*(3 * np.cos(thetas)**2 - 1) * normalize
+    pEnvMap[:,:,:,7] = shCoefficients[7].reshape([1,1,3]) * spherical_harmonics_coeffs[7]*np.sin(thetas) * np.cos(phis) * np.cos(thetas) * normalize
+    pEnvMap[:,:,:,8] = shCoefficients[8].reshape([1,1,3]) * spherical_harmonics_coeffs[8]*(((np.sin(thetas) * np.cos(phis)) ** 2) - ((np.sin(thetas) * np.sin(phis)) ** 2)) * normalize
+
+    return pEnvMap
 
 def sphericalHarmonicsZRotation(angle):
     return np.array([[1,0,0,0,0,0,0,0,0],[0, np.cos(angle), 0, np.sin(angle), 0,0,0,0,0],[0,0,1,0,0,0,0,0,0],[0, -np.sin(angle), 0, np.cos(angle), 0,0,0,0,0],[0,0,0,0,np.cos(2*angle),0,0,0,np.sin(2*angle)],[0,0,0,0,0,np.cos(angle), 0, np.sin(angle),0],[0,0,0,0,0,0,1,0,0],[0,0,0,0,0, -np.sin(angle),0, np.cos(angle),0],[0,0,0,0,-np.sin(2*angle),0,0,0,np.cos(2*angle)]])
