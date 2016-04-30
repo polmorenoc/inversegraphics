@@ -28,7 +28,16 @@ FAILSAFE_OFFSET = 0.00001
 
 import cv2
 
-
+spherical_harmonics_coeffs = np.array([
+    0.282095,
+    0.488603 ,
+    0.488603 ,
+     0.488603,
+     1.092548,
+     1.092548,
+    0.315392 ,
+    1.092548 ,
+    0.546274 ])
 
 def processSphericalEnvironmentMap(envMapTexture):
     mask = np.ones([envMapTexture.shape[0],envMapTexture.shape[1]]).astype(np.uint8)
@@ -431,6 +440,7 @@ spherical_harmonics = {
 }
 
 
+
 def SHProjection(envMap, shCoefficients):
     #Backprojected.
     phis = 2*ch.pi*np.tile((np.roll(np.arange(envMap.shape[1])[::-1], np.int(envMap.shape[1]/2))/envMap.shape[1]).reshape([1,envMap.shape[1],1]), [envMap.shape[0],1,3])
@@ -439,7 +449,6 @@ def SHProjection(envMap, shCoefficients):
     phis = np.mod(phis, 2*np.pi)
 
     normalize = 1
-    spherical_harmonics_coeffs = spherical_harmonics_coeffs
 
     pEnvMap = np.zeros([envMap.shape[0],envMap.shape[1], 3, 9])
     pEnvMap[:,:,:,0] = shCoefficients[0].reshape([1,1,3]) *  spherical_harmonics_coeffs[0]  * normalize
@@ -473,16 +482,7 @@ import chumpy as ch
 def chSphericalHarmonicsZRotation(angle):
     return SphericalHarmonicsZRotation(angle=angle)
 
-spherical_harmonics_coeffs = np.array([
-    0.282095,
-    0.488603 ,
-    0.488603 ,
-     0.488603,
-     1.092548,
-     1.092548,
-    0.315392 ,
-    1.092548 ,
-    0.546274 ])
+
 
 def getEnvironmentMapCoefficients(envMap, normalize, phiOffset, type):
     """ returns the RGB spherical harmonic coefficients for a given

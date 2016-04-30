@@ -25,6 +25,7 @@ from utils import *
 import OpenGL.GL as GL
 import light_probes
 from OpenGL import contextdata
+from light_probes import SHProjection
 
 plt.ion()
 
@@ -139,7 +140,7 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
-    vmod, vnmod = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
+    vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
     renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.msaa = True
     renderer.r
@@ -211,7 +212,7 @@ trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/'
 trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
 useShapeModel = True
-makeVideo = True
+makeVideo = False
 
 ignoreGT = True
 ignore = []
@@ -441,7 +442,7 @@ if useShapeModel:
     chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
 
-    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
+    smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
 
     renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
@@ -2026,7 +2027,7 @@ for testSetting, model in enumerate(modelTests):
                 plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
             #Every now and then (or after the final test case), produce plots to keep track of work accross different levels of occlusion.
-            if np.mod(test_i+1,20) == 0 or test_i + 1 >= len(testSet):
+            if np.mod(test_i+1,1000) == 0 or test_i + 1 >= len(testSet):
                 if approxProjectionsPredList:
                     approxProjectionsPred = np.vstack(approxProjectionsPredList)
                 if approxProjectionsGTList:

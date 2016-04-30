@@ -30,15 +30,17 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_cycles'
+prefix = 'train4_occlusion_multi'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
 renderOcclusions = True
 useOpenDR = True
 useBlender = True
+renderBlender = False
+captureEnvMapFromBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -108,6 +110,7 @@ for teapotIdx, teapotName in enumerate(selection):
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
+scene_io_utils.loadMugsBlendData()
 for mugIdx, mugName in enumerate(selectionMugs):
     mug = bpy.data.scenes[mugName[0:63]].objects['mugInstance' + str(renderMugsList[mugIdx])]
     mug.layers[1] = True
@@ -115,6 +118,15 @@ for mugIdx, mugName in enumerate(selectionMugs):
     mugModels = mugModels + [mug]
     blender_mugs = blender_mugs + [mug]
 v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat_mugs, varray_mugs, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, useBlender, unpackModelsFromBlender, mugModels)
+
+v_mug = v_mugs[0]
+f_list_mug = f_list_mugs[0]
+chVColorsMug = ch.Ch([1,0,0])
+vc_mug = [[chVColorsMug * np.ones(v_mug[0][0].shape)]]
+vn_mug = vn_mugs[0]
+uv_mug = uv_mugs[0]
+haveTextures_list_mug = haveTextures_list_mugs[0]
+textures_list_mug = textures_list_mugs[0]
 
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
@@ -139,6 +151,13 @@ chElGT = ch.Ch(chEl.r[0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
+
+chObjDistGT = ch.Ch([0])
+chObjRotationGT = ch.Ch([0])
+chObjAzMug = ch.Ch([0])
+chObjDistMug = ch.Ch([0])
+chObjRotationMug = ch.Ch([0])
+
 
 chPointLightIntensity = ch.Ch([1])
 chPointLightIntensityGT = ch.Ch([1])
@@ -220,8 +239,8 @@ addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_mugs[c
 center = center_teapots[currentTeapotModel]
 
 if useOpenDR:
-    rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
 
+    rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
 
     vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
     vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -507,7 +526,6 @@ if not renderFromPreviousGT:
         unlinkedObj = None
         envMapFilename = None
 
-
         for targetidx, targetIndex in enumerate(targetIndices):
             targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
 
@@ -566,29 +584,47 @@ if not renderFromPreviousGT:
                         glfw.destroy_window(rendererGT.win)
                     del rendererGT
 
-                currentTeapotModel = teapot_i
-                center = center_teapots[teapot_i]
+                    currentTeapotModel = teapot_i
+                    center = center_teapots[teapot_i]
 
-                removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+                    removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
-                if useShapeModel:
-                    center = smCenterGT
-                    vGT, vnGT = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]),np.array([0, 0, 0]))
+                    if useShapeModel:
+                        center = smCenterGT
+                        UVs = smUVsGT
+                        vGT = smVerticesGT
+                        vnGT = smNormalsGT
+                        Faces = smFacesGT
+                        VColors = smVColorsGT
+                        UVs = smUVsGT
+                        HaveTextures = smHaveTexturesGT
+                        TexturesList = smTexturesListGT
+                    else:
+                        vGT, vnGT = v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0]
+                        Faces = f_list_teapots[currentTeapotModel][0]
+                        VColors = vc_teapots[currentTeapotModel][0]
+                        UVs = uv_teapots[currentTeapotModel][0]
+                        HaveTextures = haveTextures_list_teapots[currentTeapotModel][0]
+                        TexturesList = textures_list_teapots[currentTeapotModel][0]
 
-                    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, smFacesGT, smVColorsGT, vnGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+                    vGT, vnGT, teapotPosOffset = transformObject(vGT, vnGT, chScaleGT, chObjAzGT, chObjDistGT, chObjRotationGT, targetPosition)
 
-                else:
-                    vGT, vnGT = transformObject(v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
+                    verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug - np.pi / 2, chObjDistMug, chObjRotationMug, targetPosition)
 
-                    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vnGT, uv_teapots[currentTeapotModel][0],
-                                  haveTextures_list_teapots[currentTeapotModel][0],
-                                  textures_list_teapots[currentTeapotModel][0])
+                    VerticesB = [vGT] + verticesMug
+                    NormalsB = [vnGT] + normalsMug
+                    FacesB = Faces + f_list_mug
+                    VColorsB = VColors + vc_mug
+                    UVsB = UVs + uv_mug
+                    HaveTexturesB = HaveTextures + haveTextures_list_mug
+                    TexturesListB = TexturesList + textures_list_mug
 
-                if useOpenDR:
+                    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, VerticesB, VColorsB, FacesB, NormalsB,  UVsB, HaveTexturesB, TexturesListB)
+
+
                     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width,
                                                   height, uv, haveTextures_list, textures_list, frustum, None)
                 ## Blender: Unlink and link new teapot.
-
                 if useBlender:
                     # if currentScene != -1 and currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
                     if teapot.name in scene.objects:
@@ -616,12 +652,18 @@ if not renderFromPreviousGT:
                         mat = makeMaterial('teapotMat', (0, 0, 0), (0, 0, 0), 1)
                         setMaterial(teapotMesh, mat)
 
+                    mug = blender_mugs[currentTeapotModel]
                     # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
 
-                    placeNewTarget(scene, teapot, targetPosition[:].copy())
+                    placeNewTarget(scene, teapot, targetPosition[:].copy() + teapotPosOffset)
+                    placeNewTarget(scene, mug, targetPosition[:].copy() + mugPosOffset)
+
                     teapot.layers[1] = True
                     teapot.layers[0] = True
+                    mug.layers[1] = True
+                    mug.layers[0] = True
                     original_matrix_world = teapot.matrix_world.copy()
+                    original_matrix_world_mug = mug.matrix_world.copy()
 
                 for hdrFile, hdrValues in hdrstorender:
                     hdridx = hdrValues[0]
@@ -666,7 +708,6 @@ if not renderFromPreviousGT:
                         shapeParams = np.random.randn(latentDim)
                         chShapeParamsGTVals = shapeParams
 
-
                         ## Update renderer scene latent variables.
 
                         ignore = False
@@ -706,8 +747,7 @@ if not renderFromPreviousGT:
 
                         if not ignore:
                             # Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
-                            cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3,
-                                        3]
+                            cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3,3]
                             vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[
                                 rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
                             if np.min(np.linalg.norm(vDists, axis=1) <= clip_start):
@@ -716,9 +756,10 @@ if not renderFromPreviousGT:
                         ## Environment map update if using Cycles.
 
                         if not ignore and useBlender:
-                            envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum,
-                                                              totalOffset.r.copy(), links, treeNodes, teapot, center,
-                                                              targetPosition, width, height, gtDir, train_i)
+                            if captureEnvMapFromBlender:
+                                envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum,
+                                                                  totalOffset.r.copy(), links, treeNodes, teapot, center,
+                                                                  targetPosition, width, height, gtDir, train_i)
 
                         if useBlender:
                             envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0),
@@ -735,12 +776,8 @@ if not renderFromPreviousGT:
 
                             azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
 
-                            teapot.matrix_world = mathutils.Matrix.Translation(
-                                original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(
-                                -original_matrix_world.to_translation())) * original_matrix_world
-                            placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi,
-                                        chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(),
-                                        center[:].copy() + targetPosition[:].copy())
+                            teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+                            placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi, chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(), center[:].copy() + targetPosition[:].copy())
 
                             setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
 
@@ -752,56 +789,79 @@ if not renderFromPreviousGT:
 
                             scene.update()
 
-                            bpy.ops.render.render(write_still=True)
+                            if renderBlender:
+                                bpy.ops.render.render(write_still=True)
 
-                            image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
-                            image[image > 1] = 1
-                            blenderRender = image
+                                image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
+                                image[image > 1] = 1
+                                blenderRender = image
 
-                            blenderRenderGray = 0.3 * blenderRender[:, :, 0] + 0.59 * blenderRender[:, :,
-                                                                                      1] + 0.11 * blenderRender[:, :, 2]
+                                lin2srgb(blenderRender)
 
-                            # For some reason I need to correct average intensity in OpenDR a few times before it gets it right:
+                                cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg',
+                                            255 * blenderRender[:, :, [2, 1, 0]],
+                                            [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-                            rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                     :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                 :]
-                            meanIntensityScale = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                rendererGTGray[vis_occluded]).copy()
-                            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale
+                                if captureEnvMapFromBlender:
+                                    blenderRenderGray = 0.3 * blenderRender[:, :, 0] + 0.59 * blenderRender[:, :,
+                                                                                              1] + 0.11 * blenderRender[:, :, 2]
 
-                            rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                     :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                 :]
-                            meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                rendererGTGray[vis_occluded]).copy()
-                            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale2
+                                    # For some reason I need to correct average intensity in OpenDR a few times before it gets it right:
 
-                            rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                     :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                 :]
-                            meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                rendererGTGray[vis_occluded]).copy()
-                            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale3
+                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                         :]
+                                    meanIntensityScale = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                        rendererGTGray[vis_occluded]).copy()
+                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale
 
-                            rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                     :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                 :]
-                            meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                rendererGTGray[vis_occluded]).copy()
-                            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale4
+                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                         :]
+                                    meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                        rendererGTGray[vis_occluded]).copy()
+                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale2
 
-                            rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                     :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                 :]
-                            meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                rendererGTGray[vis_occluded]).copy()
-                            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale5
+                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                         :]
+                                    meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                        rendererGTGray[vis_occluded]).copy()
+                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale3
 
-                            lin2srgb(blenderRender)
-                        # pEnvMap = SHProjection(envMapTexture, envMapCoeffsRotated)
-                        # approxProjection = np.sum(pEnvMap, axis=3)
-                        # cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjectionRot' + str(hdridx) + '_rot' + str(int(totalOffset*180/np.pi)) + '_' + str(str(train_i)) + '.jpeg' , 255*approxProjection[:,:,[2,1,0]])
+                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                         :]
+                                    meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                        rendererGTGray[vis_occluded]).copy()
+                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale4
+
+                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                         :]
+                                    meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                        rendererGTGray[vis_occluded]).copy()
+                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale5
+
+                                    if np.mean(rendererGTGray, axis=(0, 1)) < 0.01:
+                                        ignore = True
+
+
+                        if useOpenDR:
+                            image = rendererGT.r[:].copy()
+                            lin2srgb(image)
+
+                        if not ignore:
+                            # hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
+                            # illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
+
+                            if useOpenDR:
+                                cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg',
+                                            255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+                            # cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                            if useOpenDR:
+                                np.save(gtDir + 'masks_occlusion/mask' + str(train_i) + '.npy', vis_occluded)
 
                         #Add groundtruth to arrays
                         trainAzsGT = chAzGTVals
@@ -954,13 +1014,11 @@ for gtIdx in rangeGT[:]:
 
         if useShapeModel:
             center = smCenterGT
-            vGT, vnGT = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]),
-                                        np.array([0, 0, 0]))
-            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, smVerticesGT, smFacesGT, smVColorsGT,
-                          smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+            vGT, vnGT = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]),np.array([0, 0, 0]))
+
+            addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, smFacesGT, smVColorsGT, vnGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
         else:
-            vGT, vnGT = transformObject(v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], chScaleGT,
-                                        chObjAzGT, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
+            vGT, vnGT = transformObject(v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
             addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT,
                           f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vnGT,
                           uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0],

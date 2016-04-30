@@ -288,7 +288,7 @@ def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation, t
         vtransf = vtransf + [ch.dot(v[mesh_i], transformation) + newPos + targetPosition]
         vntransf = vntransf + [ch.dot(vn[mesh_i], invTranspModel)]
 
-    return vtransf, vntransf
+    return vtransf, vntransf, newPos
 
 def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()

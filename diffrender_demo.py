@@ -420,7 +420,7 @@ if useShapeModel:
     smHaveTexturesB = [smHaveTextures]
     smTexturesListB = [smTexturesList]
 
-    smVertices, smNormals = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0.1]), ch.Ch([1]), targetPosition)
+    smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0.1]), ch.Ch([1]), targetPosition)
 
     v_mug = v_mugs[0]
     f_list_mug = f_list_mugs[0]
@@ -431,7 +431,7 @@ if useShapeModel:
     haveTextures_list_mug = haveTextures_list_mugs[0]
     textures_list_mug = textures_list_mugs[0]
 
-    verticesMug, normalsMug = transformObject(v_mug, vn_mug, chScale, chObjAz - np.pi/2, ch.Ch([0.2]), ch.Ch([0]), targetPosition)
+    verticesMug, normalsMug, _ = transformObject(v_mug, vn_mug, chScale, chObjAz - np.pi/2, ch.Ch([0.2]), ch.Ch([0]), targetPosition)
 
     VerticesB = [smVertices ] + verticesMug
     NormalsB = [smNormals] + normalsMug
@@ -505,7 +505,7 @@ if useShapeModel:
     chVerticesGT = chVerticesGT*0.09
     smCenterGT = ch.array([0,0,0.1])
     smVerticesGT = [chVerticesGT]
-    smVerticesGT, smNormalsGT = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
+    smVerticesGT, smNormalsGT, _ = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
 
 if useShapeModel:
     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
