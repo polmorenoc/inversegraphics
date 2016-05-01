@@ -713,7 +713,7 @@ def addAmbientLightingScene(scene, useCycles):
         lamp.layers[2] = True
 
 
-def targetSceneCollision(target, scene):
+def targetSceneCollision(target, scene, roomName, targetParentInstance):
 
     for sceneInstance in scene.objects:
         if sceneInstance.type == 'EMPTY' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
@@ -721,7 +721,6 @@ def targetSceneCollision(target, scene):
                 return True
 
     return False
-
 
 def view_plane(camd, winx, winy, xasp, yasp):
     #/* fields rendering */

@@ -107,7 +107,8 @@ for teapot_i in range(len(renderTeapotsList)):
     haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
-    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.msaa = True
     renderer.r
     renderer_teapots = renderer_teapots + [renderer]
@@ -160,8 +161,8 @@ if useShapeModel:
     smVertices = [chVertices]
     chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
-
-    renderer = createRendererTarget(glMode, True, chAz, chObjAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, chScale, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+    smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -275,7 +276,6 @@ post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array(
 # modelLogLikelihoodRobustRegionCh = -ch.sum(generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
 #
 # pixelLikelihoodRobustRegionCh = generative_models.LogRobustModelRegion(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
-
 
 # models = [negLikModel, negLikModelRobust, hogError]
 models = [negLikModel, negLikModelRobust]
@@ -393,7 +393,7 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 ##### Load Results data:
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV'
 resultDir = 'results/' + testPrefix + '/'
 
 with open(resultDir + 'experiment.pickle', 'rb') as pfile:
@@ -451,32 +451,32 @@ approxProjections = None
 approxProjectionsGT = None
 
 #
-#
 # ##### Load Results data:
 #
-# testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH-6902-17944_optimize_1000samples__method1errorFun1_std0.01_shapePen0'
-# resultDir2 = 'results/' + testPrefix2 + '/'
-# with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
-#     experimentDic2 = pickle.load(pfile)
-# testSet2 = experimentDic2['testSet']
-# methodsPred2 = experimentDic2['methodsPred']
-# testOcclusions2 = experimentDic2[ 'testOcclusions']
-# testPrefixBase2 = experimentDic2[ 'testPrefixBase']
-# parameterRecognitionModels2 = experimentDic2[ 'parameterRecognitionModels']
-# azimuths2 = experimentDic2['azimuths']
-# elevations2 = experimentDic2[ 'elevations']
-# vColors2 = experimentDic2[ 'vColors']
-# lightCoeffs2 = experimentDic2[ 'lightCoeffs']
-# likelihoods2 = experimentDic2['likelihoods']
-# shapeParams2 = experimentDic2['shapeParams']
-# if os.path.isfile(resultDir2 + 'segmentations.pickle'):
-#     with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
-#         segmentationsDic2 = pickle.load(pfile)
-#     segmentations2 = segmentationsDic2['segmentations']
-# else:
-#     segmentations2 = [None]*len(methodsPred2)
-#
-# testOcclusionsFull2 = testOcclusions2.copy()
+
+testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH-6902-17944_optimize_1000samples__method1errorFun1_std0.01_shapePen0'
+resultDir2 = 'results/' + testPrefix2 + '/'
+with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
+    experimentDic2 = pickle.load(pfile)
+testSet2 = experimentDic2['testSet']
+methodsPred2 = experimentDic2['methodsPred']
+testOcclusions2 = experimentDic2[ 'testOcclusions']
+testPrefixBase2 = experimentDic2[ 'testPrefixBase']
+parameterRecognitionModels2 = experimentDic2[ 'parameterRecognitionModels']
+azimuths2 = experimentDic2['azimuths']
+elevations2 = experimentDic2[ 'elevations']
+vColors2 = experimentDic2[ 'vColors']
+lightCoeffs2 = experimentDic2[ 'lightCoeffs']
+likelihoods2 = experimentDic2['likelihoods']
+shapeParams2 = experimentDic2['shapeParams']
+if os.path.isfile(resultDir2 + 'segmentations.pickle'):
+    with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
+        segmentationsDic2 = pickle.load(pfile)
+    segmentations2 = segmentationsDic2['segmentations']
+else:
+    segmentations2 = [None]*len(methodsPred2)
+
+testOcclusionsFull2 = testOcclusions2.copy()
 
 # with open(resultDir2 + 'approxProjections.pickle', 'rb') as pfile:
 #     approxProjectionsDic2 = pickle.load(pfile)
@@ -514,18 +514,18 @@ approxProjectionsGT2 = None
 SHModel = ""
 #
 
-# methodsPred = methodsPred + ['Occlusion Pred Fit']
-# azimuths = azimuths + [azimuths2[3]]
-# elevations = elevations + [elevations2[3]]
-# vColors = vColors + [vColors2[3]]
-# lightCoeffs = lightCoeffs + [lightCoeffs2[3]]
-# likelihoods = likelihoods + [likelihoods2[3]]
-# shapeParams = shapeParams + [shapeParams2[3]]
-# segmentations = segmentations + [segmentations2[3]]
-#
-# errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
-#         = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
-#
+methodsPred = methodsPred + ['Occlusion Pred Fit']
+azimuths = azimuths + [azimuths2[3]]
+elevations = elevations + [elevations2[3]]
+vColors = vColors + [vColors2[3]]
+lightCoeffs = lightCoeffs + [lightCoeffs2[3]]
+likelihoods = likelihoods + [likelihoods2[3]]
+shapeParams = shapeParams + [shapeParams2[3]]
+segmentations = segmentations + [segmentations2[3]]
+
+errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
+        = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
+
 
 
 # envMapTexture = np.zeros([180,360,3])
@@ -544,19 +544,19 @@ SHModel = ""
 #     approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT[None,:]]
 # approxProjectionsGT = np.vstack(approxProjectionsGTList)
 
-# experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
-#
-# with open(resultDir + 'experiment.pickle', 'wb') as pfile:
-#     pickle.dump(experimentDic, pfile)
-#
-# experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsSList':errorsVColorsSList,'errorsSegmentationList':errorsSegmentationList}
-# #
-# with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
-#     pickle.dump(experimentErrorsDic, pfile)
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-CRF-JOINED-NOSEARCH-1ALL005-2APPLIGHT001-2530-17944_optimize_1000samples__method1errorFun1_std0.01_shapePen0'
+resultDir = 'results/' + testPrefix + '/'
 
+experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
 
-with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
-    experimentErrorsDic = pickle.load(pfile)
+with open(resultDir + 'experiment.pickle', 'wb') as pfile:
+    pickle.dump(experimentDic, pfile)
+
+experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsSList':errorsVColorsSList,'errorsSegmentationList':errorsSegmentationList}
+#
+with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
+    pickle.dump(experimentErrorsDic, pfile)
+
 
 errorsPosePredList  = experimentErrorsDic['errorsPosePredList']
 errorsLightCoeffsList  = experimentErrorsDic['errorsLightCoeffsList']

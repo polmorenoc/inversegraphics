@@ -685,6 +685,19 @@ if not renderFromPreviousGT:
 
                         objAzGT = objAzGT*np.pi/180
                         chObjAzGTVals = objAzGT.copy()
+                        chObjAzGTVals = np.random.uniform(0,np.pi*2)
+
+                        parentIdx = instances[targetIndex][1]
+                        parentSupportObj = scene.objects[str(parentIdx)]
+                        supportWidth = modelWidth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
+                        supportDepth = modelDepth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
+                        supportRad = np.sqrt(supportDepth**2 + supportWidth**2)/2
+
+                        chObjDistGTVals = np.random.uniform(0,supportRad)
+                        chObjAzMugVals = np.random.uniform(0,np.pi*2)
+                        chObjDistMugVals = np.random.uniform(0,supportRad)
+                        chObjRotationMugVals = np.random.uniform(0,np.pi*2)
+                        chObjRotationGTVals = np.random.uniform(0,np.pi*2)
 
                         if renderOcclusions:
                             azInterval = choice(len(occlusionProbs), size=1, p=occlusionProbs)
@@ -733,6 +746,12 @@ if not renderFromPreviousGT:
                             chShapeParamsGT[:] = shapeParams
                         except:
                             chShapeParamsGT[:] = np.random.randn(latentDim)
+
+                        chObjDistGT = chObjDistGTVals
+                        chObjRotationGT = chObjRotationGTVals
+                        chObjAzMug = chObjAzMugVals
+                        chObjDistMug = chObjDistMugVals
+                        chObjRotationMug = chObjRotationMugVals
 
                         ## Some validation checks:
 
