@@ -39,8 +39,8 @@ useShapeModel = True
 renderOcclusions = True
 useOpenDR = True
 useBlender = True
-renderBlender = False
-captureEnvMapFromBlender = False
+renderBlender = True
+captureEnvMapFromBlender = True
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -72,7 +72,7 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.01
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-camDistance = 0.4
+camDistance = 0.6
 
 teapots = [line.strip() for line in open('teapots.txt')]
 renderTeapotsList = np.arange(len(teapots))[0:1]
@@ -97,9 +97,7 @@ removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, tex
 targetModels = []
 mugModels = []
 blender_teapots = []
-blender_mugs = []
 selection = [ teapots[i] for i in renderTeapotsList]
-selectionMugs = [ mugs[i] for i in renderMugsList]
 scene_io_utils.loadTargetsBlendData()
 for teapotIdx, teapotName in enumerate(selection):
     teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
@@ -110,6 +108,8 @@ for teapotIdx, teapotName in enumerate(selection):
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
+blender_mugs = []
+selectionMugs = [ mugs[i] for i in renderMugsList]
 scene_io_utils.loadMugsBlendData()
 for mugIdx, mugName in enumerate(selectionMugs):
     mug = bpy.data.scenes[mugName[0:63]].objects['mugInstance' + str(renderMugsList[mugIdx])]
@@ -119,14 +119,14 @@ for mugIdx, mugName in enumerate(selectionMugs):
     blender_mugs = blender_mugs + [mug]
 v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat_mugs, varray_mugs, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, useBlender, unpackModelsFromBlender, mugModels)
 
-v_mug = v_mugs[0]
-f_list_mug = f_list_mugs[0]
+v_mug = v_mugs[0][0]
+f_list_mug = f_list_mugs[0][0]
 chVColorsMug = ch.Ch([1,0,0])
-vc_mug = [[chVColorsMug * np.ones(v_mug[0][0].shape)]]
-vn_mug = vn_mugs[0]
-uv_mug = uv_mugs[0]
-haveTextures_list_mug = haveTextures_list_mugs[0]
-textures_list_mug = textures_list_mugs[0]
+vc_mug = [chVColorsMug * np.ones(v_mug[0].shape)]
+vn_mug = vn_mugs[0][0]
+uv_mug = uv_mugs[0][0]
+haveTextures_list_mug = haveTextures_list_mugs[0][0]
+textures_list_mug = textures_list_mugs[0][0]
 
 azimuth = np.pi
 chCosAz = ch.Ch([np.cos(azimuth)])
@@ -485,13 +485,11 @@ if not renderFromPreviousGT:
             with open(occlusionSceneFile, 'rb') as pfile:
                 occlusions = pickle.load(pfile)
 
-        v2, f_list2, vc2, vn2, uv2, haveTextures_list2, textures_list2 = scene_io_utils.loadSavedScene(sceneDicFile,
-                                                                                                       tex_srgb2lin)
+        v2, f_list2, vc2, vn2, uv2, haveTextures_list2, textures_list2 = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
         if useBlender and not loadBlenderSceneFile:
             bpy.ops.wm.read_factory_settings()
             scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
-            scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16,
-                                      useCycles, True)
+            scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, True)
             scene.update()
             # Save barebones scene.
         elif useBlender and loadBlenderSceneFile:
@@ -514,7 +512,17 @@ if not renderFromPreviousGT:
                 targetModels = targetModels + [teapotIdx]
                 blender_teapots = blender_teapots + [teapot]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 3000, 'CUDA', 'CUDA_0')
+            blender_mugs = []
+            selectionMugs = [mugs[i] for i in renderMugsList]
+            scene_io_utils.loadMugsBlendData()
+            for mugIdx, mugName in enumerate(selectionMugs):
+                mug = bpy.data.scenes[mugName[0:63]].objects['mugInstance' + str(renderMugsList[mugIdx])]
+                mug.layers[1] = True
+                mug.layers[2] = True
+                mugModels = mugModels + [mug]
+                blender_mugs = blender_mugs + [mug]
+
+            setupSceneGroundtruth(scene, width, height, clip_start, 1000, 'CUDA', 'CUDA_0')
 
             treeNodes = scene.world.node_tree
 
@@ -611,19 +619,17 @@ if not renderFromPreviousGT:
 
                     verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug - np.pi / 2, chObjDistMug, chObjRotationMug, targetPosition)
 
-                    VerticesB = [vGT] + verticesMug
-                    NormalsB = [vnGT] + normalsMug
+                    VerticesB = vGT + verticesMug
+                    NormalsB = vnGT + normalsMug
                     FacesB = Faces + f_list_mug
                     VColorsB = VColors + vc_mug
                     UVsB = UVs + uv_mug
                     HaveTexturesB = HaveTextures + haveTextures_list_mug
                     TexturesListB = TexturesList + textures_list_mug
+                    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, verticesMug, f_list_mug, vc_mug,  normalsMug, uv_mug, haveTextures_list_mug, textures_list_mug)
+                    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, Faces, VColors, vnGT, UVs, HaveTextures, TexturesList)
 
-                    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, VerticesB, VColorsB, FacesB, NormalsB,  UVsB, HaveTexturesB, TexturesListB)
-
-
-                    rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width,
-                                                  height, uv, haveTextures_list, textures_list, frustum, None)
+                    rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, uv, haveTextures_list, textures_list, frustum, None)
                 ## Blender: Unlink and link new teapot.
                 if useBlender:
                     # if currentScene != -1 and currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
@@ -632,6 +638,10 @@ if not renderFromPreviousGT:
 
                         if useShapeModel:
                             deleteInstance(teapot)
+
+                    if mug.name in scene.objects:
+                        scene.objects.unlink(mug)
+                    #     deleteInstance(mug)
 
                     if not useShapeModel:
                         teapot = blender_teapots[currentTeapotModel]
@@ -663,6 +673,10 @@ if not renderFromPreviousGT:
                     mug.layers[1] = True
                     mug.layers[0] = True
                     original_matrix_world = teapot.matrix_world.copy()
+
+                    # mug.matrix_world = mug.matrix_world * mathutils.Matrix.Rotation(-np.pi/2, 4, 'Y')
+                    # mug.matrix_world = mug.matrix_world
+
                     original_matrix_world_mug = mug.matrix_world.copy()
 
                 for hdrFile, hdrValues in hdrstorender:
@@ -689,13 +703,13 @@ if not renderFromPreviousGT:
 
                         parentIdx = instances[targetIndex][1]
                         parentSupportObj = scene.objects[str(parentIdx)]
-                        supportWidth = modelWidth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
-                        supportDepth = modelDepth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
-                        supportRad = np.sqrt(supportDepth**2 + supportWidth**2)/2
+                        supportWidthMax, supportWidthMin  = modelWidth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
+                        supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
+                        supportRad = np.sqrt(0.5*(supportDepthMax - supportDepthMin)**2 + 0.5*(supportWidthMax - supportWidthMin)**2)/2
 
-                        chObjDistGTVals = np.random.uniform(0,supportRad)
+                        chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.4))
                         chObjAzMugVals = np.random.uniform(0,np.pi*2)
-                        chObjDistMugVals = np.random.uniform(0,supportRad)
+                        chObjDistMugVals = np.random.uniform(0,np.min(supportRad, 0.4))
                         chObjRotationMugVals = np.random.uniform(0,np.pi*2)
                         chObjRotationGTVals = np.random.uniform(0,np.pi*2)
 
@@ -706,6 +720,7 @@ if not renderFromPreviousGT:
                         else:
                             chAzGTVals = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
 
+
                         chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
 
                         chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
@@ -714,6 +729,7 @@ if not renderFromPreviousGT:
                         chLightIntensityGTVals = 0
 
                         chVColorsGTVals =  np.random.uniform(0.2,0.8, [1, 3])
+                        chVColorsMugVals = np.random.uniform(0.2, 0.8, [1, 3])
 
                         envMapCoeffsRotatedVals = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
                         envMapCoeffsRotatedRelVals = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
@@ -747,21 +763,26 @@ if not renderFromPreviousGT:
                         except:
                             chShapeParamsGT[:] = np.random.randn(latentDim)
 
-                        chObjDistGT = chObjDistGTVals
-                        chObjRotationGT = chObjRotationGTVals
-                        chObjAzMug = chObjAzMugVals
-                        chObjDistMug = chObjDistMugVals
-                        chObjRotationMug = chObjRotationMugVals
+                        chObjDistGT[:] = chObjDistGTVals
+                        chObjRotationGT[:] = chObjRotationGTVals
+                        chObjAzMug[:] = chObjAzMugVals
+                        chObjDistMug[:] = chObjDistMugVals
+                        chObjRotationMug[:] = chObjRotationMugVals
+                        chVColorsMug[:] = chVColorsMugVals
 
                         ## Some validation checks:
 
                         if useOpenDR:
-                            occlusion = getOcclusionFraction(rendererGT)
+                            occlusion = getOcclusionFraction(rendererGT, id=0)
+                            occlusionMug = getOcclusionFraction(rendererGT, id=1)
 
                             vis_occluded = np.array(rendererGT.indices_image == 1).copy().astype(np.bool)
                             vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
 
-                        if occlusion > 0.9:
+                            vis_occluded_mug = np.array(rendererGT.indices_image == 1).copy().astype(np.bool)
+                            vis_im_mug = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+
+                        if occlusion > 0.9 or occlusionMug > 0.9 or np.isnan(occlusion) or np.isnan(occlusionMug):
                             ignore = True
 
                         if not ignore:
@@ -769,8 +790,33 @@ if not renderFromPreviousGT:
                             cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3,3]
                             vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[
                                 rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
-                            if np.min(np.linalg.norm(vDists, axis=1) <= clip_start):
+
+                            vDistsTeapot = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded].ravel()].ravel()] - cameraEye
+
+                            vDistsMug = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded_mug].ravel()].ravel()] - cameraEye
+
+                            #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
+                            minDistToObjects = 0.1
+                            maxDistToObjects = 1
+                            if np.min(np.linalg.norm(vDists, axis=1) <= clip_start) or np.min(np.linalg.norm(vDistsTeapot, axis=1) <= minDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) <= minDistToObjects):
                                 ignore = True
+
+                            if np.min(np.linalg.norm(vDistsTeapot, axis=1) > maxDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) > maxDistToObjects):
+                                ignore = True
+
+                            if useBlender:
+                                import collision
+                                if collision.targetSceneCollision(teapot, scene, roomName, parentSupportObj):
+                                    ignore = True
+
+                                if collision.targetSceneCollision(mug, scene, roomName, parentSupportObj):
+                                    ignore = True
+                            #
+                            #     if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
+                            #         ignore = True
+                            #
+                            #     if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*mug.matrix_world, mug.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
+                            #         ignore = True
 
                         ## Environment map update if using Cycles.
 
@@ -778,7 +824,7 @@ if not renderFromPreviousGT:
                             if captureEnvMapFromBlender:
                                 envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum,
                                                                   totalOffset.r.copy(), links, treeNodes, teapot, center,
-                                                                  targetPosition, width, height, gtDir, train_i)
+                                                                  targetPosition, width, height, 1000, gtDir, train_i)
 
                         if useBlender:
                             envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0),
@@ -795,16 +841,22 @@ if not renderFromPreviousGT:
 
                             azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
 
-                            teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation()) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+                            teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation() + mathutils.Vector(teapotPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+
                             placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi, chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(), center[:].copy() + targetPosition[:].copy())
 
                             setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
+
+                            setObjectDiffuseColor(mug, chVColorsMug.r.copy())
+
+                            azimuthRotMug = mathutils.Matrix.Rotation(chObjAzMug.r[:].copy() - np.pi/2, 4, 'Z')
+
+                            mug.matrix_world = mathutils.Matrix.Translation(original_matrix_world_mug.to_translation() + mathutils.Vector(mugPosOffset.r)) * azimuthRotMug * (mathutils.Matrix.Translation(-original_matrix_world_mug.to_translation())) * original_matrix_world_mug
 
                             if useShapeModel:
                                 mesh = teapot.dupli_group.objects[0]
                                 for vertex_i, vertex in enumerate(mesh.data.vertices):
                                     vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
-                            # ipdb.set_trace()
 
                             scene.update()
 
@@ -865,7 +917,6 @@ if not renderFromPreviousGT:
                                     if np.mean(rendererGTGray, axis=(0, 1)) < 0.01:
                                         ignore = True
 
-
                         if useOpenDR:
                             image = rendererGT.r[:].copy()
                             lin2srgb(image)
@@ -882,42 +933,40 @@ if not renderFromPreviousGT:
                             if useOpenDR:
                                 np.save(gtDir + 'masks_occlusion/mask' + str(train_i) + '.npy', vis_occluded)
 
-                        #Add groundtruth to arrays
-                        trainAzsGT = chAzGTVals
-                        trainObjAzsGT = chObjAzGTVals
-                        trainElevsGT = chElGTVals
-                        trainLightAzsGT = chLightAzGTVals
-                        trainLightElevsGT = chLightElGTVals
-                        trainLightIntensitiesGT = chLightIntensityGTVals
-                        trainVColorGT = chVColorsGTVals
-                        lightCoeffs = envMapCoeffsRotatedVals[None, :].copy().squeeze()
-                        lightCoeffs = 0.3*lightCoeffs[:,0] + 0.59*lightCoeffs[:,1] + 0.11*lightCoeffs[:,2]
-                        trainLightCoefficientsGT = lightCoeffs
-                        lightCoeffsRel = envMapCoeffsRotatedRelVals[None, :].copy().squeeze()
-                        lightCoeffsRel = 0.3*lightCoeffsRel[:,0] + 0.59*lightCoeffsRel[:,1] + 0.11*lightCoeffsRel[:,2]
-                        trainLightCoefficientsGTRel = lightCoeffsRel
-                        trainAmbientIntensityGT = chAmbientIntensityGTVals
-                        trainEnvMapPhiOffsets = phiOffset
-                        trainScenes = sceneNumber
-                        trainTeapotIds = teapot_i
-                        trainEnvMaps = hdridx
-                        trainShapeModelCoeffsGT = chShapeParamsGTVals.copy()
-                        trainOcclusions = -1
-                        trainIds = train_i
-                        trainTargetIndices = targetIndex
+                            #Add groundtruth to arrays
+                            trainAzsGT = chAzGTVals
+                            trainObjAzsGT = chObjAzGTVals
+                            trainElevsGT = chElGTVals
+                            trainLightAzsGT = chLightAzGTVals
+                            trainLightElevsGT = chLightElGTVals
+                            trainLightIntensitiesGT = chLightIntensityGTVals
+                            trainVColorGT = chVColorsGTVals
+                            lightCoeffs = envMapCoeffsRotatedVals[None, :].copy().squeeze()
+                            lightCoeffs = 0.3*lightCoeffs[:,0] + 0.59*lightCoeffs[:,1] + 0.11*lightCoeffs[:,2]
+                            trainLightCoefficientsGT = lightCoeffs
+                            lightCoeffsRel = envMapCoeffsRotatedRelVals[None, :].copy().squeeze()
+                            lightCoeffsRel = 0.3*lightCoeffsRel[:,0] + 0.59*lightCoeffsRel[:,1] + 0.11*lightCoeffsRel[:,2]
+                            trainLightCoefficientsGTRel = lightCoeffsRel
+                            trainAmbientIntensityGT = chAmbientIntensityGTVals
+                            trainEnvMapPhiOffsets = phiOffset
+                            trainScenes = sceneNumber
+                            trainTeapotIds = teapot_i
+                            trainEnvMaps = hdridx
+                            trainShapeModelCoeffsGT = chShapeParamsGTVals.copy()
+                            trainOcclusions = -1
+                            trainIds = train_i
+                            trainTargetIndices = targetIndex
 
-                        gtDatasetToRender.resize(gtDatasetToRender.shape[0]+1, axis=0)
-                        gtDatasetToRender[-1] = np.array([(trainIds, trainAzsGT,trainObjAzsGT,trainElevsGT,trainLightAzsGT,trainLightElevsGT,trainLightIntensitiesGT,trainVColorGT,trainScenes,trainTeapotIds,trainEnvMaps,trainOcclusions,trainTargetIndices, trainLightCoefficientsGT, trainLightCoefficientsGTRel, trainAmbientIntensityGT, phiOffsetVals, trainShapeModelCoeffsGT)],dtype=gtDtype)
+                            gtDatasetToRender.resize(gtDatasetToRender.shape[0]+1, axis=0)
+                            gtDatasetToRender[-1] = np.array([(trainIds, trainAzsGT,trainObjAzsGT,trainElevsGT,trainLightAzsGT,trainLightElevsGT,trainLightIntensitiesGT,trainVColorGT,trainScenes,trainTeapotIds,trainEnvMaps,trainOcclusions,trainTargetIndices, trainLightCoefficientsGT, trainLightCoefficientsGTRel, trainAmbientIntensityGT, phiOffsetVals, trainShapeModelCoeffsGT)],dtype=gtDtype)
 
-                        train_i = train_i + 1
+                            train_i = train_i + 1
 
-                        if np.mod(train_i, 100) == 0:
-                            print("Generated " + str(train_i) + " GT instances.")
-                            print("Generating groundtruth. Iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
-
+                            if np.mod(train_i, 100) == 0:
+                                print("Generated " + str(train_i) + " GT instances.")
+                                print("Generating groundtruth. Iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
 
 if renderFromPreviousGT:
-
     groundTruthFilename = 'groundtruth/' + previousGTPrefix + '/groundTruth.h5'
     gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
     groundTruthToRender = gtDataFileToRender[previousGTPrefix]
@@ -985,7 +1034,7 @@ for gtIdx in rangeGT[:]:
                 targetModels = targetModels + [teapotIdx]
                 blender_teapots = blender_teapots + [teapot]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 3000, 'CUDA', 'CUDA_0')
+            setupSceneGroundtruth(scene, width, height, clip_start, 1000, 'CUDA', 'CUDA_0')
 
             treeNodes = scene.world.node_tree
 
@@ -1138,8 +1187,7 @@ for gtIdx in rangeGT[:]:
         if np.min(np.linalg.norm(vDists,axis=1) <= clip_start):
             ignore = True
 
-    if not ignore and useBlender:
-
+    if captureEnvMapFromBlender and not ignore and useBlender:
         envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, totalOffset.r.copy(), links, treeNodes, teapot, center, targetPosition, width, height, gtDir, train_i)
 
     if useBlender:

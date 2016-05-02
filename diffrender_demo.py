@@ -369,7 +369,7 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
 
-    vmod, vnmod = transformObject(vmod, vnmod, chScale, np.pi/2, ch.Ch([0]), ch.Ch([0]), targetPosition)
+    vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, np.pi/2, ch.Ch([0]), ch.Ch([0]), targetPosition)
     renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
 
     renderer.msaa = True
@@ -422,25 +422,26 @@ if useShapeModel:
 
     smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0.1]), ch.Ch([1]), targetPosition)
 
-    v_mug = v_mugs[0]
+    v_mug = v_mugs[0][0]
     f_list_mug = f_list_mugs[0]
 
     vc_mug = [[np.array([1,0,0])*np.ones(v_mug[0][0].shape)]]
-    vn_mug = vn_mugs[0]
+    vn_mug = vn_mugs[0][0]
     uv_mug = uv_mugs[0]
     haveTextures_list_mug = haveTextures_list_mugs[0]
     textures_list_mug = textures_list_mugs[0]
 
     verticesMug, normalsMug, _ = transformObject(v_mug, vn_mug, chScale, chObjAz - np.pi/2, ch.Ch([0.2]), ch.Ch([0]), targetPosition)
 
-    VerticesB = [smVertices ] + verticesMug
-    NormalsB = [smNormals] + normalsMug
+    VerticesB = [smVertices ] + [verticesMug]
+    NormalsB = [smNormals] + [normalsMug]
     FacesB = smFacesB + f_list_mug
     VColorsB = smVColorsB + vc_mug
     UVsB = smUVsB + uv_mug
     HaveTexturesB = smHaveTexturesB + haveTextures_list_mug
     TexturesListB = smTexturesListB + textures_list_mug
 
+    ipdb.set_trace()
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
     renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
@@ -508,6 +509,7 @@ if useShapeModel:
     smVerticesGT, smNormalsGT, _ = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
 
 if useShapeModel:
+    ipdb.set_trace()
     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
 else:
     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])

@@ -448,7 +448,7 @@ def lin2srgb(im):
 import light_probes
 import imageio
 
-def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, gtDir='', train_i=0):
+def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, cyclesSamples=3000, gtDir='', train_i=0):
     envMapTexture = cv2.resize(src=envMapTexture, dsize=(360, 180))
     # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
 
@@ -525,7 +525,7 @@ def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, li
                 255 * approxProjection[:, :, [2, 1, 0]])
 
     links.new(treeNodes.nodes['lightPathNode'].outputs[0], treeNodes.nodes['mixShaderNode'].inputs[0])
-    scene.cycles.samples = 3000
+    scene.cycles.samples = cyclesSamples
     scene.render.filepath = 'opendr_blender.exr'
     roomInstance.cycles_visibility.camera = True
     scene.render.image_settings.file_format = 'OPEN_EXR'
@@ -713,14 +713,7 @@ def addAmbientLightingScene(scene, useCycles):
         lamp.layers[2] = True
 
 
-def targetSceneCollision(target, scene, roomName, targetParentInstance):
 
-    for sceneInstance in scene.objects:
-        if sceneInstance.type == 'EMPTY' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
-            if instancesIntersect(target, sceneInstance):
-                return True
-
-    return False
 
 def view_plane(camd, winx, winy, xasp, yasp):
     #/* fields rendering */

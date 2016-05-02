@@ -116,6 +116,7 @@ def bmesh_check_intersect_objects(obj, objTransf,  obj2, obj2Transf):
 def instancesIntersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
 
     if aabb_intersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
+        return True
         print ("AABB intersection!")
         for mesh1 in instanceObjs1:
             for mesh2 in instanceObjs2:
@@ -124,7 +125,15 @@ def instancesIntersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs
                     return True
     # else:
     #     print ("There's NO intersection!")
+    print("There's NO intersection!")
 
     return False
 
+def targetSceneCollision(target, scene, roomName, targetParentInstance):
+    # bpy.ops.mesh.primitive_cube_add
+    for sceneInstance in scene.objects:
+        if sceneInstance.type == 'EMPTY' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
+            if instancesIntersect(target.matrix_world, target.dupli_group.objects, sceneInstance.matrix_world, sceneInstance.dupli_group.objects):
+                return True
 
+    return False

@@ -426,9 +426,10 @@ def generateSceneImages(width, height, envMapFilename, envMapMean, phiOffset, ch
             bpy.ops.render.render(write_still=True)
 
 
-def getOcclusionFraction(renderer):
-    vis_occluded = np.array(renderer.indices_image==1).copy().astype(np.bool)
-    vis_im = np.array(renderer.image_mesh_bool([0])).copy().astype(np.bool)
+def getOcclusionFraction(renderer, id=0):
+    vis_occluded = np.array(renderer.indices_image==id+1).copy().astype(np.bool)
+    vis_im = np.array(renderer.image_mesh_bool([id])).copy().astype(np.bool)
+
 
     return 1. - np.sum(vis_occluded)/np.sum(vis_im)
 
