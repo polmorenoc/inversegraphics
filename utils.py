@@ -354,6 +354,241 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
     fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
     plt.close(fig)
 
+def saveScatterPlotsMethodFit(methodFitNum, resultDir, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS):
+
+    latexify(columns=2)
+
+    directory = resultDir + 'pred-azimuth-errors_fitted-azimuth-error-' + str(methodFitNum) + '-'
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(abs(errorsPosePred[0]), abs(errorsPoseFitted[0]), s=20, vmin=0, vmax=100,
+                      c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted azimuth errors')
+    ax.set_ylabel('Fitted azimuth errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    for test_i in range(len(errorsPosePred[0])):
+        if abs(errorsPoseFitted[0][test_i]) > abs(errorsPosePred[0][test_i]) + 10:
+            plt.annotate(
+                str(test_i),
+                xy=(abs(errorsPosePred[0][test_i]), abs(errorsPoseFitted[0][test_i])), xytext=(0, 15),
+                textcoords='offset points', ha='right', va='bottom',
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'), size=8)
+                # bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+    ax.set_title('Recognition vs fitted azimuth errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'pred-elevation-errors_fitted-elevation-error-' + str(methodFitNum) + '-'
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(abs(errorsPosePred[1]), abs(errorsPoseFitted[1]), s=20, vmin=0, vmax=100,
+                      c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    for test_i in range(len(errorsPosePred[1])):
+        if abs(errorsPoseFitted[1][test_i]) > abs(errorsPosePred[1][test_i]) + 10:
+            plt.annotate(
+                str(test_i),
+                xy=(abs(errorsPosePred[1][test_i]), abs(errorsPoseFitted[1][test_i])), xytext=(15, 15),
+                textcoords='offset points', ha='right', va='bottom',
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'), size=8)
+                # bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted elevation errors')
+    ax.set_ylabel('Fitted elevation errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted azimuth errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'shcoeffsserrorsC_fitted-shcoeffsserrorsC-' + str(methodFitNum) + '-'
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(np.mean(errorsLightCoeffsC, axis=1), np.mean(errorsFittedLightCoeffsC, axis=1), s=20,
+                      vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    for test_i in range(len(errorsLightCoeffsC)):
+        if np.mean(errorsFittedLightCoeffsC, axis=1)[test_i] > np.mean(errorsLightCoeffsC, axis=1)[test_i] + 0.1:
+            plt.annotate(
+                str(test_i),
+                xy=(np.mean(errorsLightCoeffsC, axis=1)[test_i], np.mean(errorsFittedLightCoeffsC, axis=1)[test_i]), xytext=(0, 15),
+                textcoords='offset points', ha='right', va='bottom',
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'), size=8)
+                # bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted SH coefficients errors')
+    ax.set_ylabel('Fitted SH coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted SH coefficients errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    if errorsEnvMap is not None and  errorsFittedEnvMap is not None:
+        directory = resultDir + 'shcoeffsserrorsC_fitted-shEnvMap-' + str(methodFitNum) + '-'
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+        scat = ax.scatter(errorsEnvMap, errorsFittedEnvMap, s=20,
+                          vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+        cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+        cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+        ax.set_xlabel('Predicted SH coefficients errors')
+        ax.set_ylabel('Fitted SH coefficients errors')
+        x1, x2 = ax.get_xlim()
+        y1, y2 = ax.get_ylim()
+        ax.set_xlim((0, max(x2,y2)))
+        ax.set_ylim((0, max(x2,y2)))
+        ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+        ax.set_title('Recognition vs fitted SH Environment map errors')
+        fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+        plt.close(fig)
+
+    directory = resultDir + 'shcoeffsserrors_fitted-shcoeffsserrors-' + str(methodFitNum) + '-'
+    # Show scatter correlations with occlusions.
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(np.mean(errorsLightCoeffs, axis=1), np.mean(errorsFittedLightCoeffs, axis=1), s=20,
+                      vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted SH coefficients errors')
+    ax.set_ylabel('Fitted SH coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted SH coefficients errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    if useShapeModel:
+        directory = resultDir + 'shapeparamserrors_fitted-shapeparamserrors-' + str(methodFitNum) + '-'
+        # Show scatter correlations with occlusions.
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+        scat = ax.scatter(np.mean(errorsShapeParams, axis=1), np.mean(errorsFittedShapeParams, axis=1), s=20,
+                          vmin=0, vmax=100, c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+        cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+        cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+        ax.set_xlabel('Predicted shape parameters errors')
+        ax.set_ylabel('Fitted shape parameters errors')
+        x1, x2 = ax.get_xlim()
+        y1, y2 = ax.get_ylim()
+        ax.set_xlim((0, max(x2,y2)))
+        ax.set_ylim((0, max(x2,y2)))
+        ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+        ax.set_title('Recognition vs fitted Shape parameters errors')
+        fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+        plt.close(fig)
+
+        if errorsShapeVertices is not None and  errorsFittedShapeVertices is not None:
+            directory = resultDir + 'shapeverticeserrors_fitted-shapeverticesserrors-' + str(methodFitNum) + '-'
+            # Show scatter correlations with occlusions.
+            fig = plt.figure()
+            ax = fig.add_subplot(111, aspect='equal')
+            scat = ax.scatter(errorsShapeVertices, errorsFittedShapeVertices, s=20, vmin=0, vmax=100,
+                              c=testOcclusions * 100, cmap=matplotlib.cm.plasma)
+            for test_i in range(len(errorsLightCoeffsC)):
+                if errorsFittedShapeVertices[test_i] > errorsShapeVertices[test_i] + 0.75:
+                    plt.annotate(
+                        str(test_i),
+                        xy=(errorsShapeVertices[test_i], errorsFittedShapeVertices[test_i]),
+                        xytext=(15, 15),
+                        textcoords='offset points', ha='right', va='bottom',
+                        arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'), size=8)
+            cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+            cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+            ax.set_xlabel('Predicted shape vertices errors')
+            ax.set_ylabel('Fitted shape vertices errors')
+            x1, x2 = ax.get_xlim()
+            y1, y2 = ax.get_ylim()
+            ax.set_xlim((0, max(x2,y2)))
+            ax.set_ylim((0, max(x2,y2)))
+            ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+            ax.set_title('Recognition vs fitted Shape parameters errors')
+            fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+            plt.close(fig)
+
+    directory = resultDir + 'vColorsE_fitted-vColorsE-' + str(methodFitNum) + '-'
+
+    # Show scatter correlations with occlusions.
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(errorsVColorsE, errorsFittedVColorsE, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted VColor E coefficients errors')
+    ax.set_ylabel('Fitted VColor E coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted vertex color errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'vColorsC_fitted-vColorsC-' + str(methodFitNum) + '-'
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(errorsVColorsC, errorsFittedVColorsC, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted vertex color errors')
+    ax.set_ylabel('Fitted vertex color errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2,y2)))
+    ax.set_ylim((0, max(x2,y2)))
+    ax.plot([0, max(x2,y2)], [0, max(x2,y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted vertex color errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+    directory = resultDir + 'vColorsS_fitted-vColorsS-' + str(methodFitNum) + '-'
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, aspect='equal')
+    scat = ax.scatter(errorsVColorsS, errorsFittedVColorsS, s=20, vmin=0, vmax=100, c=testOcclusions * 100,
+                      cmap=matplotlib.cm.plasma)
+    for test_i in range(len(errorsVColorsS)):
+        if errorsFittedVColorsS[test_i] > errorsVColorsS[test_i] + 0.1:
+            plt.annotate(
+                str(test_i),
+                xy=(errorsVColorsS[test_i], errorsFittedVColorsS[test_i]),
+                xytext=(15, 15),
+                textcoords='offset points', ha='right', va='bottom',
+                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'), size=8)
+    cbar = fig.colorbar(scat, ticks=[0, 50, 100])
+    cbar.ax.set_yticklabels(['0%', '50%', '100%'])  # vertically oriented colorbar
+    ax.set_xlabel('Predicted VColor coefficients errors')
+    ax.set_ylabel('Fitted VColor coefficients errors')
+    x1, x2 = ax.get_xlim()
+    y1, y2 = ax.get_ylim()
+    ax.set_xlim((0, max(x2, y2)))
+    ax.set_ylim((0, max(x2, y2)))
+    ax.plot([0, max(x2, y2)], [0, max(x2, y2)], ls="--", c=".3")
+    ax.set_title('Recognition vs fitted vertex color errors')
+    fig.savefig(directory + '-performance-scatter.pdf', bbox_inches='tight')
+    plt.close(fig)
 
 def saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMethodsIndices, meanLikelihoodArr):
 

@@ -39,8 +39,8 @@ useShapeModel = True
 renderOcclusions = False
 useOpenDR = True
 useBlender = True
-renderBlender = True
-captureEnvMapFromBlender = True
+renderBlender = False
+captureEnvMapFromBlender = False
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -806,11 +806,11 @@ if not renderFromPreviousGT:
 
                             if useBlender:
                                 import collision
-                                if collision.targetSceneCollision(teapot, scene, roomName, parentSupportObj):
-                                    ignore = True
-
-                                if collision.targetSceneCollision(mug, scene, roomName, parentSupportObj):
-                                    ignore = True
+                                # if collision.targetSceneCollision(teapot, scene, roomName, parentSupportObj):
+                                #     ignore = True
+                                #
+                                # if collision.targetSceneCollision(mug, scene, roomName, parentSupportObj):
+                                #     ignore = True
                             #
                             #     if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
                             #         ignore = True

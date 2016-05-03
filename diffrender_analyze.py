@@ -908,6 +908,8 @@ for occlusionLevel in [25,75,100]:
     errorsFittedVColorsS= errorsVColorsSList[robustIdx][setUnderOcclusionLevel]
     errorsFittedSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
 
+
+
     # azTop10 = np.argsort(errorsPoseFitted[0] - errorsPosePred[0])[:10]
     # elTop10 = np.argsort(errorsPoseFitted[1] - errorsPosePred[1])[:10]
     # vColorTop10 = np.argsort(errorsFittedVColorsC - errorsVColorsC)[:10]
@@ -961,6 +963,22 @@ for occlusionLevel in [25,75,100]:
     #     samples.write(str(segmentationTop10) + '\n')
 
     saveScatterPlots(resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS)
+
+    errorsPoseFitted =  [errorsPosePredList[5][0][setUnderOcclusionLevel], errorsPosePredList[5][1][setUnderOcclusionLevel]]
+    errorsFittedLightCoeffs = errorsLightCoeffsList[5][setUnderOcclusionLevel]
+    errorsFittedShapeParams = errorsShapeParamsList[5][setUnderOcclusionLevel]
+    errorsFittedShapeVertices= errorsShapeVerticesList[5][setUnderOcclusionLevel]
+    if errorsEnvMapList[recognitionIdx] is not None:
+        errorsFittedEnvMap = errorsEnvMapList[5][setUnderOcclusionLevel]
+    else:
+        errorsFittedEnvMap = None
+    errorsFittedLightCoeffsC= errorsLightCoeffsCList[5][setUnderOcclusionLevel]
+    errorsFittedVColorsE= errorsVColorsEList[5][setUnderOcclusionLevel]
+    errorsFittedVColorsC= errorsVColorsCList[5][setUnderOcclusionLevel]
+    errorsFittedVColorsS= errorsVColorsSList[5][setUnderOcclusionLevel]
+    errorsFittedSegmentation = errorsSegmentationList[5][setUnderOcclusionLevel]
+
+    saveScatterPlotsMethodFit(4, resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS)
 
     # saveLikelihoodScatter(resultDirOcclusion, setUnderOcclusionLevel, testOcclusions,  likelihoods)
 
