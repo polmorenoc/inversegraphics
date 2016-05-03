@@ -36,7 +36,7 @@ previousGTPrefix = 'train4_occlusion_shapemodel'
 #Main script options:
 renderFromPreviousGT = False
 useShapeModel = True
-renderOcclusions = True
+renderOcclusions = False
 useOpenDR = True
 useBlender = True
 renderBlender = True
@@ -50,7 +50,7 @@ loadSavedSH = False
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
-width, height = (150, 150)
+width, height = (200, 200)
 win = -1
 
 if useOpenDR:
@@ -705,7 +705,7 @@ if not renderFromPreviousGT:
                         parentSupportObj = scene.objects[str(parentIdx)]
                         supportWidthMax, supportWidthMin  = modelWidth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
                         supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
-                        supportRad = np.sqrt(0.5*(supportDepthMax - supportDepthMin)**2 + 0.5*(supportWidthMax - supportWidthMin)**2)/2
+                        supportRad = min(0.5*np.sqrt((supportDepthMax - supportDepthMin)**2), 0.5*np.min((supportWidthMax - supportWidthMin)**2))
 
                         chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.4))
                         chObjAzMugVals = np.random.uniform(0,np.pi*2)
@@ -796,8 +796,8 @@ if not renderFromPreviousGT:
                             vDistsMug = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded_mug].ravel()].ravel()] - cameraEye
 
                             #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
-                            minDistToObjects = 0.1
-                            maxDistToObjects = 1
+                            minDistToObjects = 0.2
+                            maxDistToObjects = 0.75
                             if np.min(np.linalg.norm(vDists, axis=1) <= clip_start) or np.min(np.linalg.norm(vDistsTeapot, axis=1) <= minDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) <= minDistToObjects):
                                 ignore = True
 
