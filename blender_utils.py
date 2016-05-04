@@ -448,6 +448,77 @@ def lin2srgb(im):
 import light_probes
 import imageio
 
+
+def createCubeScene(scene):
+    bpy.ops.scene.new(type='EMPTY')
+    bpy.context.scene.name = "CubeScene"
+    cubeScene = bpy.context.scene
+    cubeScene.camera = scene.camera
+    cubeScene.world = scene.world
+
+    for sceneInstanceIdx, sceneInstance in enumerate(scene.objects):
+        if sceneInstance.type == 'EMPTY':
+            # ipdb.set_trace()
+            minX1, maxX1 = modelWidth(sceneInstance.dupli_group.objects, mathutils.Matrix.Identity(4))
+            minY1, maxY1 = modelDepth(sceneInstance.dupli_group.objects, mathutils.Matrix.Identity(4))
+            minZ1, maxZ1 = modelHeight(sceneInstance.dupli_group.objects, mathutils.Matrix.Identity(4))
+
+            #
+            bpy.ops.mesh.primitive_cube_add()
+            cubeObj2 = bpy.context.object
+            cubeObj2.name = 'cube' + sceneInstance.name
+
+            cubeScale = mathutils.Matrix([[(maxX1 - minX1)/ 2, 0, 0, 0], [0, (maxY1 - minY1)/ 2, 0, 0], [0, 0, (maxZ1 - minZ1)/ 2, 0], [0, 0, 0, 1]])
+            cubeObj2.data.transform(cubeScale * mathutils.Matrix.Translation(mathutils.Vector((0,0,1))))
+
+            cubeObj2.data.update()
+            # cubeObj2.data.show_double_sided = True
+
+            bpy.ops.mesh.primitive_cube_add()
+            cubeObj = bpy.context.object
+            cubeObj.name = 'cube' + sceneInstance.name
+
+            import bmesh
+            bm = bmesh.new()
+
+            bm.from_mesh(cubeObj.data)   # fill it in from a Mesh
+            bm.verts.ensure_lookup_table()
+
+            bm.verts[0].co = mathutils.Vector((minX1, minY1, minZ1))
+            bm.verts[1].co = mathutils.Vector((minX1, minY1, maxZ1))
+            bm.verts[2].co = mathutils.Vector((minX1, maxY1, minZ1))
+            bm.verts[3].co = mathutils.Vector((minX1, maxY1, maxZ1))
+            bm.verts[4].co = mathutils.Vector((maxX1, minY1, minZ1))
+            bm.verts[5].co = mathutils.Vector((maxX1, minY1, maxZ1))
+            bm.verts[6].co = mathutils.Vector((maxX1, maxY1, minZ1))
+            bm.verts[7].co = mathutils.Vector((maxX1, maxY1, maxZ1))
+
+            # Finish up, write the bmesh back to the mesh
+
+            # cubeObj.data.vertices[0].co = mathutils.Vector((minX1, minY1, minZ1))
+            # cubeObj.data.vertices[1].co = mathutils.Vector((minX1, minY1, maxZ1))
+            # cubeObj.data.vertices[2].co = mathutils.Vector((minX1, maxY1, minZ1))
+            # cubeObj.data.vertices[3].co = mathutils.Vector((minX1, maxY1, maxZ1))
+            # cubeObj.data.vertices[4].co = mathutils.Vector((maxX1, minY1, minZ1))
+            # cubeObj.data.vertices[5].co = mathutils.Vector((maxX1, minY1, maxZ1))
+            # cubeObj.data.vertices[6].co = mathutils.Vector((maxX1, maxY1, minZ1))
+            # cubeObj.data.vertices[7].co = mathutils.Vector((maxX1, maxY1, maxZ1))
+
+            bm.to_mesh(cubeObj.data)
+            cubeObj.matrix_world = sceneInstance.matrix_world
+
+            cubeObj.data.update()
+            cubeObj.data.show_double_sided = True
+
+            cubeScene.update()
+
+            ipdb.set_trace()
+
+
+
+            # cubeScene.objects.link(cubeObj)
+    return cubeScene
+
 def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, cyclesSamples=3000, gtDir='', train_i=0):
     envMapTexture = cv2.resize(src=envMapTexture, dsize=(360, 180))
     # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
