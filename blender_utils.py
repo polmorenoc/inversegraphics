@@ -407,6 +407,11 @@ def deleteInstance(instance):
     instance.user_clear()
     bpy.data.objects.remove(instance)
 
+def deleteObject(object):
+
+    object.user_clear()
+    bpy.data.objects.remove(object)
+
 
 def placeNewTarget(scene, target, targetPosition):
     target.layers[1] = True
@@ -447,6 +452,105 @@ def lin2srgb(im):
 
 import light_probes
 import imageio
+def sortface(f):
+
+
+    if len(f) != 4:
+        return f
+    v=[mathutils.Vector(list(p)) for p in f]
+    v2m0=v[2]-v[0]
+    # The normal of the plane
+    v1m0 = v[1] - v[0]
+    n=v1m0.cross(v2m0)
+    #k=DotVecs(v[0],n)
+    #if DotVecs(v[3],n) != k:
+    #  raise ValueError("Not Coplanar")
+    # Well, the above test would be a good hint to make triangles.
+    # Get a vector pointing along the plane perpendicular to v[0]-v[2]
+    n2=n.cross(v2m0)
+    # Get the respective distances along that line
+    k=[p.dot(n2) for p in v[1:]]
+    # Check if the vertices are on the proper side
+    cmp = lambda x, y: (x > y) - (x < y)
+
+    if cmp(k[1],k[0]) == cmp(k[1],k[2]):
+        #print "Bad",v
+        f.v=[f[0],f[2],f[3],f[1]]
+
+def getCubeObj(instance):
+    minX1, maxX1 = modelWidth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
+    minY1, maxY1 = modelDepth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
+    minZ1, maxZ1 = modelHeight(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
+
+    ob = instance.dupli_group.objects[0]
+    bbox = [ob.matrix_world * mathutils.Vector(corner) for corner in ob.bound_box]
+
+    #
+    # bpy.ops.mesh.primitive_cube_add()
+    # cubeObj2 = bpy.context.object
+    # cubeObj2.name = 'cube' + instance.name
+    #
+    # cubeScale = mathutils.Matrix([[(maxX1 - minX1)/ 2, 0, 0, 0], [0, (maxY1 - minY1)/ 2, 0, 0], [0, 0, (maxZ1 - minZ1)/ 2, 0], [0, 0, 0, 1]])
+    # cubeObj2.data.transform(cubeScale * mathutils.Matrix.Translation(mathutils.Vector((0,0,1))))
+    #
+    # cubeObj2.data.update()
+    # cubeObj2.data.show_double_sided = True
+    #
+    # cubeObj2.matrix_world = instance.matrix_world
+
+    mesh = bpy.data.meshes.new('meshCube' + instance.name)
+    cubeObj = bpy.data.objects.new('cube' + instance.name, mesh)
+    # cubeObj.name = 'cube' + instance.name
+
+    import bmesh
+    bm = bmesh.new()
+
+    # bm.from_mesh(cubeObj.data)   # fill it in from a Mesh
+    bm.verts.ensure_lookup_table()
+
+    # for v_co in bm.verts.new((v_co))
+    #
+    bm.verts.new(bbox[0])
+    bm.verts.new(bbox[1])
+    bm.verts.new(bbox[2])
+    bm.verts.new(bbox[3])
+    bm.verts.new(bbox[4])
+    bm.verts.new(bbox[5])
+    bm.verts.new(bbox[6])
+    bm.verts.new(bbox[7])
+
+    faces = [(3, 7, 6, 2),
+             (6, 5, 4, 7),
+             (5, 1, 0, 4),
+             (4, 7, 3, 0),
+             (5, 6, 2, 1),
+             (1, 3, 2, 0),
+             ]
+
+    # faces = [(1, 2, 3, 0),
+    #          (5, 6, 7, 4),
+    #          (1, 2, 6, 5),
+    #          (0, 3, 7, 4),
+    #          (1, 0, 4, 5),
+    #          (2, 3, 7, 6),
+    #          ]
+
+    bm.verts.ensure_lookup_table()
+    bm.faces.ensure_lookup_table()
+    for f_idx in faces:
+        bm.faces.new([bm.verts[i] for i in f_idx])
+
+    # ipdb.set_trace()
+    # Finish up, write the bmesh back to the mesh
+
+    bm.to_mesh(cubeObj.data)
+
+    cubeObj.matrix_world = instance.matrix_world
+
+    cubeObj.data.update()
+    cubeObj.data.show_double_sided = True
+
+    return cubeObj
 
 
 def createCubeScene(scene):
@@ -459,64 +563,13 @@ def createCubeScene(scene):
     for sceneInstanceIdx, sceneInstance in enumerate(scene.objects):
         if sceneInstance.type == 'EMPTY':
             # ipdb.set_trace()
-            minX1, maxX1 = modelWidth(sceneInstance.dupli_group.objects, mathutils.Matrix.Identity(4))
-            minY1, maxY1 = modelDepth(sceneInstance.dupli_group.objects, mathutils.Matrix.Identity(4))
-            minZ1, maxZ1 = modelHeight(sceneInstance.dupli_group.objects, mathutils.Matrix.Identity(4))
 
-            #
-            bpy.ops.mesh.primitive_cube_add()
-            cubeObj2 = bpy.context.object
-            cubeObj2.name = 'cube' + sceneInstance.name
+            cubeObj = getCubeObj(sceneInstance)
 
-            cubeScale = mathutils.Matrix([[(maxX1 - minX1)/ 2, 0, 0, 0], [0, (maxY1 - minY1)/ 2, 0, 0], [0, 0, (maxZ1 - minZ1)/ 2, 0], [0, 0, 0, 1]])
-            cubeObj2.data.transform(cubeScale * mathutils.Matrix.Translation(mathutils.Vector((0,0,1))))
-
-            cubeObj2.data.update()
-            # cubeObj2.data.show_double_sided = True
-
-            bpy.ops.mesh.primitive_cube_add()
-            cubeObj = bpy.context.object
-            cubeObj.name = 'cube' + sceneInstance.name
-
-            import bmesh
-            bm = bmesh.new()
-
-            bm.from_mesh(cubeObj.data)   # fill it in from a Mesh
-            bm.verts.ensure_lookup_table()
-
-            bm.verts[0].co = mathutils.Vector((minX1, minY1, minZ1))
-            bm.verts[1].co = mathutils.Vector((minX1, minY1, maxZ1))
-            bm.verts[2].co = mathutils.Vector((minX1, maxY1, minZ1))
-            bm.verts[3].co = mathutils.Vector((minX1, maxY1, maxZ1))
-            bm.verts[4].co = mathutils.Vector((maxX1, minY1, minZ1))
-            bm.verts[5].co = mathutils.Vector((maxX1, minY1, maxZ1))
-            bm.verts[6].co = mathutils.Vector((maxX1, maxY1, minZ1))
-            bm.verts[7].co = mathutils.Vector((maxX1, maxY1, maxZ1))
-
-            # Finish up, write the bmesh back to the mesh
-
-            # cubeObj.data.vertices[0].co = mathutils.Vector((minX1, minY1, minZ1))
-            # cubeObj.data.vertices[1].co = mathutils.Vector((minX1, minY1, maxZ1))
-            # cubeObj.data.vertices[2].co = mathutils.Vector((minX1, maxY1, minZ1))
-            # cubeObj.data.vertices[3].co = mathutils.Vector((minX1, maxY1, maxZ1))
-            # cubeObj.data.vertices[4].co = mathutils.Vector((maxX1, minY1, minZ1))
-            # cubeObj.data.vertices[5].co = mathutils.Vector((maxX1, minY1, maxZ1))
-            # cubeObj.data.vertices[6].co = mathutils.Vector((maxX1, maxY1, minZ1))
-            # cubeObj.data.vertices[7].co = mathutils.Vector((maxX1, maxY1, maxZ1))
-
-            bm.to_mesh(cubeObj.data)
-            cubeObj.matrix_world = sceneInstance.matrix_world
-
-            cubeObj.data.update()
-            cubeObj.data.show_double_sided = True
+            cubeScene.objects.link(cubeObj)
 
             cubeScene.update()
 
-            ipdb.set_trace()
-
-
-
-            # cubeScene.objects.link(cubeObj)
     return cubeScene
 
 def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, cyclesSamples=3000, gtDir='', train_i=0):

@@ -522,9 +522,11 @@ if not renderFromPreviousGT:
                 mugModels = mugModels + [mug]
                 blender_mugs = blender_mugs + [mug]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 1000, 'CUDA', 'CUDA_0')
+            setupSceneGroundtruth(scene, width, height, clip_start, 250, 'CUDA', 'CUDA_0')
 
             treeNodes = scene.world.node_tree
+
+            cubeScene = createCubeScene(scene)
 
             links = treeNodes.links
 
@@ -769,6 +771,40 @@ if not renderFromPreviousGT:
                         chObjRotationMug[:] = chObjRotationMugVals
                         chVColorsMug[:] = chVColorsMugVals
 
+                        if useBlender and not ignore:
+
+                            azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
+
+                            teapot.matrix_world = mathutils.Matrix.Translation(
+                                original_matrix_world.to_translation() + mathutils.Vector(
+                                    teapotPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(
+                                -original_matrix_world.to_translation())) * original_matrix_world
+
+                            placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi,
+                                        chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(),
+                                        center[:].copy() + targetPosition[:].copy())
+
+                            setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
+
+                            setObjectDiffuseColor(mug, chVColorsMug.r.copy())
+
+                            azimuthRotMug = mathutils.Matrix.Rotation(chObjAzMug.r[:].copy() - np.pi / 2, 4, 'Z')
+
+                            mug.matrix_world = mathutils.Matrix.Translation(
+                                original_matrix_world_mug.to_translation() + mathutils.Vector(
+                                    mugPosOffset.r)) * azimuthRotMug * (mathutils.Matrix.Translation(
+                                -original_matrix_world_mug.to_translation())) * original_matrix_world_mug
+
+                            if useShapeModel:
+                                mesh = teapot.dupli_group.objects[0]
+                                for vertex_i, vertex in enumerate(mesh.data.vertices):
+                                    vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
+
+                            scene.update()
+
+
+                            # setEnviornmentMapStrength(10, cubeScene)
+
                         ## Some validation checks:
 
                         if useOpenDR:
@@ -795,7 +831,7 @@ if not renderFromPreviousGT:
                             vDistsMug = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded_mug].ravel()].ravel()] - cameraEye
 
                             #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
-                            minDistToObjects = 0.2
+                            minDistToObjects = 0.3
                             maxDistToObjects = 0.75
                             if np.min(np.linalg.norm(vDists, axis=1) <= clip_start) or np.min(np.linalg.norm(vDistsTeapot, axis=1) <= minDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) <= minDistToObjects):
                                 ignore = True
@@ -803,19 +839,37 @@ if not renderFromPreviousGT:
                             if np.min(np.linalg.norm(vDistsTeapot, axis=1) > maxDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) > maxDistToObjects):
                                 ignore = True
 
-                            # if useBlender:
-                            #     import collision
-                                # if collision.targetSceneCollision(teapot, scene, roomName, parentSupportObj):
+                            if useBlender:
+                                import collision
+
+                                cubeTeapot = getCubeObj(teapot)
+                                cubeMug = getCubeObj(mug)
+
+                                cubeScene.objects.link(cubeTeapot)
+                                cubeScene.objects.link(cubeMug)
+
+                                cubeParentSupportObj = cubeScene.objects['cube'+str(parentIdx)]
+                                cubeScene.update()
+
+                                if collision.targetCubeSceneCollision(cubeTeapot, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
+                                    ignore = ignore
+                                    # pass
+
+                                if collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
+                                    ignore = ignore
+                                    # pass
+
+
+                                # if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
                                 #     ignore = True
                                 #
-                                # if collision.targetSceneCollision(mug, scene, roomName, parentSupportObj):
+                                # if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*mug.matrix_world, mug.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
                                 #     ignore = True
-                            #
-                            #     if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
-                            #         ignore = True
-                            #
-                            #     if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*mug.matrix_world, mug.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
-                            #         ignore = True
+
+                                cubeScene.objects.unlink(cubeTeapot)
+                                cubeScene.objects.unlink(cubeMug)
+                                deleteObject(cubeTeapot)
+                                deleteObject(cubeMug)
 
                         ## Environment map update if using Cycles.
 
@@ -836,30 +890,6 @@ if not renderFromPreviousGT:
                             envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset),
                                                                envMapCoeffs[[0, 3, 2, 1, 4, 5, 6, 7, 8]])[[0, 3, 2, 1, 4, 5, 6, 7, 8]]
 
-                        if useBlender and not ignore:
-
-                            azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
-
-                            teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation() + mathutils.Vector(teapotPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
-
-                            placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi, chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(), center[:].copy() + targetPosition[:].copy())
-
-                            setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
-
-                            setObjectDiffuseColor(mug, chVColorsMug.r.copy())
-
-                            azimuthRotMug = mathutils.Matrix.Rotation(chObjAzMug.r[:].copy() - np.pi/2, 4, 'Z')
-
-                            mug.matrix_world = mathutils.Matrix.Translation(original_matrix_world_mug.to_translation() + mathutils.Vector(mugPosOffset.r)) * azimuthRotMug * (mathutils.Matrix.Translation(-original_matrix_world_mug.to_translation())) * original_matrix_world_mug
-
-                            if useShapeModel:
-                                mesh = teapot.dupli_group.objects[0]
-                                for vertex_i, vertex in enumerate(mesh.data.vertices):
-                                    vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
-
-                            scene.update()
-
-                            cubeScene = createCubeScene(scene)
 
                             # ipdb.set_trace()
 
@@ -922,14 +952,11 @@ if not renderFromPreviousGT:
                             lin2srgb(image)
 
                         if not ignore:
-                            # hogs = hogs + [imageproc.computeHoG(image).reshape([1,-1])]
-                            # illumfeats = illumfeats + [imageproc.featuresIlluminationDirection(image,20)]
 
                             if useOpenDR:
                                 cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg',
                                             255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-                            # cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg' , 255*image[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
                             if useOpenDR:
                                 np.save(gtDir + 'masks_occlusion/mask' + str(train_i) + '.npy', vis_occluded)
 
