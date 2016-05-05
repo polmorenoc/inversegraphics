@@ -142,7 +142,8 @@ def targetCubeSceneCollision(target, scene, roomName, targetParentInstance):
     # bpy.ops.mesh.primitive_cube_add
     for sceneInstance in scene.objects:
         if sceneInstance.type == 'MESH' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
-            if instancesIntersect(target.matrix_world, [target], sceneInstance.matrix_world, [sceneInstance]):
+
+            if instancesIntersect(mathutils.Matrix.Identity(4), [target], mathutils.Matrix.Identity(4), [sceneInstance]):
 
                 return True
 

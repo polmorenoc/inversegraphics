@@ -522,11 +522,11 @@ if not renderFromPreviousGT:
                 mugModels = mugModels + [mug]
                 blender_mugs = blender_mugs + [mug]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 250, 'CUDA', 'CUDA_0')
+            setupSceneGroundtruth(scene, width, height, clip_start, 1000, 'CUDA', 'CUDA_0')
 
             treeNodes = scene.world.node_tree
 
-            cubeScene = createCubeScene(scene)
+
 
             links = treeNodes.links
 
@@ -553,6 +553,8 @@ if not renderFromPreviousGT:
                     scene.objects.link(unlinkedObj)
                 unlinkedObj = scene.objects[str(targetIndex)]
                 scene.objects.unlink(unlinkedObj)
+
+                cubeScene = createCubeScene(scene)
 
             if not collisions[targetIndex][1]:
                 continue
@@ -803,8 +805,6 @@ if not renderFromPreviousGT:
                             scene.update()
 
 
-                            # setEnviornmentMapStrength(10, cubeScene)
-
                         ## Some validation checks:
 
                         if useOpenDR:
@@ -851,12 +851,13 @@ if not renderFromPreviousGT:
                                 cubeParentSupportObj = cubeScene.objects['cube'+str(parentIdx)]
                                 cubeScene.update()
 
+
                                 if collision.targetCubeSceneCollision(cubeTeapot, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
-                                    ignore = ignore
+                                    ignore = True
                                     # pass
 
                                 if collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
-                                    ignore = ignore
+                                    ignore = True
                                     # pass
 
 
@@ -866,10 +867,6 @@ if not renderFromPreviousGT:
                                 # if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*mug.matrix_world, mug.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
                                 #     ignore = True
 
-                                cubeScene.objects.unlink(cubeTeapot)
-                                cubeScene.objects.unlink(cubeMug)
-                                deleteObject(cubeTeapot)
-                                deleteObject(cubeMug)
 
                         ## Environment map update if using Cycles.
 
@@ -891,61 +888,68 @@ if not renderFromPreviousGT:
                                                                envMapCoeffs[[0, 3, 2, 1, 4, 5, 6, 7, 8]])[[0, 3, 2, 1, 4, 5, 6, 7, 8]]
 
 
-                            # ipdb.set_trace()
+                        # ipdb.set_trace()
 
-                            if renderBlender:
-                                bpy.ops.render.render(write_still=True)
+                        if renderBlender and not ignore:
+                            # bpy.context.screen.scene = scene
+                            setEnviornmentMapStrength(10, cubeScene)
+                            bpy.ops.render.render(write_still=True)
 
-                                image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
-                                image[image > 1] = 1
-                                blenderRender = image
+                            cubeScene.objects.unlink(cubeTeapot)
+                            cubeScene.objects.unlink(cubeMug)
+                            deleteObject(cubeTeapot)
+                            deleteObject(cubeMug)
 
-                                lin2srgb(blenderRender)
+                            image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
+                            image[image > 1] = 1
+                            blenderRender = image
 
-                                cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg', 255 * blenderRender[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-                                if captureEnvMapFromBlender:
-                                    blenderRenderGray = 0.3 * blenderRender[:, :, 0] + 0.59 * blenderRender[:, :,
-                                                                                              1] + 0.11 * blenderRender[:, :, 2]
+                            lin2srgb(blenderRender)
 
-                                    # For some reason I need to correct average intensity in OpenDR a few times before it gets it right:
+                            cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg', 255 * blenderRender[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                            if captureEnvMapFromBlender:
+                                blenderRenderGray = 0.3 * blenderRender[:, :, 0] + 0.59 * blenderRender[:, :,
+                                                                                          1] + 0.11 * blenderRender[:, :, 2]
 
-                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                         :]
-                                    meanIntensityScale = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                        rendererGTGray[vis_occluded]).copy()
-                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale
+                                # For some reason I need to correct average intensity in OpenDR a few times before it gets it right:
 
-                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                         :]
-                                    meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                        rendererGTGray[vis_occluded]).copy()
-                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale2
+                                rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                         :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                     :]
+                                meanIntensityScale = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                    rendererGTGray[vis_occluded]).copy()
+                                chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale
 
-                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                         :]
-                                    meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                        rendererGTGray[vis_occluded]).copy()
-                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale3
+                                rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                         :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                     :]
+                                meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                    rendererGTGray[vis_occluded]).copy()
+                                chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale2
 
-                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                         :]
-                                    meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                        rendererGTGray[vis_occluded]).copy()
-                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale4
+                                rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                         :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                     :]
+                                meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                    rendererGTGray[vis_occluded]).copy()
+                                chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale3
 
-                                    rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
-                                                                                             :] + 0.11 * rendererGT[:, :, 2].r[
-                                                                                                         :]
-                                    meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
-                                        rendererGTGray[vis_occluded]).copy()
-                                    chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale5
+                                rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                         :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                     :]
+                                meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                    rendererGTGray[vis_occluded]).copy()
+                                chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale4
 
-                                    if np.mean(rendererGTGray, axis=(0, 1)) < 0.01:
-                                        ignore = True
+                                rendererGTGray = 0.3 * rendererGT[:, :, 0].r[:] + 0.59 * rendererGT[:, :, 1].r[
+                                                                                         :] + 0.11 * rendererGT[:, :, 2].r[
+                                                                                                     :]
+                                meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded]) / np.mean(
+                                    rendererGTGray[vis_occluded]).copy()
+                                chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy() * meanIntensityScale5
+
+                                if np.mean(rendererGTGray, axis=(0, 1)) < 0.01:
+                                    ignore = True
 
                         if useOpenDR:
                             image = rendererGT.r[:].copy()
