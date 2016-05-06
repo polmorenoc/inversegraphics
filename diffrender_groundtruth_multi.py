@@ -805,15 +805,14 @@ if not renderFromPreviousGT:
                         except:
                             chShapeParamsGT[:] = np.random.randn(latentDim)
 
-                        ipdb.set_trace()
                         teapotPlacement = np.random.choice(instantiationBins.sum())
 
                         mugPlacement = np.random.choice(instantiationBinsMug.sum())
 
-                        chObjDistGTVals = totalBins[0].ravel()[instantiationBins].ravel()[teapotPlacement]
-                        chObjRotationGTVals = totalBins[1].ravel()[instantiationBins].ravel()[teapotPlacement]
-                        chObjDistMugVals = totalBinsMug[0][instantiationBinsMug].ravel()[mugPlacement]
-                        chObjRotationMugVals = totalBinsMug[1][instantiationBinsMug].ravel()[mugPlacement]
+                        chObjDistGTVals = totalBins[0].ravel()[instantiationBins][teapotPlacement]
+                        chObjRotationGTVals = totalBins[1].ravel()[instantiationBins][teapotPlacement]
+                        chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMug][mugPlacement]
+                        chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMug][mugPlacement]
 
                         chObjAzMug[:] = chObjAzMugVals
 
@@ -821,6 +820,7 @@ if not renderFromPreviousGT:
                         chObjRotationGT[:] = chObjRotationGTVals
                         chObjDistMug[:] = chObjDistMugVals
                         chObjRotationMug[:] = chObjRotationMugVals
+
                         chVColorsMug[:] = chVColorsMugVals
 
                         if useBlender and not ignore:
