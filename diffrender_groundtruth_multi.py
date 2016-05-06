@@ -23,6 +23,7 @@ import light_probes
 import imageio
 from OpenGL import contextdata
 from light_probes import SHProjection
+import collision
 import copy
 
 plt.ion()
@@ -34,13 +35,15 @@ prefix = 'train4_occlusion_multi'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
+
 renderFromPreviousGT = False
 useShapeModel = True
 renderOcclusions = False
 useOpenDR = True
 useBlender = True
-renderBlender = True
+renderBlender = False
 captureEnvMapFromBlender = False
+parseSceneInstantiations = True
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -526,14 +529,12 @@ if not renderFromPreviousGT:
 
             treeNodes = scene.world.node_tree
 
-
-
             links = treeNodes.links
 
-        unlinkedObj = None
-        envMapFilename = None
+            cubeScene = createCubeScene(scene)
 
         unlinkedObj = None
+        unlinkedCubeObj = None
         envMapFilename = None
 
         for targetidx, targetIndex in enumerate(targetIndices):
@@ -551,10 +552,12 @@ if not renderFromPreviousGT:
             if useBlender:
                 if unlinkedObj != None:
                     scene.objects.link(unlinkedObj)
+                    cubeScene.objects.link(unlinkedCubeObj)
                 unlinkedObj = scene.objects[str(targetIndex)]
+                unlinkedCubeObj = cubeScene.objects['cube' + str(targetIndex)]
                 scene.objects.unlink(unlinkedObj)
+                cubeScene.objects.unlink(unlinkedCubeObj)
 
-                cubeScene = createCubeScene(scene)
 
             if not collisions[targetIndex][1]:
                 continue
@@ -669,8 +672,8 @@ if not renderFromPreviousGT:
                     mug = blender_mugs[currentTeapotModel]
                     # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
 
-                    placeNewTarget(scene, teapot, targetPosition[:].copy() + teapotPosOffset)
-                    placeNewTarget(scene, mug, targetPosition[:].copy() + mugPosOffset)
+                    placeNewTarget(scene, teapot, targetPosition[:].copy())
+                    placeNewTarget(scene, mug, targetPosition[:].copy())
 
                     teapot.layers[1] = True
                     teapot.layers[0] = True
@@ -682,6 +685,46 @@ if not renderFromPreviousGT:
                     # mug.matrix_world = mug.matrix_world
 
                     original_matrix_world_mug = mug.matrix_world.copy()
+
+                    parentIdx = instances[targetIndex][1]
+                    parentSupportObj = scene.objects[str(parentIdx)]
+                    supportWidthMax, supportWidthMin = modelWidth(parentSupportObj.dupli_group.objects,
+                                                                  parentSupportObj.matrix_world)
+                    supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects,
+                                                                  parentSupportObj.matrix_world)
+                    supportRad = min(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2),0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
+                    supportRad = np.sqrt(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2) + 0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
+
+                    if parseSceneInstantiations:
+
+
+                        cubeTeapot = getCubeObj(teapot)
+                        cubeMug = getCubeObj(mug)
+
+                        cubeScene.objects.link(cubeTeapot)
+                        cubeScene.objects.link(cubeMug)
+
+                        cubeParentSupportObj = cubeScene.objects['cube' + str(parentIdx)]
+                        cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
+                        cubeScene.update()
+
+                        distRange = supportRad
+                        distInterval = 0.1
+                        rotationRange = 2*np.pi
+                        rotationInterval = 10*np.pi/180
+
+                        instantiationBins, totalBins = collision.parseSceneCollisions(cubeTeapot, cubeScene, teapotPosOffset, chObjDistGT, chObjRotationGT, cubeParentSupportObj, cubeRoomObj, distRange, rotationRange, distInterval, rotationInterval)
+
+                        instantiationBinsMug, totalBinsMug = collision.parseSceneCollisions(cubeMug, cubeScene, mugPosOffset,
+                                                                           chObjDistMug, chObjRotationMug,
+                                                                           cubeParentSupportObj, cubeRoomObj, distRange,
+                                                                           rotationRange, distInterval,
+                                                                           rotationInterval)
+
+                        cubeScene.objects.unlink(cubeTeapot)
+                        cubeScene.objects.unlink(cubeMug)
+                        deleteObject(cubeTeapot)
+                        deleteObject(cubeMug)
 
                 for hdrFile, hdrValues in hdrstorender:
                     hdridx = hdrValues[0]
@@ -705,11 +748,7 @@ if not renderFromPreviousGT:
                         chObjAzGTVals = objAzGT.copy()
                         chObjAzGTVals = np.random.uniform(0,np.pi*2)
 
-                        parentIdx = instances[targetIndex][1]
-                        parentSupportObj = scene.objects[str(parentIdx)]
-                        supportWidthMax, supportWidthMin  = modelWidth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
-                        supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects, parentSupportObj.matrix_world)
-                        supportRad = min(0.5*np.sqrt((supportDepthMax - supportDepthMin)**2), 0.5*np.min((supportWidthMax - supportWidthMin)**2))
+
 
                         chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.4))
                         chObjAzMugVals = np.random.uniform(0,np.pi*2)
@@ -766,9 +805,20 @@ if not renderFromPreviousGT:
                         except:
                             chShapeParamsGT[:] = np.random.randn(latentDim)
 
+                        ipdb.set_trace()
+                        teapotPlacement = np.random.choice(instantiationBins.sum())
+
+                        mugPlacement = np.random.choice(instantiationBinsMug.sum())
+
+                        chObjDistGTVals = totalBins[0].ravel()[instantiationBins].ravel()[teapotPlacement]
+                        chObjRotationGTVals = totalBins[1].ravel()[instantiationBins].ravel()[teapotPlacement]
+                        chObjDistMugVals = totalBinsMug[0][instantiationBinsMug].ravel()[mugPlacement]
+                        chObjRotationMugVals = totalBinsMug[1][instantiationBinsMug].ravel()[mugPlacement]
+
+                        chObjAzMug[:] = chObjAzMugVals
+
                         chObjDistGT[:] = chObjDistGTVals
                         chObjRotationGT[:] = chObjRotationGTVals
-                        chObjAzMug[:] = chObjAzMugVals
                         chObjDistMug[:] = chObjDistMugVals
                         chObjRotationMug[:] = chObjRotationMugVals
                         chVColorsMug[:] = chVColorsMugVals
@@ -777,10 +827,7 @@ if not renderFromPreviousGT:
 
                             azimuthRot = mathutils.Matrix.Rotation(chObjAzGT.r[:].copy(), 4, 'Z')
 
-                            teapot.matrix_world = mathutils.Matrix.Translation(
-                                original_matrix_world.to_translation() + mathutils.Vector(
-                                    teapotPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(
-                                -original_matrix_world.to_translation())) * original_matrix_world
+                            teapot.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation() + mathutils.Vector(teapotPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
 
                             placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi,
                                         chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(),
@@ -792,10 +839,7 @@ if not renderFromPreviousGT:
 
                             azimuthRotMug = mathutils.Matrix.Rotation(chObjAzMug.r[:].copy() - np.pi / 2, 4, 'Z')
 
-                            mug.matrix_world = mathutils.Matrix.Translation(
-                                original_matrix_world_mug.to_translation() + mathutils.Vector(
-                                    mugPosOffset.r)) * azimuthRotMug * (mathutils.Matrix.Translation(
-                                -original_matrix_world_mug.to_translation())) * original_matrix_world_mug
+                            mug.matrix_world = mathutils.Matrix.Translation(original_matrix_world_mug.to_translation() + mathutils.Vector(mugPosOffset.r)) * azimuthRotMug * (mathutils.Matrix.Translation(-original_matrix_world_mug.to_translation())) * original_matrix_world_mug
 
                             if useShapeModel:
                                 mesh = teapot.dupli_group.objects[0]
@@ -814,11 +858,23 @@ if not renderFromPreviousGT:
                             vis_occluded = np.array(rendererGT.indices_image == 1).copy().astype(np.bool)
                             vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
 
-                            vis_occluded_mug = np.array(rendererGT.indices_image == 1).copy().astype(np.bool)
-                            vis_im_mug = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+                            vis_occluded_mug = np.array(rendererGT.indices_image == 2).copy().astype(np.bool)
+                            vis_im_mug = np.array(rendererGT.image_mesh_bool([1])).copy().astype(np.bool)
+
 
                         if occlusion > 0.9 or occlusionMug > 0.9 or np.isnan(occlusion) or np.isnan(occlusionMug):
                             ignore = True
+
+                        if vis_occluded.sum() < 10 or vis_occluded_mug.sum() < 10:
+                            ignore = True
+
+                        #Check that objects are not only partly in the viewing plane of the camera:
+                        if np.sum(vis_im_mug[:,0]) > 1 or np.sum(vis_im_mug[0,:]) > 1 or np.sum(vis_im_mug[:,-1]) > 1 or np.sum(vis_im_mug[-1,:]) > 1:
+                            ignore = True
+
+                        if np.sum(vis_im[:,0]) > 1 or np.sum(vis_im[0,:]) > 1 or np.sum(vis_im[:,-1]) > 1 or np.sum(vis_im[-1,:]) > 1:
+                            ignore = True
+
 
                         if not ignore:
                             # Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
@@ -840,7 +896,7 @@ if not renderFromPreviousGT:
                                 ignore = True
 
                             if useBlender:
-                                import collision
+
 
                                 cubeTeapot = getCubeObj(teapot)
                                 cubeMug = getCubeObj(mug)
@@ -849,18 +905,63 @@ if not renderFromPreviousGT:
                                 cubeScene.objects.link(cubeMug)
 
                                 cubeParentSupportObj = cubeScene.objects['cube'+str(parentIdx)]
+                                cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
                                 cubeScene.update()
 
-
                                 if collision.targetCubeSceneCollision(cubeTeapot, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
+                                    print("Teapot intersects with an object.")
                                     ignore = True
                                     # pass
 
-                                if collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
+                                if not ignore and collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
+                                    print("Mug intersects with an object.")
                                     ignore = True
                                     # pass
 
+                                if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                                    print("Teapot not on table.")
+                                    ignore = True
 
+                                if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                                    print("Mug not on table.")
+                                    ignore = True
+
+                                if collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                                    print("Teapot interesects supporting object.")
+                                    ignore = True
+
+                                if collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                                    print("Mug intersects supporting object")
+                                    ignore = True
+
+                                # ipdb.set_trace()
+                                if collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeRoomObj]):
+                                    print("Teapot intersects room")
+                                    ignore = True
+
+                                if collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeMug], mathutils.Matrix.Identity(4), [cubeRoomObj]):
+                                    print("Mug intersects room")
+                                    ignore = True
+
+                                if not ignore:
+                                    print("No collision issues")
+
+                                # setEnviornmentMapStrength(10, cubeScene)
+
+                                # bpy.ops.render.render(write_still=True)
+
+                                # image = np.array(imageio.imread(cubeScene.render.filepath))[:, :, 0:3]
+                                # image[image > 1] = 1
+                                # blenderRender = image
+
+                                # lin2srgb(blenderRender)
+                                #
+                                # cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg', 255 * blenderRender[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+                                cubeScene.objects.unlink(cubeTeapot)
+                                cubeScene.objects.unlink(cubeMug)
+                                deleteObject(cubeTeapot)
+                                deleteObject(cubeMug)
                                 # if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
                                 #     ignore = True
                                 #
@@ -891,14 +992,9 @@ if not renderFromPreviousGT:
                         # ipdb.set_trace()
 
                         if renderBlender and not ignore:
-                            # bpy.context.screen.scene = scene
-                            setEnviornmentMapStrength(10, cubeScene)
-                            bpy.ops.render.render(write_still=True)
+                            bpy.context.screen.scene = scene
 
-                            cubeScene.objects.unlink(cubeTeapot)
-                            cubeScene.objects.unlink(cubeMug)
-                            deleteObject(cubeTeapot)
-                            deleteObject(cubeMug)
+                            bpy.ops.render.render(write_still=True)
 
                             image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
                             image[image > 1] = 1
@@ -958,8 +1054,7 @@ if not renderFromPreviousGT:
                         if not ignore:
 
                             if useOpenDR:
-                                cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg',
-                                            255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                                cv2.imwrite(gtDir + 'images_opendr/im' + str(train_i) + '.jpeg', 255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
                             if useOpenDR:
                                 np.save(gtDir + 'masks_occlusion/mask' + str(train_i) + '.npy', vis_occluded)

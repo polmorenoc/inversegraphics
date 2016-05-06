@@ -116,15 +116,15 @@ def bmesh_check_intersect_objects(obj, objTransf,  obj2, obj2Transf):
 def instancesIntersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
 
     if aabb_intersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
-        print ("AABB intersection!")
+        # print ("AABB intersection!")
         for mesh1 in instanceObjs1:
             for mesh2 in instanceObjs2:
                 if bmesh_check_intersect_objects(mesh1, matrix_world1,  mesh2, matrix_world2):
-                    print ("There's a MESH intersection!")
+                    # print ("There's a MESH intersection!")
                     return True
     # else:
     #     print ("There's NO intersection!")
-    print("There's NO intersection!")
+    # print("There's NO intersection!")
 
     return False
 
@@ -144,7 +144,51 @@ def targetCubeSceneCollision(target, scene, roomName, targetParentInstance):
         if sceneInstance.type == 'MESH' and sceneInstance != target and sceneInstance.name != roomName and sceneInstance != targetParentInstance:
 
             if instancesIntersect(mathutils.Matrix.Identity(4), [target], mathutils.Matrix.Identity(4), [sceneInstance]):
-
                 return True
 
     return False
+
+def parseSceneCollisions(target, scene, targetPosOffset, chObjDistGT, chObjRotationGT, targetParentInstance, roomObj,  distRange, rotationRange, distInterval, rotationInterval):
+
+
+    original_matrix_world = target.matrix_world.copy()
+    distBins = np.linspace(0, distRange, distRange/distInterval)
+    rotBins = np.linspace(0, rotationRange, rotationRange / rotationInterval)
+    totalBins = np.meshgrid(distBins, rotBins)
+    boolBins = np.zeros(len(totalBins[0].ravel())).astype(np.bool)
+
+    scene.update()
+
+    for bin_i in range(len(totalBins[0].ravel())):
+        dist = totalBins[0].ravel()[bin_i]
+        rot = totalBins[1].ravel()[bin_i]
+        chObjDistGT[:]= dist
+        chObjRotationGT[:]= rot
+
+        ignore = False
+
+        azimuthRot = mathutils.Matrix.Rotation(0, 4, 'Z')
+
+        target.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation() + mathutils.Vector(targetPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
+
+        if targetCubeSceneCollision(target, scene, roomObj.name, targetParentInstance):
+            print("Teapot intersects with an object.")
+            ignore = True
+            # pass
+
+        if not instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01))), [target], mathutils.Matrix.Identity(4), [targetParentInstance]):
+            print("Teapot not on table.")
+            ignore = True
+
+        if instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [target], mathutils.Matrix.Identity(4), [targetParentInstance]):
+            print("Teapot interesects supporting object.")
+            ignore = True
+
+        # ipdb.set_trace()
+        if instancesIntersect(mathutils.Matrix.Identity(4), [target], mathutils.Matrix.Identity(4), [roomObj]):
+            print("Teapot intersects room")
+            ignore = True
+
+        boolBins[bin_i] = not ignore
+
+    return boolBins, totalBins
