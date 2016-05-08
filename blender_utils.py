@@ -477,6 +477,24 @@ def sortface(f):
         #print "Bad",v
         f.v=[f[0],f[2],f[3],f[1]]
 
+def createCube(scaleX, scaleY, scaleZ, name):
+
+    bpy.ops.mesh.primitive_cube_add()
+
+    cubeObj = bpy.context.object
+    cubeObj.name = name
+
+    cubeScale = mathutils.Matrix([[scaleX / 2, 0, 0, 0], [0, scaleY / 2, 0, 0], [0, 0, scaleZ / 2, 0], [0, 0, 0, 1]])
+
+    cubeObj.data.transform(cubeScale * mathutils.Matrix.Translation(mathutils.Vector((0, 0, 1))))
+
+    bpy.context.scene.objects.unlink(cubeObj)
+
+
+    return cubeObj
+
+
+
 def getCubeObj(instance):
     minX1, maxX1 = modelWidth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
     minY1, maxY1 = modelDepth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))

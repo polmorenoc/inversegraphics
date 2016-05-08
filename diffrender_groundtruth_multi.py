@@ -532,6 +532,9 @@ if not renderFromPreviousGT:
             links = treeNodes.links
 
             cubeScene = createCubeScene(scene)
+            setEnviornmentMapStrength(20, cubeScene)
+            # cubeScene.render.engine = 'BLENDER_RENDER'
+
 
         unlinkedObj = None
         unlinkedCubeObj = None
@@ -558,28 +561,101 @@ if not renderFromPreviousGT:
                 scene.objects.unlink(unlinkedObj)
                 cubeScene.objects.unlink(unlinkedCubeObj)
 
+                parentIdx = instances[targetIndex][1]
+                parentSupportObj = scene.objects[str(parentIdx)]
+                supportWidthMax, supportWidthMin = modelWidth(parentSupportObj.dupli_group.objects,
+                                                              parentSupportObj.matrix_world)
+                supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects,
+                                                              parentSupportObj.matrix_world)
+                # supportRad = min(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2),0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
+                supportRad = np.sqrt(
+                    0.5 * (supportDepthMax - supportDepthMin) ** 2 + 0.5 * (supportWidthMax - supportWidthMin) ** 2)
 
-            if not collisions[targetIndex][1]:
-                continue
+                sceneCollisions = {}
+                collisionsFile = 'data/collisions/discreteCollisions_scene' + str(scene_i) + '_targetIdx' + str(targetIndex) + '.pickle'
 
-            collisionProbs = np.zeros(len(collisions[targetIndex][1]))
+                if not parseSceneInstantiations:
+                    with open(collisionsFile, 'rb') as pfile:
+                        sceneCollisions = pickle.load(pfile)
 
-            # removeObjectData(int(targetIndex-1), v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+                    supportRad = sceneCollisions['supportRad']
+                    instantiationBins = sceneCollisions['instantiationBins']
+                    cubeRoomObj = sceneCollisions['cubeRoomObj']
+                    distRange = sceneCollisions['distRange']
+                    rotationRange = sceneCollisions['rotationRange']
+                    distInterval = sceneCollisions['distInterval']
+                    instantiationBinsMug = sceneCollisions['instantiationBinsMug']
+                    totalBinsTeapot = sceneCollisions['totalBinsTeapot']
+                    totalBinsMug = sceneCollisions['totalBinsMug']
 
-            for intervalIdx, interval in enumerate(collisions[targetIndex][1]):
-                collisionProbs[intervalIdx] = collisions[targetIndex][1][intervalIdx][1] - collisions[targetIndex][1][intervalIdx][0]
+                else:
+                    placeCamera(cubeScene.camera, 0,
+                                45, chDistGT.r[0].copy(),
+                                center[:].copy() + targetPosition[:].copy())
 
-            collisionsProbs = collisionProbs / np.sum(collisionProbs)
+                    scaleZ = 0.2
+                    scaleY = 0.2
+                    scaleX = 0.2
 
-            if renderOcclusions:
-                occlusionProbs = np.zeros(len(occlusions[targetIndex][1]))
+                    cubeTeapot = createCube(scaleX, scaleY, scaleZ, 'cubeTeapot')
+                    cubeTeapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
 
-                for intervalIdx, interval in enumerate(occlusions[targetIndex][1]):
-                    occlusionProbs[intervalIdx] = abs(occlusions[targetIndex][1][intervalIdx][1] - occlusions[targetIndex][1][intervalIdx][0])
+                    # cubeTeapot = getCubeObj(teapot)
+                    # cubeMug = getCubeObj(mug)
 
-                occlusionProbs = occlusionProbs / np.sum(occlusionProbs)
+                    scaleZ = 0.1
+                    scaleY = 0.1
+                    scaleX = 0.1
 
-            # if useShapeModel
+                    cubeMug = createCube(scaleX, scaleY, scaleZ, 'cubeMug')
+                    cubeMug.matrix_world = mathutils.Matrix.Translation(targetPosition)
+
+                    cubeScene.objects.link(cubeTeapot)
+
+                    cubeParentSupportObj = cubeScene.objects['cube' + str(parentIdx)]
+                    cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
+                    cubeScene.update()
+
+                    distRange = min(supportRad, 0.5)
+                    distInterval = 0.05
+                    rotationRange = 2 * np.pi
+                    rotationInterval = 10 * np.pi / 180
+
+                    objDisplacementMat = computeHemisphereTransformation(chObjRotationGT, 0, chObjDistGT,
+                                                                         np.array([0, 0, 0]))
+                    objOffset = objDisplacementMat[0:3, 3]
+
+                    instantiationBinsTeapot, totalBinsTeapot = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeTeapot,
+                                                                                  cubeScene, objOffset, chObjDistGT,
+                                                                                  chObjRotationGT, cubeParentSupportObj,
+                                                                                  cubeRoomObj, distRange, rotationRange,
+                                                                                  distInterval, rotationInterval)
+                    cubeScene.objects.unlink(cubeTeapot)
+
+                    cubeScene.objects.link(cubeMug)
+
+                    instantiationBinsMug, totalBinsMug = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeMug,
+                                                                                        cubeScene, objOffset,
+                                                                                        chObjDistGT, chObjRotationGT,
+                                                                                        cubeParentSupportObj, cubeRoomObj,
+                                                                                        distRange,
+                                                                                        rotationRange, distInterval,
+                                                                                        rotationInterval)
+                    cubeScene.objects.unlink(cubeMug)
+
+                    deleteObject(cubeTeapot)
+                    deleteObject(cubeMug)
+
+                    sceneCollisions = {'totalBinsTeapot':totalBinsTeapot,'totalBinsMug':totalBinsMug, 'supportRad':supportRad,'instantiationBinsTeapot':instantiationBinsTeapot,'cubeRoomObj':cubeRoomObj,'distRange':distRange,'rotationRange':rotationRange,'distInterval':distInterval,'instantiationBinsMug':instantiationBinsMug}
+                    with open(collisionsFile, 'wb') as pfile:
+                        pickle.dump(sceneCollisions, pfile)
+
+                #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
+                if instantiationBinsTeapot.sum() < 4 or instantiationBinsMug.sum() < 4:
+                    print("This scene position has not place to instantiate the objects.")
+                    pass
+
+                        # if useShapeModel
             for teapot_i in renderTeapotsList:
 
                 if useShapeModel:
@@ -686,45 +762,6 @@ if not renderFromPreviousGT:
 
                     original_matrix_world_mug = mug.matrix_world.copy()
 
-                    parentIdx = instances[targetIndex][1]
-                    parentSupportObj = scene.objects[str(parentIdx)]
-                    supportWidthMax, supportWidthMin = modelWidth(parentSupportObj.dupli_group.objects,
-                                                                  parentSupportObj.matrix_world)
-                    supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects,
-                                                                  parentSupportObj.matrix_world)
-                    supportRad = min(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2),0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
-                    supportRad = np.sqrt(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2) + 0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
-
-                    if parseSceneInstantiations:
-
-
-                        cubeTeapot = getCubeObj(teapot)
-                        cubeMug = getCubeObj(mug)
-
-                        cubeScene.objects.link(cubeTeapot)
-                        cubeScene.objects.link(cubeMug)
-
-                        cubeParentSupportObj = cubeScene.objects['cube' + str(parentIdx)]
-                        cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
-                        cubeScene.update()
-
-                        distRange = supportRad
-                        distInterval = 0.1
-                        rotationRange = 2*np.pi
-                        rotationInterval = 10*np.pi/180
-
-                        instantiationBins, totalBins = collision.parseSceneCollisions(cubeTeapot, cubeScene, teapotPosOffset, chObjDistGT, chObjRotationGT, cubeParentSupportObj, cubeRoomObj, distRange, rotationRange, distInterval, rotationInterval)
-
-                        instantiationBinsMug, totalBinsMug = collision.parseSceneCollisions(cubeMug, cubeScene, mugPosOffset,
-                                                                           chObjDistMug, chObjRotationMug,
-                                                                           cubeParentSupportObj, cubeRoomObj, distRange,
-                                                                           rotationRange, distInterval,
-                                                                           rotationInterval)
-
-                        cubeScene.objects.unlink(cubeTeapot)
-                        cubeScene.objects.unlink(cubeMug)
-                        deleteObject(cubeTeapot)
-                        deleteObject(cubeMug)
 
                 for hdrFile, hdrValues in hdrstorender:
                     hdridx = hdrValues[0]
@@ -741,14 +778,12 @@ if not renderFromPreviousGT:
 
                         # phiOffset[:] = 0
                         from numpy.random import choice
-                        objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
-                        objAzGT = np.random.uniform(0,1)*(collisions[targetIndex][1][objAzInterval][1] - collisions[targetIndex][1][objAzInterval][0]) + collisions[targetIndex][1][objAzInterval][0]
-
-                        objAzGT = objAzGT*np.pi/180
-                        chObjAzGTVals = objAzGT.copy()
+                        # objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
+                        # objAzGT = np.random.uniform(0,1)*(collisions[targetIndex][1][objAzInterval][1] - collisions[targetIndex][1][objAzInterval][0]) + collisions[targetIndex][1][objAzInterval][0]
+                        #
+                        # objAzGT = objAzGT*np.pi/180
+                        # chObjAzGTVals = objAzGT.copy()
                         chObjAzGTVals = np.random.uniform(0,np.pi*2)
-
-
 
                         chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.4))
                         chObjAzMugVals = np.random.uniform(0,np.pi*2)
@@ -756,12 +791,12 @@ if not renderFromPreviousGT:
                         chObjRotationMugVals = np.random.uniform(0,np.pi*2)
                         chObjRotationGTVals = np.random.uniform(0,np.pi*2)
 
-                        if renderOcclusions:
-                            azInterval = choice(len(occlusionProbs), size=1, p=occlusionProbs)
-                            azGT = np.random.uniform(0,1)*(occlusions[targetIndex][1][azInterval][1] - occlusions[targetIndex][1][azInterval][0]) + occlusions[targetIndex][1][azInterval][0]
-                            chAzGTVals = azGT*np.pi/180
-                        else:
-                            chAzGTVals = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
+                        # if renderOcclusions:
+                        #     # azInterval = choice(len(occlusionProbs), size=1, p=occlusionProbs)
+                        #     # azGT = np.random.uniform(0,1)*(occlusions[targetIndex][1][azInterval][1] - occlusions[targetIndex][1][azInterval][0]) + occlusions[targetIndex][1][azInterval][0]
+                        #     chAzGTVals = azGT*np.pi/180
+                        # else:
+                        chAzGTVals = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
 
                         chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
 
@@ -783,7 +818,6 @@ if not renderFromPreviousGT:
 
                         ignore = False
 
-                        # chAmbientIntensityGT[:] = groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
                         chAmbientIntensityGT[:] = chAmbientIntensityGTVals
 
                         phiOffset[:] = phiOffsetVals
@@ -797,20 +831,18 @@ if not renderFromPreviousGT:
                         chLightAzGT[:] = chLightAzGTVals
                         chLightElGT[:] = chLightElGTVals
 
-                        # chLightIntensityGT[:] = np.random.uniform(5,10, 1)
-
                         chVColorsGT[:] = chVColorsGTVals
                         try:
                             chShapeParamsGT[:] = shapeParams
                         except:
                             chShapeParamsGT[:] = np.random.randn(latentDim)
 
-                        teapotPlacement = np.random.choice(instantiationBins.sum())
+                        teapotPlacement = np.random.choice(instantiationBinsTeapot.sum())
 
                         mugPlacement = np.random.choice(instantiationBinsMug.sum())
 
-                        chObjDistGTVals = totalBins[0].ravel()[instantiationBins][teapotPlacement]
-                        chObjRotationGTVals = totalBins[1].ravel()[instantiationBins][teapotPlacement]
+                        chObjDistGTVals = totalBinsTeapot[0].ravel()[instantiationBinsTeapot][teapotPlacement]
+                        chObjRotationGTVals = totalBinsTeapot[1].ravel()[instantiationBinsTeapot][teapotPlacement]
                         chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMug][mugPlacement]
                         chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMug][mugPlacement]
 

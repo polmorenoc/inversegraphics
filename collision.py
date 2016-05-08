@@ -148,7 +148,9 @@ def targetCubeSceneCollision(target, scene, roomName, targetParentInstance):
 
     return False
 
-def parseSceneCollisions(target, scene, targetPosOffset, chObjDistGT, chObjRotationGT, targetParentInstance, roomObj,  distRange, rotationRange, distInterval, rotationInterval):
+def parseSceneCollisions(gtDir, scene_i, target_i, target, scene, targetPosOffset, chObjDistGT, chObjRotationGT, targetParentInstance, roomObj,  distRange, rotationRange, distInterval, rotationInterval):
+
+    scene.cycles.samples = 500
 
 
     original_matrix_world = target.matrix_world.copy()
@@ -172,23 +174,34 @@ def parseSceneCollisions(target, scene, targetPosOffset, chObjDistGT, chObjRotat
         target.matrix_world = mathutils.Matrix.Translation(original_matrix_world.to_translation() + mathutils.Vector(targetPosOffset.r)) * azimuthRot * (mathutils.Matrix.Translation(-original_matrix_world.to_translation())) * original_matrix_world
 
         if targetCubeSceneCollision(target, scene, roomObj.name, targetParentInstance):
-            print("Teapot intersects with an object.")
+            # print("Teapot intersects with an object.")
             ignore = True
             # pass
 
         if not instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01))), [target], mathutils.Matrix.Identity(4), [targetParentInstance]):
-            print("Teapot not on table.")
+            # print("Teapot not on table.")
             ignore = True
 
         if instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [target], mathutils.Matrix.Identity(4), [targetParentInstance]):
-            print("Teapot interesects supporting object.")
+            # print("Teapot interesects supporting object.")
             ignore = True
 
         # ipdb.set_trace()
         if instancesIntersect(mathutils.Matrix.Identity(4), [target], mathutils.Matrix.Identity(4), [roomObj]):
-            print("Teapot intersects room")
+            # print("Teapot intersects room")
             ignore = True
 
         boolBins[bin_i] = not ignore
+
+        # bpy.ops.render.render(write_still=True)
+        #
+        # import imageio
+        #
+        # image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
+        #
+        # from blender_utils import lin2srgb
+        # blender_utils.lin2srgb(image)
+        #
+        # cv2.imwrite(gtDir + 'images/scene' + str(scene_i) + '_' + 'targetidx' + str(target_i) + 'bin' + str(bin_i) + '_ignore' + str(ignore) + '.jpeg', 255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
     return boolBins, totalBins
