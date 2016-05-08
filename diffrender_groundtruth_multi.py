@@ -83,7 +83,7 @@ mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(teapots))[0:1]
 
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -441,28 +441,29 @@ for sceneIdx in scenesToRender:
     sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
     sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 
-    if renderOcclusions:
-        targetIndicesNew = []
-        occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
-        with open(occlusionSceneFile, 'rb') as pfile:
-            occlusions = pickle.load(pfile)
+    # if renderOcclusions:
+    #     targetIndicesNew = []
+    #     occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
+    #     with open(occlusionSceneFile, 'rb') as pfile:
+    #         occlusions = pickle.load(pfile)
+    #
+    #     for targetidx, targetIndex in enumerate(targetIndices):
+    #         if not occlusions[targetIndex][1]:
+    #             print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " has no proper occlusion.")
+    #         else:
+    #             targetIndicesNew = targetIndicesNew + [targetIndex]
+    #     targetIndices = targetIndicesNew
+    #
+    # collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
+    # scenes = scenes + [targetIndices]
+    # with open(collisionSceneFile, 'rb') as pfile:
+    #     collisions = pickle.load(pfile)
+    #
+    # for targetidx, targetIndex in enumerate(targetIndices):
+    #     if not collisions[targetIndex][1]:
+    #         print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
 
-        for targetidx, targetIndex in enumerate(targetIndices):
-            if not occlusions[targetIndex][1]:
-                print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " has no proper occlusion.")
-            else:
-                targetIndicesNew = targetIndicesNew + [targetIndex]
-        targetIndices = targetIndicesNew
-
-    collisionSceneFile = 'data/collisions/collisionScene' + str(sceneNumber) + '.pickle'
     scenes = scenes + [targetIndices]
-    with open(collisionSceneFile, 'rb') as pfile:
-        collisions = pickle.load(pfile)
-
-    for targetidx, targetIndex in enumerate(targetIndices):
-        if not collisions[targetIndex][1]:
-            print("Scene idx " + str(sceneIdx) + " at index " + str(targetIndex) + " collides everywhere.")
-
     lenScenes += len(targetIndices)
 
 #Generate GT labels before rendering them.
@@ -473,9 +474,10 @@ if not renderFromPreviousGT:
         print("Generating groundtruth for scene: " + str(sceneIdx))
         sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 
-        targetIndices = scenes[scene_i]
-        if not targetIndices:
-            continue
+        # targetIndices = scenes[scene_i]
+        # if not targetIndices:
+        #     continue
+        targetIndices = targetIndicesScene
 
         sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 
@@ -574,12 +576,12 @@ if not renderFromPreviousGT:
                 sceneCollisions = {}
                 collisionsFile = 'data/collisions/discreteCollisions_scene' + str(scene_i) + '_targetIdx' + str(targetIndex) + '.pickle'
 
-                if not parseSceneInstantiations:
+                if not parseSceneInstantiations and os.path.exists(collisionsFile):
                     with open(collisionsFile, 'rb') as pfile:
                         sceneCollisions = pickle.load(pfile)
 
                     supportRad = sceneCollisions['supportRad']
-                    instantiationBins = sceneCollisions['instantiationBins']
+                    instantiationBinsTeapot = sceneCollisions['instantiationBinsTeapot']
                     cubeRoomObj = sceneCollisions['cubeRoomObj']
                     distRange = sceneCollisions['distRange']
                     rotationRange = sceneCollisions['rotationRange']
@@ -653,7 +655,7 @@ if not renderFromPreviousGT:
                 #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
                 if instantiationBinsTeapot.sum() < 4 or instantiationBinsMug.sum() < 4:
                     print("This scene position has not place to instantiate the objects.")
-                    pass
+                    continue
 
                         # if useShapeModel
             for teapot_i in renderTeapotsList:
