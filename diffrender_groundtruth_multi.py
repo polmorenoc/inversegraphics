@@ -43,7 +43,7 @@ useOpenDR = True
 useBlender = True
 renderBlender = False
 captureEnvMapFromBlender = False
-parseSceneInstantiations = True
+parseSceneInstantiations = False
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -83,7 +83,7 @@ mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(teapots))[0:1]
 
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -160,7 +160,7 @@ chObjRotationGT = ch.Ch([0])
 chObjAzMug = ch.Ch([0])
 chObjDistMug = ch.Ch([0])
 chObjRotationMug = ch.Ch([0])
-
+chAzRelMug = chAz - chObjAzMug
 
 chPointLightIntensity = ch.Ch([1])
 chPointLightIntensityGT = ch.Ch([1])
@@ -702,7 +702,7 @@ if not renderFromPreviousGT:
 
                     vGT, vnGT, teapotPosOffset = transformObject(vGT, vnGT, chScaleGT, chObjAzGT, chObjDistGT, chObjRotationGT, targetPosition)
 
-                    verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug - np.pi / 2, chObjDistMug, chObjRotationMug, targetPosition)
+                    verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, targetPosition)
 
                     VerticesB = vGT + verticesMug
                     NormalsB = vnGT + normalsMug
@@ -788,10 +788,6 @@ if not renderFromPreviousGT:
                         chObjAzGTVals = np.random.uniform(0,np.pi*2)
 
                         chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.4))
-                        chObjAzMugVals = np.random.uniform(0,np.pi*2)
-                        chObjDistMugVals = np.random.uniform(0,np.min(supportRad, 0.4))
-                        chObjRotationMugVals = np.random.uniform(0,np.pi*2)
-                        chObjRotationGTVals = np.random.uniform(0,np.pi*2)
 
                         # if renderOcclusions:
                         #     # azInterval = choice(len(occlusionProbs), size=1, p=occlusionProbs)
@@ -839,6 +835,12 @@ if not renderFromPreviousGT:
                         except:
                             chShapeParamsGT[:] = np.random.randn(latentDim)
 
+                        #Instantiate such that we always see the handle if only a bit!
+
+                        chObjDistMugVals = np.random.uniform(0,np.min(supportRad, 0.4))
+                        chObjRotationMugVals = np.random.uniform(0,np.pi*2)
+                        chObjRotationGTVals = np.random.uniform(0,np.pi*2)
+
                         teapotPlacement = np.random.choice(instantiationBinsTeapot.sum())
 
                         mugPlacement = np.random.choice(instantiationBinsMug.sum())
@@ -848,12 +850,36 @@ if not renderFromPreviousGT:
                         chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMug][mugPlacement]
                         chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMug][mugPlacement]
 
-                        chObjAzMug[:] = chObjAzMugVals
-
                         chObjDistGT[:] = chObjDistGTVals
                         chObjRotationGT[:] = chObjRotationGTVals
                         chObjDistMug[:] = chObjDistMugVals
                         chObjRotationMug[:] = chObjRotationMugVals
+
+                        cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3, 3]
+
+                        vecToMug = targetPosition + mugPosOffset.r - cameraEye
+                        vecToMug = vecToMug / np.linalg.norm(vecToMug)
+
+                        vecToCenter = targetPosition - cameraEye
+                        vecToCenter = vecToCenter / np.linalg.norm(vecToCenter)
+
+                        rightCamVec = np.cross(vecToCenter, np.array([0,0,1]))
+
+                        mugPosRight = np.sign(rightCamVec.dot(vecToMug))
+
+                        angleToMug = np.arccos(vecToMug.dot(vecToCenter))
+
+                        if np.isnan(angleToMug):
+                            angleToMug = 0
+                            ignore = True
+                        chObjAzMugVals = np.random.uniform(chAzGT.r + angleToMug - 2 * np.pi / 3,
+                                                           chAzGT.r + angleToMug + 2 * np.pi / 3)
+
+                        chObjAzMugVals = chAzGT.r - mugPosRight*angleToMug
+
+                        chObjAzMug[:] = chObjAzMugVals
+
+                        # ipdb.set_trace()
 
                         chVColorsMug[:] = chVColorsMugVals
 
