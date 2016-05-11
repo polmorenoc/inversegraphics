@@ -100,7 +100,13 @@ import skimage.color
 #     arr[mask] = ch.power((arr[mask] + 0.055) / 1.055, 2.4)
 #     arr[notmask] /= 12.92
 #     return _convert(xyz_from_rgb, arr)
-from utils import scaleInvariantMSECoeff
+def scaleInvariantMSECoeff(x_pred, x_target):
+    #Rows: test samples
+    #Cols: target variables
+    scales = (matrix_multiply(x_pred[:,None,:],x_target[:,:,None])/matrix_multiply(x_pred[:,None,:],x_pred[:,:,None])).ravel()
+
+    return scales
+
 def scaleInvariantColourDifference(rgbGT, rgbPred):
     scaleRGB = scaleInvariantMSECoeff(rgbPred, rgbGT)
     dist = np.sqrt(np.sum((rgbGT - scaleRGB[:,None]*rgbPred)**2, axis=1))

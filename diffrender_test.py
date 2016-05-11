@@ -45,9 +45,11 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 # parameterRecognitionModels = set(['neuralNetPose', 'neuralNetApperanceAndLight'])
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
-
-gtPrefix = 'train4_occlusion_shapemodel'
-experimentPrefix = 'train4_occlusion_shapemodel_10k'
+#
+# gtPrefix = 'train4_occlusion_shapemodel'
+# experimentPrefix = 'train4_occlusion_shapemodel_10k'
+gtPrefix = 'train4_occlusion_multi'
+experimentPrefix = 'train4_occlusion_multi'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
 trainPrefixVColor = 'train4_occlusion_shapemodel_10k'
 trainPrefixLightCoeffs = 'train4_occlusion_shapemodel_10k'
@@ -65,6 +67,8 @@ glMode = glModes[0]
 
 width, height = (150, 150)
 win = -1
+
+multiObjects = True
 
 if glMode == 'glfw':
     #Initialize base GLFW context for the Demo and to share context among all renderers.
@@ -111,16 +115,19 @@ chDist = ch.Ch([camDistance])
 
 chLightSHCoeffs = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
+if multiObjects:
+    chObjDist = ch.Ch([0])
+    chObjRotation = ch.Ch([0])
+    chObjAzMug = ch.Ch([0])
+    chObjDistMug = ch.Ch([0])
+    chObjRotationMug = ch.Ch([0])
+
+    chVColorsMug = ch.Ch([1,0,0])
+
 clampedCosCoeffs = clampedCosineCoefficients()
 chComponent = chLightSHCoeffs * clampedCosCoeffs
 
-chPointLightIntensity = ch.Ch([1])
-
-chLightAz = ch.Ch([0.0])
-chLightEl = ch.Ch([np.pi/2])
-chLightDist = ch.Ch([0.5])
-
-light_color = ch.ones(3)*chPointLightIntensity
+light_color = ch.ones(3)
 
 chVColors = ch.Ch([0.4,0.4,0.4])
 
@@ -149,6 +156,22 @@ for teapot_i in range(len(renderTeapotsList)):
 currentTeapotModel = 0
 
 center = center_teapots[currentTeapotModel]
+
+if multiObjects:
+    mugs = [line.strip() for line in open('mugs.txt')]
+    renderMugsList = np.arange(len(teapots))[0:1]
+
+    v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat_mugs, varray_mugs, center_mugs = scene_io_utils.loadMugsOpenDRData(
+        renderMugsList, False, False, None)
+
+    v_mug = v_mugs[0][0]
+    f_list_mug = f_list_mugs[0][0]
+    chVColorsMug = ch.Ch([1, 0, 0])
+    vc_mug = [chVColorsMug * np.ones(v_mug[0].shape)]
+    vn_mug = vn_mugs[0][0]
+    uv_mug = uv_mugs[0][0]
+    haveTextures_list_mug = haveTextures_list_mugs[0][0]
+    textures_list_mug = textures_list_mugs[0][0]
 
 #########################################
 # Initialization ends here
@@ -222,8 +245,7 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-rangeTests = np.arange(100,1100)
-
+rangeTests = np.arange(0,10)
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 
@@ -259,6 +281,20 @@ dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
 dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataIds = groundTruth['trainIds']
 
+if multiObjects:
+    dataObjDistGT = groundTruth['trainObjDistGT']
+    dataObjRotationGT = groundTruth['trainObjRotationGT']
+    dataObjDistMug = groundTruth['trainObjDistMug']
+    dataObjRotationMug = groundTruth['trainObjRotationMug']
+    dataObjAzMug = groundTruth['trainObjAzMug']
+    dataVColorsMug = groundTruth['trainVColorsMug']
+    dataObjAzMugRel = groundTruth['trainObjAzMugRel']
+    dataObjAzGTRel = groundTruth['trainObjAzGTRel']
+
+    dataMugPosOffset = groundTruth['trainMugPosOffset']
+    dataTeapotPosOffset = groundTruth['trainTeapotPosOffset']
+
+
 if useShapeModel:
     dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
@@ -273,7 +309,6 @@ for test_it, test_id in enumerate(testSet):
         whereBad = whereBad + [bad]
 
 # testSet = testSetFixed
-
 
 loadFromHdf5 = False
 
@@ -305,6 +340,21 @@ if useShapeModel:
 testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
 
 testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
+
+if multiObjects:
+    testObjAzMugRel = dataObjAzMugRel
+    testObjAzGTRel = dataObjAzGTRel
+
+    testMugPosOffset = dataMugPosOffset
+    testTeapotPosOffset = dataTeapotPosOffset
+    testVColorMug = dataVColorsMug
+
+    testObjDistGT = dataObjDistGT
+    testObjRotationGT = dataObjRotationGT
+    testObjDistMug = dataObjDistMug
+    testObjRotationMug = dataObjRotationMug
+    testObjAzMug = dataObjAzMug
+    testVColorsMug = dataVColorsMug
 
 ##Read Training set labels
 
@@ -360,7 +410,6 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 # ax.set_xlim(0,100)
 # fig.savefig(directory + '-histogram.pdf', bbox_inches='tight')
 # plt.close(fig)
-
 
 recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
@@ -442,9 +491,40 @@ if useShapeModel:
     chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
 
-    smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
+    if useShapeModel:
+        center = smCenter
+        UVs = smUVs
+        v = smVertices
+        vn = smNormals
+        Faces = smFaces
+        VColors = smVColors
+        UVs = smUVs
+        HaveTextures = smHaveTextures
+        TexturesList = smTexturesList
+    else:
+        v, vn = v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0]
+        Faces = f_list_teapots[currentTeapotModel][0]
+        VColors = vc_teapots[currentTeapotModel][0]
+        UVs = uv_teapots[currentTeapotModel][0]
+        HaveTextures = haveTextures_list_teapots[currentTeapotModel][0]
+        TexturesList = textures_list_teapots[currentTeapotModel][0]
 
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+    v, vn, teapotPosOffset = transformObject(v, vn, chScale, chObjAz, chObjDist, chObjRotation, np.array([0,0,0]))
+
+    verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, np.array([0,0,0]))
+
+    VerticesB = v + verticesMug
+    NormalsB = vn + normalsMug
+    FacesB = Faces + f_list_mug
+    VColorsB = VColors + vc_mug
+    UVsB = UVs + uv_mug
+    HaveTexturesB = HaveTextures + haveTextures_list_mug
+    TexturesListB = TexturesList + textures_list_mug
+
+    renderer = createRendererTarget(glMode, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height,
+                              UVsB, HaveTexturesB, TexturesListB, frustum, None)
+
+    # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -472,6 +552,34 @@ if loadMask:
 # cv2.imwrite('rendererGT' + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
 # plt.imsave('renderered.png', lin2srgb(render))
+
+
+color = testVColorGT[test_i]
+az = 0
+el = testElevsGT[test_i]
+lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+
+if useShapeModel:
+    shapeParams = testShapeParamsGT[test_i]
+
+chAz[:] = az
+chEl[:] = el
+chVColors[:] = color
+chLightSHCoeffs[:] = lightCoefficientsRel
+if useShapeModel:
+    chShapeParams[:] = shapeParams
+
+
+chObjAz[:] = testObjAzGTRel[test_i]
+chObjDist[:] = testObjDistGT[test_i]
+chObjRotation[:] = testObjRotationGT[test_i]
+chObjAzMug[:] = testObjAzMugRel[test_i]
+chObjDistMug[:] = testObjDistMug[test_i]
+chObjRotationMug[:] = testObjRotationMug[test_i]
+
+chVColorsMug[:] = testVColorMug[test_i]
+
+ipdb.set_trace()
 
 import skimage.color
 
@@ -603,9 +711,6 @@ if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.np
         # with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
         #     neuralNetModelPose = pickle.load(pfile)
         #
-
-
-
 else:
     elevsPred = np.load(trainModelsDirPose + 'elevsPred.npy')[rangeTests]
     azsPred = np.load(trainModelsDirPose + 'azsPred.npy')[rangeTests]
@@ -643,18 +748,6 @@ if recomputePredictions or not os.path.isfile(trainModelsDirVColor + "vColorsPre
 
         np.save(trainModelsDirPose + 'vColorsPred.npy', vColorsPred)
 
-        #Samples:
-        # vColorsPredSamples = []
-        # appPredictionNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-        #
-        # for i in range(100):
-        #     appPredictionsSample = np.zeros([len(testImages), 3])
-        #     for start_idx in range(0, len(testImages), nnBatchSize):
-        #         appPredictionsSample[start_idx:start_idx + nnBatchSize] = appPredictionNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-        #
-        #     vColorsPredSamples = vColorsPredSamples + [appPredictionsSample[:,:][:,:,None]]
-        #
-        # vColorsPredSamples = np.concatenate(vColorsPredSamples, axis=2)
 
     if 'randForestVColors' in parameterRecognitionModels:
         with open(trainModelsDirVColor + 'randForestModelVColor.pickle', 'rb') as pfile:
@@ -855,16 +948,11 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "neura
 else:
     maskPredictions = np.load(trainModelsDirShapeParams + 'maskPredictions.npy')[rangeTests]
 
-
-
-
-
 loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
 print("Finished loading and compiling recognition models")
-
 
 envMapDic = {}
 SHFilename = 'data/LightSHCoefficients.pickle'

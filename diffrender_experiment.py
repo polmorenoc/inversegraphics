@@ -20,13 +20,13 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion_shapemodel'
-experimentPrefix = 'train4_occlusion_shapemodel_17k'
+gtPrefix = 'train4_occlusion_multi'
+experimentPrefix = 'train4_occlusion_multi'
 experimentDescr = 'Synthetic test set with occlusions and shape model'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
-groundTruthFilename = gtDir + 'groundTruth.h5'
+groundTruthFilename = gtDir + 'groundTruthToRender.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 onlySynthetic = True
@@ -88,21 +88,23 @@ allDataIds = gtDataFile[gtPrefix]['trainIds']
 #     plt.imsave('tmp/check/badImage' + str(badImages[id]) + '.png', np.tile(badImage[:,:,None], [1,1,3]))
 #
 
-ipdb.set_trace()
+
 
 size = len(allDataIds)
-if not os.path.isfile(experimentDir + 'train.npy'):
-    np.random.seed(seed)
-    data = np.arange(size)
-    np.random.shuffle(data)
-    train = data[0:17000]
-    test = data[17000::]
+# if not os.path.isfile(experimentDir + 'train.npy'):
+np.random.seed(seed)
+data = np.arange(size)
+np.random.shuffle(data)
+train = data[0:50]
+test = data[50::]
 
-    if not os.path.exists(experimentDir):
-        os.makedirs(experimentDir)
+if not os.path.exists(experimentDir):
+    os.makedirs(experimentDir)
 
-    np.save(experimentDir + 'train.npy', train)
-    np.save(experimentDir + 'test.npy', test)
+np.save(experimentDir + 'train.npy', train)
+np.save(experimentDir + 'test.npy', test)
+
+ipdb.set_trace()
 
 ########## Out of sample selections.
 

@@ -72,7 +72,7 @@ if useOpenDR:
         # glfw.make_context_current(win)
 
 angle = 60 * 180 / numpy.pi
-clip_start = 0.01
+clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
 camDistance = 0.4
@@ -336,7 +336,18 @@ trainEnvMaps = np.array([], dtype=np.uint8)
 trainOcclusions = np.array([])
 trainTargetIndices = np.array([], dtype=np.uint8)
 trainIds = np.array([], dtype=np.uint32)
-#zeros
+
+#Multi
+trainObjDistGT = np.array([])
+trainObjRotationGT = np.array([])
+trainObjDistMug = np.array([])
+trainObjRotationMug = np.array([])
+trainObjAzMug = np.array([])
+trainVColorsMug = np.array([])
+trainObjAzMugRel = np.array([])
+trainObjAzGTRel = np.array([])
+trainMugPosOffset = np.array([])
+trainTeapotPosOffset = np.array([])
 
 trainLightCoefficientsGT = np.array([]).reshape([0,9])
 trainLightCoefficientsGTRel = np.array([]).reshape([0,9])
@@ -366,10 +377,6 @@ trainSize = 20000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
-# for hdrit, hdri in enumerate(list(envMapDic.items())):
-#     if hdri[0] == 'data/hdr/dataset/canada_montreal_nad_photorealism.exr':
-#         hdrtorenderi = hdrit
-
 ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
 
 hdritems = list(envMapDic.items())[:]
@@ -381,7 +388,6 @@ for hdrFile, hdrValues in hdritems:
     envMapCoeffs = hdrValues[1]
     if hdridx not in ignoreEnvMaps:
         hdrstorender = hdrstorender + [(hdrFile,hdrValues)]
-
 
     # if not os.path.exists('light_probes/envMap' + str(hdridx)):
     #     os.makedirs('light_probes/envMap' + str(hdridx))
@@ -406,13 +412,30 @@ for hdrFile, hdrValues in hdritems:
     #     cv2.imwrite('light_probes/envMap' + str(hdridx) + '/opendr_' + str(np.int(180*phiOffset/np.pi)) + '.png' , 255*rendererGT.r[:,:,[2,1,0]])
 # sys.exit("")
 
-gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name), ('trainLightCoefficientsGT',trainLightCoefficientsGT.dtype, (9,)), ('trainLightCoefficientsGTRel', trainLightCoefficientsGTRel.dtype, (9,)), ('trainAmbientIntensityGT', trainAmbientIntensityGT.dtype), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype), ('trainShapeModelCoeffsGT', trainShapeModelCoeffsGT.dtype, (latentDim,))]
+gtDtype = [('trainIds', trainIds.dtype.name), ('trainAzsGT', trainAzsGT.dtype.name),('trainObjAzsGT', trainObjAzsGT.dtype.name),('trainElevsGT', trainElevsGT.dtype.name),
+           ('trainLightAzsGT', trainLightAzsGT.dtype.name),('trainLightElevsGT', trainLightElevsGT.dtype.name),('trainLightIntensitiesGT', trainLightIntensitiesGT.dtype.name),
+           ('trainVColorGT', trainVColorGT.dtype.name, (3,) ),('trainScenes', trainScenes.dtype.name),('trainTeapotIds', trainTeapotIds.dtype.name),
+           ('trainEnvMaps', trainEnvMaps.dtype.name),('trainOcclusions', trainOcclusions.dtype.name),('trainTargetIndices', trainTargetIndices.dtype.name),
+           ('trainLightCoefficientsGT',trainLightCoefficientsGT.dtype, (9,)), ('trainLightCoefficientsGTRel', trainLightCoefficientsGTRel.dtype, (9,)),
+           ('trainAmbientIntensityGT', trainAmbientIntensityGT.dtype), ('trainEnvMapPhiOffsets', trainEnvMapPhiOffsets.dtype),
+           ('trainShapeModelCoeffsGT', trainShapeModelCoeffsGT.dtype, (latentDim,)),
+           ('trainObjDistGT', trainObjDistGT.dtype),
+           ('trainObjRotationGT', trainObjRotationGT.dtype),
+           ('trainObjDistMug', trainObjDistMug.dtype),
+           ('trainObjRotationMug', trainObjRotationMug.dtype),
+           ('trainObjAzMug', trainObjAzMug.dtype),
+           ('trainVColorsMug', trainVColorsMug.dtype, (3,)),
+           ('trainObjAzMugRel', trainObjAzMugRel.dtype),
+           ('trainObjAzGTRel', trainObjAzGTRel.dtype),
+           ('trainMugPosOffset', trainMugPosOffset.dtype,(3,)),
+           ('trainTeapotPosOffset', trainTeapotPosOffset.dtype,(3,)),
+           ]
 
 groundTruth = np.array([], dtype = gtDtype)
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'a')
 
-gtDataFileToRender = h5py.File(gtDir + 'groundTruthToRender.h5', 'w')
+gtDataFileToRender = h5py.File(gtDir + 'groundTruth.h5', 'w')
 gtDatasetToRender = gtDataFileToRender.create_dataset(prefix, data=groundTruth, maxshape=(None,))
 
 nextId = 0
@@ -510,8 +533,7 @@ if not renderFromPreviousGT:
             selection = [teapots[i] for i in renderTeapotsList]
             scene_io_utils.loadTargetsBlendData()
             for teapotIdx, teapotName in enumerate(selection):
-                teapot = bpy.data.scenes[teapotName[0:63]].objects[
-                    'teapotInstance' + str(renderTeapotsList[teapotIdx])]
+                teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
                 teapot.layers[1] = True
                 teapot.layers[2] = True
                 targetModels = targetModels + [teapotIdx]
@@ -570,8 +592,7 @@ if not renderFromPreviousGT:
                 supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects,
                                                               parentSupportObj.matrix_world)
                 # supportRad = min(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2),0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
-                supportRad = np.sqrt(
-                    0.5 * (supportDepthMax - supportDepthMin) ** 2 + 0.5 * (supportWidthMax - supportWidthMin) ** 2)
+                supportRad = np.sqrt(0.5 * (supportDepthMax - supportDepthMin) ** 2 + 0.5 * (supportWidthMax - supportWidthMin) ** 2)
 
                 sceneCollisions = {}
                 collisionsFile = 'data/collisions/discreteCollisions_scene' + str(scene_i) + '_targetIdx' + str(targetIndex) + '.pickle'
@@ -590,6 +611,8 @@ if not renderFromPreviousGT:
                     totalBinsMug = sceneCollisions['totalBinsMug']
 
                 else:
+
+                    print("Parsing collisions for scene " + str(scene_i))
                     placeCamera(cubeScene.camera, 0,
                                 45, chDistGT.r[0].copy(),
                                 center[:].copy() + targetPosition[:].copy())
@@ -617,7 +640,7 @@ if not renderFromPreviousGT:
                     cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
                     cubeScene.update()
 
-                    distRange = min(supportRad, 0.5)
+                    distRange = min(supportRad, 0.3)
                     distInterval = 0.05
                     rotationRange = 2 * np.pi
                     rotationInterval = 10 * np.pi / 180
@@ -651,6 +674,8 @@ if not renderFromPreviousGT:
 
                     with open(collisionsFile, 'wb') as pfile:
                         pickle.dump(sceneCollisions, pfile)
+
+                    continue
 
                 #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
                 if instantiationBinsTeapot.sum() < 4 or instantiationBinsMug.sum() < 4:
@@ -711,6 +736,7 @@ if not renderFromPreviousGT:
                     UVsB = UVs + uv_mug
                     HaveTexturesB = HaveTextures + haveTextures_list_mug
                     TexturesListB = TexturesList + textures_list_mug
+
                     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, verticesMug, f_list_mug, vc_mug,  normalsMug, uv_mug, haveTextures_list_mug, textures_list_mug)
                     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, Faces, VColors, vnGT, UVs, HaveTextures, TexturesList)
 
@@ -759,9 +785,6 @@ if not renderFromPreviousGT:
                     mug.layers[0] = True
                     original_matrix_world = teapot.matrix_world.copy()
 
-                    # mug.matrix_world = mug.matrix_world * mathutils.Matrix.Rotation(-np.pi/2, 4, 'Y')
-                    # mug.matrix_world = mug.matrix_world
-
                     original_matrix_world_mug = mug.matrix_world.copy()
 
 
@@ -780,20 +803,11 @@ if not renderFromPreviousGT:
 
                         # phiOffset[:] = 0
                         from numpy.random import choice
-                        # objAzInterval = choice(len(collisionsProbs), size=1, p=collisionsProbs)
-                        # objAzGT = np.random.uniform(0,1)*(collisions[targetIndex][1][objAzInterval][1] - collisions[targetIndex][1][objAzInterval][0]) + collisions[targetIndex][1][objAzInterval][0]
-                        #
-                        # objAzGT = objAzGT*np.pi/180
-                        # chObjAzGTVals = objAzGT.copy()
+
                         chObjAzGTVals = np.random.uniform(0,np.pi*2)
 
-                        chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.4))
+                        chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.3))
 
-                        # if renderOcclusions:
-                        #     # azInterval = choice(len(occlusionProbs), size=1, p=occlusionProbs)
-                        #     # azGT = np.random.uniform(0,1)*(occlusions[targetIndex][1][azInterval][1] - occlusions[targetIndex][1][azInterval][0]) + occlusions[targetIndex][1][azInterval][0]
-                        #     chAzGTVals = azGT*np.pi/180
-                        # else:
                         chAzGTVals = np.mod(np.random.uniform(0,np.pi, 1) - np.pi/2, 2*np.pi)
 
                         chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
@@ -869,17 +883,21 @@ if not renderFromPreviousGT:
 
                         angleToMug = np.arccos(vecToMug.dot(vecToCenter))
 
+                        vecToTeapot = targetPosition + teapotPosOffset.r - cameraEye
+                        vecToTeapot = vecToTeapot / np.linalg.norm(vecToTeapot)
+                        teapotPosRight = np.sign(rightCamVec.dot(vecToTeapot))
+                        angleToTeapot = np.arccos(vecToTeapot.dot(vecToCenter))
+
                         if np.isnan(angleToMug):
                             angleToMug = 0
                             ignore = True
-                        chObjAzMugVals = np.random.uniform(chAzGT.r + angleToMug - 2 * np.pi / 3,
-                                                           chAzGT.r + angleToMug + 2 * np.pi / 3)
+                        chObjAzMugVals = np.random.uniform(chAzGT.r - mugPosRight*angleToMug - 2 * np.pi / 3,
+                                                           chAzGT.r - mugPosRight * angleToMug + 2 * np.pi / 3)
 
-                        chObjAzMugVals = chAzGT.r - mugPosRight*angleToMug
+                        chObjAzMugRel = chAzGT.r - mugPosRight*angleToMug
+                        chObjAzGTRel = chAzGT.r - teapotPosRight * angleToTeapot
 
                         chObjAzMug[:] = chObjAzMugVals
-
-                        # ipdb.set_trace()
 
                         chVColorsMug[:] = chVColorsMugVals
 
@@ -907,7 +925,6 @@ if not renderFromPreviousGT:
                                     vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
 
                             scene.update()
-
 
                         ## Some validation checks:
 
@@ -939,6 +956,7 @@ if not renderFromPreviousGT:
                         if not ignore:
                             # Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
                             cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3,3]
+
                             vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[
                                 rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
 
@@ -948,7 +966,7 @@ if not renderFromPreviousGT:
 
                             #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
                             minDistToObjects = 0.3
-                            maxDistToObjects = 0.75
+                            maxDistToObjects = 0.6
                             if np.min(np.linalg.norm(vDists, axis=1) <= clip_start) or np.min(np.linalg.norm(vDistsTeapot, axis=1) <= minDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) <= minDistToObjects):
                                 ignore = True
 
@@ -976,33 +994,33 @@ if not renderFromPreviousGT:
                                     ignore = True
                                     # pass
 
-                                if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0,0,-0.01))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
-                                    print("Teapot not on table.")
-                                    ignore = True
-
-                                if not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
-                                    print("Mug not on table.")
-                                    ignore = True
-
-                                if collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
                                     print("Teapot interesects supporting object.")
                                     ignore = True
 
-                                if collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
                                     print("Mug intersects supporting object")
                                     ignore = True
 
                                 # ipdb.set_trace()
-                                if collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeRoomObj]):
+                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeRoomObj]):
                                     print("Teapot intersects room")
                                     ignore = True
 
-                                if collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeMug], mathutils.Matrix.Identity(4), [cubeRoomObj]):
+                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeMug], mathutils.Matrix.Identity(4), [cubeRoomObj]):
                                     print("Mug intersects room")
                                     ignore = True
 
                                 if not ignore:
                                     print("No collision issues")
+
+                                if not ignore and not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
+                                    print("Teapot not on table.")
+                                    ignore = True
+
+                                if not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01)))*mug.matrix_world, mug.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
+                                    print("Mug not on table.")
+                                    ignore = True
 
                                 cubeScene.objects.unlink(cubeTeapot)
                                 cubeScene.objects.unlink(cubeMug)
@@ -1113,6 +1131,19 @@ if not renderFromPreviousGT:
                             trainIds = train_i
                             trainTargetIndices = targetIndex
 
+                            trainObjDistGT = chObjDistGTVals
+                            trainObjRotationGT = chObjRotationGTVals
+                            trainObjDistMug = chObjDistMugVals
+                            trainObjRotationMug = chObjRotationMugVals
+                            trainObjAzMug = chObjAzMugVals
+                            trainVColorsMug = chVColorsMugVals
+
+                            trainObjAzMugRel = chObjAzMugRel
+                            trainObjAzGTRel = chObjAzGTRel
+
+                            trainMugPosOffset = mugPosOffset.r
+                            trainTeapotPosOffset = teapotPosOffset.r
+
                             gtDatasetToRender.resize(gtDatasetToRender.shape[0]+1, axis=0)
                             gtDatasetToRender[-1] = np.array([(trainIds, trainAzsGT, trainObjAzsGT, trainElevsGT,
                                                                trainLightAzsGT, trainLightElevsGT,
@@ -1120,7 +1151,17 @@ if not renderFromPreviousGT:
                                                                trainTeapotIds, trainEnvMaps, trainOcclusions,
                                                                trainTargetIndices, trainLightCoefficientsGT,
                                                                trainLightCoefficientsGTRel, trainAmbientIntensityGT,
-                                                               phiOffsetVals, trainShapeModelCoeffsGT)], dtype=gtDtype)
+                                                               phiOffsetVals, trainShapeModelCoeffsGT,
+                                                               trainObjDistGT,
+                                                               trainObjRotationGT,
+                                                               trainObjDistMug,
+                                                               trainObjRotationMug,
+                                                               trainObjAzMug,
+                                                               trainVColorsMug,
+                                                               trainObjAzMugRel,
+                                                               trainObjAzGTRel,
+                                                               trainMugPosOffset,
+                                                               trainTeapotPosOffset)], dtype=gtDtype)
 
                             train_i = train_i + 1
 

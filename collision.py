@@ -154,9 +154,13 @@ def parseSceneCollisions(gtDir, scene_i, target_i, target, scene, targetPosOffse
 
 
     original_matrix_world = target.matrix_world.copy()
-    distBins = np.linspace(0, distRange, distRange/distInterval)
+    distBins = np.linspace(distInterval, distRange, distRange/distInterval)
     rotBins = np.linspace(0, rotationRange, rotationRange / rotationInterval)
+
     totalBins = np.meshgrid(distBins, rotBins)
+    totalBins[0] = np.append([0], totalBins[0].ravel())
+    totalBins[1] = np.append([0], totalBins[1].ravel())
+
     boolBins = np.zeros(len(totalBins[0].ravel())).astype(np.bool)
 
     scene.update()
@@ -182,7 +186,7 @@ def parseSceneCollisions(gtDir, scene_i, target_i, target, scene, targetPosOffse
             # print("Teapot not on table.")
             ignore = True
 
-        if instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.01))), [target], mathutils.Matrix.Identity(4), [targetParentInstance]):
+        if instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [target], mathutils.Matrix.Identity(4), [targetParentInstance]):
             # print("Teapot interesects supporting object.")
             ignore = True
 

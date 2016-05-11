@@ -935,6 +935,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     plt.close(fig)
 
 from numpy.core.umath_tests import matrix_multiply
+
 def scaleInvariantMSECoeff(x_pred, x_target):
     #Rows: test samples
     #Cols: target variables
