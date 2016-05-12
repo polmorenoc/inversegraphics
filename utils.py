@@ -1185,6 +1185,15 @@ def loadMasks(imagesDir, maskSet):
 
     return np.vstack(masks)
 
+def loadMasksMug(imagesDir, maskSet):
+    masks = []
+    for imageit, imageid  in enumerate(maskSet):
+
+        if os.path.isfile(imagesDir + 'mask' + str(imageid) + '_mug.npy'):
+            masks = masks + [np.load(imagesDir + 'mask' + str(imageid) + '_mug.npy')[None,:,:]]
+
+    return np.vstack(masks)
+
 def readImages(imagesDir, imageSet, loadGray=False, loadFromHdf5=False):
     if loadFromHdf5:
         if not loadGray:

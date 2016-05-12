@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_multi'
+prefix = 'train4_occlusion_multi2'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
@@ -435,7 +435,7 @@ groundTruth = np.array([], dtype = gtDtype)
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'a')
 
-gtDataFileToRender = h5py.File(gtDir + 'groundTruth.h5', 'w')
+gtDataFileToRender = h5py.File(gtDir + 'groundTruthToRender.h5', 'w')
 gtDatasetToRender = gtDataFileToRender.create_dataset(prefix, data=groundTruth, maxshape=(None,))
 
 nextId = 0
@@ -740,6 +740,7 @@ if not renderFromPreviousGT:
                     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, verticesMug, f_list_mug, vc_mug,  normalsMug, uv_mug, haveTextures_list_mug, textures_list_mug)
                     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, Faces, VColors, vnGT, UVs, HaveTextures, TexturesList)
 
+                    ipdb.set_trace()
                     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, uv, haveTextures_list, textures_list, frustum, None)
                 ## Blender: Unlink and link new teapot.
                 if useBlender:

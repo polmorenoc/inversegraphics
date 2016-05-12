@@ -242,7 +242,7 @@ ignore = []
 if os.path.isfile(gtDir + 'ignore.npy'):
     ignore = np.load(gtDir + 'ignore.npy')
 
-groundTruthFilename = gtDir + 'groundTruth.h5'
+groundTruthFilename = gtDir + 'groundTruthToRender.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 rangeTests = np.arange(0,10)
@@ -423,7 +423,6 @@ model = 1
 maxiter = 100
 numSamples = 1
 
-
 mintime = time.time()
 
 free_variables = [ chAz, chEl]
@@ -467,9 +466,6 @@ if useShapeModel:
 
     chVertices = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVertices.T).T
 
-    chNormals = shape_model.chGetNormals(chVertices, faces)
-
-    smNormals = [chNormals]
     smFaces = [[faces]]
     smVColors = [chVColors*np.ones(chVertices.shape)]
     smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
@@ -513,16 +509,15 @@ if useShapeModel:
 
     verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, np.array([0,0,0]))
 
-    VerticesB = v + verticesMug
-    NormalsB = vn + normalsMug
-    FacesB = Faces + f_list_mug
-    VColorsB = VColors + vc_mug
-    UVsB = UVs + uv_mug
-    HaveTexturesB = HaveTextures + haveTextures_list_mug
-    TexturesListB = TexturesList + textures_list_mug
+    VerticesB = [v] + [verticesMug]
+    NormalsB = [vn] + [normalsMug]
+    FacesB = [Faces] + [f_list_mug]
+    VColorsB = [VColors] + [vc_mug]
+    UVsB = [UVs] + [uv_mug]
+    HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
+    TexturesListB = [TexturesList] + [textures_list_mug]
 
-    renderer = createRendererTarget(glMode, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height,
-                              UVsB, HaveTexturesB, TexturesListB, frustum, None)
+    renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
 
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
@@ -553,6 +548,7 @@ if loadMask:
 
 # plt.imsave('renderered.png', lin2srgb(render))
 
+test_i = 0
 
 color = testVColorGT[test_i]
 az = 0
@@ -562,22 +558,57 @@ lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
 if useShapeModel:
     shapeParams = testShapeParamsGT[test_i]
 
-chAz[:] = az
+chAz[:] = 0
 chEl[:] = el
 chVColors[:] = color
 chLightSHCoeffs[:] = lightCoefficientsRel
 if useShapeModel:
     chShapeParams[:] = shapeParams
 
-
-chObjAz[:] = testObjAzGTRel[test_i]
+chObjAz[:] = testObjAzsGT[test_i] - testAzsGT[test_i]
 chObjDist[:] = testObjDistGT[test_i]
-chObjRotation[:] = testObjRotationGT[test_i]
-chObjAzMug[:] = testObjAzMugRel[test_i]
+chObjRotation[:] = testObjRotationGT[test_i] - testAzsGT[test_i]
+chObjAzMug[:] =  testObjAzMug[test_i] - testAzsGT[test_i]
 chObjDistMug[:] = testObjDistMug[test_i]
-chObjRotationMug[:] = testObjRotationMug[test_i]
+chObjRotationMug[:] = testObjRotationMug[test_i] - testAzsGT[test_i]
 
 chVColorsMug[:] = testVColorMug[test_i]
+
+image = skimage.transform.resize(images[test_i], [height, width])
+imageSrgb = image.copy()
+rendererGT[:] = srgb2lin(image)
+
+masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
+masksMug = loadMasksMug(gtDir + '/masks_occlusion/', testSet)
+
+maskTeapot = masksGT[test_i]
+maskMug = masksMug[test_i]
+
+coords = np.meshgrid(np.arange(width)-width/2, np.arange(height)-height/2)
+
+
+coordsMugX = coords[1][maskMug]
+coordsMugY = coords[0][maskMug]
+
+bbRendererGT = rendererGT.r.copy()
+
+bbRendererGT[coordsMugX.min()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
+bbRendererGT[coordsMugX.max()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
+bbRendererGT[coordsMugX.min()+width/2 : coordsMugX.max() + width/2, coordsMugY.min()+height/2] = np.array([1,0,0])
+bbRendererGT[coordsMugX.min()+width/2:coordsMugX.max()+width/2, coordsMugY.max() + height/2] = np.array([1,0,0])
+plt.imsave('bbRendererGT.png', bbRendererGT)
+
+coordsTeapotX = coords[1][maskTeapot]
+coordsTeapotY = coords[0][maskTeapot]
+
+bbRendererGT[coordsTeapotX.min()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
+bbRendererGT[coordsTeapotX.max()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
+bbRendererGT[coordsTeapotX.min()+width/2 : coordsTeapotX.max() + width/2, coordsTeapotY.min()+height/2] = np.array([1,0,0])
+bbRendererGT[coordsTeapotX.min()+width/2:coordsTeapotX.max()+width/2, coordsTeapotY.max() + height/2] = np.array([1,0,0])
+plt.imsave('bbRendererGT.png', bbRendererGT)
+
+# createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+# camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
 
 ipdb.set_trace()
 
@@ -778,37 +809,6 @@ else:
 
 SHModel = ""
 
-# import theano
-# import theano.tensor as T
-
-# ## Theano NN error function 1.
-# with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
-#     neuralNetModelPose = pickle.load(pfile)
-#
-# meanImage = neuralNetModelPose['mean'].reshape([150,150])
-#
-# modelType = neuralNetModelPose['type']
-# param_values = neuralNetModelPose['params']
-# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-# layer = lasagne.layers.get_all_layers(network)[-2]
-# inputLayer = lasagne.layers.get_all_layers(network)[0]
-# layer_output = lasagne.layers.get_output(layer, deterministic=True)
-# dim_output= layer.output_shape[1]
-#
-# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-# layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
-# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
-# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
-#
-# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
-#
-# chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
-#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
-#
-# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
-#
-# chThError.r
 
 if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLightCoefficientsPred.npy"):
     if 'neuralNetModelSHLight' in parameterRecognitionModels:
@@ -960,68 +960,6 @@ SHFilename = 'data/LightSHCoefficients.pickle'
 with open(SHFilename, 'rb') as pfile:
     envMapDic = pickle.load(pfile)
 hdritems = list(envMapDic.items())[:]
-
-## NN prediction samples analysis.
-# directory = resultDir
-# plt.ioff()
-# fig = plt.figure()
-# errorFun = models[0]
-# for test_i, sampleAzsPredictions in enumerate(azsPredictions):
-#
-#     testId = dataIds[test_i]
-#
-#     rendererGT[:] = srgb2lin(images[test_i])
-#
-#     testnum = (test_i + 1)*2
-#
-#     plt.scatter(np.ones_like(sampleAzsPredictions)*testnum, np.mod(sampleAzsPredictions*180/np.pi, 360), c='b')
-#
-#     bestAzErr = np.finfo('f').max
-#     bestAz = testAzsRel[test_i]
-#     bestAzNormalErr = np.finfo('f').max
-#     bestAzNormal = testAzsRel[test_i]
-#     for sample_i in range(len(testAzsRel)):
-#
-#         color = testVColorGT[test_i]
-#         az =  sampleAzsPredictions[sample_i]
-#         el = testElevsGT[test_i]
-#         lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
-#         chAz[:] = az
-#         chEl[:] = el
-#         chVColors[:] = color
-#         chLightSHCoeffs[:] = lightCoefficientsRel
-#         if chThError.r < bestAzErr:
-#             bestAzErr = chThError.r
-#             bestAz = az
-#         if errorFun.r < bestAzNormalErr:
-#             bestAzNormalErr = errorFun.r
-#             bestAzNormal = az
-#
-#     from sklearn import mixture
-#     # gmm = mixture.GMM(n_components=20, covariance_type='spherical', min_covar=radians(5)**2, init_params='wmc', params='wmc')
-#
-#     # gmm.fit(np.hstack([sinAzsPredictions[:,sample_i][:,None], cosAzsPredictions[:,sample_i][:,None]]))
-#     # azsGmms = azsGmms + [gmm]
-#     # for comp_i, weight in enumerate(gmm.weights_):
-#     #     meanSin = gmm.means_[comp_i][0]
-#     #     meanCos = gmm.means_[comp_i][1]
-#     #     azCompMean = np.arctan2(meanSin, meanCos)
-#     #     plt.plot(sample-0.4, np.mod(azCompMean*180/np.pi, 360), marker='o', ms=weight*50, c='y')
-#     plt.plot(testnum,np.mod(bestAzNormal*180/np.pi,360), marker='o', ms=20, c='purple')
-#     plt.plot(testnum,np.mod(bestAz*180/np.pi,360), marker='o', ms=20, c='y')
-#     plt.plot(testnum,testAzsRel[test_i]*180/np.pi, marker='o', ms=20, c='g')
-#     plt.plot(testnum, np.mod(azsPred[test_i]*180/np.pi, 360), marker='o', ms=20, c='r')
-#
-# plt.xlabel('Sample')
-# plt.ylabel('Angular error')
-# x1,x2,y1,y2 = plt.axis()
-# plt.axis((0,len(testSet+1)*2,0,360))
-# plt.title('Neuralnet multiple predictions')
-# fig.savefig(directory + 'neuralNet_Az_scatter.png', bbox_inches='tight')
-# plt.close(fig)
-# # elsPredictions = [np.arctan2(sinElsPredictions[i], cosAzsPredictions[i]) for i in range(len(cosAzsPredictions))]
-#
-#
 
 analyzeSamples = False
 
