@@ -551,7 +551,7 @@ if loadMask:
 test_i = 0
 
 color = testVColorGT[test_i]
-az = 0
+az = testAzsGT[test_i]
 el = testElevsGT[test_i]
 lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
 
@@ -586,7 +586,6 @@ maskMug = masksMug[test_i]
 
 coords = np.meshgrid(np.arange(width)-width/2, np.arange(height)-height/2)
 
-
 coordsMugX = coords[1][maskMug]
 coordsMugY = coords[0][maskMug]
 
@@ -607,8 +606,27 @@ bbRendererGT[coordsTeapotX.min()+width/2 : coordsTeapotX.max() + width/2, coords
 bbRendererGT[coordsTeapotX.min()+width/2:coordsTeapotX.max()+width/2, coordsTeapotY.max() + height/2] = np.array([1,0,0])
 plt.imsave('bbRendererGT.png', bbRendererGT)
 
+posMug = np.array([(coordsMugY.min() + coordsMugY.max())/2, (coordsMugX.min() + coordsMugX.max())/2])
+posTeapot = np.array([(coordsTeapotY.min() + coordsTeapotY.max())/2, (coordsTeapotX.min() + coordsTeapotX.max())/2])
+
 # createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
-# camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+chAzCam = ch.Ch([0])
+chElCam = chEl.r
+
+relPosTeapotGT = v[0].r.sum(axis=0)/v[0].r.shape[0]
+relPosMugGT = verticesMug[0].r.sum(axis=0)/verticesMug[0].r.shape[0]
+
+imPosMugCam, modelRotation = setupCamera(ch.Ch(relPosMugGT), chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
+imPosMug = imPosMugCam.r- np.array([height/2, width/2])
+
+posMugCrossVecMat = np.array([[0, posMug[1], - 1], [1, 0, -posMug[0]], [-posMug[1], posMug[0], 0]])
+
+Amug = posMugCrossVecMat.dot(imPosMugCam.camera_mtx.dot(imPosMugCam.view_matrix[0:3,0:3]))
+
+np.linalg.solve(Amug)
+
+imPosTeapotCam, modelRotation = setupCamera(ch.Ch(relPosTeapotGT), chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
+imPosTeapot = imPosTeapotCam.r - np.array([height/2, width/2])
 
 ipdb.set_trace()
 

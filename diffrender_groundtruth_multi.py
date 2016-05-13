@@ -645,8 +645,8 @@ if not renderFromPreviousGT:
                     rotationRange = 2 * np.pi
                     rotationInterval = 10 * np.pi / 180
 
-                    objDisplacementMat = computeHemisphereTransformation(chObjRotationGT, 0, chObjDistGT,
-                                                                         np.array([0, 0, 0]))
+                    objDisplacementMat = computeHemisphereTransformation(chObjRotationGT, 0, chObjDistGT, np.array([0, 0, 0]))
+
                     objOffset = objDisplacementMat[0:3, 3]
 
                     instantiationBinsTeapot, totalBinsTeapot = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeTeapot,

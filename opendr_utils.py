@@ -507,6 +507,7 @@ def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
     camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
     return camera, modelRotation
 
+
 def computeHemisphereTransformation(chAz, chEl, chDist, objCenter):
 
     chDistMat = geometry.Translate(x=ch.Ch(0), y=-chDist, z=ch.Ch(0))
