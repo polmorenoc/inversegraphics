@@ -329,7 +329,7 @@ def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, v
     else:
         vstack = ch.vstack(vflat)
 
-    camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+    camera, modelRotation, _ = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
 
     setupTexturedRenderer(renderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
@@ -349,7 +349,7 @@ def createRendererGT(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, ligh
     else:
         vstack = ch.vstack(vch)
 
-    camera, modelRotation = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+    camera, modelRotation, _ = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
     vnflat = [item for sublist in vn for item in sublist]
     # vnch = [ch.array(vnflat[mesh]) for mesh in rangeMeshes]
     # vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
@@ -505,7 +505,7 @@ def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
     translation, rotation = (chTranslation, chRod)
     camera = ProjectPoints(v=v, rt=rotation, t=translation, f= 1.12*ch.array([width,width]), c=ch.array([width,height])/2.0, k=ch.zeros(5))
     camera.openglMat = np.array(mathutils.Matrix.Rotation(radians(180), 4, 'X'))
-    return camera, modelRotation
+    return camera, modelRotation, chMVMat
 
 
 def computeHemisphereTransformation(chAz, chEl, chDist, objCenter):
