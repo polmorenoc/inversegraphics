@@ -549,159 +549,151 @@ if loadMask:
 # plt.imsave('renderered.png', lin2srgb(render))
 
 test_i = 0
+for test_i in range(len(testSet)):
 
-color = testVColorGT[test_i]
-az = testAzsGT[test_i]
-el = testElevsGT[test_i]
-lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+    color = testVColorGT[test_i]
+    az = testAzsGT[test_i]
+    el = testElevsGT[test_i]
+    lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
 
-if useShapeModel:
-    shapeParams = testShapeParamsGT[test_i]
+    if useShapeModel:
+        shapeParams = testShapeParamsGT[test_i]
 
-chAz[:] = 0
-chEl[:] = el
-chVColors[:] = color
-chLightSHCoeffs[:] = lightCoefficientsRel
-if useShapeModel:
-    chShapeParams[:] = shapeParams
+    chAz[:] = 0
+    chEl[:] = el
+    chVColors[:] = color
+    chLightSHCoeffs[:] = lightCoefficientsRel
+    if useShapeModel:
+        chShapeParams[:] = shapeParams
 
-chObjAz[:] = testObjAzsGT[test_i] - testAzsGT[test_i]
-chObjDist[:] = testObjDistGT[test_i]
-chObjRotation[:] = testObjRotationGT[test_i] - testAzsGT[test_i]
-chObjAzMug[:] =  testObjAzMug[test_i] - testAzsGT[test_i]
-chObjDistMug[:] = testObjDistMug[test_i]
-chObjRotationMug[:] = testObjRotationMug[test_i] - testAzsGT[test_i]
+    chObjAz[:] = testObjAzsGT[test_i] - testAzsGT[test_i]
+    chObjDist[:] = testObjDistGT[test_i]
+    chObjRotation[:] = testObjRotationGT[test_i] - testAzsGT[test_i]
+    chObjAzMug[:] =  testObjAzMug[test_i] - testAzsGT[test_i]
+    chObjDistMug[:] = testObjDistMug[test_i]
+    chObjRotationMug[:] = testObjRotationMug[test_i] - testAzsGT[test_i]
 
-chVColorsMug[:] = testVColorMug[test_i]
+    chVColorsMug[:] = testVColorMug[test_i]
 
-image = skimage.transform.resize(images[test_i], [height, width])
-imageSrgb = image.copy()
-rendererGT[:] = srgb2lin(image)
+    image = skimage.transform.resize(images[test_i], [height, width])
+    imageSrgb = image.copy()
+    rendererGT[:] = srgb2lin(image)
 
-masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
-masksMug = loadMasksMug(gtDir + '/masks_occlusion/', testSet)
+    masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
+    masksMug = loadMasksMug(gtDir + '/masks_occlusion/', testSet)
 
-maskTeapot = masksGT[test_i]
-maskMug = masksMug[test_i]
+    maskTeapot = masksGT[test_i]
+    maskMug = masksMug[test_i]
 
-coords = np.meshgrid(np.arange(width)-width/2, np.arange(height)-height/2)
+    coords = np.meshgrid(np.arange(width)-width/2, np.arange(height)-height/2)
 
-coordsMugX = coords[1][maskMug]
-coordsMugY = coords[0][maskMug]
+    coordsMugX = coords[1][maskMug]
+    coordsMugY = coords[0][maskMug]
 
-bbRendererGT = rendererGT.r.copy()
+    bbRendererGT = rendererGT.r.copy()
 
-bbRendererGT[coordsMugX.min()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
-bbRendererGT[coordsMugX.max()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
-bbRendererGT[coordsMugX.min()+width/2 : coordsMugX.max() + width/2, coordsMugY.min()+height/2] = np.array([1,0,0])
-bbRendererGT[coordsMugX.min()+width/2:coordsMugX.max()+width/2, coordsMugY.max() + height/2] = np.array([1,0,0])
+    bbRendererGT[coordsMugX.min()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
+    bbRendererGT[coordsMugX.max()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
+    bbRendererGT[coordsMugX.min()+width/2 : coordsMugX.max() + width/2, coordsMugY.min()+height/2] = np.array([1,0,0])
+    bbRendererGT[coordsMugX.min()+width/2:coordsMugX.max()+width/2, coordsMugY.max() + height/2] = np.array([1,0,0])
 
-coordsTeapotX = coords[1][maskTeapot]
-coordsTeapotY = coords[0][maskTeapot]
+    coordsTeapotX = coords[1][maskTeapot]
+    coordsTeapotY = coords[0][maskTeapot]
 
-bbRendererGT[coordsTeapotX.min()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
-bbRendererGT[coordsTeapotX.max()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
-bbRendererGT[coordsTeapotX.min()+width/2 : coordsTeapotX.max() + width/2, coordsTeapotY.min()+height/2] = np.array([1,0,0])
-bbRendererGT[coordsTeapotX.min()+width/2:coordsTeapotX.max()+width/2, coordsTeapotY.max() + height/2] = np.array([1,0,0])
-
-
-posMug = np.array([(coordsMugY.min() + coordsMugY.max())/2, (coordsMugX.min() + coordsMugX.max())/2])
-posTeapot = np.array([(coordsTeapotY.min() + coordsTeapotY.max())/2, (coordsTeapotX.min() + coordsTeapotX.max())/2])
-
-# createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
-chAzCam = ch.Ch([0])
-chElCam = ch.Ch(chEl.r.copy())
-
-relPosTeapotGT = v[0].r.sum(axis=0)/v[0].r.shape[0]
-relPosMugGT = verticesMug[0].r.sum(axis=0)/verticesMug[0].r.shape[0]
-
-bbRendererGT[posMug[1] - 2+width/2:posMug[1] + 2+width/2, posMug[0] - 2 + height/2: posMug[0] + 2 + height/2] = np.array([1,0,0])
-bbRendererGT[posTeapot[1] - 2+width/2:posTeapot[1] + 2+width/2, posTeapot[0] - 2 + height/2: posTeapot[0] + 2 + height/2] = np.array([1,0,0])
+    bbRendererGT[coordsTeapotX.min()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
+    bbRendererGT[coordsTeapotX.max()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
+    bbRendererGT[coordsTeapotX.min()+width/2 : coordsTeapotX.max() + width/2, coordsTeapotY.min()+height/2] = np.array([1,0,0])
+    bbRendererGT[coordsTeapotX.min()+width/2:coordsTeapotX.max()+width/2, coordsTeapotY.max() + height/2] = np.array([1,0,0])
 
 
-# posTeapotCrossVecMat = np.array([[0, posMug[1], - 1], [1, 0, -posMug[0]], [-posMug[1], posMug[0], 0]])
-#
-# Amug = posMugCrossVecMat.dot(imPosMugCam.camera_mtx.dot(imPosMugCam.view_matrix[0:3,0:3]))
+    posMug = np.array([(coordsMugY.min() + coordsMugY.max())/2, (coordsMugX.min() + coordsMugX.max())/2])
+    posTeapot = np.array([(coordsTeapotY.min() + coordsTeapotY.max())/2, (coordsTeapotX.min() + coordsTeapotX.max())/2])
 
-# np.linalg.solve(Amug)
+    # createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+    chAzCam = ch.Ch([0])
+    chElCam = ch.Ch(chEl.r.copy())
 
+    relPosTeapotGT = v[0].r.sum(axis=0)/v[0].r.shape[0]
+    relPosMugGT = verticesMug[0].r.sum(axis=0)/verticesMug[0].r.shape[0]
 
-_, _, camTransfomMatGT = setupCamera(np.array([0,0,0]), chAz.r, chEl.r, chDist, np.array([0,0,0.1]), width, height)
-camEyeGT = camTransfomMatGT[0:4,0:4].dot(np.array([0,0,0,1]))[0:3]
+    bbRendererGT[posMug[1] - 2+width/2:posMug[1] + 2+width/2, posMug[0] - 2 + height/2: posMug[0] + 2 + height/2] = np.array([1,0,0])
+    bbRendererGT[posTeapot[1] - 2+width/2:posTeapot[1] + 2+width/2, posTeapot[0] - 2 + height/2: posTeapot[0] + 2 + height/2] = np.array([1,0,0])
 
-vecMugToCamGT = camEyeGT - (mugPosOffset + np.array([0,0,0.1]))
-mugCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) - vecMugToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) + ch.norm(ch.array([0,-1,0]))*vecMugToCamGT))
+    _, _, camTransfomMatGT = setupCamera(np.array([0,0,0]), chAz.r, chEl.r, chDist, np.array([0,0,0.1]), width, height)
+    camEyeGT = camTransfomMatGT[0:4,0:4].dot(np.array([0,0,0,1]))[0:3]
 
-vecTeapotToCamGT = camEyeGT - (teapotPosOffset + np.array([0,0,0.1]))
-teapotCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) - vecTeapotToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCamGT))
+    vecMugToCamGT = camEyeGT - (mugPosOffset + np.array([0,0,0.1]))
+    mugCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) - vecMugToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) + ch.norm(ch.array([0,-1,0]))*vecMugToCamGT))
 
-objDisplacementMat = computeHemisphereTransformation(chObjRotationMug, 0, chObjDistMug, np.array([0, 0, 0.1]))
-pointMug = objDisplacementMat[0:3, 3]
+    vecTeapotToCamGT = camEyeGT - (teapotPosOffset + np.array([0,0,0.1]))
+    teapotCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) - vecTeapotToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCamGT))
 
-# pointMug = ch.Ch([0,0,0.1])
-imPosMugCam, modelRotation, camTransfomMat = setupCamera(pointMug, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
-imPosMug = imPosMugCam - np.array([height/2, width/2])
+    objDisplacementMat = computeHemisphereTransformation(chObjRotationMug, 0, chObjDistMug, np.array([0, 0, 0.05]))
+    pointMug = objDisplacementMat[0:3, 3]
 
-objDisplacementMat = computeHemisphereTransformation(chObjRotation, 0, chObjDist, np.array([0, 0, 0.1]))
-pointTeapot = objDisplacementMat[0:3, 3]
-# pointTeapot = ch.Ch([0,0,0.1])
+    # pointMug = ch.Ch([0,0,0.1])
+    imPosMugCam, modelRotation, camTransfomMat = setupCamera(pointMug, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
+    imPosMug = imPosMugCam - np.array([height/2, width/2])
 
-imPosTeapotCam, modelRotation, camTransfomMat = setupCamera(pointTeapot, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
-imPosTeapot = imPosTeapotCam - np.array([height/2, width/2])
+    objDisplacementMat = computeHemisphereTransformation(chObjRotation, 0, chObjDist, np.array([0, 0, 0.1]))
+    pointTeapot = objDisplacementMat[0:3, 3]
+    # pointTeapot = ch.Ch([0,0,0.1])
 
-errMug = ch.sum((imPosMug - posMug)**2)
-errTeapot = ch.sum((imPosTeapot - posTeapot)**2)
+    imPosTeapotCam, modelRotation, camTransfomMat = setupCamera(pointTeapot, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
+    imPosTeapot = imPosTeapotCam - np.array([height/2, width/2])
 
-camEye = camTransfomMat[0:4,0:4].dot(np.array([0,0,0, 1]))[0:3]
+    errMug = ch.sum((imPosMug - posMug)**2)
+    errTeapot = ch.sum((imPosTeapot - posTeapot)**2)
 
-vecMugToCam = camEye - pointMug
-mugCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) - vecMugToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) + ch.norm(ch.array([0,-1,0]))*vecMugToCam))
+    camEye = camTransfomMat[0:4,0:4].dot(np.array([0,0,0, 1]))[0:3]
 
-vecTeapotToCam = camEye - pointTeapot
+    vecMugToCam = camEye - pointMug
+    mugCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) - vecMugToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) + ch.norm(ch.array([0,-1,0]))*vecMugToCam))
 
-teapotCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) - vecTeapotToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCam))
+    vecTeapotToCam = camEye - pointTeapot
 
-chElPredMug = mugCamElGT
-chElPredTeapot = teapotCamElGT
+    teapotCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) - vecTeapotToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCam))
 
-errElMug = ch.sum((chElPredMug  - mugCamEl)**2)
-errElTeapot = ch.sum((chElPredTeapot - teapotCamEl)**2)
+    chElPredMug = mugCamElGT
+    chElPredTeapot = teapotCamElGT
 
-# spatialFreeVars = [pointTeapot[0:2], pointMug[0:2], chElCam]
-spatialFreeVars = [chObjRotationMug, chObjRotation, chObjDistMug, chObjDist, chElCam]
+    errElMug = ch.sum((chElPredMug*180/np.pi  - mugCamEl*180/np.pi)**2)
+    errElTeapot = ch.sum((chElPredTeapot*180/np.pi - teapotCamEl*180/np.pi)**2)
 
-spatialErrorFun = errMug + errTeapot + errElMug*10+ errElTeapot*10
+    # spatialFreeVars = [pointTeapot[0:2], pointMug[0:2], chElCam]
+    spatialFreeVars = [chObjRotationMug, chObjRotation, chObjDistMug, chObjDist, chElCam]
 
-def cbS(_):
-    pass
+    spatialErrorFun = errMug + errTeapot + errElMug+ errElTeapot
 
-bbRendererGT[imPosTeapot[1] - 2 +width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,0,1])
-bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,0,1])
+    def cbS(_):
+        pass
 
-plt.imsave('rendererPred.png', renderer.r)
+    bbRendererGT[imPosTeapot[1] - 2 +width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,0,1])
+    bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,0,1])
 
-#Dumb initial state (center of table).
-chObjDist[:] = 0
-chObjRotation[:] = 0
-chObjDistMug[:] = 0
-chObjRotationMug[:] = 0
+    plt.imsave('tmp/rendererPred' + str(test_i) + '.png', renderer.r)
 
-plt.imsave('rendererInit.png', renderer.r)
+    #Dumb initial state (center of table).
+    chObjDist[:] = 0
+    chObjRotation[:] = 0
+    chObjDistMug[:] = 0
+    chObjRotationMug[:] = 0
 
-# ch.minimize({'raw': spatialErrorFun }, bounds=[(-0.5,0.5), (-0.5,0.5), (0,np.pi/2)], method=methods[1], x0=spatialFreeVars, callback=cbS, options={'disp':False, 'maxiter':10})
-ch.minimize({'raw': spatialErrorFun }, bounds=[(-2*np.pi,2*np.pi), (-2*np.pi,2*np.pi), (0,0.5), (0,0.5), (0,np.pi/2)], method=methods[1], x0=spatialFreeVars, callback=cbS, options={'disp':False, 'maxiter':10})
+    plt.imsave('tmp/rendererInit' + str(test_i) + '.png', renderer.r)
 
-bbRendererGT[imPosTeapot[1] - 2+width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,1,0])
-bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,1,0])
+    # ch.minimize({'raw': spatialErrorFun }, bounds=[(-0.5,0.5), (-0.5,0.5), (0,np.pi/2)], method=methods[1], x0=spatialFreeVars, callback=cbS, options={'disp':False, 'maxiter':10})
+    ch.minimize({'raw': spatialErrorFun }, bounds=[(-2*np.pi,2*np.pi), (-2*np.pi,2*np.pi), (0,0.5), (0,0.5), (0,np.pi/2)], method=methods[2], x0=spatialFreeVars, callback=cbS, options={'disp':True, 'maxiter':50})
 
-plt.imsave('bbRendererGT.png', bbRendererGT)
+    bbRendererGT[imPosTeapot[1] - 2+width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,1,0])
+    bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,1,0])
 
-# chEl[:] = chElCam.r.copy()
+    plt.imsave('tmp/bbRendererGT' + str(test_i) + '.png', bbRendererGT)
 
-plt.imsave('rendererOpt.png', renderer.r)
+    chEl[:] = chElCam.r.copy()
+
+    plt.imsave('tmp/rendererOpt' + str(test_i) + '.png', renderer.r)
 
 ipdb.set_trace()
-
 
 import skimage.color
 
