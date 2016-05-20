@@ -51,8 +51,8 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-renderTeapots =  False
-renderMugs = False
+renderTeapots =  True
+renderMugs = True
 teapotSceneIndex = 0
 mugSceneIndex = 0
 if renderTeapots and renderMugs:
@@ -99,7 +99,7 @@ mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(teapots))[0:1]
 
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -523,8 +523,8 @@ if not renderFromPreviousGT:
 
     for scene_i, sceneIdx in enumerate(scenesToRender):
 
-        print("Generating groundtruth for scene: " + str(sceneIdx))
         sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+        print("Generating groundtruth for scene: " + str(sceneNumber))
 
         # targetIndices = scenes[scene_i]
         # if not targetIndices:
@@ -626,9 +626,15 @@ if not renderFromPreviousGT:
                 supportRad = np.sqrt(0.5 * (supportDepthMax - supportDepthMin) ** 2 + 0.5 * (supportWidthMax - supportWidthMin) ** 2)
 
                 sceneCollisions = {}
-                collisionsFile = 'data/collisions/discreteCollisions_scene' + str(scene_i) + '_targetIdx' + str(targetIndex) + '.pickle'
+                collisionsFile = 'data/collisions/discreteCollisions_scene' + str(sceneNumber) + '_targetIdx' + str(targetIndex) + '.pickle'
+
+                distRange = min(supportRad, 0.3)
+                distInterval = 0.05
+                rotationRange = 2 * np.pi
+                rotationInterval = 10 * np.pi / 180
 
                 if not parseSceneInstantiations and os.path.exists(collisionsFile):
+
                     with open(collisionsFile, 'rb') as pfile:
                         sceneCollisions = pickle.load(pfile)
 
@@ -642,7 +648,8 @@ if not renderFromPreviousGT:
                     totalBinsTeapot = sceneCollisions['totalBinsTeapot']
                     totalBinsMug = sceneCollisions['totalBinsMug']
                 else:
-                    print("Parsing collisions for scene " + str(scene_i))
+
+                    print("Parsing collisions for scene " + str(sceneNumber))
                     placeCamera(cubeScene.camera, 0,
                                 45, chDistGT.r[0].copy(),
                                 center[:].copy() + targetPosition[:].copy())
@@ -670,11 +677,6 @@ if not renderFromPreviousGT:
                     cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
                     cubeScene.update()
 
-                    distRange = min(supportRad, 0.3)
-                    distInterval = 0.05
-                    rotationRange = 2 * np.pi
-                    rotationInterval = 10 * np.pi / 180
-
                     objDisplacementMat = computeHemisphereTransformation(chObjRotationGT, 0, chObjDistGT, np.array([0, 0, 0]))
 
                     objOffset = objDisplacementMat[0:3, 3]
@@ -699,6 +701,8 @@ if not renderFromPreviousGT:
                     sceneCollisions = {'totalBinsTeapot':totalBinsTeapot,'totalBinsMug':totalBinsMug, 'supportRad':supportRad,'instantiationBinsTeapot':instantiationBinsTeapot, 'distRange':distRange,'rotationRange':rotationRange,'distInterval':distInterval, 'rotationInterval':rotationInterval,'instantiationBinsMug':instantiationBinsMug}
                     with open(collisionsFile, 'wb') as pfile:
                         pickle.dump(sceneCollisions, pfile)
+
+                    continue
 
 
                 #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
@@ -942,9 +946,25 @@ if not renderFromPreviousGT:
                             chObjDistMugVals = np.random.uniform(0,np.min(supportRad, 0.4))
                             chObjRotationMugVals = np.random.uniform(0,np.pi*2)
 
-                            mugPlacement = np.random.choice(instantiationBinsMug.sum())
-                            chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMug][mugPlacement]
-                            chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMug][mugPlacement]
+                            instantiationBinsMugUpdated = instantiationBinsMug
+                            if renderTeapots:
+                                ys = -np.cos(totalBinsMug[1]) * totalBinsMug[0]
+                                xs = np.sin(totalBinsMug[1]) * totalBinsMug[0]
+
+                                y = -np.cos(chObjRotationGTVals) * chObjDistGTVals
+                                x = np.sin(chObjRotationGTVals) * chObjDistGTVals
+
+                                instantiationBinsMugUpdated = instantiationBinsMug.copy()
+                                # instantiationBinsMugUpdated[(totalBinsMug[0] > chObjDistGTVals - 0.15) & (totalBinsMug[0] < chObjDistGTVals + 0.15) & (totalBinsMug[1] > chObjRotationGTVals - 15*np.pi/180) & (totalBinsMug[1] < chObjRotationGTVals + 15*np.pi/180)] = False
+
+                                instantiationBinsMugUpdated[np.sqrt((ys-y)**2 + (xs-x)**2) < 0.15] = False
+
+                                if instantiationBinsMugUpdated.sum() == 0:
+                                    ignore = True
+
+                            mugPlacement = np.random.choice(instantiationBinsMugUpdated.sum())
+                            chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMugUpdated][mugPlacement]
+                            chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMugUpdated][mugPlacement]
                             chObjDistMugVals = np.random.uniform(chObjDistMugVals - distInterval/2, chObjDistMugVals + distInterval/2)
                             chObjRotationMugVals = np.mod(np.random.uniform(chObjRotationMugVals - rotationInterval/2, chObjRotationMugVals + rotationInterval/2), 2*np.pi)
                             chObjDistMug[:] = chObjDistMugVals
@@ -962,7 +982,6 @@ if not renderFromPreviousGT:
                             chObjAzMugVals = np.random.uniform(chAzGT.r - mugPosRight*angleToMug - 2 * np.pi / 3, chAzGT.r - mugPosRight * angleToMug + 2 * np.pi / 3)
                             chObjAzMugRel = chAzGT.r - mugPosRight*angleToMug
                             chObjAzMug[:] = chObjAzMugVals
-
 
                             chVColorsMug[:] = chVColorsMugVals
 
@@ -1000,7 +1019,7 @@ if not renderFromPreviousGT:
 
                         ## Some validation checks:
 
-                        if useOpenDR:
+                        if useOpenDR and not ignore:
                             if renderTeapots:
                                 occlusion = getOcclusionFraction(rendererGT, id=teapotSceneIndex)
                                 vis_occluded = np.array(rendererGT.indices_image == teapotSceneIndex+1).copy().astype(np.bool)
@@ -1011,20 +1030,20 @@ if not renderFromPreviousGT:
                                 vis_occluded_mug = np.array(rendererGT.indices_image == mugSceneIndex+1).copy().astype(np.bool)
                                 vis_im_mug = np.array(rendererGT.image_mesh_bool([mugSceneIndex])).copy().astype(np.bool)
 
-                        if renderTeapots:
-                            if occlusion > 0.9 or vis_occluded.sum() < 10 or np.isnan(occlusion):
-                                ignore = True
+                            if renderTeapots:
+                                if occlusion > 0.9 or vis_occluded.sum() < 10 or np.isnan(occlusion):
+                                    ignore = True
 
-                            if np.sum(vis_im[:,0]) > 1 or np.sum(vis_im[0,:]) > 1 or np.sum(vis_im[:,-1]) > 1 or np.sum(vis_im[-1,:]) > 1:
-                                ignore = True
+                                if np.sum(vis_im[:,0]) > 1 or np.sum(vis_im[0,:]) > 1 or np.sum(vis_im[:,-1]) > 1 or np.sum(vis_im[-1,:]) > 1:
+                                    ignore = True
 
-                        if renderMugs:
-                            if  occlusionMug > 0.9 or vis_occluded_mug.sum() < 10 or np.isnan(occlusionMug):
-                                ignore = True
+                            if renderMugs:
+                                if  occlusionMug > 0.9 or vis_occluded_mug.sum() < 10 or np.isnan(occlusionMug):
+                                    ignore = True
 
-                            #Check that objects are not only partly in the viewing plane of the camera:
-                            if np.sum(vis_im_mug[:,0]) > 1 or np.sum(vis_im_mug[0,:]) > 1 or np.sum(vis_im_mug[:,-1]) > 1 or np.sum(vis_im_mug[-1,:]) > 1:
-                                ignore = True
+                                #Check that objects are not only partly in the viewing plane of the camera:
+                                if np.sum(vis_im_mug[:,0]) > 1 or np.sum(vis_im_mug[0,:]) > 1 or np.sum(vis_im_mug[:,-1]) > 1 or np.sum(vis_im_mug[-1,:]) > 1:
+                                    ignore = True
 
 
                         if not ignore:
