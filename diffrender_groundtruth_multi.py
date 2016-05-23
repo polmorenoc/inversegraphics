@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_multi3'
+prefix = 'train4_occlusion_multi_mugs'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
@@ -43,7 +43,7 @@ useOpenDR = True
 useBlender = True
 renderBlender = False
 captureEnvMapFromBlender = False
-parseSceneInstantiations = True
+parseSceneInstantiations = False
 loadBlenderSceneFile = True
 groundTruthBlender = True
 useCycles = True
@@ -51,13 +51,12 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-renderTeapots =  True
+renderTeapots =  False
 renderMugs = True
 teapotSceneIndex = 0
 mugSceneIndex = 0
 if renderTeapots and renderMugs:
     mugSceneIndex = 1
-
 
 glModes = ['glfw','mesa']
 glMode = glModes[0]
@@ -395,7 +394,7 @@ print("Generating renders")
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 
-trainSize = 20000
+trainSize = 10000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -698,12 +697,13 @@ if not renderFromPreviousGT:
                     cubeScene.objects.unlink(cubeMug)
                     deleteObject(cubeTeapot)
                     deleteObject(cubeMug)
-                    sceneCollisions = {'totalBinsTeapot':totalBinsTeapot,'totalBinsMug':totalBinsMug, 'supportRad':supportRad,'instantiationBinsTeapot':instantiationBinsTeapot, 'distRange':distRange,'rotationRange':rotationRange,'distInterval':distInterval, 'rotationInterval':rotationInterval,'instantiationBinsMug':instantiationBinsMug}
+                    sceneCollisions = {'totalBinsTeapot': totalBinsTeapot, 'totalBinsMug': totalBinsMug,
+                                       'supportRad': supportRad, 'instantiationBinsTeapot': instantiationBinsTeapot,
+                                       'distRange': distRange, 'rotationRange': rotationRange,
+                                       'distInterval': distInterval, 'rotationInterval': rotationInterval,
+                                       'instantiationBinsMug': instantiationBinsMug}
                     with open(collisionsFile, 'wb') as pfile:
                         pickle.dump(sceneCollisions, pfile)
-
-                    continue
-
 
                 #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
                 if instantiationBinsTeapot.sum() < 4 or instantiationBinsMug.sum() < 4:
@@ -849,8 +849,16 @@ if not renderFromPreviousGT:
 
                     envMapFilename = hdrFile
                     envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+                    numTeapotTrain = 0
+                    numAttempts = 0
+                    maxAttempts = max(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))),1)
+                    exitInstantiationLoop = False
+                    while numTeapotTrain < maxAttempts and not exitInstantiationLoop:
 
-                    for numTeapotTrain in range(max(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))),1)):
+                        numAttempts = numAttempts + 1
+                        if numAttempts > 10 and numAttempts/(numTeapotTrain + 1) > 10:
+                            exitInstantiationLoop = True
+
 
                         ignore = False
                         chAmbientIntensityGTVals = 0.75/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
@@ -941,7 +949,7 @@ if not renderFromPreviousGT:
                         chObjAzMugVals = 0
                         mugCamElGT = 0
                         mugPosOffsetVals = 0
-                        chVColorsMugVals = np.random.uniform(0.2, 0.8, [1, 3])
+                        chVColorsMugVals = np.random.uniform(0.1, 0.9, [1, 3])
                         if renderMugs:
                             chObjDistMugVals = np.random.uniform(0,np.min(supportRad, 0.4))
                             chObjRotationMugVals = np.random.uniform(0,np.pi*2)
@@ -1284,10 +1292,12 @@ if not renderFromPreviousGT:
 
 
                             train_i = train_i + 1
+                            numTeapotTrain = numTeapotTrain + 1
 
                             if np.mod(train_i, 100) == 0:
                                 print("Generated " + str(train_i) + " GT instances.")
                                 print("Generating groundtruth. Iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
+
 
 if renderFromPreviousGT:
     groundTruthFilename = 'groundtruth/' + previousGTPrefix + '/groundTruth.h5'
