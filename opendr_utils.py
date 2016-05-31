@@ -57,6 +57,104 @@ class TheanoFunOnOpenDR(Ch):
         if not self.initialized:
             self.compileFunctions()
 
+        n_channels = 1
+        if len(self.opendr_input.r.shape) == 3:
+            n_channels = self.opendr_input.r.shape[2]
+
+        h = self.opendr_input.r.shape[1]
+        w = self.opendr_input.r.shape[0]
+        x = self.opendr_input.r.reshape([1,n_channels,h,w]).astype(np.float32)
+        x_gt = self.opendr_input_gt.reshape([1,n_channels,h,w]).astype(np.float32)
+        # out_gt = self.predict_input_gt().ravel().astype(np.float32)
+
+        output = np.array(self.error_fun(x, x_gt))
+
+        return output.ravel()
+
+    def predict_input(self):
+        n_channels = 1
+        if len(self.opendr_input.r.shape) == 3:
+            n_channels = self.opendr_input.r.shape[2]
+
+        h = self.opendr_input.r.shape[1]
+        w = self.opendr_input.r.shape[0]
+        x = self.opendr_input.r.reshape([1,n_channels,h,w]).astype(np.float32)
+        output = self.prediction_fn(x)
+        return output.ravel()
+
+    def predict_input_gt(self):
+        n_channels = 1
+        if len(self.opendr_input.r.shape) == 3:
+            n_channels = self.opendr_input.r.shape[2]
+
+        h = self.opendr_input.r.shape[1]
+        w = self.opendr_input.r.shape[0]
+        x_gt = self.opendr_input_gt.reshape([1, n_channels, h, w]).astype(np.float32)
+        output = self.prediction_fn_gt(x_gt)
+        return output.ravel()
+
+    def compute_dr_wrt(self,wrt):
+        if self.opendr_input is wrt:
+            if not self.initialized:
+                self.compileFunctions()
+            n_channels = 1
+            if len(self.opendr_input.r.shape) == 3:
+                n_channels = self.opendr_input.r.shape[2]
+
+            h = self.opendr_input.r.shape[1]
+            w = self.opendr_input.r.shape[0]
+            x = self.opendr_input.r.reshape([1, n_channels, h, w]).astype(np.float32)
+            x_gt = self.opendr_input_gt.reshape([1, n_channels, h, w]).astype(np.float32)
+            jac = np.array(self.errorGrad_fun(x,x_gt)).squeeze().reshape([1,self.opendr_input.r.size])
+
+            return sp.csr.csr_matrix(jac)
+        return None
+
+    def old_grads(self):
+        import theano
+        import theano.tensor as T
+        self.grad_fns = [theano.function([self.theano_input], theano.gradient.grad(self.theano_output.flatten()[grad_i], self.theano_input)) for grad_i in range(self.dim_output)]
+        x = self.opendr_input.r
+        jac = [sp.lil_matrix(np.array(grad_fun(x[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
+
+        return sp.vstack(jac).tocsr()
+
+class TheanoFunFiniteDiff(Ch):
+    terms = 'opendr_input_gt'
+    dterms = 'opendr_input'
+
+    initialized = False
+
+    def compileFunctions(self, theano_output, theano_input, dim_output, theano_input_gt, theano_output_gt):
+        import theano
+        import theano.tensor as T
+        self.prediction_fn = theano.function([theano_input], theano_output)
+
+        # self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
+        # self.J, updates = theano.scan(lambda i, y,x : T.grad(y[i], x), sequences=T.arange(y.shape[0]), non_sequences=[y,x])
+
+        self.prediction_fn_gt = theano.function([theano_input_gt], theano_output_gt)
+
+        x = theano_input
+        gt_output = T.vector('gt_output')
+
+        # self.error = T.sum(theano_output + gt_output)
+        self.error = T.sum(T.pow(theano_output.ravel() - theano_output_gt.ravel(),2))
+
+        self.errorGrad = T.grad(self.error, x)
+
+        from theano.compile.nanguardmode import NanGuardMode
+        self.errorGrad_fun = theano.function([theano_input, theano_input_gt], self.errorGrad)
+        # self.error_fun = theano.function([theano_input, theano_input_gt], self.error, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+        self.error_fun = theano.function([theano_input, theano_input_gt], self.error)
+        # self.grad = theano.function([x], self.J, updates=updates, mode='FAST_RUN')
+
+        self.initialized = True
+
+    def compute_r(self):
+        if not self.initialized:
+            self.compileFunctions()
+
         x = self.opendr_input.r[None,None,:,:].astype(np.float32)
         x_gt = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
         # out_gt = self.predict_input_gt().ravel().astype(np.float32)
@@ -79,9 +177,28 @@ class TheanoFunOnOpenDR(Ch):
         if self.opendr_input is wrt:
             if not self.initialized:
                 self.compileFunctions()
+
+            delta = 0.01
+
             x = self.opendr_input.r[None,None,:,:].astype(np.float32)
             x_gt = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
             jac = np.array(self.errorGrad_fun(x,x_gt)).squeeze().reshape([1,self.opendr_input.r.size])
+
+            #Finite differences:
+            approxjacs = []
+            for idx, freevar in enumerate(vars):
+                f0 = self.error_fun(x, x_gt)
+                oldvar = freevar.r[:].copy()
+                freevar[:] = freevar.r[:] + delta
+                f1 = self.error_fun(x, x_gt)
+                diff = (f1 - f0) / np.abs(delta)
+                freevar[:] = oldvar.copy()
+
+                approxjacs = approxjacs + [diff]
+                approxjacs = np.concatenate(approxjacs)
+
+
+            ipdb.set_trace()
 
             return sp.csr.csr_matrix(jac)
         return None

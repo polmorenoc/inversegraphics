@@ -20,16 +20,16 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion_multi'
-experimentPrefix = 'train4_occlusion_multi'
-experimentDescr = 'Synthetic test set with occlusions and shape model'
+gtPrefix = 'train4_occlusion_shapemodel_cycles'
+experimentPrefix = 'train4_occlusion_shapemodel_cycles'
+experimentDescr = 'Cycles test set with occlusions and shape model'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
-groundTruthFilename = gtDir + 'groundTruthToRender.h5'
+groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-onlySynthetic = True
+onlySynthetic = False
 
 
 print("Reading experiment data.")

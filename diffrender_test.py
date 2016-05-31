@@ -46,10 +46,10 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 #
-# gtPrefix = 'train4_occlusion_shapemodel'
-# experimentPrefix = 'train4_occlusion_shapemodel_10k'
-gtPrefix = 'train4_occlusion_multi'
-experimentPrefix = 'train4_occlusion_multi'
+gtPrefix = 'train4_occlusion_shapemodel_cycles'
+experimentPrefix = 'train4_occlusion_shapemodel_cycles'
+# gtPrefix = 'train4_occlusion_multi'
+# experimentPrefix = 'train4_occlusion_multi'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
 trainPrefixVColor = 'train4_occlusion_shapemodel_10k'
 trainPrefixLightCoeffs = 'train4_occlusion_shapemodel_10k'
@@ -68,7 +68,7 @@ glMode = glModes[0]
 width, height = (150, 150)
 win = -1
 
-multiObjects = True
+multiObjects = False
 
 if glMode == 'glfw':
     #Initialize base GLFW context for the Demo and to share context among all renderers.
@@ -115,14 +115,14 @@ chDist = ch.Ch([camDistance])
 
 chLightSHCoeffs = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
-if multiObjects:
-    chObjDist = ch.Ch([0])
-    chObjRotation = ch.Ch([0])
-    chObjAzMug = ch.Ch([0])
-    chObjDistMug = ch.Ch([0])
-    chObjRotationMug = ch.Ch([0])
+# if multiObjects:
+chObjDist = ch.Ch([0])
+chObjRotation = ch.Ch([0])
+chObjAzMug = ch.Ch([0])
+chObjDistMug = ch.Ch([0])
+chObjRotationMug = ch.Ch([0])
 
-    chVColorsMug = ch.Ch([1,0,0])
+chVColorsMug = ch.Ch([1,0,0])
 
 clampedCosCoeffs = clampedCosineCoefficients()
 chComponent = chLightSHCoeffs * clampedCosCoeffs
@@ -242,7 +242,7 @@ ignore = []
 if os.path.isfile(gtDir + 'ignore.npy'):
     ignore = np.load(gtDir + 'ignore.npy')
 
-groundTruthFilename = gtDir + 'groundTruthToRender.h5'
+groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 rangeTests = np.arange(0,10)
@@ -312,7 +312,7 @@ for test_it, test_id in enumerate(testSet):
 
 loadFromHdf5 = False
 
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -415,7 +415,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = True
 
 method = 1
@@ -507,19 +507,20 @@ if useShapeModel:
 
     v, vn, teapotPosOffset = transformObject(v, vn, chScale, chObjAz, chObjDist, chObjRotation, np.array([0,0,0]))
 
-    verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, np.array([0,0,0]))
+    if multiObjects:
+        verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, np.array([0,0,0]))
 
-    VerticesB = [v] + [verticesMug]
-    NormalsB = [vn] + [normalsMug]
-    FacesB = [Faces] + [f_list_mug]
-    VColorsB = [VColors] + [vc_mug]
-    UVsB = [UVs] + [uv_mug]
-    HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
-    TexturesListB = [TexturesList] + [textures_list_mug]
+        VerticesB = [v] + [verticesMug]
+        NormalsB = [vn] + [normalsMug]
+        FacesB = [Faces] + [f_list_mug]
+        VColorsB = [VColors] + [vc_mug]
+        UVsB = [UVs] + [uv_mug]
+        HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
+        TexturesListB = [TexturesList] + [textures_list_mug]
 
-    renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
-
-    # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+    else:
+        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -548,152 +549,152 @@ if loadMask:
 
 # plt.imsave('renderered.png', lin2srgb(render))
 
-test_i = 0
-for test_i in range(len(testSet)):
 
-    color = testVColorGT[test_i]
-    az = testAzsGT[test_i]
-    el = testElevsGT[test_i]
-    lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
-
-    if useShapeModel:
-        shapeParams = testShapeParamsGT[test_i]
-
-    chAz[:] = 0
-    chEl[:] = el
-    chVColors[:] = color
-    chLightSHCoeffs[:] = lightCoefficientsRel
-    if useShapeModel:
-        chShapeParams[:] = shapeParams
-
-    chObjAz[:] = testObjAzsGT[test_i] - testAzsGT[test_i]
-    chObjDist[:] = testObjDistGT[test_i]
-    chObjRotation[:] = testObjRotationGT[test_i] - testAzsGT[test_i]
-    chObjAzMug[:] =  testObjAzMug[test_i] - testAzsGT[test_i]
-    chObjDistMug[:] = testObjDistMug[test_i]
-    chObjRotationMug[:] = testObjRotationMug[test_i] - testAzsGT[test_i]
-
-    chVColorsMug[:] = testVColorMug[test_i]
-
-    image = skimage.transform.resize(images[test_i], [height, width])
-    imageSrgb = image.copy()
-    rendererGT[:] = srgb2lin(image)
-
-    masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
-    masksMug = loadMasksMug(gtDir + '/masks_occlusion/', testSet)
-
-    maskTeapot = masksGT[test_i]
-    maskMug = masksMug[test_i]
-
-    coords = np.meshgrid(np.arange(width)-width/2, np.arange(height)-height/2)
-
-    coordsMugX = coords[1][maskMug]
-    coordsMugY = coords[0][maskMug]
-
-    bbRendererGT = rendererGT.r.copy()
-
-    bbRendererGT[coordsMugX.min()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
-    bbRendererGT[coordsMugX.max()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
-    bbRendererGT[coordsMugX.min()+width/2 : coordsMugX.max() + width/2, coordsMugY.min()+height/2] = np.array([1,0,0])
-    bbRendererGT[coordsMugX.min()+width/2:coordsMugX.max()+width/2, coordsMugY.max() + height/2] = np.array([1,0,0])
-
-    coordsTeapotX = coords[1][maskTeapot]
-    coordsTeapotY = coords[0][maskTeapot]
-
-    bbRendererGT[coordsTeapotX.min()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
-    bbRendererGT[coordsTeapotX.max()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
-    bbRendererGT[coordsTeapotX.min()+width/2 : coordsTeapotX.max() + width/2, coordsTeapotY.min()+height/2] = np.array([1,0,0])
-    bbRendererGT[coordsTeapotX.min()+width/2:coordsTeapotX.max()+width/2, coordsTeapotY.max() + height/2] = np.array([1,0,0])
-
-
-    posMug = np.array([(coordsMugY.min() + coordsMugY.max())/2, (coordsMugX.min() + coordsMugX.max())/2])
-    posTeapot = np.array([(coordsTeapotY.min() + coordsTeapotY.max())/2, (coordsTeapotX.min() + coordsTeapotX.max())/2])
-
-    # createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
-    chAzCam = ch.Ch([0])
-    chElCam = ch.Ch(chEl.r.copy())
-
-    relPosTeapotGT = v[0].r.sum(axis=0)/v[0].r.shape[0]
-    relPosMugGT = verticesMug[0].r.sum(axis=0)/verticesMug[0].r.shape[0]
-
-    bbRendererGT[posMug[1] - 2+width/2:posMug[1] + 2+width/2, posMug[0] - 2 + height/2: posMug[0] + 2 + height/2] = np.array([1,0,0])
-    bbRendererGT[posTeapot[1] - 2+width/2:posTeapot[1] + 2+width/2, posTeapot[0] - 2 + height/2: posTeapot[0] + 2 + height/2] = np.array([1,0,0])
-
-    _, _, camTransfomMatGT = setupCamera(np.array([0,0,0]), chAz.r, chEl.r, chDist, np.array([0,0,0.1]), width, height)
-    camEyeGT = camTransfomMatGT[0:4,0:4].dot(np.array([0,0,0,1]))[0:3]
-
-    vecMugToCamGT = camEyeGT - (mugPosOffset + np.array([0,0,0.1]))
-    mugCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) - vecMugToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) + ch.norm(ch.array([0,-1,0]))*vecMugToCamGT))
-
-    vecTeapotToCamGT = camEyeGT - (teapotPosOffset + np.array([0,0,0.1]))
-    teapotCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) - vecTeapotToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCamGT))
-
-    objDisplacementMat = computeHemisphereTransformation(chObjRotationMug, 0, chObjDistMug, np.array([0, 0, 0.05]))
-    pointMug = objDisplacementMat[0:3, 3]
-
-    # pointMug = ch.Ch([0,0,0.1])
-    imPosMugCam, modelRotation, camTransfomMat = setupCamera(pointMug, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
-    imPosMug = imPosMugCam - np.array([height/2, width/2])
-
-    objDisplacementMat = computeHemisphereTransformation(chObjRotation, 0, chObjDist, np.array([0, 0, 0.1]))
-    pointTeapot = objDisplacementMat[0:3, 3]
-    # pointTeapot = ch.Ch([0,0,0.1])
-
-    imPosTeapotCam, modelRotation, camTransfomMat = setupCamera(pointTeapot, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
-    imPosTeapot = imPosTeapotCam - np.array([height/2, width/2])
-
-    errMug = ch.sum((imPosMug - posMug)**2)
-    errTeapot = ch.sum((imPosTeapot - posTeapot)**2)
-
-    camEye = camTransfomMat[0:4,0:4].dot(np.array([0,0,0, 1]))[0:3]
-
-    vecMugToCam = camEye - pointMug
-    mugCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) - vecMugToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) + ch.norm(ch.array([0,-1,0]))*vecMugToCam))
-
-    vecTeapotToCam = camEye - pointTeapot
-
-    teapotCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) - vecTeapotToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCam))
-
-    chElPredMug = mugCamElGT
-    chElPredTeapot = teapotCamElGT
-
-    errElMug = ch.sum((chElPredMug*180/np.pi  - mugCamEl*180/np.pi)**2)
-    errElTeapot = ch.sum((chElPredTeapot*180/np.pi - teapotCamEl*180/np.pi)**2)
-
-    # spatialFreeVars = [pointTeapot[0:2], pointMug[0:2], chElCam]
-    spatialFreeVars = [chObjRotationMug, chObjRotation, chObjDistMug, chObjDist, chElCam]
-
-    spatialErrorFun = errMug + errTeapot + errElMug+ errElTeapot
-
-    def cbS(_):
-        pass
-
-    bbRendererGT[imPosTeapot[1] - 2 +width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,0,1])
-    bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,0,1])
-
-    plt.imsave('tmp/rendererPred' + str(test_i) + '.png', renderer.r)
-
-    #Dumb initial state (center of table).
-    chObjDist[:] = 0
-    chObjRotation[:] = 0
-    chObjDistMug[:] = 0
-    chObjRotationMug[:] = 0
-
-    plt.imsave('tmp/rendererInit' + str(test_i) + '.png', renderer.r)
-
-    # ch.minimize({'raw': spatialErrorFun }, bounds=[(-0.5,0.5), (-0.5,0.5), (0,np.pi/2)], method=methods[1], x0=spatialFreeVars, callback=cbS, options={'disp':False, 'maxiter':10})
-    ch.minimize({'raw': spatialErrorFun }, bounds=[(-2*np.pi,2*np.pi), (-2*np.pi,2*np.pi), (0,0.5), (0,0.5), (0,np.pi/2)], method=methods[2], x0=spatialFreeVars, callback=cbS, options={'disp':True, 'maxiter':50})
-
-    bbRendererGT[imPosTeapot[1] - 2+width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,1,0])
-    bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,1,0])
-
-    plt.imsave('tmp/bbRendererGT' + str(test_i) + '.png', bbRendererGT)
-
-    chEl[:] = chElCam.r.copy()
-
-    plt.imsave('tmp/rendererOpt' + str(test_i) + '.png', renderer.r)
-
-ipdb.set_trace()
+##### Tests with optimizing multiple objects in scene and camera settings.
+# test_i = 0
+# for test_i in range(len(testSet)):
+#
+#     color = testVColorGT[test_i]
+#     az = testAzsGT[test_i]
+#     el = testElevsGT[test_i]
+#     lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+#
+#     if useShapeModel:
+#         shapeParams = testShapeParamsGT[test_i]
+#
+#     chAz[:] = 0
+#     chEl[:] = el
+#     chVColors[:] = color
+#     chLightSHCoeffs[:] = lightCoefficientsRel
+#     if useShapeModel:
+#         chShapeParams[:] = shapeParams
+#
+#     chObjAz[:] = testObjAzsGT[test_i] - testAzsGT[test_i]
+#     chObjDist[:] = testObjDistGT[test_i]
+#     chObjRotation[:] = testObjRotationGT[test_i] - testAzsGT[test_i]
+#     chObjAzMug[:] =  testObjAzMug[test_i] - testAzsGT[test_i]
+#     chObjDistMug[:] = testObjDistMug[test_i]
+#     chObjRotationMug[:] = testObjRotationMug[test_i] - testAzsGT[test_i]
+#
+#     chVColorsMug[:] = testVColorMug[test_i]
+#
+#     image = skimage.transform.resize(images[test_i], [height, width])
+#     imageSrgb = image.copy()
+#     rendererGT[:] = srgb2lin(image)
+#
+#     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
+#     masksMug = loadMasksMug(gtDir + '/masks_occlusion/', testSet)
+#
+#     maskTeapot = masksGT[test_i]
+#     maskMug = masksMug[test_i]
+#
+#     coords = np.meshgrid(np.arange(width)-width/2, np.arange(height)-height/2)
+#
+#     coordsMugX = coords[1][maskMug]
+#     coordsMugY = coords[0][maskMug]
+#
+#     bbRendererGT = rendererGT.r.copy()
+#
+#     bbRendererGT[coordsMugX.min()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
+#     bbRendererGT[coordsMugX.max()+width/2, coordsMugY.min()+height/2 : coordsMugY.max() + height/2] = np.array([1,0,0])
+#     bbRendererGT[coordsMugX.min()+width/2 : coordsMugX.max() + width/2, coordsMugY.min()+height/2] = np.array([1,0,0])
+#     bbRendererGT[coordsMugX.min()+width/2:coordsMugX.max()+width/2, coordsMugY.max() + height/2] = np.array([1,0,0])
+#
+#     coordsTeapotX = coords[1][maskTeapot]
+#     coordsTeapotY = coords[0][maskTeapot]
+#
+#     bbRendererGT[coordsTeapotX.min()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
+#     bbRendererGT[coordsTeapotX.max()+width/2, coordsTeapotY.min()+height/2 : coordsTeapotY.max() + height/2] = np.array([1,0,0])
+#     bbRendererGT[coordsTeapotX.min()+width/2 : coordsTeapotX.max() + width/2, coordsTeapotY.min()+height/2] = np.array([1,0,0])
+#     bbRendererGT[coordsTeapotX.min()+width/2:coordsTeapotX.max()+width/2, coordsTeapotY.max() + height/2] = np.array([1,0,0])
+#
+#
+#     posMug = np.array([(coordsMugY.min() + coordsMugY.max())/2, (coordsMugX.min() + coordsMugX.max())/2])
+#     posTeapot = np.array([(coordsTeapotY.min() + coordsTeapotY.max())/2, (coordsTeapotX.min() + coordsTeapotX.max())/2])
+#
+#     # createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+#     chAzCam = ch.Ch([0])
+#     chElCam = ch.Ch(chEl.r.copy())
+#
+#     relPosTeapotGT = v[0].r.sum(axis=0)/v[0].r.shape[0]
+#     relPosMugGT = verticesMug[0].r.sum(axis=0)/verticesMug[0].r.shape[0]
+#
+#     bbRendererGT[posMug[1] - 2+width/2:posMug[1] + 2+width/2, posMug[0] - 2 + height/2: posMug[0] + 2 + height/2] = np.array([1,0,0])
+#     bbRendererGT[posTeapot[1] - 2+width/2:posTeapot[1] + 2+width/2, posTeapot[0] - 2 + height/2: posTeapot[0] + 2 + height/2] = np.array([1,0,0])
+#
+#     _, _, camTransfomMatGT = setupCamera(np.array([0,0,0]), chAz.r, chEl.r, chDist, np.array([0,0,0.1]), width, height)
+#     camEyeGT = camTransfomMatGT[0:4,0:4].dot(np.array([0,0,0,1]))[0:3]
+#
+#     vecMugToCamGT = camEyeGT - (mugPosOffset + np.array([0,0,0.1]))
+#     mugCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) - vecMugToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCamGT) + ch.norm(ch.array([0,-1,0]))*vecMugToCamGT))
+#
+#     vecTeapotToCamGT = camEyeGT - (teapotPosOffset + np.array([0,0,0.1]))
+#     teapotCamElGT = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) - vecTeapotToCamGT*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCamGT) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCamGT))
+#
+#     objDisplacementMat = computeHemisphereTransformation(chObjRotationMug, 0, chObjDistMug, np.array([0, 0, 0.05]))
+#     pointMug = objDisplacementMat[0:3, 3]
+#
+#     # pointMug = ch.Ch([0,0,0.1])
+#     imPosMugCam, modelRotation, camTransfomMat = setupCamera(pointMug, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
+#     imPosMug = imPosMugCam - np.array([height/2, width/2])
+#
+#     objDisplacementMat = computeHemisphereTransformation(chObjRotation, 0, chObjDist, np.array([0, 0, 0.1]))
+#     pointTeapot = objDisplacementMat[0:3, 3]
+#     # pointTeapot = ch.Ch([0,0,0.1])
+#
+#     imPosTeapotCam, modelRotation, camTransfomMat = setupCamera(pointTeapot, chAzCam, chElCam, chDist, np.array([0,0,0.1]), width, height)
+#     imPosTeapot = imPosTeapotCam - np.array([height/2, width/2])
+#
+#     errMug = ch.sum((imPosMug - posMug)**2)
+#     errTeapot = ch.sum((imPosTeapot - posTeapot)**2)
+#
+#     camEye = camTransfomMat[0:4,0:4].dot(np.array([0,0,0, 1]))[0:3]
+#
+#     vecMugToCam = camEye - pointMug
+#     mugCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) - vecMugToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecMugToCam) + ch.norm(ch.array([0,-1,0]))*vecMugToCam))
+#
+#     vecTeapotToCam = camEye - pointTeapot
+#
+#     teapotCamEl = 2*ch.arctan(ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) - vecTeapotToCam*ch.norm(ch.array([0,-1,0])))/ch.norm(ch.array([0,-1,0])*ch.norm(vecTeapotToCam) + ch.norm(ch.array([0,-1,0]))*vecTeapotToCam))
+#
+#     chElPredMug = mugCamElGT
+#     chElPredTeapot = teapotCamElGT
+#
+#     errElMug = ch.sum((chElPredMug*180/np.pi  - mugCamEl*180/np.pi)**2)
+#     errElTeapot = ch.sum((chElPredTeapot*180/np.pi - teapotCamEl*180/np.pi)**2)
+#
+#     # spatialFreeVars = [pointTeapot[0:2], pointMug[0:2], chElCam]
+#     spatialFreeVars = [chObjRotationMug, chObjRotation, chObjDistMug, chObjDist, chElCam]
+#
+#     spatialErrorFun = errMug + errTeapot + errElMug+ errElTeapot
+#
+#     def cbS(_):
+#         pass
+#
+#     bbRendererGT[imPosTeapot[1] - 2 +width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,0,1])
+#     bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,0,1])
+#
+#     plt.imsave('tmp/rendererPred' + str(test_i) + '.png', renderer.r)
+#
+#     #Dumb initial state (center of table).
+#     chObjDist[:] = 0
+#     chObjRotation[:] = 0
+#     chObjDistMug[:] = 0
+#     chObjRotationMug[:] = 0
+#
+#     plt.imsave('tmp/rendererInit' + str(test_i) + '.png', renderer.r)
+#
+#     # ch.minimize({'raw': spatialErrorFun }, bounds=[(-0.5,0.5), (-0.5,0.5), (0,np.pi/2)], method=methods[1], x0=spatialFreeVars, callback=cbS, options={'disp':False, 'maxiter':10})
+#     ch.minimize({'raw': spatialErrorFun }, bounds=[(-2*np.pi,2*np.pi), (-2*np.pi,2*np.pi), (0,0.5), (0,0.5), (0,np.pi/2)], method=methods[2], x0=spatialFreeVars, callback=cbS, options={'disp':True, 'maxiter':50})
+#
+#     bbRendererGT[imPosTeapot[1] - 2+width/2:imPosTeapot[1] + 2+width/2, imPosTeapot[0] - 2 + height/2: imPosTeapot[0] + 2 + height/2] = np.array([0,1,0])
+#     bbRendererGT[imPosMug[1] - 2+width/2:imPosMug[1] + 2+width/2, imPosMug[0] - 2 + height/2: imPosMug[0] + 2 + height/2] = np.array([0,1,0])
+#
+#     plt.imsave('tmp/bbRendererGT' + str(test_i) + '.png', bbRendererGT)
+#
+#     chEl[:] = chElCam.r.copy()
+#
+#     plt.imsave('tmp/rendererOpt' + str(test_i) + '.png', renderer.r)
 
 import skimage.color
 
@@ -710,10 +711,10 @@ nnBatchSize = 100
 
 azsPredictions = np.array([])
 
-recomputeMeans = False
+recomputeMeans = True
 includeMeanBaseline = False
 
-recomputePredictions = False
+recomputePredictions = True
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -891,6 +892,72 @@ else:
     vColorsPred = np.load(trainModelsDirVColor + 'vColorsPred.npy')[rangeTests]
 
 SHModel = ""
+
+import theano
+import theano.tensor as T
+
+## Theano NN error function 1.
+import lasagne_nn
+import lasagne
+
+with open(trainModelsDirPose + 'neuralNetModelAppearance.pickle', 'rb') as pfile:
+    neuralNetModelPose = pickle.load(pfile)
+
+meanImage = neuralNetModelPose['mean'].reshape([150,150,3])
+
+modelType = neuralNetModelPose['type']
+param_values = neuralNetModelPose['params']
+network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+layer = lasagne.layers.get_all_layers(network)[6]
+inputLayer = lasagne.layers.get_all_layers(network)[0]
+layer_output = lasagne.layers.get_output(layer, deterministic=True)
+dim_output= layer.output_shape[1]
+
+networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+layerGT = lasagne.layers.get_all_layers(networkGT)[6]
+inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+
+rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+
+chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=renderer - meanImage, dim_output = dim_output,
+                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGT - meanImage)
+
+chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+
+chThError.r
+
+
+#
+# ## Theano NN error function finite differences.
+# with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+#     neuralNetModelPose = pickle.load(pfile)
+#
+# meanImage = neuralNetModelPose['mean'].reshape([150,150])
+#
+# modelType = neuralNetModelPose['type']
+# param_values = neuralNetModelPose['params']
+# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layer = lasagne.layers.get_all_layers(network)[-2]
+# inputLayer = lasagne.layers.get_all_layers(network)[0]
+# layer_output = lasagne.layers.get_output(layer, deterministic=True)
+# dim_output= layer.output_shape[1]
+#
+# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
+# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+#
+# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+#
+# chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
+#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
+#
+# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+#
+# chThError.r
 
 
 if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLightCoefficientsPred.npy"):
@@ -1207,31 +1274,31 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     plt.xlabel('Sample')
     plt.ylabel('Angular error')
 
-    if samplingMode == False:
-
-        scaleAzSamples = np.array(errorFunAzSamples)
-        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-        scaleAzSamples = scaleAzSamples*0.25*y2/np.max(scaleAzSamples)
-        for azSample_i, azSample in enumerate(scaleAzSamples):
-            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='r')
-
-        scaleAzSamples = np.array(errorFunGaussianAzSamples)
-        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-        scaleAzSamples = scaleAzSamples*0.4*y2/np.max(scaleAzSamples)
-        for azSample_i, azSample in enumerate(scaleAzSamples):
-            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='g')
-
-        scaleAzSamples = np.array(errorFunAzSamplesPred)
-        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-        scaleAzSamples = scaleAzSamples*0.65*y2/np.max(scaleAzSamples)
-        for azSample_i, azSample in enumerate(scaleAzSamples):
-            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='b')
-
-        scaleAzSamples = np.array(errorFunGaussianAzSamplesPred)
-        scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-        scaleAzSamples = scaleAzSamples*0.75*y2/np.max(scaleAzSamples)
-        for azSample_i, azSample in enumerate(scaleAzSamples):
-            plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='y')
+    # if samplingMode == False:
+    #
+    #     scaleAzSamples = np.array(errorFunAzSamples)
+    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+    #     scaleAzSamples = scaleAzSamples*0.25*y2/np.max(scaleAzSamples)
+    #     for azSample_i, azSample in enumerate(scaleAzSamples):
+    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='r')
+    #
+    #     scaleAzSamples = np.array(errorFunGaussianAzSamples)
+    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+    #     scaleAzSamples = scaleAzSamples*0.4*y2/np.max(scaleAzSamples)
+    #     for azSample_i, azSample in enumerate(scaleAzSamples):
+    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='g')
+    #
+    #     scaleAzSamples = np.array(errorFunAzSamplesPred)
+    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+    #     scaleAzSamples = scaleAzSamples*0.65*y2/np.max(scaleAzSamples)
+    #     for azSample_i, azSample in enumerate(scaleAzSamples):
+    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='b')
+    #
+    #     scaleAzSamples = np.array(errorFunGaussianAzSamplesPred)
+    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+    #     scaleAzSamples = scaleAzSamples*0.75*y2/np.max(scaleAzSamples)
+    #     for azSample_i, azSample in enumerate(scaleAzSamples):
+    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='y')
 
     plt.axis((0,360,y1,y2))
     plt.title('Neuralnet multiple predictions')
@@ -1276,7 +1343,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-CRF-NOSEARCH-1ALL005-2APPLIGHT001-' + testRangeStr
+testDescription = 'NNERROFUN-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1537,6 +1604,11 @@ for testSetting, model in enumerate(modelTests):
     fittedPosteriorsList = []
 
     revertedSamples = np.array([])
+
+    errorFunAzSamples = []
+    errorFunAzSamplesPred = []
+    errorFunGaussianAzSamplesPred = []
+    errorFunGaussianAzSamples = []
 
     if nearestNeighbours:
         azimuthNearestNeighboursList = []
@@ -1843,9 +1915,10 @@ for testSetting, model in enumerate(modelTests):
 
                     samplingMode = False
                     chAz[:] = az
-                    # analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel, azsPredictions[test_i], sampleStds=stds.r)
+
 
                 chAz[:] = az
+
                 chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
                 chVColors[:] = color.copy()
                 chLightSHCoeffs[:] = lightCoefficientsRel.copy()
@@ -1855,6 +1928,11 @@ for testSetting, model in enumerate(modelTests):
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/best_sample' + '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                 predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
+
+                analyzeAz(resultDir + 'az_samples/test' + str(test_i) + '_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel,
+                          azsPredictions[test_i], sampleStds=stds.r)
+
+                ipdb.set_trace()
 
                 global iterat
                 iterat = 0
