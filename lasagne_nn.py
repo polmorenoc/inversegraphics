@@ -150,6 +150,57 @@ def build_cnn(input_var=None):
 
     return network
 
+
+def build_cnn_pose_embedding(input_var=None):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    network = lasagne.layers.InputLayer(shape=(None, 1, 150, 150),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=256, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+            lasagne.layers.dropout(network, p=.5),
+            num_units=128,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+        network,
+            num_units=32,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    return network
+
 def build_cnn_small(input_var=None):
     # As a third model, we'll create a CNN of two convolution + pooling stages
     # and a fully-connected hidden layer in front of the output layer.
@@ -1197,6 +1248,117 @@ def get_prediction_fun_nondeterministic(network):
     return prediction_fn
 
 def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType = 'cnn', num_epochs=150, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle', param_values=[]):
+    # Load the dataset
+
+    print("Loading validation set")
+
+    if meanImage.ndim == 2:
+        meanImage = meanImage[:,:,None]
+
+    X_val = X_h5[trainSetVal::].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+    print("Ended loading validation set")
+
+    model = {}
+
+    model['mean'] = meanImage
+    model['type'] = modelType
+
+    if param_values:
+        lasagne.layers.set_all_param_values(network, param_values)
+
+    input_var = lasagne.layers.get_all_layers(network)[0].input_var
+    target_var = T.fmatrix('targets')
+
+    prediction = lasagne.layers.get_output(network)
+
+    params = lasagne.layers.get_all_params(network, trainable=True)
+
+
+    test_prediction = lasagne.layers.get_output(network, deterministic=True)
+
+    if modelType == 'cnn_mask':
+        loss = lasagne.objectives.binary_crossentropy(prediction, target_var)
+        loss = loss.mean()
+        test_loss = lasagne.objectives.binary_crossentropy(test_prediction, target_var)
+        test_loss = test_loss.mean()
+    else:
+        loss = lasagne.objectives.squared_error(prediction, target_var)
+        loss = loss.mean()
+        test_loss = lasagne.objectives.squared_error(test_prediction,
+                                                                target_var)
+        test_loss = test_loss.mean()
+
+    updates = lasagne.updates.nesterov_momentum(
+            loss, params, learning_rate=0.01, momentum=0.9)
+
+    train_fn = theano.function([input_var, target_var], loss, updates=updates)
+
+    # Compile a second function computing the validation loss and accura# cy:
+    val_fn = theano.function([input_var, target_var], test_loss)
+
+    # Finally, launch the training loop.
+    print("Starting training...")
+    # We iterate over epochs:
+
+    patience = 20
+    best_valid = np.inf
+    best_valid_epoch = 0
+    best_weights = None
+    batchSize = 128
+    for epoch in range(num_epochs):
+        # In each epoch, we do a full pass over the training data:
+        train_err = 0
+        train_batches = 0
+        start_time = time.time()
+        slicesize = 20000
+        sliceidx = 0
+        for start_idx in range(0, trainSetVal, slicesize):
+            sliceidx += 1
+            print("Working on slice " + str(sliceidx) + " of " +  str(int(trainSetVal/slicesize)))
+            X_train = X_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+
+            for batch in iterate_minibatches(X_train, y_train[start_idx:min(start_idx + slicesize,trainSetVal)], batchSize, shuffle=True):
+                # print("Batch " + str(train_batches))
+                inputs, targets = batch
+                train_err += train_fn(inputs, targets)
+                train_batches += 1
+
+        # And a full pass over the validation data:
+        val_err = 0
+        val_batches = 0
+        for batch in iterate_minibatches(X_val, y_val, batchSize, shuffle=False):
+            inputs, targets = batch
+            err = val_fn(inputs, targets)
+            val_err += err
+            val_batches += 1
+
+        if val_err < best_valid:
+            best_weights = lasagne.layers.get_all_param_values(network)
+            if saveModelAtEpoch:
+                model['params'] = best_weights
+                with open(modelPath, 'wb') as pfile:
+                    pickle.dump(model, pfile)
+            best_valid = val_err
+            best_valid_epoch = epoch
+
+        elif best_valid_epoch + patience < epoch:
+            print("Early stopping.")
+            # print("Best valid loss was {:.6f} at epoch {}.".format(
+            #     best_valid, best_valid_epoch))
+            break
+
+        # Then we print the results for this epoch:
+        print("Epoch {} of {} took {:.3f}s".format(
+            epoch + 1, num_epochs, time.time() - start_time))
+        print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
+        print("  validation loss:\t\t{:.6f}".format(val_err / val_batches))
+
+
+    model['params'] = best_weights
+
+    return model
+
+def train_triplets_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType = 'cnn', num_epochs=150, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle', param_values=[]):
     # Load the dataset
 
     print("Loading validation set")

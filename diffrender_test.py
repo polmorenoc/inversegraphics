@@ -46,8 +46,8 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 #
-gtPrefix = 'train4_occlusion_shapemodel_cycles'
-experimentPrefix = 'train4_occlusion_shapemodel_cycles'
+gtPrefix = 'train4_occlusion_shapemodel'
+experimentPrefix = 'train4_occlusion_shapemodel_10k'
 # gtPrefix = 'train4_occlusion_multi'
 # experimentPrefix = 'train4_occlusion_multi'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
@@ -312,7 +312,7 @@ for test_it, test_id in enumerate(testSet):
 
 loadFromHdf5 = False
 
-syntheticGroundtruth = False
+syntheticGroundtruth = True
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -520,7 +520,7 @@ if useShapeModel:
 
         renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
     else:
-        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -534,6 +534,40 @@ loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
+
+
+### Groundtruth triplets generation
+
+groundTruthFilename = 'groundtruth/' + gtPrefix + '/' '/groundTruth.h5'
+gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
+groundTruthToRender = gtDataFileToRender[gtPrefix]
+
+rangeGT = np.arange(len(groundTruthToRender))
+
+for gtIdx in rangeGT[:]:
+    groundTruthToRender['trainEnvMapPhiOffsets'][gtIdx]
+
+    color = groundTruthToRender['trainVColorGT'][gtIdx]
+    az = groundTruthToRender['trainObjAzsGT'][gtIdx] - groundTruthToRender['trainAzsGT'][gtIdx]
+    el = groundTruthToRender['trainElevsGT'][gtIdx]
+    lightCoefficientsRel = groundTruthToRender['trainLightCoefficientsGTRel'][gtIdx] * groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
+
+    if useShapeModel:
+        shapeParams = groundTruthToRender['trainShapeModelCoeffsGT'][gtIdx]
+
+    chAz[:] = 0
+    chEl[:] = el
+    chObjAz[:] = az
+    chVColors[:] = color
+    chLightSHCoeffs[:] = lightCoefficientsRel
+    if useShapeModel:
+        chShapeParams[:] = shapeParams
+
+    image = renderer.r[:].copy()
+    lin2srgb(image)
+    cv2.imwrite(gtDir + '/backprojections/im' + str(gtIdx) + '.jpeg', 255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+ipdb.set_trace()
 
 # vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
 # im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.
@@ -926,6 +960,7 @@ chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=l
 
 chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
 
+ipdb.set_trace()
 chThError.r
 
 
@@ -1234,11 +1269,11 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     for az_i, az in enumerate(azRange):
         angles = np.append(angles, az*180/np.pi)
         chAz[:] = az
-        for idx, renderer_idx in enumerate(trainingTeapots):
-            renderer_i = renderer_teapots[renderer_idx]
-            rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
-            chThError.opendr_input = rendererGray
-            chThErrors[idx, az_i] = chThError.r
+        # for idx, renderer_idx in enumerate(trainingTeapots):
+        #     renderer_i = renderer_teapots[renderer_idx]
+        #     rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
+        #     chThError.opendr_input = rendererGray
+        chThErrors[0, az_i] = chThError.r
 
         robustErrors = np.append(robustErrors, errorFunRobust.r)
         gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
@@ -1932,7 +1967,6 @@ for testSetting, model in enumerate(modelTests):
                 analyzeAz(resultDir + 'az_samples/test' + str(test_i) + '_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel,
                           azsPredictions[test_i], sampleStds=stds.r)
 
-                ipdb.set_trace()
 
                 global iterat
                 iterat = 0

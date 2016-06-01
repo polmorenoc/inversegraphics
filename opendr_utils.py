@@ -64,7 +64,7 @@ class TheanoFunOnOpenDR(Ch):
         h = self.opendr_input.r.shape[1]
         w = self.opendr_input.r.shape[0]
         x = self.opendr_input.r.reshape([1,n_channels,h,w]).astype(np.float32)
-        x_gt = self.opendr_input_gt.reshape([1,n_channels,h,w]).astype(np.float32)
+        x_gt = self.opendr_input_gt.r.reshape([1,n_channels,h,w]).astype(np.float32)
         # out_gt = self.predict_input_gt().ravel().astype(np.float32)
 
         output = np.array(self.error_fun(x, x_gt))
@@ -89,7 +89,7 @@ class TheanoFunOnOpenDR(Ch):
 
         h = self.opendr_input.r.shape[1]
         w = self.opendr_input.r.shape[0]
-        x_gt = self.opendr_input_gt.reshape([1, n_channels, h, w]).astype(np.float32)
+        x_gt = self.opendr_input_gt.r.reshape([1, n_channels, h, w]).astype(np.float32)
         output = self.prediction_fn_gt(x_gt)
         return output.ravel()
 
@@ -104,7 +104,7 @@ class TheanoFunOnOpenDR(Ch):
             h = self.opendr_input.r.shape[1]
             w = self.opendr_input.r.shape[0]
             x = self.opendr_input.r.reshape([1, n_channels, h, w]).astype(np.float32)
-            x_gt = self.opendr_input_gt.reshape([1, n_channels, h, w]).astype(np.float32)
+            x_gt = self.opendr_input_gt.r.reshape([1, n_channels, h, w]).astype(np.float32)
             jac = np.array(self.errorGrad_fun(x,x_gt)).squeeze().reshape([1,self.opendr_input.r.size])
 
             return sp.csr.csr_matrix(jac)
@@ -211,6 +211,9 @@ class TheanoFunFiniteDiff(Ch):
         jac = [sp.lil_matrix(np.array(grad_fun(x[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
 
         return sp.vstack(jac).tocsr()
+
+
+
 
 
 def recoverAmbientIntensities(hdritems, gtDataset, clampedCosCoeffs):
