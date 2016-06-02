@@ -1240,6 +1240,30 @@ def readImagesHdf5(imagesDir, loadGray=False):
                 gtDataFile = h5py.File(imagesDir + 'images_gray.h5', 'r')
                 return gtDataFile["images"]
 
+
+def getTriplets(parameterVals, closeDist = 5*np.pi/180, farDist=15*np.pi/180, normConst = 2*np.pi, chunkSize=10):
+    numTrainSet = len(parameterVals)
+
+    initIdx = np.random.permutation(np.arange(numTrainSet))
+    orderedIdx = np.argsort(parameterVals)
+
+    chunkArange = np.arange(chunkSize)
+    shuffledIdx = np.arange(numTrainSet)
+    for i in np.arange(0, numTrainSet, chunkSize):
+        maxi = min(numTrainSet, i + chunkSize)
+
+        shuffledIdx[i:i+chunkSize] = np.random.permutation(chunkArange)[:maxi] + i
+
+    idxDist5 = np.roll(np.arange(numTrainSet), int(numTrainSet * closeDist / normConst) )
+    idxDist15 = np.roll(np.arange(numTrainSet), int(numTrainSet * farDist / normConst) )
+
+    anchorIdx = orderedIdx[initIdx]
+    closeIdx = orderedIdx[shuffledIdx[idxDist5][initIdx]]
+    farIdx = orderedIdx[shuffledIdx[idxDist15][initIdx]]
+
+    return anchorIdx, closeIdx, farIdx
+
+
 def generateExperiment(size, experimentDir, ratio, seed):
     np.random.seed(seed)
     data = np.arange(size)

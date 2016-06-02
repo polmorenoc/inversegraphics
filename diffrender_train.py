@@ -97,7 +97,7 @@ imagesAreH5 = False
 loadGrayFromHdf5 = False
 
 filter = np.ones(len(trainSet)).astype(np.bool)
-filter = np.array(tuple(dataOcclusions > 0) and tuple(dataOcclusions < 0.9))
+filter = np.array(tuple(dataOcclusions >= 0) and tuple(dataOcclusions < 0.9))
 # filter = dataOcclusions < 0.3
 trainSet = trainSet[filter]
 
@@ -113,6 +113,18 @@ grayImages = readImages(imagesDir, trainSet, True, loadGrayFromHdf5)
 # images = readImages(imagesDir, trainSet, False, False)
 
 # grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
+
+
+
+
+
+backprojectionsDir = gtDir + 'backprojections/'
+backprojections = readImages(backprojectionsDir, trainSet, True, False)
+
+
+
+
+ipdb.set_trace()
 
 loadMask = False
 gtDirMask = 'groundtruth/train4_occlusion_mask/'

@@ -536,38 +536,38 @@ if loadMask:
 
 
 
-### Groundtruth triplets generation
-
-groundTruthFilename = 'groundtruth/' + gtPrefix + '/' '/groundTruth.h5'
-gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
-groundTruthToRender = gtDataFileToRender[gtPrefix]
-
-rangeGT = np.arange(len(groundTruthToRender))
-
-for gtIdx in rangeGT[:]:
-    groundTruthToRender['trainEnvMapPhiOffsets'][gtIdx]
-
-    color = groundTruthToRender['trainVColorGT'][gtIdx]
-    az = groundTruthToRender['trainObjAzsGT'][gtIdx] - groundTruthToRender['trainAzsGT'][gtIdx]
-    el = groundTruthToRender['trainElevsGT'][gtIdx]
-    lightCoefficientsRel = groundTruthToRender['trainLightCoefficientsGTRel'][gtIdx] * groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
-
-    if useShapeModel:
-        shapeParams = groundTruthToRender['trainShapeModelCoeffsGT'][gtIdx]
-
-    chAz[:] = 0
-    chEl[:] = el
-    chObjAz[:] = az
-    chVColors[:] = color
-    chLightSHCoeffs[:] = lightCoefficientsRel
-    if useShapeModel:
-        chShapeParams[:] = shapeParams
-
-    image = renderer.r[:].copy()
-    lin2srgb(image)
-    cv2.imwrite(gtDir + '/backprojections/im' + str(gtIdx) + '.jpeg', 255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-
-ipdb.set_trace()
+# ### Groundtruth triplets generation
+#
+# groundTruthFilename = 'groundtruth/' + gtPrefix + '/' '/groundTruth.h5'
+# gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
+# groundTruthToRender = gtDataFileToRender[gtPrefix]
+#
+# rangeGT = np.arange(len(groundTruthToRender))
+#
+# for gtIdx in rangeGT[:]:
+#     groundTruthToRender['trainEnvMapPhiOffsets'][gtIdx]
+#
+#     color = groundTruthToRender['trainVColorGT'][gtIdx]
+#     az = groundTruthToRender['trainObjAzsGT'][gtIdx] - groundTruthToRender['trainAzsGT'][gtIdx]
+#     el = groundTruthToRender['trainElevsGT'][gtIdx]
+#     lightCoefficientsRel = groundTruthToRender['trainLightCoefficientsGTRel'][gtIdx] * groundTruthToRender['trainAmbientIntensityGT'][gtIdx]
+#
+#     if useShapeModel:
+#         shapeParams = groundTruthToRender['trainShapeModelCoeffsGT'][gtIdx]
+#
+#     chAz[:] = 0
+#     chEl[:] = el
+#     chObjAz[:] = az
+#     chVColors[:] = color
+#     chLightSHCoeffs[:] = lightCoefficientsRel
+#     if useShapeModel:
+#         chShapeParams[:] = shapeParams
+#
+#     image = renderer.r[:].copy()
+#     lin2srgb(image)
+#     cv2.imwrite(gtDir + '/backprojections/im' + str(gtIdx) + '.jpeg', 255 * image[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+#
+# ipdb.set_trace()
 
 # vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
 # im = skimage.io.imread('renderergt539.jpeg').astype(np.float32)/255.
