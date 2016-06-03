@@ -1384,7 +1384,6 @@ def train_triplets_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, mod
 
     params = lasagne.layers.get_all_params(network, trainable=True)
 
-
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
 
     if modelType == 'cnn_mask':
