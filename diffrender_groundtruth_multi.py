@@ -1408,60 +1408,140 @@ if renderFromPreviousGT:
 
             currentTeapotModel = teapot_i
             center = center_teapots[teapot_i]
-
-            if currentScene != -1 and  currentTargetIndex != -1 and currentTeapot != -1 and (targetIndex != currentTargetIndex or teapot_i != currentTeapot):
-                removeObjectData(0, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
-
             if useShapeModel:
-                center = smCenterGT
-                vGT, vnGT, teapostPosOffset = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]),np.array([0, 0, 0]))
-
-                addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, smFacesGT, smVColorsGT, vnGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+                teapot_i = -1
             else:
-                vGT, vnGT, teapotPosOffset = transformObject(v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
-                addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT,
-                              f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vnGT,
-                              uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0],
-                              textures_list_teapots[currentTeapotModel][0])
+                currentTeapotModel = teapot_i
+                center = center_teapots[teapot_i]
 
-            if useOpenDR:
-                rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT,
-                                              chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width,
-                                              height, uv, haveTextures_list, textures_list, frustum, None)
             print("Ground truth on new teapot" + str(teapot_i))
 
+            ##Destroy and create renderer
+            if useOpenDR:
+                rendererGT.makeCurrentContext()
+                rendererGT.clear()
+                contextdata.cleanupContext(contextdata.getContext())
+                if glMode == 'glfw':
+                    glfw.destroy_window(rendererGT.win)
+                del rendererGT
+
+                if renderTeapots:
+                    currentTeapotModel = teapot_i
+                    center = center_teapots[teapot_i]
+
+                if useShapeModel:
+                    center = smCenterGT
+                    UVs = smUVsGT
+                    vGT = smVerticesGT
+                    vnGT = smNormalsGT
+                    Faces = smFacesGT
+                    VColors = smVColorsGT
+                    UVs = smUVsGT
+                    HaveTextures = smHaveTexturesGT
+                    TexturesList = smTexturesListGT
+                else:
+                    vGT, vnGT = v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0]
+                    Faces = f_list_teapots[currentTeapotModel][0]
+                    VColors = vc_teapots[currentTeapotModel][0]
+                    UVs = uv_teapots[currentTeapotModel][0]
+                    HaveTextures = haveTextures_list_teapots[currentTeapotModel][0]
+                    TexturesList = textures_list_teapots[currentTeapotModel][0]
+
+                vGT, vnGT, teapotPosOffset = transformObject(vGT, vnGT, chScaleGT, chObjAzGT, chObjDistGT, chObjRotationGT, targetPosition)
+
+                if renderMugs:
+                    verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug,
+                                                                            chObjRotationMug, targetPosition)
+
+                    VerticesMug = [verticesMug]
+                    NormalsMug = [normalsMug]
+                    FacesMug = [f_list_mug]
+                    VColorsMug = [vc_mug]
+                    UVsMug = [uv_mug]
+                    HaveTexturesMug = [haveTextures_list_mug]
+                    TexturesListMug = [textures_list_mug]
+                else:
+                    VerticesMug = []
+                    NormalsMug = []
+                    FacesMug = []
+                    VColorsMug = []
+                    UVsMug = []
+                    HaveTexturesMug = []
+                    TexturesListMug = []
+
+                if renderTeapots:
+                    VerticesTeapot = [vGT]
+                    NormalsTeapot = [vnGT]
+                    FacesTeapot = [Faces]
+                    VColorsTeapot = [VColors]
+                    UVsTeapot = [UVs]
+                    HaveTexturesTeapot = [HaveTextures]
+                    TexturesListTeapot = [TexturesList]
+                else:
+                    VerticesTeapot = []
+                    NormalsTeapot = []
+                    FacesTeapot = []
+                    VColorsTeapot = []
+                    UVsTeapot = []
+                    HaveTexturesTeapot = []
+                    TexturesListTeapot = []
+
+                # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, verticesMug, f_list_mug, vc_mug,  normalsMug, uv_mug, haveTextures_list_mug, textures_list_mug)
+                # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, Faces, VColors, vnGT, UVs, HaveTextures, TexturesList)
+
+                rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, VerticesTeapot + VerticesMug + v,
+                                              VColorsTeapot + VColorsMug + vc, FacesTeapot + FacesMug + f_list, NormalsTeapot + NormalsMug + vn,
+                                              light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height,
+                                              UVsTeapot + UVsMug + uv, HaveTexturesTeapot + HaveTexturesMug + haveTextures_list,
+                                              TexturesListTeapot + TexturesListMug + textures_list, frustum, None)
+            ## Blender: Unlink and link new teapot.
             if useBlender:
-                if currentScene != -1 and  currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
+
+                if renderTeapots:
+                    # if currentScene != -1 and currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
                     if teapot.name in scene.objects:
                         scene.objects.unlink(teapot)
 
                         if useShapeModel:
                             deleteInstance(teapot)
 
-                if not useShapeModel:
-                    teapot = blender_teapots[currentTeapotModel]
-                else:
-                    teapotMesh = createMeshFromData('teapotShapeModelMesh', chVerticesGT.r.tolist(), faces.astype(np.int32).tolist())
-                    teapotMesh.layers[0] = True
-                    teapotMesh.layers[1] = True
-                    teapotMesh.pass_index = 1
+                    if not useShapeModel:
+                        teapot = blender_teapots[currentTeapotModel]
+                    else:
+                        teapotMesh = createMeshFromData('teapotShapeModelMesh', chVerticesGT.r.tolist(),
+                                                        faces.astype(np.int32).tolist())
+                        teapotMesh.layers[0] = True
+                        teapotMesh.layers[1] = True
+                        teapotMesh.pass_index = 1
 
-                    targetGroup = bpy.data.groups.new('teapotShapeModelGroup')
-                    targetGroup.objects.link(teapotMesh)
-                    teapot = bpy.data.objects.new('teapotShapeModel', None)
-                    teapot.dupli_type = 'GROUP'
-                    teapot.dupli_group = targetGroup
-                    teapot.pass_index = 1
+                        targetGroup = bpy.data.groups.new('teapotShapeModelGroup')
+                        targetGroup.objects.link(teapotMesh)
+                        teapot = bpy.data.objects.new('teapotShapeModel', None)
+                        teapot.dupli_type = 'GROUP'
+                        teapot.dupli_group = targetGroup
+                        teapot.pass_index = 1
 
-                    mat = makeMaterial('teapotMat', (0,0,0), (0,0,0), 1)
-                    setMaterial(teapotMesh, mat)
+                        mat = makeMaterial('teapotMat', (0, 0, 0), (0, 0, 0), 1)
+                        setMaterial(teapotMesh, mat)
 
-                # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+                    # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
+                    placeNewTarget(scene, teapot, targetPosition[:].copy())
+                    teapot.layers[1] = True
+                    teapot.layers[0] = True
+                    original_matrix_world = teapot.matrix_world.copy()
 
-                placeNewTarget(scene, teapot, targetPosition[:].copy())
-                teapot.layers[1]=True
-                teapot.layers[0]=True
-                original_matrix_world = teapot.matrix_world.copy()
+                if renderMugs:
+                    if mug.name in scene.objects:
+                        scene.objects.unlink(mug)
+                    # deleteInstance(mug)
+
+                    mug = blender_mugs[currentTeapotModel]
+                    placeNewTarget(scene, mug, targetPosition[:].copy())
+
+                    mug.layers[1] = True
+                    mug.layers[0] = True
+                    original_matrix_world_mug = mug.matrix_world.copy()
+
 
         hdridx = groundTruthToRender['trainEnvMaps'][gtIdx]
 
@@ -1504,21 +1584,22 @@ if renderFromPreviousGT:
         except:
             chShapeParamsGT[:] = np.random.randn(latentDim)
 
-        if useOpenDR:
-            occlusion = getOcclusionFraction(rendererGT)
+        try:
+            chObjDistGT[:] = groundTruthToRender['trainObjDistGT'][gtIdx]
+        except:
+            chObjDistGT[:] = 0
 
-            vis_occluded = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
-            vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+        try:
+            chObjRotationGT[:] = groundTruthToRender['trainObjRotationGT'][gtIdx]
+        except:
+            chObjRotationGT[:] = 0
 
-        if occlusion > 0.9:
-            ignore = True
+        if renderMugs:
+            chObjDistMug[:] = groundTruthToRender['trainObjDistMug'][gtIdx]
+            chObjRotationMug[:] = groundTruthToRender['trainObjRotationMug'][gtIdx]
+            chObjAzMug[:] = groundTruthToRender['trainObjAzMug'][gtIdx]
+            chVColorsMug[:] = groundTruthToRender['trainVColorsMug'][gtIdx]
 
-        if not ignore:
-            #Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
-            cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0,0,0,1]])])[0:3,3]
-            vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
-            if np.min(np.linalg.norm(vDists,axis=1) <= clip_start):
-                ignore = True
 
         if captureEnvMapFromBlender and not ignore and useBlender:
             envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, totalOffset.r.copy(), links, treeNodes, teapot, center, targetPosition, width, height, gtDir, train_i)
