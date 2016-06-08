@@ -117,7 +117,6 @@ grayImages = readImages(imagesDir, trainSet, True, loadGrayFromHdf5)
 
 
 
-
 backprojectionsDir = gtDir + 'backprojections/'
 backprojections = readImages(backprojectionsDir, trainSet, True, False)
 

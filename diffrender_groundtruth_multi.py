@@ -1220,8 +1220,6 @@ if not renderFromPreviousGT:
                                     coordsMugX = coords[1][vis_im_mug]
                                     coordsMugY = coords[0][vis_im_mug]
 
-
-
                             #Add groundtruth to arrays
                             trainAzsGT = chAzGTVals
                             trainObjAzsGT = chObjAzGTVals

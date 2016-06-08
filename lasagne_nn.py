@@ -29,6 +29,7 @@ from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
 from lasagne.layers import MaxPool2DLayer as PoolLayer
 from lasagne.layers import LocalResponseNormalization2DLayer as NormLayer
 from lasagne.utils import floatX
+from utils import getTriplets
 
 import ipdb
 
@@ -1386,17 +1387,17 @@ def train_triplets_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, mod
 
     test_prediction = lasagne.layers.get_output(network, deterministic=True)
 
-    if modelType == 'cnn_mask':
-        loss = lasagne.objectives.binary_crossentropy(prediction, target_var)
-        loss = loss.mean()
-        test_loss = lasagne.objectives.binary_crossentropy(test_prediction, target_var)
-        test_loss = test_loss.mean()
-    else:
-        loss = lasagne.objectives.squared_error(prediction, target_var)
-        loss = loss.mean()
-        test_loss = lasagne.objectives.squared_error(test_prediction,
-                                                                target_var)
-        test_loss = test_loss.mean()
+    # if modelType == 'cnn_mask':
+    #     loss = lasagne.objectives.binary_crossentropy(prediction, target_var)
+    #     loss = loss.mean()
+    #     test_loss = lasagne.objectives.binary_crossentropy(test_prediction, target_var)
+    #     test_loss = test_loss.mean()
+    # else:
+    #     loss = lasagne.objectives.squared_error(prediction, target_var)
+    #     loss = loss.mean()
+    #     test_loss = lasagne.objectives.squared_error(test_prediction,
+    #                                                             target_var)
+    #     test_loss = test_loss.mean()
 
     updates = lasagne.updates.nesterov_momentum(
             loss, params, learning_rate=0.01, momentum=0.9)
@@ -1427,7 +1428,11 @@ def train_triplets_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, mod
             print("Working on slice " + str(sliceidx) + " of " +  str(int(trainSetVal/slicesize)))
             X_train = X_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
 
-            for batch in iterate_minibatches(X_train, y_train[start_idx:min(start_idx + slicesize,trainSetVal)], batchSize, shuffle=True):
+            parameterVals = y_train[start_idx:min(start_idx + slicesize,trainSetVal)]
+            anchorIdx, closeIdx, farIdx = getTriplets(parameterVals, closeDist=5 * np.pi / 180, farDist=15 * np.pi / 180, normConst=2 * np.pi, chunkSize=10)
+
+
+            for batch in iterate_minibatches(X_train, parameterVals, batchSize, shuffle=True):
                 # print("Batch " + str(train_batches))
                 inputs, targets = batch
                 train_err += train_fn(inputs, targets)
