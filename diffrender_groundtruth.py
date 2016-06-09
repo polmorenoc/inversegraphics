@@ -595,7 +595,7 @@ if useShapeModel:
     teapot_i = -1
     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
-for gtIdx in rangeGT[21:]:
+for gtIdx in rangeGT[:]:
 
     sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
 

@@ -48,6 +48,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 #
 gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
+
 # gtPrefix = 'train4_occlusion_multi'
 # experimentPrefix = 'train4_occlusion_multi'
 trainPrefixPose = 'train4_occlusion_shapemodel_10k'
@@ -246,6 +247,7 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 rangeTests = np.arange(0,10)
+
 
 testSet = np.load(experimentDir + 'test.npy')[rangeTests]
 

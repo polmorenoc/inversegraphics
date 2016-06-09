@@ -617,7 +617,7 @@ def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, li
     # updateEnviornmentMap(envMapFilename, scene)
     updateEnviornmentMap(gtDir + 'im.exr', scene)
 
-    rotateEnviornmentMap(rotationOffset, scene)
+    rotateEnviornmentMap(-rotationOffset, scene)
 
     cv2.imwrite(gtDir + 'sphericalharmonics/envMapProjOr' + str(train_i) + '.jpeg',
                 255 * approxProjection[:, :, [2, 1, 0]])
@@ -635,7 +635,8 @@ def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, li
     roomInstance.cycles_visibility.camera = False
     roomInstance.cycles_visibility.shadow = False
     teapot.cycles_visibility.camera = False
-    teapot.cycles_visibility.shadow = True
+    #NOt sure if should set to True or False
+    teapot.cycles_visibility.shadow = False
 
     # image = cv2.imread(scene.render.filepath)
     # image = np.float64(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))/255.0
