@@ -726,7 +726,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
 
         cycles = bpy.context.scene.cycles
 
-        cycles.samples = 512
+        cycles.samples = 2000
         cycles.max_bounces = 36
         cycles.min_bounces = 4
         cycles.caustics_reflective = False

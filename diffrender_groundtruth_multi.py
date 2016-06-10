@@ -32,17 +32,17 @@ plt.ion()
 # Initialization starts here
 #########################################
 prefix = 'train4_occlusion_shapemodel_photorealistc_10K_test100-1100'
+prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
 
 renderFromPreviousGT = True
 useShapeModel = True
-renderOcclusions = False
 useOpenDR = True
 useBlender = True
-renderBlender = True
-captureEnvMapFromBlender = True
+renderBlender = False
+captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
 groundTruthBlender = True
@@ -51,8 +51,14 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
+replaceNewGroundtruth = True
+renderOcclusions = False
+occlusionMin = 0.0
+occlusionMax = 0.9
 renderTeapots =  True
 renderMugs = False
+centeredObject = True
+fixedCamDistance = True
 
 teapotSceneIndex = 0
 mugSceneIndex = 0
@@ -99,7 +105,7 @@ mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(teapots))[0:1]
 
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -395,7 +401,7 @@ print("Generating renders")
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 
-trainSize = 10000
+trainSize = 20000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -460,15 +466,20 @@ groundTruth = np.array([], dtype = gtDtype)
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'a')
 
-gtDataFileToRender = h5py.File(gtDir + 'groundTruthToRender.h5', 'w')
-gtDatasetToRender = gtDataFileToRender.create_dataset(prefix, data=groundTruth, maxshape=(None,))
+
+gtDirToRender = 'groundtruth/' + previousGTPrefix + '/'
+gtDataFileToRender = h5py.File(gtDirToRender + 'groundTruth.h5', 'w')
+gtDatasetToRender = gtDataFileToRender.create_dataset(previousGTPrefix, data=groundTruth, maxshape=(None,))
 
 nextId = 0
-try:
-    gtDataset = gtDataFile[prefix]
-    if gtDataset.size > 0:
-        nextId = gtDataset['trainIds'][-1] + 1
-except:
+if not replaceNewGroundtruth:
+    try:
+        gtDataset = gtDataFile[prefix]
+        if gtDataset.size > 0:
+            nextId = gtDataset['trainIds'][-1] + 1
+    except:
+        gtDataset = gtDataFile.create_dataset(prefix, data=groundTruth, maxshape=(None,))
+else:
     gtDataset = gtDataFile.create_dataset(prefix, data=groundTruth, maxshape=(None,))
 
 train_i = nextId
@@ -537,10 +548,10 @@ if not renderFromPreviousGT:
         with open(collisionSceneFile, 'rb') as pfile:
             collisions = pickle.load(pfile)
 
-        if renderOcclusions:
-            occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
-            with open(occlusionSceneFile, 'rb') as pfile:
-                occlusions = pickle.load(pfile)
+        # if renderOcclusions:
+        #     occlusionSceneFile = 'data/occlusions/occlusionScene' + str(sceneNumber) + '.pickle'
+        #     with open(occlusionSceneFile, 'rb') as pfile:
+        #         occlusions = pickle.load(pfile)
 
         v2, f_list2, vc2, vn2, uv2, haveTextures_list2, textures_list2 = scene_io_utils.loadSavedScene(sceneDicFile, tex_srgb2lin)
         if useBlender and not loadBlenderSceneFile:
@@ -581,7 +592,7 @@ if not renderFromPreviousGT:
                     mugModels = mugModels + [mug]
                     blender_mugs = blender_mugs + [mug]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 2000, 'CUDA', 'CUDA_MULTI')
+            setupSceneGroundtruth(scene, width, height, clip_start, 5000, 'CUDA', 'CUDA_MULTI_2')
 
             treeNodes = scene.world.node_tree
 
@@ -923,13 +934,17 @@ if not renderFromPreviousGT:
 
                             chObjRotationGTVals = np.random.uniform(0,np.pi*2)
 
-                            teapotPlacement = np.random.choice(instantiationBinsTeapot.sum())
+                            if not centeredObject:
+                                teapotPlacement = np.random.choice(instantiationBinsTeapot.sum())
 
-                            chObjDistGTVals = totalBinsTeapot[0].ravel()[instantiationBinsTeapot][teapotPlacement]
-                            chObjRotationGTVals = totalBinsTeapot[1].ravel()[instantiationBinsTeapot][teapotPlacement]
+                                chObjDistGTVals = totalBinsTeapot[0].ravel()[instantiationBinsTeapot][teapotPlacement]
+                                chObjRotationGTVals = totalBinsTeapot[1].ravel()[instantiationBinsTeapot][teapotPlacement]
 
-                            chObjDistGTVals = np.random.uniform(chObjDistGTVals - distInterval/2, chObjDistGTVals + distInterval/2)
-                            chObjRotationGTVals = np.mod(np.random.uniform(chObjRotationGTVals - rotationInterval/2, chObjRotationGTVals + rotationInterval/2), 2*np.pi)
+                                chObjDistGTVals = np.random.uniform(chObjDistGTVals - distInterval/2, chObjDistGTVals + distInterval/2)
+                                chObjRotationGTVals = np.mod(np.random.uniform(chObjRotationGTVals - rotationInterval/2, chObjRotationGTVals + rotationInterval/2), 2*np.pi)
+                            else:
+                                chObjDistGTVals = 0
+                                chObjRotationGTVals = 0
 
                             chObjDistGT[:] = chObjDistGTVals
                             chObjRotationGT[:] = chObjRotationGTVals
@@ -957,25 +972,33 @@ if not renderFromPreviousGT:
 
                             instantiationBinsMugUpdated = instantiationBinsMug
                             if renderTeapots:
-                                ys = -np.cos(totalBinsMug[1]) * totalBinsMug[0]
-                                xs = np.sin(totalBinsMug[1]) * totalBinsMug[0]
 
-                                y = -np.cos(chObjRotationGTVals) * chObjDistGTVals
-                                x = np.sin(chObjRotationGTVals) * chObjDistGTVals
+                                if not centeredObject:
 
-                                instantiationBinsMugUpdated = instantiationBinsMug.copy()
-                                # instantiationBinsMugUpdated[(totalBinsMug[0] > chObjDistGTVals - 0.15) & (totalBinsMug[0] < chObjDistGTVals + 0.15) & (totalBinsMug[1] > chObjRotationGTVals - 15*np.pi/180) & (totalBinsMug[1] < chObjRotationGTVals + 15*np.pi/180)] = False
+                                    ys = -np.cos(totalBinsMug[1]) * totalBinsMug[0]
+                                    xs = np.sin(totalBinsMug[1]) * totalBinsMug[0]
 
-                                instantiationBinsMugUpdated[np.sqrt((ys-y)**2 + (xs-x)**2) < 0.15] = False
+                                    y = -np.cos(chObjRotationGTVals) * chObjDistGTVals
+                                    x = np.sin(chObjRotationGTVals) * chObjDistGTVals
 
-                                if instantiationBinsMugUpdated.sum() == 0:
-                                    ignore = True
+                                    instantiationBinsMugUpdated = instantiationBinsMug.copy()
+                                    # instantiationBinsMugUpdated[(totalBinsMug[0] > chObjDistGTVals - 0.15) & (totalBinsMug[0] < chObjDistGTVals + 0.15) & (totalBinsMug[1] > chObjRotationGTVals - 15*np.pi/180) & (totalBinsMug[1] < chObjRotationGTVals + 15*np.pi/180)] = False
 
-                            mugPlacement = np.random.choice(instantiationBinsMugUpdated.sum())
-                            chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMugUpdated][mugPlacement]
-                            chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMugUpdated][mugPlacement]
-                            chObjDistMugVals = np.random.uniform(chObjDistMugVals - distInterval/2, chObjDistMugVals + distInterval/2)
-                            chObjRotationMugVals = np.mod(np.random.uniform(chObjRotationMugVals - rotationInterval/2, chObjRotationMugVals + rotationInterval/2), 2*np.pi)
+                                    instantiationBinsMugUpdated[np.sqrt((ys-y)**2 + (xs-x)**2) < 0.15] = False
+
+                                    if instantiationBinsMugUpdated.sum() == 0:
+                                        ignore = True
+
+                                    mugPlacement = np.random.choice(instantiationBinsMugUpdated.sum())
+                                    chObjDistMugVals = totalBinsMug[0].ravel()[instantiationBinsMugUpdated][mugPlacement]
+                                    chObjRotationMugVals = totalBinsMug[1].ravel()[instantiationBinsMugUpdated][mugPlacement]
+                                    chObjDistMugVals = np.random.uniform(chObjDistMugVals - distInterval/2, chObjDistMugVals + distInterval/2)
+                                    chObjRotationMugVals = np.mod(np.random.uniform(chObjRotationMugVals - rotationInterval/2, chObjRotationMugVals + rotationInterval/2), 2*np.pi)
+
+                                else:
+                                    chObjDistGTVals = 0
+                                    chObjRotationGTVals = 0
+
                             chObjDistMug[:] = chObjDistMugVals
                             chObjRotationMug[:] = chObjRotationMugVals
 
@@ -1040,6 +1063,10 @@ if not renderFromPreviousGT:
                                 vis_im_mug = np.array(rendererGT.image_mesh_bool([mugSceneIndex])).copy().astype(np.bool)
 
                             if renderTeapots:
+
+                                if occlusion < occlusionMin or occlusion > occlusionMax:
+                                    ignore = True
+
                                 if occlusion > 0.9 or vis_occluded.sum() < 10 or np.isnan(occlusion):
                                     ignore = True
 
@@ -1105,9 +1132,10 @@ if not renderFromPreviousGT:
                                         print("Teapot intersects room")
                                         ignore = True
 
-                                    if not ignore and not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01)))*teapot.matrix_world, teapot.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
+                                    if not ignore and not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.02))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
                                         print("Teapot not on table.")
-                                        ignore = True
+                                        ipdb.set_trace()
+                                        ignore = False
 
                                 if renderMugs:
                                     if not ignore and collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube' + str(roomInstanceNum), cubeParentSupportObj):
@@ -1122,7 +1150,7 @@ if not renderFromPreviousGT:
                                         print("Mug intersects room")
                                         ignore = True
 
-                                    if not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.01)))*mug.matrix_world, mug.dupli_group.objects, parentSupportObj.matrix_world, parentSupportObj.dupli_group.objects):
+                                    if not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.02))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
                                         print("Mug not on table.")
                                         ignore = True
 
@@ -1269,9 +1297,9 @@ if not renderFromPreviousGT:
                             trainTeapotPresent = renderTeapots
                             trainMugPresent = renderMugs
 
-                            gtDatasetToRender.resize(gtDatasetToRender.shape[0] + 1, axis=0)
+                            gtDataset.resize(gtDataset.shape[0] + 1, axis=0)
 
-                            gtDatasetToRender[-1] = np.array([(trainIds, trainAzsGT, trainObjAzsGT, trainElevsGT,
+                            gtDataset[-1] = np.array([(trainIds, trainAzsGT, trainObjAzsGT, trainElevsGT,
                                                                trainLightAzsGT, trainLightElevsGT,
                                                                trainLightIntensitiesGT, trainVColorGT, trainScenes,
                                                                trainTeapotIds, trainEnvMaps, trainOcclusions,
@@ -1294,7 +1322,7 @@ if not renderFromPreviousGT:
                                                               trainMugPresent
                                                              )], dtype=gtDtype)
 
-
+                            gtDataFile.flush()
                             train_i = train_i + 1
                             numTeapotTrain = numTeapotTrain + 1
 
@@ -1309,8 +1337,6 @@ if renderFromPreviousGT:
     groundTruthToRender = gtDataFileToRender[previousGTPrefix]
 else:
     groundTruthToRender = gtDataFileToRender[prefix]
-
-train_i = nextId
 
 currentScene = -1
 currentTeapot = -1
@@ -1333,10 +1359,30 @@ if useShapeModel:
     teapot_i = -1
     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
+idxToRender = rangeGT[:][subsetToRender]
+sceneIdxsToRender = groundTruthToRender['trainScenes'][idxToRender]
+sortedSceneIndices = np.argsort(sceneIdxsToRender)
+
+sortedSceneAndTargetIdxs = np.arange(len(idxToRender))
+for sceneIdx in np.unique(sceneIdxsToRender[sortedSceneIndices]):
+    sortedTargetIdxs = np.argsort(groundTruthToRender['trainTargetIndices'][idxToRender][np.where(sceneIdxsToRender[sortedSceneIndices]==sceneIdx)])
+    sortedSceneAndTargetIdx = idxToRender[sortedSceneIndices][np.where(sceneIdxsToRender[sortedSceneIndices]==sceneIdx)][sortedTargetIdxs]
+    sortedSceneAndTargetIdxs[np.where(sceneIdxsToRender[sortedSceneIndices]==sceneIdx)] = sortedSceneAndTargetIdx
+
+
+ipdb.set_trace()
+
 if renderFromPreviousGT:
-    for gtIdx in rangeGT[:][subsetToRender]:
+    for gtIdx in sortedSceneAndTargetIdxs:
+
+        if not replaceNewGroundtruth:
+            if gtIdx in gtDataset['trainIds']:
+                continue
 
         sceneNumber = groundTruthToRender['trainScenes'][gtIdx]
+
+        # train_i = np.where(idxToRender==gtIdx)[0][0]
+        train_i = gtIdx
 
         sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
 
@@ -1389,7 +1435,7 @@ if renderFromPreviousGT:
                         mugModels = mugModels + [mug]
                         blender_mugs = blender_mugs + [mug]
 
-                setupSceneGroundtruth(scene, width, height, clip_start, 2000, 'CUDA', 'CUDA_MULTI_2')
+                setupSceneGroundtruth(scene, width, height, clip_start, 5000, 'CUDA', 'CUDA_MULTI_2')
 
                 treeNodes = scene.world.node_tree
 
@@ -1401,6 +1447,9 @@ if renderFromPreviousGT:
 
         targetIndex = groundTruthToRender['trainTargetIndices'][gtIdx]
 
+        if sceneIdx != currentScene and not renderMugs and sceneIdx == 44 and sceneNumber == 114:
+            removeObjectData(1, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+
         if sceneIdx != currentScene or targetIndex != currentTargetIndex:
             targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
             import copy
@@ -1408,12 +1457,23 @@ if renderFromPreviousGT:
 
             removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
+
         if sceneIdx != currentScene or targetIndex != currentTargetIndex:
             if useBlender:
                 if unlinkedObj != None:
                     scene.objects.link(unlinkedObj)
-                unlinkedObj = scene.objects[str(targetIndex)]
-                scene.objects.unlink(unlinkedObj)
+
+                try:
+                    unlinkedObj = scene.objects[str(targetIndex)]
+                    scene.objects.unlink(unlinkedObj)
+                except:
+                    pass
+
+                if sceneIdx == 44 and sceneNumber == 114:
+                    try:
+                        scene.objects.unlink(scene.objects['fc035f7d732166b97b6fd5468f603b31_cleaned'])
+                    except:
+                        pass
 
         teapot_i = groundTruthToRender['trainTeapotIds'][gtIdx]
 
@@ -1766,9 +1826,9 @@ if renderFromPreviousGT:
 
             trainMugPresent = renderMugs
 
-            gtDatasetToRender.resize(gtDatasetToRender.shape[0] + 1, axis=0)
+            gtDataset.resize(gtDataset.shape[0] + 1, axis=0)
 
-            gtDatasetToRender[-1] = np.array([(trainIds, trainAzsGT, trainObjAzsGT, trainElevsGT,
+            gtDataset[-1] = np.array([(trainIds, trainAzsGT, trainObjAzsGT, trainElevsGT,
                                                trainLightAzsGT, trainLightElevsGT,
                                                trainLightIntensitiesGT, trainVColorGT, trainScenes,
                                                trainTeapotIds, trainEnvMaps, trainOcclusions,
@@ -1796,6 +1856,7 @@ if renderFromPreviousGT:
         currentScene  = sceneIdx
         currentTargetIndex = targetIndex
         currentTeapot = teapot_i
+        gtDataFile.flush()
 
     # np.savetxt(gtDir + 'data.txt',np.array(np.hstack([trainIds[:,None], trainAzsGT[:,None], trainObjAzsGT[:,None], trainElevsGT[:,None], phiOffsets[:,None], trainOcclusions[:,None]])), fmt="%g")
     gtDataFile.close()
