@@ -6,6 +6,7 @@ import numpy as np
 import ipdb
 
 import skimage.color
+from numpy.core.umath_tests import matrix_multiply
 
 # def xyz2labCh(xyz, illuminant="D65", observer="2"):
 #     """XYZ to CIE-LAB color space conversion.

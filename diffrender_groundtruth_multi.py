@@ -31,7 +31,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_photorealistc_10K_test100-1100'
+prefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
@@ -45,13 +45,12 @@ renderBlender = True
 captureEnvMapFromBlender = True
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
-groundTruthBlender = True
 useCycles = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-replaceNewGroundtruth = True
+replaceNewGroundtruth = False
 renderOcclusions = True
 occlusionMin = 0.001
 occlusionMax = 0.9
@@ -271,16 +270,6 @@ if useOpenDR:
     shapeIm = vis_gt.shape
 
 numPixels = height * width
-
-def imageGT():
-    global groundTruthBlender
-    global rendererGT
-    global blenderRender
-
-    if groundTruthBlender:
-        return blenderRender
-    else:
-        return np.copy(np.array(rendererGT.r)).astype(np.float64)
 
 import multiprocessing
 numTileAxis = np.ceil(np.sqrt(multiprocessing.cpu_count())/2)
@@ -526,7 +515,7 @@ for sceneIdx in scenesToRender:
     scenes = scenes + [targetIndices]
     lenScenes += len(targetIndices)
 
-groundTruthInfo = {'prefix':prefix, 'previousGTPrefix':previousGTPrefix, 'renderFromPreviousGT':renderFromPreviousGT, 'useShapeModel':useShapeModel, 'renderOcclusions':renderOcclusions, 'useOpenDR':useOpenDR, 'useBlender':useBlender, 'renderBlender':renderBlender, 'captureEnvMapFromBlender':captureEnvMapFromBlender, 'parseSceneInstantiations':parseSceneInstantiations, 'loadBlenderSceneFile':loadBlenderSceneFile, 'groundTruthBlender':groundTruthBlender, 'useCycles':useCycles, 'unpackModelsFromBlender':unpackModelsFromBlender, 'unpackSceneFromBlender':unpackSceneFromBlender, 'loadSavedSH':loadSavedSH, 'renderTeapots':renderTeapots, 'renderMugs':renderMugs, 'width':width, 'height':height, 'angle':angle, 'clip_start':clip_start, 'clip_end':clip_end, 'camDistance':camDistance, 'renderTeapotsList':renderTeapotsList, 'renderMugsList':renderMugsList, 'replaceableScenesFile':replaceableScenesFile, 'teapotsFile':teapotsFile, 'SHFilename':SHFilename, 'light_colorGT':light_colorGT, 'chDisplacement':chDisplacement, 'chDisplacementGT':chDisplacementGT, 'chScale':chScale, 'chScaleGT':chScaleGT}
+groundTruthInfo = {'prefix':prefix, 'previousGTPrefix':previousGTPrefix, 'renderFromPreviousGT':renderFromPreviousGT, 'useShapeModel':useShapeModel, 'renderOcclusions':renderOcclusions, 'useOpenDR':useOpenDR, 'useBlender':useBlender, 'renderBlender':renderBlender, 'captureEnvMapFromBlender':captureEnvMapFromBlender, 'parseSceneInstantiations':parseSceneInstantiations, 'loadBlenderSceneFile':loadBlenderSceneFile, 'useCycles':useCycles, 'unpackModelsFromBlender':unpackModelsFromBlender, 'unpackSceneFromBlender':unpackSceneFromBlender, 'loadSavedSH':loadSavedSH, 'renderTeapots':renderTeapots, 'renderMugs':renderMugs, 'width':width, 'height':height, 'angle':angle, 'clip_start':clip_start, 'clip_end':clip_end, 'camDistance':camDistance, 'renderTeapotsList':renderTeapotsList, 'renderMugsList':renderMugsList, 'replaceableScenesFile':replaceableScenesFile, 'teapotsFile':teapotsFile, 'SHFilename':SHFilename, 'light_colorGT':light_colorGT, 'chDisplacement':chDisplacement, 'chDisplacementGT':chDisplacementGT, 'chScale':chScale, 'chScaleGT':chScaleGT}
 with open(gtDir + 'gtInfo.pickle', 'wb') as pfile:
     pickle.dump(groundTruthInfo, pfile)
 
@@ -1343,6 +1332,8 @@ if renderFromPreviousGT:
     groundTruthFilename = 'groundtruth/' + previousGTPrefix + '/groundTruth.h5'
     gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
     groundTruthToRender = gtDataFileToRender[previousGTPrefix]
+else:
+    exit()
 
 currentScene = -1
 currentTeapot = -1

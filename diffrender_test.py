@@ -46,6 +46,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 #
+
 gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
@@ -191,8 +192,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
 initialPixelStdev = 0.01
-reduceVariance = False
-getColorFromCRF = False
+
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
 variances = stds ** 2
@@ -235,8 +235,12 @@ trainModelsDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
 trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/'
 trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
+useCRFOcclusionPred = False
 useShapeModel = True
 makeVideo = False
+reduceVariance = False
+getColorFromCRF = False
+syntheticGroundtruth = True
 
 ignoreGT = True
 ignore = []
@@ -246,10 +250,11 @@ if os.path.isfile(gtDir + 'ignore.npy'):
 groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-rangeTests = np.arange(0,10)
+testSet = np.load(experimentDir + 'test.npy')
 
+rangeTests = np.arange(100,1100)
 
-testSet = np.load(experimentDir + 'test.npy')[rangeTests]
+testSet = testSet[rangeTests]
 
 numTests = len(testSet)
 
@@ -296,7 +301,6 @@ if multiObjects:
     dataMugPosOffset = groundTruth['trainMugPosOffset']
     dataTeapotPosOffset = groundTruth['trainTeapotPosOffset']
 
-
 if useShapeModel:
     dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
@@ -313,8 +317,6 @@ for test_it, test_id in enumerate(testSet):
 # testSet = testSetFixed
 
 loadFromHdf5 = False
-
-syntheticGroundtruth = True
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -417,7 +419,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 0
+optimizationType = 1
 computePredErrorFuns = True
 
 method = 1
@@ -442,7 +444,6 @@ vColorVar = 0.01
 shCoeffsVar = 0.01
 df_vars = np.concatenate([azVar*np.ones(chAz.shape), elVar*np.ones(chEl.shape), vColorVar*np.ones(chVColors.r.shape), shCoeffsVar*np.ones(chLightSHCoeffs.r.shape)])
 options = {'disp':False, 'maxiter':maxiter, 'df_vars':df_vars}
-
 
 testRenderer = 0
 
@@ -535,8 +536,6 @@ else:
 loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
-
-
 
 # ### Groundtruth triplets generation
 #
@@ -933,38 +932,36 @@ import theano
 import theano.tensor as T
 
 ## Theano NN error function 1.
-import lasagne_nn
-import lasagne
-
-with open(trainModelsDirPose + 'neuralNetModelAppearance.pickle', 'rb') as pfile:
-    neuralNetModelPose = pickle.load(pfile)
-
-meanImage = neuralNetModelPose['mean'].reshape([150,150,3])
-
-modelType = neuralNetModelPose['type']
-param_values = neuralNetModelPose['params']
-network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-layer = lasagne.layers.get_all_layers(network)[6]
-inputLayer = lasagne.layers.get_all_layers(network)[0]
-layer_output = lasagne.layers.get_output(layer, deterministic=True)
-dim_output= layer.output_shape[1]
-
-networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-layerGT = lasagne.layers.get_all_layers(networkGT)[6]
-inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
-layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
-
-rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
-
-chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=renderer - meanImage, dim_output = dim_output,
-                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGT - meanImage)
-
-chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
-
-ipdb.set_trace()
-chThError.r
-
+# import lasagne_nn
+# import lasagne
+#
+# with open(trainModelsDirPose + 'neuralNetModelAppearance.pickle', 'rb') as pfile:
+#     neuralNetModelPose = pickle.load(pfile)
+#
+# meanImage = neuralNetModelPose['mean'].reshape([150,150,3])
+#
+# modelType = neuralNetModelPose['type']
+# param_values = neuralNetModelPose['params']
+# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layer = lasagne.layers.get_all_layers(network)[6]
+# inputLayer = lasagne.layers.get_all_layers(network)[0]
+# layer_output = lasagne.layers.get_output(layer, deterministic=True)
+# dim_output= layer.output_shape[1]
+#
+# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layerGT = lasagne.layers.get_all_layers(networkGT)[6]
+# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+#
+# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+#
+# chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=renderer - meanImage, dim_output = dim_output,
+#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGT - meanImage)
+#
+# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+#
+# chThError.r
 
 #
 # ## Theano NN error function finite differences.
@@ -1081,7 +1078,6 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "shape
 else:
     shapeParamsPred = np.load(trainModelsDirShapeParams + 'shapeParamsPred.npy')[rangeTests]
     shapeParamsPredSamples = np.load(trainModelsDirShapeParams + 'shapeParamsPredSamples.npy')[rangeTests]
-
 
 if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "neuralNetModelMaskLarge.npy"):
     if 'neuralNetModelMask' in parameterRecognitionModels:
@@ -1234,7 +1230,6 @@ def analyzeHue(figurePath, rendererGT, renderer, sampleEl, sampleAz, sampleSH, s
     chVColors[:] = currentVColors
     cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-
 def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH, sampleAzsPredictions=None, sampleStds=0.1):
     global stds
     global chAz
@@ -1372,7 +1367,6 @@ pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, gr
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 
-
 models = [negLikModel, negLikModelRobust]
 pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 modelsDescr = ["Gaussian Model", "Outlier model" ]
@@ -1380,7 +1374,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'NNERROFUN-' + testRangeStr
+testDescription = 'ECCV-SYNTH-FIX-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1391,7 +1385,6 @@ stdsTests = [0.01]
 modelTests = len(stdsTests)*[1]
 modelTests = [1]
 methodTests = len(stdsTests)*[1]
-
 
 if makeVideo:
     plt.ioff()
@@ -1433,7 +1426,6 @@ if makeVideo:
 
     plt.tight_layout()
     vidImgs = []
-
 
 nearestNeighbours = False
 
@@ -1583,7 +1575,6 @@ def cb(_):
     global shapeParams
 
     t = time.time()
-
 
 for testSetting, model in enumerate(modelTests):
     model = modelTests[testSetting]
@@ -1803,13 +1794,13 @@ for testSetting, model in enumerate(modelTests):
                 vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
                 bound_im = renderer.boundarybool_image.astype(np.bool)
 
-                if optimizationTypeDescr[optimizationType] != 'optimize':
-                    import densecrf_model
-                    #
-                    # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/crf/renderer', renderer.r)
-                    #
-                    sample_i = test_i
-                    segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.75,0.25,0.01], resultDir + 'imgs/crf/Q_' + str(sample_i))
+                # if optimizationTypeDescr[optimizationType] != 'optimize':
+                #     import densecrf_model
+                #     #
+                #     # plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/crf/renderer', renderer.r)
+                #     #
+                #     sample_i = test_i
+                #     segmentation, Q = densecrf_model.crfInference(rendererGT.r, vis_im, bound_im, [0.75,0.25,0.01], resultDir + 'imgs/crf/Q_' + str(sample_i))
                 # if np.sum(segmentation==0) == 0:
                 #     segmentVColorsList = segmentVColorsList + [color]
                 # else:
@@ -1817,8 +1808,6 @@ for testSetting, model in enumerate(modelTests):
                 #     segmentRegion = segmentation==0
                 #     segmentColor = np.median(rendererGT.reshape([-1,3])[segmentRegion.ravel()], axis=0)
                 #     segmentVColorsList = segmentVColorsList + [segmentColor]
-                #
-
                 #
 
                 # optLightSHCoeffs = chLightSHCoeffs.r
@@ -1966,9 +1955,8 @@ for testSetting, model in enumerate(modelTests):
 
                 predictedErrorFuns = np.append(predictedErrorFuns, errorFun.r)
 
-                analyzeAz(resultDir + 'az_samples/test' + str(test_i) + '_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel,
-                          azsPredictions[test_i], sampleStds=stds.r)
-
+                # analyzeAz(resultDir + 'az_samples/test' + str(test_i) + '_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel,
+                #           azsPredictions[test_i], sampleStds=stds.r)
 
                 global iterat
                 iterat = 0
@@ -1989,30 +1977,31 @@ for testSetting, model in enumerate(modelTests):
                     globalPrior[:] = 0.9
 
                     errorFun = models[1]
+                    vColor = color
+                    if useCRFOcclusionPred:
+                        priorProbs = [0.75, 0.25, 0.01]
+                        test_sample = test_i
+                        Q = recognition_models.segmentCRFModel(renderer=renderer, groundtruth=rendererGT,
+                                                               priorProbs=priorProbs, resultDir=resultDir,
+                                                               test_i=test_sample)
 
-                    priorProbs = [0.75, 0.25, 0.01]
-                    test_sample = test_i
-                    Q = recognition_models.segmentCRFModel(renderer=renderer, groundtruth=rendererGT,
-                                                           priorProbs=priorProbs, resultDir=resultDir,
-                                                           test_i=test_sample)
-
-                    getColorFromCRF = False
-                    segmentation = np.argmax(Q.r, axis=0).reshape(renderer.r.shape[:2])
-                    if np.sum(segmentation == 0) == 0:
-                        ignore = True
-                        vColor = color
-                    else:
-                        segmentRegion = segmentation == 0
-                        vColor = np.median(rendererGT.reshape([-1, 3])[segmentRegion.ravel()], axis=0) * 1.4
-                        vColor = vColor / max(np.max(vColor), 1.)
-
-                        vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
-                        chVColors[:] = vColor
-                        colorRegion = np.all(renderer.r != 0,axis=2).ravel() * segmentRegion.ravel() * vis_im.ravel()
-                        if colorRegion.sum() == 0:
+                        getColorFromCRF = False
+                        segmentation = np.argmax(Q.r, axis=0).reshape(renderer.r.shape[:2])
+                        if np.sum(segmentation == 0) == 0:
                             ignore = True
+                            vColor = color
                         else:
-                            vColor = vColor * np.median(rendererGT.r.reshape([-1, 3])[colorRegion] / renderer.r.reshape([-1, 3])[colorRegion])
+                            segmentRegion = segmentation == 0
+                            vColor = np.median(rendererGT.reshape([-1, 3])[segmentRegion.ravel()], axis=0) * 1.4
+                            vColor = vColor / max(np.max(vColor), 1.)
+
+                            vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+                            chVColors[:] = vColor
+                            colorRegion = np.all(renderer.r != 0,axis=2).ravel() * segmentRegion.ravel() * vis_im.ravel()
+                            if colorRegion.sum() == 0:
+                                ignore = True
+                            else:
+                                vColor = vColor * np.median(rendererGT.r.reshape([-1, 3])[colorRegion] / renderer.r.reshape([-1, 3])[colorRegion])
 
                     if not ignore:
                         color = vColor
@@ -2021,175 +2010,235 @@ for testSetting, model in enumerate(modelTests):
                         ## Bayes Optimization
 
                         ### Bayesian Optimization tests.
+                        if useCRFOcclusionPred:
+                            free_variables = [ chAz, chEl]
+                            free_variables_app_light = [ chLightSHCoeffs]
 
-                        free_variables = [ chAz, chEl]
-                        free_variables_app_light = [ chLightSHCoeffs]
+                            azSampleStdev = np.sqrt(-np.log(np.min([np.mean(np.sin(azsPredictions)[test_i])**2 + np.mean(np.cos(azsPredictions)[test_i])**2,1])))
 
-                        azSampleStdev = np.sqrt(-np.log(np.min([np.mean(np.sin(azsPredictions)[test_i])**2 + np.mean(np.cos(azsPredictions)[test_i])**2,1])))
+                            azMean = azsPred[test_i]
+                            elMean = elevsPred[test_i]
 
-                        azMean = azsPred[test_i]
-                        elMean = elevsPred[test_i]
+                            elSampleStdev = np.sqrt(-np.log(np.min([np.mean(np.sin(elevsPredictions)[test_i])**2 + np.mean(np.cos(elevsPredictions)[test_i])**2,1])))
+                            elBound = np.min(elSampleStdev, np.pi/4)
 
-                        elSampleStdev = np.sqrt(-np.log(np.min([np.mean(np.sin(elevsPredictions)[test_i])**2 + np.mean(np.cos(elevsPredictions)[test_i])**2,1])))
-                        elBound = np.min(elSampleStdev, np.pi/4)
+                            elMean = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
 
-                        elMean = min(max(elevsPred[test_i],radians(1)), np.pi/2-radians(1))
+                            shapeStdevs = np.min(np.vstack([2*np.sqrt(np.cov(shapeParamsPredSamples[test_i]).diagonal()), np.ones([latentDim])*3.5]), 0)
 
-                        shapeStdevs = np.min(np.vstack([2*np.sqrt(np.cov(shapeParamsPredSamples[test_i]).diagonal()), np.ones([latentDim])*3.5]), 0)
+                            azBound = min(azSampleStdev, np.pi)
+                            optBounds = [(azMean - azBound, azMean + azBound), (min(max(elMean - elBound,0), np.pi/2), min(max(elMean + elBound,0), np.pi/2))] + [(max(shapeParams[shape_i] - shapeStdevs[shape_i],-3.5), min(shapeParams[shape_i] + shapeStdevs[shape_i],3.5)) for shape_i in range(len(shapeStdevs))]
+                            optBounds = [(azMean - azBound, azMean + azBound), (min(max(elMean - elBound,0), np.pi/2), min(max(elMean + elBound,0), np.pi/2))]
 
-                        azBound = min(azSampleStdev, np.pi)
-                        optBounds = [(azMean - azBound, azMean + azBound), (min(max(elMean - elBound,0), np.pi/2), min(max(elMean + elBound,0), np.pi/2))] + [(max(shapeParams[shape_i] - shapeStdevs[shape_i],-3.5), min(shapeParams[shape_i] + shapeStdevs[shape_i],3.5)) for shape_i in range(len(shapeStdevs))]
-                        optBounds = [(azMean - azBound, azMean + azBound), (min(max(elMean - elBound,0), np.pi/2), min(max(elMean + elBound,0), np.pi/2))]
+                            numSamples = max(int(np.ceil(2*azSampleStdev*180./(np.pi*20.))),1)
+                            # azSamples = np.linspace(0, azSampleStdev, numSamples)
+                            azSamples = np.linspace(0, np.pi, 10)
 
-                        numSamples = max(int(np.ceil(2*azSampleStdev*180./(np.pi*20.))),1)
-                        # azSamples = np.linspace(0, azSampleStdev, numSamples)
-                        azSamples = np.linspace(0, np.pi, 10)
+                            numSamples = max(int(np.ceil(2*elSampleStdev*180./(np.pi*10.))),1)
+                            elSamples = np.linspace(0, 2*elSampleStdev, numSamples)
 
-                        numSamples = max(int(np.ceil(2*elSampleStdev*180./(np.pi*10.))),1)
-                        elSamples = np.linspace(0, 2*elSampleStdev, numSamples)
+                            elSamples = chEl.r + np.concatenate([elSamples, -elSamples[1:]])
 
-                        elSamples = chEl.r + np.concatenate([elSamples, -elSamples[1:]])
+                            totalAzSamples = chAz.r + np.concatenate([azSamples, -azSamples[1:]])
+                            if len(totalAzSamples) == 0:
+                                totalAzSamples = np.array([chAz.r])
 
-                        totalAzSamples = chAz.r + np.concatenate([azSamples, -azSamples[1:]])
-                        if len(totalAzSamples) == 0:
-                            totalAzSamples = np.array([chAz.r])
+                            if azSampleStdev < 20*np.pi/180:
+                                totalAzSamples = np.array([chAz.r])
 
-                        if azSampleStdev < 20*np.pi/180:
-                            totalAzSamples = np.array([chAz.r])
+                            totalElSamples = np.array([elSample for elSample in elSamples if elSample > 0 and elSample < np.pi/2])
+                            if len(totalElSamples) == 0:
+                                totalElSamples = np.array([chEl.r])
 
-                        totalElSamples = np.array([elSample for elSample in elSamples if elSample > 0 and elSample < np.pi/2])
-                        if len(totalElSamples) == 0:
                             totalElSamples = np.array([chEl.r])
 
-                        totalElSamples = np.array([chEl.r])
+
+                            # totalElSamples = np.array([testElevsGT[test_i]])
+                            # chShapeParams[:] = testShapeParamsGT[test_i]
+                            # chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
+                            # chVColors[:] = testVColorGT[test_i]
+                            # vColor = testVColorGT[test_i]
+                            # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+
+                            totalSamples = np.meshgrid(totalAzSamples, totalElSamples)
+                            totalSamples = np.hstack([totalSamples[0].reshape([-1,1]),totalSamples[1].reshape([-1,1])])
+
+                            import diffrender_opt
+                            # objFun = diffrender_opt.opendrObjectiveFunction(errorFun, free_variables)
+
+                            # res = diffrender_opt.bayesOpt(objFun, objBounds)
+                            methodOpt = methods[method]
+                            stds[:] = 0.1
+
+                            # crfObjFun = diffrender_opt.opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, vColor, chVColors, chLightSHCoeffs, lightCoefficientsRel, free_variables_app_light, resultDir, test_i, stds.r, methodOpt, False, False)
+
+                            cv2.imwrite(
+                                resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_predictedCRF' + '.png',
+                                cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
 
-                        # totalElSamples = np.array([testElevsGT[test_i]])
-                        # chShapeParams[:] = testShapeParamsGT[test_i]
-                        # chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
-                        # chVColors[:] = testVColorGT[test_i]
-                        # vColor = testVColorGT[test_i]
-                        # lightCoefficientsRel = testLightCoefficientsGTRel[test_i]
+                            # errorFunCRF = -ch.sum(generative_models.LogCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q.r.reshape([3,height, width]),
+                            #                                                     variances=variances)) / numPixels
+                            errorFunNLLCRF = generative_models.NLLCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q.r.reshape([3,height, width]),
+                                                                                variances=variances) / numPixels
 
-                        totalSamples = np.meshgrid(totalAzSamples, totalElSamples)
-                        totalSamples = np.hstack([totalSamples[0].reshape([-1,1]),totalSamples[1].reshape([-1,1])])
+                            # errorFun = models[1]
+                            # samplesEvals = []
+                            # for azSample in totalSamples[:,0]:
+                            #     chAz[:] = azSample
+                            #     samplesEvals = samplesEvals + [errorFunNLLCRF.r]
+                            #
+                            # samplesEvals = np.array(samplesEvals)
+                            #
+                            # # samplesEvals = crfObjFun(totalSamples)
+                            #
+                            # #Start Optimiaztion
+                            #
+                            # # res = diffrender_opt.bayesOpt(crfObjFun, totalSamples, samplesEvals, optBounds)
+                            # #
+                            # # optAz = res.x_opt[0]
+                            # # optEl = res.x_opt[1]
+                            # # # optShapeParams = res.x_opt[2:]
+                            # bestSample = np.argmin(samplesEvals)
+                            # optAz = totalSamples[bestSample][0]
+                            # optEl = totalSamples[bestSample][1]
+                            #
+                            # azfig = plt.figure()
+                            # ax = azfig.add_subplot(111)
+                            # ax.plot(np.mod(totalSamples[:,0], 2*np.pi), samplesEvals, 'ro')
+                            # y1, y2 = ax.get_ylim()
+                            # ax.vlines(testAzsRel[test_i], y1, y2, 'g', label = 'Groundtruth Az')
+                            # ax.vlines(np.mod(optAz, 2*np.pi), y1, y2, 'r', label = 'Optimum CRF Az')
+                            # ax.vlines(np.mod(az, 2*np.pi), y1, y2, 'b', label = 'Recognition Az')
+                            # ax.set_xlim((0, np.pi*2))
+                            # legend = ax.legend()
+                            # azfig.savefig(resultDir + 'imgs/test' + str(test_i) + '/samplesAzPlot_' + str(int(azSampleStdev*180/np.pi)) + '.png')
+                            # plt.close(azfig)
+                            #
+                            # legend = ax.legend()
+                            #
+                            # chAz[:] = optAz
+                            # chEl[:] = optEl
+                            # #### Local search:
+                            #
+                            # cv2.imwrite(
+                            #     resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_optimizedCRFPose' + '.png',
+                            #     cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
-                        import diffrender_opt
-                        # objFun = diffrender_opt.opendrObjectiveFunction(errorFun, free_variables)
+                            free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
+                            #
+                            # stds[:] = 0.03
+                            # shapePenalty = 0.0001
 
-                        # res = diffrender_opt.bayesOpt(objFun, objBounds)
-                        methodOpt = methods[method]
-                        stds[:] = 0.1
+                            stds[:] = 0.05
+                            shapePenalty = 0.0001
 
-                        # crfObjFun = diffrender_opt.opendrObjectiveFunctionCRF(free_variables, rendererGT, renderer, vColor, chVColors, chLightSHCoeffs, lightCoefficientsRel, free_variables_app_light, resultDir, test_i, stds.r, methodOpt, False, False)
+                            options={'disp':False, 'maxiter':50}
+                            # options={'disp':False, 'maxiter':2}
 
-                        cv2.imwrite(
-                            resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_predictedCRF' + '.png',
-                            cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
+                            minimizingShape = True
 
+                            method = 1
 
-                        # errorFunCRF = -ch.sum(generative_models.LogCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q.r.reshape([3,height, width]),
-                        #                                                     variances=variances)) / numPixels
-                        errorFunNLLCRF = generative_models.NLLCRFModel(renderer=renderer, groundtruth=rendererGT, Q=Q.r.reshape([3,height, width]),
-                                                                            variances=variances) / numPixels
+                            ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
-                        # errorFun = models[1]
-                        # samplesEvals = []
-                        # for azSample in totalSamples[:,0]:
-                        #     chAz[:] = azSample
-                        #     samplesEvals = samplesEvals + [errorFunNLLCRF.r]
-                        #
-                        # samplesEvals = np.array(samplesEvals)
-                        #
-                        # # samplesEvals = crfObjFun(totalSamples)
-                        #
-                        # #Start Optimiaztion
-                        #
-                        # # res = diffrender_opt.bayesOpt(crfObjFun, totalSamples, samplesEvals, optBounds)
-                        # #
-                        # # optAz = res.x_opt[0]
-                        # # optEl = res.x_opt[1]
-                        # # # optShapeParams = res.x_opt[2:]
-                        # bestSample = np.argmin(samplesEvals)
-                        # optAz = totalSamples[bestSample][0]
-                        # optEl = totalSamples[bestSample][1]
-                        #
-                        # azfig = plt.figure()
-                        # ax = azfig.add_subplot(111)
-                        # ax.plot(np.mod(totalSamples[:,0], 2*np.pi), samplesEvals, 'ro')
-                        # y1, y2 = ax.get_ylim()
-                        # ax.vlines(testAzsRel[test_i], y1, y2, 'g', label = 'Groundtruth Az')
-                        # ax.vlines(np.mod(optAz, 2*np.pi), y1, y2, 'r', label = 'Optimum CRF Az')
-                        # ax.vlines(np.mod(az, 2*np.pi), y1, y2, 'b', label = 'Recognition Az')
-                        # ax.set_xlim((0, np.pi*2))
-                        # legend = ax.legend()
-                        # azfig.savefig(resultDir + 'imgs/test' + str(test_i) + '/samplesAzPlot_' + str(int(azSampleStdev*180/np.pi)) + '.png')
-                        # plt.close(azfig)
-                        #
-                        # legend = ax.legend()
-                        #
-                        # chAz[:] = optAz
-                        # chEl[:] = optEl
-                        # #### Local search:
-                        #
-                        # cv2.imwrite(
-                        #     resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_optimizedCRFPose' + '.png',
-                        #     cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
+                            maxShapeSize = 4
+                            largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                            if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
+                                print("Warning: found large shape parameters to fix!")
+                                reverted = True
+                            # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
+                            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-                        free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
-                        #
-                        # stds[:] = 0.03
-                        # shapePenalty = 0.0001
+                            # if reverted:
+                            #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            #     reverted = False
+                            #     chAz[:] = az
+                            #     chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
+                            #     chVColors[:] = color.copy()
+                            #     chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+                            #     if useShapeModel:
+                            #         chShapeParams[:] = shapeParams.copy()
+                            #
+                            # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            #
+                            free_variables = [chVColors, chLightSHCoeffs]
+                            stds[:] = 0.01
+                            shapePenalty = 0.0
+                            options={'disp':False, 'maxiter':50}
+                            # options={'disp':False, 'maxiter':2}
+                            # free_variables = [chShapeParams ]
+                            minimizingShape = False
+                            getColorFromCRF = False
+                            ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
-                        stds[:] = 0.05
-                        shapePenalty = 0.0001
+                            # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                            # if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
+                            #     print("Warning: found large shape parameters to fix!")
+                            #     reverted = True
+                            #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            #
+                            # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                        else:
 
-                        options={'disp':False, 'maxiter':50}
-                        # options={'disp':False, 'maxiter':2}
+                            ## *** If not using CRF ***
 
-                        minimizingShape = True
+                            free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs]
+                            #
+                            # stds[:] = 0.03
+                            # shapePenalty = 0.0001
 
-                        method = 1
+                            stds[:] = 0.03
+                            shapePenalty = 0.0001
 
-                        ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            options = {'disp': False, 'maxiter': 50}
+                            # options={'disp':False, 'maxiter':2}
 
-                        maxShapeSize = 4
-                        largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                        if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
-                            print("Warning: found large shape parameters to fix!")
-                            reverted = True
-                        # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
-                        cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            minimizingShape = True
 
-                        # if reverted:
-                        #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                        #     reverted = False
-                        #     chAz[:] = az
-                        #     chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
-                        #     chVColors[:] = color.copy()
-                        #     chLightSHCoeffs[:] = lightCoefficientsRel.copy()
-                        #     if useShapeModel:
-                        #         chShapeParams[:] = shapeParams.copy()
-                        #
-                        # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                        #
-                        free_variables = [chVColors, chLightSHCoeffs]
-                        stds[:] = 0.01
-                        shapePenalty = 0.0
-                        options={'disp':False, 'maxiter':50}
-                        # options={'disp':False, 'maxiter':2}
-                        # free_variables = [chShapeParams ]
-                        minimizingShape = False
-                        getColorFromCRF = False
-                        ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            method = 1
 
-                        # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                        # if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
-                        #     print("Warning: found large shape parameters to fix!")
-                        #     reverted = True
-                        #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                        #
-                        # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                            maxShapeSize = 4
+                            largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                            if np.any(largeShapeParams) or chEl.r > np.pi / 2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(
+                                            chVertices.r - chVerticesMean) >= 3.5:
+                                print("Warning: found large shape parameters to fix!")
+                                reverted = True
+                            # chShapeParams[largeShapeParams] = np.sign(chShapeParams.r[largeShapeParams])*maxShapeSize
+                            cv2.imwrite(resultDir + 'imgs/test' + str(test_i) + '/it1' + '.png',
+                                        cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
+
+                            if reverted:
+                                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                                reverted = False
+                                chAz[:] = az
+                                chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
+                                chVColors[:] = color.copy()
+                                chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+                                if useShapeModel:
+                                    chShapeParams[:] = shapeParams.copy()
+                            #
+                            # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            #
+                            free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
+                            stds[:] = 0.01
+                            shapePenalty = 0.0
+                            options = {'disp': False, 'maxiter': 50}
+                            # options={'disp':False, 'maxiter':2}
+                            # free_variables = [chShapeParams ]
+                            minimizingShape = False
+                            getColorFromCRF = False
+                            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                            largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                            if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
+                                print("Warning: found large shape parameters to fix!")
+                                reverted = True
+                                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+
+                            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                 if not reverted:
                     bestFittedAz = chAz.r.copy()
