@@ -2299,7 +2299,7 @@ for testSetting, model in enumerate(modelTests):
                 plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
             #Every now and then (or after the final test case), produce plots to keep track of work accross different levels of occlusion.
-            if np.mod(test_i+1,1000) == 0 or test_i + 1 >= len(testSet):
+            if np.mod(test_i+1,100) == 0 or test_i + 1 >= len(testSet):
                 if approxProjectionsPredList:
                     approxProjectionsPred = np.vstack(approxProjectionsPredList)
                 if approxProjectionsGTList:

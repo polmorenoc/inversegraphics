@@ -31,13 +31,13 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
+prefix = 'train4_occlusion_shapemodel_photorealistic_10K_test0-100'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
 
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
 useOpenDR = True
 useBlender = True
@@ -50,7 +50,7 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-replaceNewGroundtruth = False
+replaceNewGroundtruth = True
 renderOcclusions = True
 occlusionMin = 0.001
 occlusionMax = 0.9
@@ -582,7 +582,7 @@ if not renderFromPreviousGT:
                     mugModels = mugModels + [mug]
                     blender_mugs = blender_mugs + [mug]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 5000, 'CUDA', 'CUDA_MULTI_2')
+            setupSceneGroundtruth(scene, width, height, clip_start, 2000, 'CUDA', 'CUDA_MULTI_2')
 
             treeNodes = scene.world.node_tree
 
@@ -864,7 +864,7 @@ if not renderFromPreviousGT:
                 while numTeapotTrain < maxAttempts and not exitInstantiationLoop:
 
                     numAttempts = numAttempts + 1
-                    if numAttempts > 20 and numAttempts/(numTeapotTrain + 1) > 10:
+                    if numAttempts > 50 and numAttempts/(numTeapotTrain + 1) > 20:
                         exitInstantiationLoop = True
 
                     ignore = False
@@ -1168,7 +1168,7 @@ if not renderFromPreviousGT:
                         if captureEnvMapFromBlender:
                             envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum,
                                                               totalOffset.r.copy(), links, treeNodes, teapot, center,
-                                                              targetPosition, width, height, 1000, gtDir, train_i)
+                                                              targetPosition, width, height, 2000, gtDir, train_i)
 
                     if useBlender:
                         envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0),
@@ -1350,7 +1350,7 @@ teapot_i = 0
 
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 experimentDir = 'experiments/' + experimentPrefix + '/'
-subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(100,1100)]
+subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(0,100)]
 # subsetToRender = np.arange(len(rangeGT))
 
 if useShapeModel:
@@ -1664,7 +1664,7 @@ if renderFromPreviousGT:
 
         if captureEnvMapFromBlender and not ignore and useBlender:
 
-            envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, totalOffset.r.copy(), links, treeNodes, teapot, center, targetPosition, width, height, 500, gtDir, train_i)
+            envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, totalOffset.r.copy(), links, treeNodes, teapot, center, targetPosition, width, height, 2000, gtDir, train_i)
 
         if useBlender and captureEnvMapFromBlender:
             envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]

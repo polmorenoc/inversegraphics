@@ -20,9 +20,9 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion_shapemodel_cycles'
-experimentPrefix = 'train4_occlusion_shapemodel_cycles'
-experimentDescr = 'Cycles test set with occlusions and shape model'
+gtPrefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
+experimentPrefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
+experimentDescr = 'Synth test set with new scenes, occlusions and shape model'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
@@ -58,6 +58,8 @@ dataIds = groundTruth['trainIds']
 gtDtype = groundTruth.dtype
 
 allDataIds = gtDataFile[gtPrefix]['trainIds']
+
+ipdb.set_trace()
 
 ########## Check if there is anything wrong with the renders:
 

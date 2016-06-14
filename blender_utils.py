@@ -591,6 +591,8 @@ def createCubeScene(scene):
     return cubeScene
 
 def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, cyclesSamples=3000, gtDir='', train_i=0):
+    bpy.context.screen.scene = scene
+
     envMapTexture = cv2.resize(src=envMapTexture, dsize=(360, 180))
     # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
 
