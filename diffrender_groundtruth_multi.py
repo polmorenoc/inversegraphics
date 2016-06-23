@@ -37,7 +37,7 @@ previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
 
-renderFromPreviousGT = False
+renderFromPreviousGT = True
 useShapeModel = True
 useOpenDR = True
 useBlender = True
@@ -50,7 +50,7 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-replaceNewGroundtruth = True
+replaceNewGroundtruth = False
 renderOcclusions = True
 occlusionMin = 0.001
 occlusionMax = 0.9
@@ -1350,7 +1350,7 @@ teapot_i = 0
 
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 experimentDir = 'experiments/' + experimentPrefix + '/'
-subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(0,100)]
+subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(100,1100)]
 # subsetToRender = np.arange(len(rangeGT))
 
 if useShapeModel:
@@ -1366,8 +1366,6 @@ for sceneIdx in np.unique(sceneIdxsToRender[sortedSceneIndices]):
     sortedTargetIdxs = np.argsort(groundTruthToRender['trainTargetIndices'][idxToRender][np.where(sceneIdxsToRender[sortedSceneIndices]==sceneIdx)])
     sortedSceneAndTargetIdx = idxToRender[sortedSceneIndices][np.where(sceneIdxsToRender[sortedSceneIndices]==sceneIdx)][sortedTargetIdxs]
     sortedSceneAndTargetIdxs[np.where(sceneIdxsToRender[sortedSceneIndices]==sceneIdx)] = sortedSceneAndTargetIdx
-
-
 
 if renderFromPreviousGT:
     for gtIdx in sortedSceneAndTargetIdxs:

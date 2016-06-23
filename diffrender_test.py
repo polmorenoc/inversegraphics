@@ -47,7 +47,10 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 #
 
-gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test0-100'
+# gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test0-100'
+# gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
+# gtPrefix = 'train4_occlusion_shapemodel'
+gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
@@ -240,7 +243,7 @@ useShapeModel = True
 makeVideo = False
 reduceVariance = False
 getColorFromCRF = False
-syntheticGroundtruth = False
+syntheticGroundtruth = True
 
 ignoreGT = True
 ignore = []
@@ -253,23 +256,26 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 testSet = np.load(experimentDir + 'test.npy')
 
 rangeTests = np.arange(100,1100)
-rangeTests = np.arange(0,42)
 
 testSet = testSet[rangeTests]
 
 numTests = len(testSet)
 
 shapeGT = gtDataFile[gtPrefix].shape
-boolTestSet = np.zeros(shapeGT).astype(np.bool)
-boolTestSet[testSet] = True
-testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
-groundTruthTest = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
-groundTruthTest[boolTestSet] = testGroundTruth
-groundTruth = groundTruthTest[testSet]
+
+# boolTestSet = np.zeros(shapeGT).astype(np.bool)
+# boolTestSet[testSet] = True
+boolTestSet = np.array([np.any(num == testSet) for num in gtDataFile[gtPrefix]['trainIds']])
+
+# testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
+# groundTruthTest = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
+# groundTruthTest[boolTestSet] = testGroundTruth
+groundTruth = gtDataFile[gtPrefix][boolTestSet]
 dataTeapotIdsTest = groundTruth['trainTeapotIds']
 test = np.arange(len(testSet))
 
 testSet = testSet[test]
+ipdb.set_trace()
 
 print("Reading experiment.")
 dataAzsGT = groundTruth['trainAzsGT']
@@ -1382,7 +1388,9 @@ testPrefixBase = testPrefix
 
 runExp = True
 shapePenaltyTests = [0,0,0,0]
+# shapePenaltyTests = [0,0,0,0]
 stdsTests = [0.15,0.1,0.05,0.01]
+# stdsTests = [0.03]
 modelTests = len(stdsTests)*[1]
 # modelTests = [1]
 methodTests = len(stdsTests)*[1]
@@ -2189,7 +2197,7 @@ for testSetting, model in enumerate(modelTests):
                             # stds[:] = 0.03
                             # shapePenalty = 0.0001
 
-                            stds[:] = 0.03
+                            stds[:] = stdsTests[testSetting]
                             shapePenalty = 0.0001
 
                             options = {'disp': False, 'maxiter': 50}
@@ -2211,35 +2219,35 @@ for testSetting, model in enumerate(modelTests):
                             cv2.imwrite(resultDir + 'imgs/test' + str(test_i) + '/it1' + '.png',
                                         cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
-                            # if reverted:
-                            #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                            #     reverted = False
-                            #     chAz[:] = az
-                            #     chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
-                            #     chVColors[:] = color.copy()
-                            #     chLightSHCoeffs[:] = lightCoefficientsRel.copy()
-                            #     if useShapeModel:
-                            #         chShapeParams[:] = shapeParams.copy()
-                            # #
-                            # # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-                            # #
-                            # free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
-                            # stds[:] = 0.01
-                            # shapePenalty = 0.0
-                            # options = {'disp': False, 'maxiter': 50}
-                            # # options={'disp':False, 'maxiter':2}
-                            # # free_variables = [chShapeParams ]
-                            # minimizingShape = False
-                            # getColorFromCRF = False
-                            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            if reverted:
+                                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                                reverted = False
+                                chAz[:] = az
+                                chEl[:] = min(max(el,radians(1)), np.pi/2-radians(1))
+                                chVColors[:] = color.copy()
+                                chLightSHCoeffs[:] = lightCoefficientsRel.copy()
+                                if useShapeModel:
+                                    chShapeParams[:] = shapeParams.copy()
                             #
-                            # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
-                            # if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
-                            #     print("Warning: found large shape parameters to fix!")
-                            #     reverted = True
-                            #     cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
                             #
-                            # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+                            free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
+                            stds[:] = 0.01
+                            shapePenalty = 0.0
+                            options = {'disp': False, 'maxiter': 50}
+                            # options={'disp':False, 'maxiter':2}
+                            # free_variables = [chShapeParams ]
+                            minimizingShape = False
+                            getColorFromCRF = False
+                            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                            largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
+                            if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
+                                print("Warning: found large shape parameters to fix!")
+                                reverted = True
+                                cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/reverted2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+
+                            cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it2'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
                 if not reverted:
                     bestFittedAz = chAz.r.copy()
