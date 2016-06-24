@@ -183,6 +183,53 @@ class EdgeFilter(Ch):
 
         return blurred_diff[rgbEdges]
 
+class NLLRobustModel(Ch):
+    terms = ['Q', 'variances']
+    dterms = ['renderer', 'groundtruth']
+
+    def compute_r(self):
+        return -np.sum(np.log(self.prob))
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            fgMask = np.array(self.renderer.image_mesh_bool([0])).astype(np.bool)
+
+            dr = (-1./(self.prob) * fgMask * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] * self.Q[:, :])[:, :, None] * ((self.groundtruth.r - self.renderer.r)/self.variances.r)
+
+            return dr.ravel()
+
+    @depends_on(dterms)
+    def fgProb(self):
+        return np.exp(- (self.renderer.r - self.groundtruth.r) ** 2 / (2 * self.variances.r)) * (1. / (np.sqrt(self.variances.r) * np.sqrt(2 * np.pi)))
+
+    @depends_on(dterms)
+    def prob(self):
+        h = self.renderer.r.shape[0]
+        w = self.renderer.r.shape[1]
+
+        occProb = np.ones([h, w])
+        bgProb = np.ones([h, w])
+
+        fgMask = np.array(self.renderer.image_mesh_bool([0])).astype(np.bool)
+
+        errorFun = fgMask[:, :]*(self.Q[:, :] * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] + (1-self.Q[:, :]))+ (1- fgMask[:, :])
+
+        return errorFun
+
+    # @depends_on(dterms)
+    # def prob(self):
+    #     h = self.renderer.r.shape[0]
+    #     w = self.renderer.r.shape[1]
+    #
+    #     occProb = np.ones([h, w])
+    #     bgProb = np.ones([h, w])
+    #
+    #     fgMask = np.array(self.renderer.image_mesh_bool([0])).astype(np.bool)
+    #
+    #     errorFun = fgMask[:, :, None] * ((self.Q[0][:, :, None] * self.fgProb) + (self.Q[1] * occProb + self.Q[2] * bgProb)[:, :, None]) + (1 - fgMask[:, :, None])
+    #
+    #     return errorFun
+
 class NLLCRFModel(Ch):
     terms = ['Q', 'variances']
     dterms = ['renderer', 'groundtruth']

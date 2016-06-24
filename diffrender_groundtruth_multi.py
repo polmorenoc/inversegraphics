@@ -31,18 +31,18 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_photorealistic_10K_test0-100'
+prefix = 'train4_occlusion_shapemodel_synthetic_newscenes'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
 
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
 useOpenDR = True
 useBlender = True
-renderBlender = True
-captureEnvMapFromBlender = True
+renderBlender = False
+captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
 useCycles = True
@@ -50,12 +50,13 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-replaceNewGroundtruth = False
+replaceNewGroundtruth = True
 renderOcclusions = True
-occlusionMin = 0.001
+occlusionMin = 0.0
 occlusionMax = 0.9
 renderTeapots =  True
 renderMugs = False
+showMug = False
 centeredObject = True
 fixedCamDistance = True
 
@@ -101,7 +102,7 @@ teapotsFile = 'teapots.txt'
 teapots = [line.strip() for line in open(teapotsFile)]
 renderTeapotsList = np.arange(len(teapots))[0:1]
 mugs = [line.strip() for line in open('mugs.txt')]
-renderMugsList = np.arange(len(teapots))[0:1]
+renderMugsList = np.arange(len(mugs))[0:1]
 
 sceneIdx = 0
 replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
@@ -708,7 +709,7 @@ if not renderFromPreviousGT:
                         pickle.dump(sceneCollisions, pfile)
 
                 #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
-                if instantiationBinsTeapot.sum() < 4 or instantiationBinsMug.sum() < 4:
+                if instantiationBinsTeapot.sum() < 1 or instantiationBinsMug.sum() < 1:
                     print("This scene position has not place to instantiate the objects.")
                     continue
 
@@ -1071,13 +1072,14 @@ if not renderFromPreviousGT:
                             if np.sum(vis_im[:,0]) > 1 or np.sum(vis_im[0,:]) > 1 or np.sum(vis_im[:,-1]) > 1 or np.sum(vis_im[-1,:]) > 1:
                                 ignore = True
 
-                        if renderMugs:
+                        if renderMugs and not showMug:
                             if  occlusionMug > 0.9 or vis_occluded_mug.sum() < 10 or np.isnan(occlusionMug):
                                 ignore = True
 
                             #Check that objects are not only partly in the viewing plane of the camera:
                             if np.sum(vis_im_mug[:,0]) > 1 or np.sum(vis_im_mug[0,:]) > 1 or np.sum(vis_im_mug[:,-1]) > 1 or np.sum(vis_im_mug[-1,:]) > 1:
-                                ignore = True
+                                if showMug:
+                                    ignore = True
 
                     if not ignore:
                         # Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
@@ -1350,7 +1352,7 @@ teapot_i = 0
 
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 experimentDir = 'experiments/' + experimentPrefix + '/'
-subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(100,1100)]
+subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(0,100)]
 # subsetToRender = np.arange(len(rangeGT))
 
 if useShapeModel:
