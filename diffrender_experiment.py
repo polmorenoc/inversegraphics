@@ -95,10 +95,14 @@ ipdb.set_trace()
 size = len(allDataIds)
 # if not os.path.isfile(experimentDir + 'train.npy'):
 np.random.seed(seed)
+
+
+
+
+
 data = np.arange(size)
 np.random.shuffle(data)
-train = data[0:50]
-test = data[50::]
+
 
 if not os.path.exists(experimentDir):
     os.makedirs(experimentDir)

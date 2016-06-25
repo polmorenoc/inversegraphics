@@ -50,9 +50,9 @@ unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
 
-replaceNewGroundtruth = True
+replaceNewGroundtruth = False
 renderOcclusions = True
-occlusionMin = 0.0
+occlusionMin = 0.01
 occlusionMax = 0.9
 renderTeapots =  True
 renderMugs = False
@@ -391,7 +391,7 @@ print("Generating renders")
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 
-trainSize = 20000
+trainSize = 10000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
