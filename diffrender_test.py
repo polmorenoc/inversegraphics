@@ -1381,7 +1381,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-PHOTOREALISTIC-' + testRangeStr
+testDescription = 'ECCV-PHOTOREALISTIC-GAUSSIAN' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1987,7 +1987,7 @@ for testSetting, model in enumerate(modelTests):
                     print("** Minimizing from initial predicted parameters. **")
                     globalPrior[:] = 0.9
 
-                    errorFun = models[1]
+                    errorFun = models[0]
                     vColor = color
                     if useCRFOcclusionPred:
                         priorProbs = [0.75, 0.25, 0.01]
@@ -2151,7 +2151,7 @@ for testSetting, model in enumerate(modelTests):
 
                             method = 1
 
-                            ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                             maxShapeSize = 4
                             largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
@@ -2173,15 +2173,15 @@ for testSetting, model in enumerate(modelTests):
                             #
                             # cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
                             #
-                            free_variables = [chVColors, chLightSHCoeffs]
-                            stds[:] = 0.01
-                            shapePenalty = 0.0
-                            options={'disp':False, 'maxiter':50}
-                            # options={'disp':False, 'maxiter':2}
-                            # free_variables = [chShapeParams ]
-                            minimizingShape = False
-                            getColorFromCRF = False
-                            ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            # free_variables = [chVColors, chLightSHCoeffs]
+                            # stds[:] = 0.01
+                            # shapePenalty = 0.0
+                            # options={'disp':False, 'maxiter':50}
+                            # # options={'disp':False, 'maxiter':2}
+                            # # free_variables = [chShapeParams ]
+                            # minimizingShape = False
+                            # getColorFromCRF = False
+                            # ch.minimize({'raw': errorFunNLLCRF }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                             # largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
                             # if np.any(largeShapeParams) or chEl.r > np.pi/2 + radians(10) or chEl.r < -radians(15) or np.linalg.norm(chVertices.r - chVerticesMean) >= 3.5:
@@ -2236,7 +2236,7 @@ for testSetting, model in enumerate(modelTests):
                             #
                             cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/it1'+ '.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
-                            free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
+                            free_variables = [chVColors]
                             stds[:] = 0.01
                             shapePenalty = 0.0
                             options = {'disp': False, 'maxiter': 50}

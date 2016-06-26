@@ -753,7 +753,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        if meanErrorsSegmentationArr[method_i] is not None:
+        if meanErrorsSegmentationArr[method_i] is not None and len(meanErrorsSegmentationArr[method_i]) > 0:
             ax.plot(occlusions, meanErrorsSegmentationArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend(loc=4)
     ax.set_xlabel('Occlusion (\%)')
@@ -771,7 +771,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.semilogy(occlusions, meanAbsErrAzsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanAbsErrAzsArr[method_i] is not None and len(meanAbsErrAzsArr[method_i]) > 0:
+            ax.semilogy(occlusions, meanAbsErrAzsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Angular error')
@@ -787,7 +788,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanAbsErrElevsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanAbsErrElevsArr[method_i] is not None and len(meanAbsErrElevsArr[method_i]) > 0:
+            ax.plot(occlusions, meanAbsErrElevsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Angular error')
@@ -803,7 +805,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanErrorsVColorsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanErrorsVColorsCArr[method_i] is not None and len(meanErrorsVColorsCArr[method_i]) > 0:
+            ax.plot(occlusions, meanErrorsVColorsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend(loc=7)
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Appearance error')
@@ -819,7 +822,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanErrorsVColorsEArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanErrorsVColorsEArr[method_i] is not None and len(meanErrorsVColorsEArr[method_i]) > 0:
+            ax.plot(occlusions, meanErrorsVColorsEArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Appearance error')
@@ -836,7 +840,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanErrorsVColorsSArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanErrorsVColorsSArr[method_i] is not None and len(meanErrorsVColorsSArr[method_i]) > 0:
+            ax.plot(occlusions, meanErrorsVColorsSArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Appearance error')
@@ -853,7 +858,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanErrorsLightCoeffsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanErrorsLightCoeffsArr[method_i] is not None and len(meanErrorsLightCoeffsArr[method_i]) > 0:
+            ax.plot(occlusions, meanErrorsLightCoeffsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend(loc=4)
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Illumination error')
@@ -870,7 +876,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         fig = plt.figure()
         ax = fig.add_subplot(111)
         for method_i in plotMethodsIndices:
-            ax.plot(occlusions, meanErrorsShapeParamsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+            if meanErrorsShapeParamsArr[method_i] is not None and len(meanErrorsShapeParamsArr[method_i]) > 0:
+                ax.plot(occlusions, meanErrorsShapeParamsArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
         legend = ax.legend()
         ax.set_xlabel('Occlusion (\%)')
         ax.set_ylabel('Shape parameters error')
@@ -887,7 +894,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
         fig = plt.figure()
         ax = fig.add_subplot(111)
         for method_i in plotMethodsIndices:
-            ax.semilogy(occlusions, meanErrorsShapeVerticesArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+            if meanErrorsShapeVerticesArr[method_i] is not None and len(meanErrorsShapeVerticesArr[method_i]) > 0:
+                ax.semilogy(occlusions, meanErrorsShapeVerticesArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
         legend = ax.legend()
         ax.set_xlabel('Occlusion (\%)')
         ax.set_ylabel('Shape vertices error')
@@ -904,7 +912,8 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for method_i in plotMethodsIndices:
-        ax.plot(occlusions, meanErrorsLightCoeffsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
+        if meanErrorsLightCoeffsCArr[method_i] is not None and len(meanErrorsLightCoeffsCArr[method_i]) > 0:
+            ax.plot(occlusions, meanErrorsLightCoeffsCArr[method_i], c=plotColors[method_i], label=methodsPred[method_i])
     legend = ax.legend()
     ax.set_xlabel('Occlusion (\%)')
     ax.set_ylabel('Illumination error')
