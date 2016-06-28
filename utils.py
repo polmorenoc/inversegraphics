@@ -108,7 +108,7 @@ def latexify(fig_width=None, fig_height=None, columns=1):
               'axes.labelsize': 12, # fontsize for x and y labels (was 10)
               'axes.titlesize': 12,
               'font.size': 12, # was 10
-              'legend.fontsize': 10, # was 10
+              'legend.fontsize': 12, # was 10
               'xtick.labelsize': 14,
               'ytick.labelsize': 14,
               'text.usetex': True,
@@ -1066,6 +1066,8 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
             errorsVColorsSList = errorsVColorsSList + [None]
 
         if posteriorsPred is not None:
+            # if method == 3:
+            #     ipdb.set_trace()
             masksCat = np.concatenate([masksGT[:,:,:,None][setTest], posteriorsPred[:,:,:,None][setTest]], axis=3)
             errorSegmentation = np.sum(np.all(masksCat, axis=3), axis=(1,2)) / np.sum(np.any(masksCat, axis=3), axis=(1,2))
             errorsSegmentation = errorsSegmentation + [errorSegmentation]

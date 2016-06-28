@@ -357,7 +357,7 @@ for test_it, test_id in enumerate(testSet):
 
 loadFromHdf5 = False
 useShapeModel = True
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -418,7 +418,7 @@ testOcclusionsFull = testOcclusions.copy()
 
 loadMask = True
 if loadMask:
-    masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
+    masksGT = loadMasks(gtDir + '/masks_occlusion/', dataIds)
 #
 # with open(resultDir + 'approxProjections.pickle', 'rb') as pfile:
 #     approxProjectionsDic = pickle.load(pfile)
@@ -556,7 +556,6 @@ segmentations = segmentations + [segmentations3[3]]
 # errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
 #         = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
 
-
 # envMapTexture = np.zeros([180,360,3])
 # approxProjectionsFittedList = []
 # for test_i in range(len(testSet)):
@@ -612,9 +611,9 @@ if nearestNeighbours:
     # methodsPred = methodsPred + ["Nearest Neighbours"]
     plotColors = plotColors + ['m']
 
-plotColors = plotColors + ['m']
+plotColors = plotColors + ['b']
 
-plotColors = plotColors + ['c']
+plotColors = plotColors + ['r']
 
 plotColors = plotColors + ['r']
 
@@ -629,7 +628,7 @@ methodsPred[5] = 'Recognition (synthetic)'
 methodsPred[6] = 'Gaussian Fit'
 
 
-plotMethodsIndices = [2,3,4,5]
+plotMethodsIndices = [2,3,6]
 recognitionIdx = 2
 robustIdx = 3
 
@@ -646,94 +645,100 @@ likelihoods = [np.array([]), np.array([])]
 
 from OpenGL import contextdata
 
-# for test_i in range(len(testSet)):
-#
-#     # sceneNumber = dataScenes[test_i]
-#     # sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
-#     # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-#     # # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-#     #
-#     # targetIndex = dataTargetIndices[test_i]
-#     # sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
-#     # v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, True)
-#     #
-#     # removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
-#     #
-#     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
-#     #
-#     # if rendererGT is not None:
-#     #     rendererGT.makeCurrentContext()
-#     #     rendererGT.clear()
-#     #     contextdata.cleanupContext(contextdata.getContext())
-#     #     if glMode == 'glfw':
-#     #         glfw.destroy_window(rendererGT.win)
-#     #     del rendererGT
-#     #
-#     # targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
-#     #
-#     # rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
-#     #
-#     # for hdrFile, hdrValues in hdritems:
-#     #     hdridx = hdrValues[0]
-#     #     envMapCoeffs = hdrValues[1]
-#     #     if hdridx == dataEnvMaps[test_i]:
-#     #         break
-#     # envMapFilename = hdrFile
-#     #
-#     # phiOffset[:] = dataEnvMapPhiOffsets[test_i]
-#     # chObjAzGT[:] = testObjAzsGT[test_i]
-#     # chAzGT[:] = testAzsGT[test_i]
-#     # chElGT[:] = testElevsGT[test_i]
-#     # chVColorsGT[:] = testVColorGT[test_i]
-#     # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-#     # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-#     # chShapeParamsGT[:] =  dataShapeModelCoeffsGT[test_i]
-#
-#     im = images[test_i]
-#     rendererGT = srgb2lin(im.copy())
-#
-#     chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
-#     chObjAz[:] = 0
-#     chAz[:] = testAzsRel[test_i]
-#     chEl[:] = testElevsGT[test_i]
-#     chVColors[:] = testVColorGT[test_i]
-#     chShapeParams[:] =  testShapeParamsGT[test_i]
-#
-#     stds[:] = 0.1
-#
-#     negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-#
-#     likelihoods[0] = np.append(likelihoods[0], negLikModelRobust.r)
-#
-#     chLightSHCoeffs[:] = lightCoeffs[4][idsInRange[test_i]]
-#     chObjAz[:] = 0
-#     chAz[:] = azimuths[4][idsInRange[test_i]]
-#     chEl[:] = elevations[4][idsInRange[test_i]]
-#     chVColors[:] = vColors[4][idsInRange[test_i]]
-#     chShapeParams[:] =  shapeParams[4][idsInRange[test_i]]
-#
-#     negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-#
-#     likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
-#
-#     #masksGT
-#     #render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
-#
-#     stds[:] = 0.03
-#     vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
-#     post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.75
-#     render = ~post.copy()
-#     mask = masksGT[test_i]
-#     render[~vis_im] = 1
-#
-#     renderRGB = np.concatenate([render[:,:,None],  render[:,:,None], render[:,:,None]], axis=2)
 
-    # cv2.imwrite('tmp/SH/renderergt' + str(test_i) + '.jpeg' , 255*lin2srgb(rendererGT[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-    # # cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*post[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-    # plt.imsave('tmp/SH/post' + str(test_i) + '.png' , renderRGB)
-    # plt.imsave('tmp/SH/renderer' + str(test_i) + '.png' , lin2srgb(renderer.r.copy()))
-#
+for test_i in range(len(testSet)):
 
+    # sceneNumber = dataScenes[test_i]
+    # sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
+    # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+    # # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+    #
+    # targetIndex = dataTargetIndices[test_i]
+    # sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
+    # v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, True)
+    #
+    # removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+    #
+    # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+    #
+    # if rendererGT is not None:
+    #     rendererGT.makeCurrentContext()
+    #     rendererGT.clear()
+    #     contextdata.cleanupContext(contextdata.getContext())
+    #     if glMode == 'glfw':
+    #         glfw.destroy_window(rendererGT.win)
+    #     del rendererGT
+    #
+    # targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
+    #
+    # rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
+    #
+    # for hdrFile, hdrValues in hdritems:
+    #     hdridx = hdrValues[0]
+    #     envMapCoeffs = hdrValues[1]
+    #     if hdridx == dataEnvMaps[test_i]:
+    #         break
+    # envMapFilename = hdrFile
+    #
+    # phiOffset[:] = dataEnvMapPhiOffsets[test_i]
+    # chObjAzGT[:] = testObjAzsGT[test_i]
+    # chAzGT[:] = testAzsGT[test_i]
+    # chElGT[:] = testElevsGT[test_i]
+    # chVColorsGT[:] = testVColorGT[test_i]
+    # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+    # chShapeParamsGT[:] =  dataShapeModelCoeffsGT[test_i]
+
+    im = images[test_i]
+    rendererGT = srgb2lin(im.copy())
+
+    chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
+    chObjAz[:] = 0
+    chAz[:] = testAzsRel[test_i]
+    chEl[:] = testElevsGT[test_i]
+    chVColors[:] = testVColorGT[test_i]
+    chShapeParams[:] =  testShapeParamsGT[test_i]
+
+    stds[:] = 0.1
+
+    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+
+    # likelihoods[0] = np.append(likelihoods[0], negLikModelRobust.r)
+
+    chLightSHCoeffs[:] = lightCoeffs[3][idsInRange[test_i]]
+    chObjAz[:] = 0
+    chAz[:] = azimuths[3][idsInRange[test_i]]
+    chEl[:] = elevations[3][idsInRange[test_i]]
+    chVColors[:] = vColors[3][idsInRange[test_i]]
+    chShapeParams[:] =  shapeParams[3][idsInRange[test_i]]
+
+    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+
+    # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
+
+    #masksGT
+    #render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+
+    stds[:] = 0.1
+    vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+    post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.5
+    render = ~post.copy()
+    mask = masksGT[test_i]
+    render[~vis_im] = 1
+
+    segmentations[3][test_i] = post
+
+    # renderRGB = np.concatenate([render[:,:,None],  render[:,:,None], render[:,:,None]], axis=2)
+
+    cv2.imwrite('tmp/SH/renderergt' + str(test_i) + '.jpeg' , 255*lin2srgb(rendererGT[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+    plt.imsave('tmp/SH/mask' + str(test_i) + '.jpeg', mask)
+    cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*post, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+    cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*render, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+    plt.imsave('tmp/SH/renderer' + str(test_i) + '.png' , lin2srgb(renderer.r.copy()))
+    # ipdb.set_trace()
+# #
+
+ipdb.set_trace()
 
 print("Printing occlusin-likelihood plots!")
 # meanLikelihoodArr = [np.array([]), np.array([]), np.array([]), np.array([])]
