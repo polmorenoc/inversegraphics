@@ -51,7 +51,7 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 # gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 # gtPrefix = 'train4_occlusion_shapemodel'
 # gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
-gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
+gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
@@ -244,7 +244,7 @@ useShapeModel = True
 makeVideo = False
 reduceVariance = False
 getColorFromCRF = False
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 
 ignoreGT = True
 ignore = []
@@ -369,44 +369,50 @@ if multiObjects:
 
 ##Read Training set labels
 
-# trainSet = np.load(experimentDir + 'train.npy')
-#
-# shapeGT = gtDataFile[gtPrefix].shape
-# boolTrainSet = np.zeros(shapeGT).astype(np.bool)
-# boolTrainSet[trainSet] = True
-# trainGroundTruth = gtDataFile[gtPrefix][boolTrainSet]
-# groundTruthTrain = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
-# groundTruthTrain[boolTrainSet] = trainGroundTruth
-# groundTruthTrain = groundTruthTrain[trainSet]
-# dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
-# train = np.arange(len(trainSet))
-#
-# testSet = testSet[test]
-#
-# print("Reading experiment.")
-# trainAzsGT = groundTruthTrain['trainAzsGT']
-# trainObjAzsGT = groundTruthTrain['trainObjAzsGT']
-# trainElevsGT = groundTruthTrain['trainElevsGT']
-# trainLightAzsGT = groundTruthTrain['trainLightAzsGT']
-# trainLightElevsGT = groundTruthTrain['trainLightElevsGT']
-# trainLightIntensitiesGT = groundTruthTrain['trainLightIntensitiesGT']
-# trainVColorGT = groundTruthTrain['trainVColorGT']
-# trainScenes = groundTruthTrain['trainScenes']
-# trainTeapotIds = groundTruthTrain['trainTeapotIds']
-# trainEnvMaps = groundTruthTrain['trainEnvMaps']
-# trainOcclusions = groundTruthTrain['trainOcclusions']
-# trainTargetIndices = groundTruthTrain['trainTargetIndices']
-# trainLightCoefficientsGT = groundTruthTrain['trainLightCoefficientsGT']
-# trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
-# trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
-# trainIds = groundTruthTrain['trainIds']
-#
-# if useShapeModel:
-#     trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
-#
-# trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None]
-#
-# trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
+trainGTPrefix = 'train4_occlusion_shapemodel'
+
+trainGTDir = 'groundtruth/' + trainGTPrefix + '/'
+trainGroundTruthFilename = trainGTDir + 'groundTruth.h5'
+trainGTDataFile = h5py.File(trainGroundTruthFilename, 'r')
+
+trainSet = np.load(experimentDir + 'train.npy')
+
+shapeGT = trainGTDataFile[trainGTPrefix].shape
+boolTrainSet = np.zeros(shapeGT).astype(np.bool)
+boolTrainSet[trainSet] = True
+trainGroundTruth = trainGTDataFile[trainGTPrefix][boolTrainSet]
+groundTruthTrain = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
+groundTruthTrain[boolTrainSet] = trainGroundTruth
+groundTruthTrain = groundTruthTrain[trainSet]
+dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
+train = np.arange(len(trainSet))
+
+testSet = testSet[test]
+
+print("Reading experiment.")
+trainAzsGT = groundTruthTrain['trainAzsGT']
+trainObjAzsGT = groundTruthTrain['trainObjAzsGT']
+trainElevsGT = groundTruthTrain['trainElevsGT']
+trainLightAzsGT = groundTruthTrain['trainLightAzsGT']
+trainLightElevsGT = groundTruthTrain['trainLightElevsGT']
+trainLightIntensitiesGT = groundTruthTrain['trainLightIntensitiesGT']
+trainVColorGT = groundTruthTrain['trainVColorGT']
+trainScenes = groundTruthTrain['trainScenes']
+trainTeapotIds = groundTruthTrain['trainTeapotIds']
+trainEnvMaps = groundTruthTrain['trainEnvMaps']
+trainOcclusions = groundTruthTrain['trainOcclusions']
+trainTargetIndices = groundTruthTrain['trainTargetIndices']
+trainLightCoefficientsGT = groundTruthTrain['trainLightCoefficientsGT']
+trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
+trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
+trainIds = groundTruthTrain['trainIds']
+
+if useShapeModel:
+    trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
+
+trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None]
+
+trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
 
 # latexify(columns=2)
@@ -426,7 +432,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = True
 
 method = 1
@@ -754,7 +760,7 @@ nnBatchSize = 100
 azsPredictions = np.array([])
 
 recomputeMeans = True
-includeMeanBaseline = False
+includeMeanBaseline = True
 
 recomputePredictions = True
 
@@ -767,21 +773,22 @@ if includeMeanBaseline:
     chShapeParams[:] = np.zeros([10])
     meanTrainShapeVertices = np.repeat(chVertices.r.copy()[None,:], numTests, axis=0)
 
-    if recomputeMeans or not os.path.isfile(experimentDir + "meanTrainEnvMapProjections.npy"):
-        envMapTexture = np.zeros([180,360,3])
-        approxProjectionsPredList = []
-        for train_i in range(len(trainSet)):
-            pEnvMap = SHProjection(envMapTexture, np.concatenate([trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None]], axis=1))
-            approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
+    # if recomputeMeans or not os.path.isfile(experimentDir + "meanTrainEnvMapProjections.npy"):
+    #     envMapTexture = np.zeros([180,360,3])
+    #     approxProjectionsPredList = []
+    #     for train_i in range(len(trainSet)):
+    #         pEnvMap = SHProjection(envMapTexture, np.concatenate([trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None], trainLightCoefficientsGTRel[train_i][:,None]], axis=1))
+    #         approxProjectionPred = np.sum(pEnvMap, axis=(2,3))
+    #
+    #         approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
+    #     approxProjections = np.vstack(approxProjectionsPredList)
+    #     meanTrainEnvMapProjections = np.mean(approxProjections, axis=0)
+    #     np.save(experimentDir + 'meanTrainEnvMapProjections.npy', meanTrainEnvMapProjections)
+    # else:
+    #     meanTrainEnvMapProjections = np.load(experimentDir + 'meanTrainEnvMapProjections.npy')
 
-            approxProjectionsPredList = approxProjectionsPredList + [approxProjectionPred[None,:]]
-        approxProjections = np.vstack(approxProjectionsPredList)
-        meanTrainEnvMapProjections = np.mean(approxProjections, axis=0)
-        np.save(experimentDir + 'meanTrainEnvMapProjections.npy', meanTrainEnvMapProjections)
-    else:
-        meanTrainEnvMapProjections = np.load(experimentDir + 'meanTrainEnvMapProjections.npy')
-
-    meanTrainEnvMapProjections = np.repeat(meanTrainEnvMapProjections[None,:], numTests, axis=0)
+    # meanTrainEnvMapProjections = np.repeat(meanTrainEnvMapProjections[None,:], numTests, axis=0)
+    meanTrainEnvMapProjections = None
 
 if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.npy"):
     if 'neuralNetPose' in parameterRecognitionModels:
@@ -1381,7 +1388,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-SYNTHETIC-GAUSSIAN' + testRangeStr
+testDescription = 'ECCV-PHOTREALISTIC-MEANBASELINE-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
