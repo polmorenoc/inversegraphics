@@ -241,7 +241,7 @@ trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
 useCRFOcclusionPred = False
 useShapeModel = True
-makeVideo = False
+makeVideo = True
 reduceVariance = False
 getColorFromCRF = False
 syntheticGroundtruth = False
@@ -256,9 +256,13 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')
 
-rangeTests = np.arange(100,1100)
+testSet = np.array([4961, 1028, 14996, 9045, 7010, 9704, 3302, 4627, 12981, 982])
 
-testSet = testSet[rangeTests]
+rangeTests = np.arange(len(testSet))
+# rangeTests = np.arange(100,1100)
+# rangeTests = np.arange(100,1100)
+#
+# testSet = testSet[rangeTests]
 
 numTests = len(testSet)
 
@@ -334,6 +338,7 @@ if syntheticGroundtruth:
 else:
     imagesDir = gtDir + 'images/'
 images = readImages(imagesDir, dataIds, loadFromHdf5)
+
 
 print("Backprojecting and fitting estimates.")
 # testSet = np.arange(len(images))[0:10]
@@ -414,7 +419,6 @@ trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensit
 
 trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
-
 # latexify(columns=2)
 #
 # directory = 'tmp/occlusions'
@@ -432,7 +436,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 0
+optimizationType = 1
 computePredErrorFuns = True
 
 method = 1
@@ -759,8 +763,8 @@ nnBatchSize = 100
 
 azsPredictions = np.array([])
 
-recomputeMeans = True
-includeMeanBaseline = True
+recomputeMeans = False
+includeMeanBaseline = False
 
 recomputePredictions = True
 
@@ -1388,7 +1392,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-PHOTREALISTIC-MEANBASELINE-' + testRangeStr
+testDescription = 'ECCV-PHOTREALISTIC-VIDEO-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1396,7 +1400,7 @@ testPrefixBase = testPrefix
 runExp = True
 shapePenaltyTests = [0,0,0,0]
 # shapePenaltyTests = [0,0,0,0]
-stdsTests = [0.05]
+stdsTests = [0.03]
 # stdsTests = [0.03]
 modelTests = len(stdsTests)*[1]
 # modelTests = [1]
@@ -1527,10 +1531,11 @@ def cb(_):
         stdsOld = stds.r
         stds[:] = 0.05
         vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+
         post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.5
         stds[:] = stdsOld
 
-        im4 = vax4.imshow(post)
+        im4 = vax4.imshow(post.copy())
         # plt.colorbar(im4, ax=vax4, use_gridspec=True)
 
         pEnvMap = SHProjection(envMapTexture, np.concatenate([chLightSHCoeffs.r[:,None], chLightSHCoeffs.r[:,None], chLightSHCoeffs.r[:,None]], axis=1))
@@ -1567,8 +1572,6 @@ def cb(_):
         annot_t = vax3.annotate("Fitting iter: " + str(iterat), xy=(1, 0), xycoords='axes fraction', fontsize=16,
                      xytext=(-20, 5), textcoords='offset points', ha='right', va='bottom', bbox=bbox_props)
 
-
-        im4 = vax4.imshow(post)
 
         plt.tight_layout()
 
@@ -1994,7 +1997,7 @@ for testSetting, model in enumerate(modelTests):
                     print("** Minimizing from initial predicted parameters. **")
                     globalPrior[:] = 0.9
 
-                    errorFun = models[0]
+                    errorFun = models[model]
                     vColor = color
                     if useCRFOcclusionPred:
                         priorProbs = [0.75, 0.25, 0.01]
