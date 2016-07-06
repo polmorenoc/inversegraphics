@@ -47,11 +47,10 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 # parameterRecognitionModels = set(['randForestAzs', 'randForestElevs','randForestVColors','randomForestSHZernike' ])
 #
 
-# gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test0-100'
-# gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 # gtPrefix = 'train4_occlusion_shapemodel'
 # gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
+# gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
@@ -241,10 +240,10 @@ trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
 
 useCRFOcclusionPred = False
 useShapeModel = True
-makeVideo = True
+makeVideo = False
 reduceVariance = False
 getColorFromCRF = False
-syntheticGroundtruth = False
+syntheticGroundtruth = True
 
 ignoreGT = True
 ignore = []
@@ -256,13 +255,14 @@ gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')
 
-testSet = np.array([4961, 1028, 14996, 9045, 7010, 9704, 3302, 4627, 12981, 982])
 
 rangeTests = np.arange(len(testSet))
 # rangeTests = np.arange(100,1100)
-# rangeTests = np.arange(100,1100)
+
+rangeTests = np.arange(100,1100)
+
 #
-# testSet = testSet[rangeTests]
+testSet = testSet[rangeTests]
 
 numTests = len(testSet)
 
@@ -280,6 +280,7 @@ dataTeapotIdsTest = groundTruth['trainTeapotIds']
 test = np.arange(len(testSet))
 
 testSet = testSet[test]
+
 
 print("Reading experiment.")
 dataAzsGT = groundTruth['trainAzsGT']
@@ -436,7 +437,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = True
 
 method = 1
@@ -763,8 +764,8 @@ nnBatchSize = 100
 
 azsPredictions = np.array([])
 
-recomputeMeans = False
-includeMeanBaseline = False
+recomputeMeans = True
+includeMeanBaseline = True
 
 recomputePredictions = True
 
@@ -1392,7 +1393,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-PHOTREALISTIC-VIDEO-' + testRangeStr
+testDescription = 'ECCV-MEANBASELINE-ORIGINALGT-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix

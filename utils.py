@@ -921,7 +921,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     y1, y2 = ax.get_ylim()
     ax.set_xlim((0, 100))
     ax.set_ylim((-0.0, y2))
-    ax.set_title('Cumulative prediction per occlusion level')
+    # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
     plt.close(fig)
 

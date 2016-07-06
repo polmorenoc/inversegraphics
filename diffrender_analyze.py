@@ -391,7 +391,7 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 ##### Load Results data:
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-MEANBASELINE-ORIGINALGT-2530-17944_predict_1000samples__method1errorFun1_std0.03_shapePen0'
 resultDir = 'results/' + testPrefix + '/'
 
 with open(resultDir + 'experiment.pickle', 'rb') as pfile:
@@ -448,67 +448,67 @@ if loadMask:
 approxProjections = None
 approxProjectionsGT = None
 
+# #
+# # ##### Load Results data:
+# #
 #
-# ##### Load Results data:
+# testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV-PHOTREALISTIC-MEANBASELINE-2530-17944_predict_1000samples__method1errorFun1_std0.05_shapePen0'
+# resultDir2 = 'results/' + testPrefix2 + '/'
+# with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
+#     experimentDic2 = pickle.load(pfile)
+# testSet2 = experimentDic2['testSet']
+# methodsPred2 = experimentDic2['methodsPred']
+# testOcclusions2 = experimentDic2[ 'testOcclusions']
+# testPrefixBase2 = experimentDic2[ 'testPrefixBase']
+# parameterRecognitionModels2 = experimentDic2[ 'parameterRecognitionModels']
+# azimuths2 = experimentDic2['azimuths']
+# elevations2 = experimentDic2[ 'elevations']
+# vColors2 = experimentDic2[ 'vColors']
+# lightCoeffs2 = experimentDic2[ 'lightCoeffs']
+# likelihoods2 = experimentDic2['likelihoods']
+# shapeParams2 = experimentDic2['shapeParams']
+# if os.path.isfile(resultDir2 + 'segmentations.pickle'):
+#     with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
+#         segmentationsDic2 = pickle.load(pfile)
+#     segmentations2 = segmentationsDic2['segmentations']
+# else:
+#     segmentations2 = [None]*len(methodsPred2)
 #
-
-testPrefix2 = 'train4_occlusion_shapemodel_10k_ECCV-PHOTREALISTIC-MEANBASELINE-2530-17944_predict_1000samples__method1errorFun1_std0.05_shapePen0'
-resultDir2 = 'results/' + testPrefix2 + '/'
-with open(resultDir2 + 'experiment.pickle', 'rb') as pfile:
-    experimentDic2 = pickle.load(pfile)
-testSet2 = experimentDic2['testSet']
-methodsPred2 = experimentDic2['methodsPred']
-testOcclusions2 = experimentDic2[ 'testOcclusions']
-testPrefixBase2 = experimentDic2[ 'testPrefixBase']
-parameterRecognitionModels2 = experimentDic2[ 'parameterRecognitionModels']
-azimuths2 = experimentDic2['azimuths']
-elevations2 = experimentDic2[ 'elevations']
-vColors2 = experimentDic2[ 'vColors']
-lightCoeffs2 = experimentDic2[ 'lightCoeffs']
-likelihoods2 = experimentDic2['likelihoods']
-shapeParams2 = experimentDic2['shapeParams']
-if os.path.isfile(resultDir2 + 'segmentations.pickle'):
-    with open(resultDir2 + 'segmentations.pickle', 'rb') as pfile:
-        segmentationsDic2 = pickle.load(pfile)
-    segmentations2 = segmentationsDic2['segmentations']
-else:
-    segmentations2 = [None]*len(methodsPred2)
-
-testOcclusionsFull2 = testOcclusions2.copy()
-
-
-testPrefix3 = 'train4_occlusion_shapemodel_10k_ECCV-SYNTH-FIX-2530-17944_optimize_1000samples__method1errorFun1_std0.03_shapePen0'
-resultDir3 = 'results/' + testPrefix3 + '/'
-with open(resultDir3 + 'experiment.pickle', 'rb') as pfile:
-    experimentDic3 = pickle.load(pfile)
-testSet3 = experimentDic3['testSet']
-methodsPred3 = experimentDic3['methodsPred']
-testOcclusions3 = experimentDic3[ 'testOcclusions']
-testPrefixBase3 = experimentDic3[ 'testPrefixBase']
-parameterRecognitionModels3 = experimentDic3[ 'parameterRecognitionModels']
-azimuths3 = experimentDic3['azimuths']
-elevations3 = experimentDic3[ 'elevations']
-vColors3 = experimentDic3[ 'vColors']
-lightCoeffs3 = experimentDic3[ 'lightCoeffs']
-likelihoods3 = experimentDic3['likelihoods']
-shapeParams3 = experimentDic3['shapeParams']
-if os.path.isfile(resultDir3 + 'segmentations.pickle'):
-    with open(resultDir3 + 'segmentations.pickle', 'rb') as pfile:
-        segmentationsDic3 = pickle.load(pfile)
-    segmentations3 = segmentationsDic3['segmentations']
-else:
-    segmentations3 = [None]*len(methodsPred3)
-
-testOcclusionsFull3 = testOcclusions3.copy()
-
-# with open(resultDir2 + 'approxProjections.pickle', 'rb') as pfile:
-#     approxProjectionsDic2 = pickle.load(pfile)
+# testOcclusionsFull2 = testOcclusions2.copy()
 #
-# approxProjections2 = approxProjectionsDic2['approxProjections']
-# approxProjectionsGT2 = approxProjectionsDic2['approxProjectionsGT']
-
-approxProjections2 = None
-approxProjectionsGT2 = None
+#
+# testPrefix3 = 'train4_occlusion_shapemodel_10k_ECCV-SYNTH-FIX-2530-17944_optimize_1000samples__method1errorFun1_std0.03_shapePen0'
+# resultDir3 = 'results/' + testPrefix3 + '/'
+# with open(resultDir3 + 'experiment.pickle', 'rb') as pfile:
+#     experimentDic3 = pickle.load(pfile)
+# testSet3 = experimentDic3['testSet']
+# methodsPred3 = experimentDic3['methodsPred']
+# testOcclusions3 = experimentDic3[ 'testOcclusions']
+# testPrefixBase3 = experimentDic3[ 'testPrefixBase']
+# parameterRecognitionModels3 = experimentDic3[ 'parameterRecognitionModels']
+# azimuths3 = experimentDic3['azimuths']
+# elevations3 = experimentDic3[ 'elevations']
+# vColors3 = experimentDic3[ 'vColors']
+# lightCoeffs3 = experimentDic3[ 'lightCoeffs']
+# likelihoods3 = experimentDic3['likelihoods']
+# shapeParams3 = experimentDic3['shapeParams']
+# if os.path.isfile(resultDir3 + 'segmentations.pickle'):
+#     with open(resultDir3 + 'segmentations.pickle', 'rb') as pfile:
+#         segmentationsDic3 = pickle.load(pfile)
+#     segmentations3 = segmentationsDic3['segmentations']
+# else:
+#     segmentations3 = [None]*len(methodsPred3)
+#
+# testOcclusionsFull3 = testOcclusions3.copy()
+#
+# # with open(resultDir2 + 'approxProjections.pickle', 'rb') as pfile:
+# #     approxProjectionsDic2 = pickle.load(pfile)
+# #
+# # approxProjections2 = approxProjectionsDic2['approxProjections']
+# # approxProjectionsGT2 = approxProjectionsDic2['approxProjectionsGT']
+#
+# approxProjections2 = None
+# approxProjectionsGT2 = None
 
 #
 # testPrefix3 = 'train4_occlusion_shapemodel_10k_ECCV-SYNTHETIC-GAUSSIAN11664-17944_optimize_300samples__method1errorFun1_std0.05_shapePen0'
@@ -577,14 +577,14 @@ approxProjectionsGT2 = None
 
 #
 
-methodsPred[0] = methodsPred2[0]
-azimuths[0] = azimuths2[0]
-elevations[0] = elevations2[0]
-vColors[0] = vColors2[0]
-lightCoeffs[0] = lightCoeffs2[0]
-likelihoods[0] = likelihoods2[0]
-shapeParams[0] = shapeParams2[0]
-segmentations[0] = segmentations2[0]
+# methodsPred[0] = methodsPred2[0]
+# azimuths[0] = azimuths2[0]
+# elevations[0] = elevations2[0]
+# vColors[0] = vColors2[0]
+# lightCoeffs[0] = lightCoeffs2[0]
+# likelihoods[0] = likelihoods2[0]
+# shapeParams[0] = shapeParams2[0]
+# segmentations[0] = segmentations2[0]
 
 rendererGT = None
 
@@ -600,164 +600,164 @@ replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
 from OpenGL import contextdata
 
 # #
-segmentations[2] = np.zeros([len(testSet), 150,150])
-segmentations[3] = np.zeros([len(testSet), 150,150])
-segmentations[4] = np.zeros([len(testSet), 150,150])
-segmentations[5] = np.zeros([len(testSet), 150,150])
-
-
-for test_i in range(len(testSet)):
-
-    # sceneNumber = dataScenes[test_i]
-    # sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
-    # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-    # # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
-    #
-    # targetIndex = dataTargetIndices[test_i]
-    # sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
-    # v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, True)
-    #
-    # removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
-    #
-    # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
-    #
-    # if rendererGT is not None:
-    #     rendererGT.makeCurrentContext()
-    #     rendererGT.clear()
-    #     contextdata.cleanupContext(contextdata.getContext())
-    #     if glMode == 'glfw':
-    #         glfw.destroy_window(rendererGT.win)
-    #     del rendererGT
-    #
-    # targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
-    #
-    # rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
-    #
-    # for hdrFile, hdrValues in hdritems:
-    #     hdridx = hdrValues[0]
-    #     envMapCoeffs = hdrValues[1]
-    #     if hdridx == dataEnvMaps[test_i]:
-    #         break
-    # envMapFilename = hdrFile
-    #
-    # phiOffset[:] = dataEnvMapPhiOffsets[test_i]
-    # chObjAzGT[:] = testObjAzsGT[test_i]
-    # chAzGT[:] = testAzsGT[test_i]
-    # chElGT[:] = testElevsGT[test_i]
-    # chVColorsGT[:] = testVColorGT[test_i]
-    # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
-    # chShapeParamsGT[:] =  dataShapeModelCoeffsGT[test_i]
-
-    im = images[test_i]
-    rendererGT = srgb2lin(im.copy())
-
-    chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
-    chObjAz[:] = 0
-    chAz[:] = testAzsRel[test_i]
-    chEl[:] = testElevsGT[test_i]
-    chVColors[:] = testVColorGT[test_i]
-    chShapeParams[:] =  testShapeParamsGT[test_i]
-
-    stds[:] = 0.05
-
-    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-
-    # likelihoods[0] = np.append(likelihoods[0], negLikModelRobust.r)
-
-    chLightSHCoeffs[:] = lightCoeffs[3][idsInRange[test_i]]
-    chObjAz[:] = 0
-    chAz[:] = azimuths[3][idsInRange[test_i]]
-    chEl[:] = elevations[3][idsInRange[test_i]]
-    chVColors[:] = vColors[3][idsInRange[test_i]]
-    chShapeParams[:] =  shapeParams[3][idsInRange[test_i]]
-
-    # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
-
-    #masksGT
-    #render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
-
-    vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
-    post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.5
-    render = ~post.copy()
-    mask = masksGT[test_i]
-    render[~vis_im] = 1
-
-    segmentations[3][test_i] = post
-
-
-    chLightSHCoeffs[:] = lightCoeffs[2][idsInRange[test_i]]
-    chObjAz[:] = 0
-    chAz[:] = azimuths[2][idsInRange[test_i]]
-    chEl[:] = elevations[2][idsInRange[test_i]]
-    chVColors[:] = vColors[2][idsInRange[test_i]]
-    chShapeParams[:] = shapeParams[2][idsInRange[test_i]]
-
-    # likelihoods[2] = np.append(likelihoods[2], negLikModelRobust.r)
-
-    # masksGT
-    # render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
-
-    post = np.array(renderer.indices_image == 1).copy().astype(np.bool)
-
-    segmentations[2][test_i] = post
-
-
-    chLightSHCoeffs[:] = lightCoeffs[5][idsInRange[test_i]]
-    chObjAz[:] = 0
-    chAz[:] = azimuths[5][idsInRange[test_i]]
-    chEl[:] = elevations[5][idsInRange[test_i]]
-    chVColors[:] = vColors[5][idsInRange[test_i]]
-    chShapeParams[:] = shapeParams[5][idsInRange[test_i]]
-
-    # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
-
-    # masksGT
-    # render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
-
-    post = np.array(renderer.indices_image == 1).copy().astype(np.bool)
-
-    segmentations[5][test_i] = post
+# segmentations[2] = np.zeros([len(testSet), 150,150])
+# segmentations[3] = np.zeros([len(testSet), 150,150])
+# segmentations[4] = np.zeros([len(testSet), 150,150])
+# segmentations[5] = np.zeros([len(testSet), 150,150])
 #
-    # chLightSHCoeffs[:] = lightCoeffs[4][idsInRange[test_i]]
-    # chObjAz[:] = 0
-    # chAz[:] = azimuths[4][idsInRange[test_i]]
-    # chEl[:] = elevations[4][idsInRange[test_i]]
-    # chVColors[:] = vColors[4][idsInRange[test_i]]
-    # chShapeParams[:] = shapeParams[4][idsInRange[test_i]]
-
-    # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
-
-    # masksGT
-    # render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
-
-    # vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
-    # post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r > 0.5
-    # render = ~post.copy()
-    # mask = masksGT[test_i]
-    # render[~vis_im] = 1
-    #
-    # segmentations[4][test_i] = post
-
-    # renderRGB = np.concatenate([render[:,:,None],  render[:,:,None], render[:,:,None]], axis=2)
-
-    # cv2.imwrite('tmp/SH/renderergt' + str(test_i) + '.jpeg' , 255*lin2srgb(rendererGT[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-    # plt.imsave('tmp/SH/mask' + str(test_i) + '.jpeg', mask)
-    # cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*post, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-    # cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*render, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-    # plt.imsave('tmp/SH/renderer' + str(test_i) + '.png' , lin2srgb(renderer.r.copy()))
-    # ipdb.set_trace()
-# # #
-
-methodsPred[3] = 'Robust Fit'
-
-methodsPred[4] = 'Robust (OpenGL)'
-
-methodsPred[5] = 'Recognition (OpenGL)'
-
-methodsPred[6] = 'Gaussian Fit'
-
-segmentations[4] = segmentations3[3]
+#
+# for test_i in range(len(testSet)):
+#
+#     # sceneNumber = dataScenes[test_i]
+#     # sceneIdx = scene_io_utils.getSceneIdx(sceneNumber, replaceableScenesFile)
+#     # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+#     # # sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
+#     #
+#     # targetIndex = dataTargetIndices[test_i]
+#     # sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
+#     # v, f_list, vc, vn, uv, haveTextures_list, textures_list = scene_io_utils.loadSavedScene(sceneDicFile, True)
+#     #
+#     # removeObjectData(len(v) -1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+#     #
+#     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
+#     #
+#     # if rendererGT is not None:
+#     #     rendererGT.makeCurrentContext()
+#     #     rendererGT.clear()
+#     #     contextdata.cleanupContext(contextdata.getContext())
+#     #     if glMode == 'glfw':
+#     #         glfw.destroy_window(rendererGT.win)
+#     #     del rendererGT
+#     #
+#     # targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
+#     #
+#     # rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
+#     #
+#     # for hdrFile, hdrValues in hdritems:
+#     #     hdridx = hdrValues[0]
+#     #     envMapCoeffs = hdrValues[1]
+#     #     if hdridx == dataEnvMaps[test_i]:
+#     #         break
+#     # envMapFilename = hdrFile
+#     #
+#     # phiOffset[:] = dataEnvMapPhiOffsets[test_i]
+#     # chObjAzGT[:] = testObjAzsGT[test_i]
+#     # chAzGT[:] = testAzsGT[test_i]
+#     # chElGT[:] = testElevsGT[test_i]
+#     # chVColorsGT[:] = testVColorGT[test_i]
+#     # envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+#     # envMapCoeffsRotatedRel[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
+#     # chShapeParamsGT[:] =  dataShapeModelCoeffsGT[test_i]
+#
+#     im = images[test_i]
+#     rendererGT = srgb2lin(im.copy())
+#
+#     chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
+#     chObjAz[:] = 0
+#     chAz[:] = testAzsRel[test_i]
+#     chEl[:] = testElevsGT[test_i]
+#     chVColors[:] = testVColorGT[test_i]
+#     chShapeParams[:] =  testShapeParamsGT[test_i]
+#
+#     stds[:] = 0.05
+#
+#     negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
+#
+#     # likelihoods[0] = np.append(likelihoods[0], negLikModelRobust.r)
+#
+#     chLightSHCoeffs[:] = lightCoeffs[3][idsInRange[test_i]]
+#     chObjAz[:] = 0
+#     chAz[:] = azimuths[3][idsInRange[test_i]]
+#     chEl[:] = elevations[3][idsInRange[test_i]]
+#     chVColors[:] = vColors[3][idsInRange[test_i]]
+#     chShapeParams[:] =  shapeParams[3][idsInRange[test_i]]
+#
+#     # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
+#
+#     #masksGT
+#     #render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+#
+#     vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
+#     post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.5
+#     render = ~post.copy()
+#     mask = masksGT[test_i]
+#     render[~vis_im] = 1
+#
+#     segmentations[3][test_i] = post
+#
+#
+#     chLightSHCoeffs[:] = lightCoeffs[2][idsInRange[test_i]]
+#     chObjAz[:] = 0
+#     chAz[:] = azimuths[2][idsInRange[test_i]]
+#     chEl[:] = elevations[2][idsInRange[test_i]]
+#     chVColors[:] = vColors[2][idsInRange[test_i]]
+#     chShapeParams[:] = shapeParams[2][idsInRange[test_i]]
+#
+#     # likelihoods[2] = np.append(likelihoods[2], negLikModelRobust.r)
+#
+#     # masksGT
+#     # render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+#
+#     post = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+#
+#     segmentations[2][test_i] = post
+#
+#
+#     chLightSHCoeffs[:] = lightCoeffs[5][idsInRange[test_i]]
+#     chObjAz[:] = 0
+#     chAz[:] = azimuths[5][idsInRange[test_i]]
+#     chEl[:] = elevations[5][idsInRange[test_i]]
+#     chVColors[:] = vColors[5][idsInRange[test_i]]
+#     chShapeParams[:] = shapeParams[5][idsInRange[test_i]]
+#
+#     # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
+#
+#     # masksGT
+#     # render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+#
+#     post = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+#
+#     segmentations[5][test_i] = post
+# #
+#     # chLightSHCoeffs[:] = lightCoeffs[4][idsInRange[test_i]]
+#     # chObjAz[:] = 0
+#     # chAz[:] = azimuths[4][idsInRange[test_i]]
+#     # chEl[:] = elevations[4][idsInRange[test_i]]
+#     # chVColors[:] = vColors[4][idsInRange[test_i]]
+#     # chShapeParams[:] = shapeParams[4][idsInRange[test_i]]
+#
+#     # likelihoods[1] = np.append(likelihoods[1], negLikModelRobust.r)
+#
+#     # masksGT
+#     # render[~mask*vis_im] = np.concatenate([np.ones([1000,1000])[:,:,None],  np.zeros([1000,1000])[:,:,None],np.zeros([1000,1000])[:,:,None]], axis=2)[~mask*vis_im]
+#
+#     # vis_im = np.array(renderer.indices_image == 1).copy().astype(np.bool)
+#     # post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r > 0.5
+#     # render = ~post.copy()
+#     # mask = masksGT[test_i]
+#     # render[~vis_im] = 1
+#     #
+#     # segmentations[4][test_i] = post
+#
+#     # renderRGB = np.concatenate([render[:,:,None],  render[:,:,None], render[:,:,None]], axis=2)
+#
+#     # cv2.imwrite('tmp/SH/renderergt' + str(test_i) + '.jpeg' , 255*lin2srgb(rendererGT[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+#     # plt.imsave('tmp/SH/mask' + str(test_i) + '.jpeg', mask)
+#     # cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*post, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+#     # cv2.imwrite('tmp/SH/post' + str(test_i) + '.jpeg' , 255*render, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+#     # plt.imsave('tmp/SH/renderer' + str(test_i) + '.png' , lin2srgb(renderer.r.copy()))
+#     # ipdb.set_trace()
+# # # #
+#
+# methodsPred[3] = 'Robust Fit'
+#
+# methodsPred[4] = 'Robust (OpenGL)'
+#
+# methodsPred[5] = 'Recognition (OpenGL)'
+#
+# methodsPred[6] = 'Gaussian Fit'
+#
+# segmentations[4] = segmentations3[3]
 #
 errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
         = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
@@ -779,13 +779,13 @@ errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVer
 #     approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT[None,:]]
 # approxProjectionsGT = np.vstack(approxProjectionsGTList)
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-MEANBASELINE-ORIGINALGT-2530-17944_predict_1000samples__method1errorFun1_std0.03_shapePen0'
 resultDir = 'results/' + testPrefix + '/'
 
-experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
-
-with open(resultDir + 'experiment.pickle', 'wb') as pfile:
-    pickle.dump(experimentDic, pfile)
+# experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
+#
+# with open(resultDir + 'experiment.pickle', 'wb') as pfile:
+#     pickle.dump(experimentDic, pfile)
 
 experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsSList':errorsVColorsSList,'errorsSegmentationList':errorsSegmentationList}
 
@@ -847,7 +847,7 @@ plotStyles = plotStyles + ['solid']
 
 plotStyles = plotStyles + ['dashed']
 
-plotMethodsIndices = [0,2,3,6]
+plotMethodsIndices = [0]
 recognitionIdx = 2
 robustIdx = 3
 
@@ -1031,45 +1031,48 @@ SHModel = ""
 
 for occlusionLevel in [25,75,100]:
 
+
     resultDirOcclusion = 'results/' + testPrefix + '/occlusion' + str(occlusionLevel) + '/'
     if not os.path.exists(resultDirOcclusion):
         os.makedirs(resultDirOcclusion)
 
     setUnderOcclusionLevel = testOcclusionsFull * 100 < occlusionLevel
     testOcclusions = testOcclusionsFull[setUnderOcclusionLevel]
-
-    errorsPosePred = [errorsPosePredList[recognitionIdx][0][setUnderOcclusionLevel], errorsPosePredList[recognitionIdx][1][setUnderOcclusionLevel]]
-    errorsLightCoeffs = errorsLightCoeffsList[recognitionIdx][setUnderOcclusionLevel]
-    errorsShapeParams = errorsShapeParamsList[recognitionIdx][setUnderOcclusionLevel]
-    errorsShapeVertices= errorsShapeVerticesList[recognitionIdx][setUnderOcclusionLevel]
-    if errorsEnvMapList[recognitionIdx] is not None:
-        errorsEnvMap= errorsEnvMapList[recognitionIdx][setUnderOcclusionLevel]
-    else:
-        errorsEnvMap = None
-    errorsLightCoeffsC= errorsLightCoeffsCList[recognitionIdx][setUnderOcclusionLevel]
-    errorsVColorsE= errorsVColorsEList[recognitionIdx][setUnderOcclusionLevel]
-    errorsVColorsC= errorsVColorsCList[recognitionIdx][setUnderOcclusionLevel]
-    errorsVColorsS= errorsVColorsSList[recognitionIdx][setUnderOcclusionLevel]
-    # errorsSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
-    errorsSegmentation = None
-
-    errorsPoseFitted =  [errorsPosePredList[robustIdx][0][setUnderOcclusionLevel], errorsPosePredList[robustIdx][1][setUnderOcclusionLevel]]
-    errorsFittedLightCoeffs = errorsLightCoeffsList[robustIdx][setUnderOcclusionLevel]
-    errorsFittedShapeParams = errorsShapeParamsList[robustIdx][setUnderOcclusionLevel]
-    errorsFittedShapeVertices= errorsShapeVerticesList[robustIdx][setUnderOcclusionLevel]
-    if errorsEnvMapList[recognitionIdx] is not None:
-        errorsFittedEnvMap = errorsEnvMapList[robustIdx][setUnderOcclusionLevel]
-    else:
-        errorsFittedEnvMap = None
-    errorsFittedLightCoeffsC= errorsLightCoeffsCList[robustIdx][setUnderOcclusionLevel]
-    errorsFittedVColorsE= errorsVColorsEList[robustIdx][setUnderOcclusionLevel]
-    errorsFittedVColorsC= errorsVColorsCList[robustIdx][setUnderOcclusionLevel]
-    errorsFittedVColorsS= errorsVColorsSList[robustIdx][setUnderOcclusionLevel]
-    # errorsFittedSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
-    errorsFittedSegmentation = None
-
-
-    saveScatterPlots(resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS)
+    #
+    #
+    # errorsPosePred = [errorsPosePredList[recognitionIdx][0][setUnderOcclusionLevel], errorsPosePredList[recognitionIdx][1][setUnderOcclusionLevel]]
+    # errorsLightCoeffs = errorsLightCoeffsList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsShapeParams = errorsShapeParamsList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsShapeVertices= errorsShapeVerticesList[recognitionIdx][setUnderOcclusionLevel]
+    # if errorsEnvMapList[recognitionIdx] is not None:
+    #     errorsEnvMap= errorsEnvMapList[recognitionIdx][setUnderOcclusionLevel]
+    # else:
+    #     errorsEnvMap = None
+    # errorsLightCoeffsC= errorsLightCoeffsCList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsVColorsE= errorsVColorsEList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsVColorsC= errorsVColorsCList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsVColorsS= errorsVColorsSList[recognitionIdx][setUnderOcclusionLevel]
+    # # errorsSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsSegmentation = None
+    #
+    #
+    # errorsPoseFitted =  [errorsPosePredList[robustIdx][0][setUnderOcclusionLevel], errorsPosePredList[robustIdx][1][setUnderOcclusionLevel]]
+    # errorsFittedLightCoeffs = errorsLightCoeffsList[robustIdx][setUnderOcclusionLevel]
+    # errorsFittedShapeParams = errorsShapeParamsList[robustIdx][setUnderOcclusionLevel]
+    # errorsFittedShapeVertices= errorsShapeVerticesList[robustIdx][setUnderOcclusionLevel]
+    # if errorsEnvMapList[recognitionIdx] is not None:
+    #     errorsFittedEnvMap = errorsEnvMapList[robustIdx][setUnderOcclusionLevel]
+    # else:
+    #     errorsFittedEnvMap = None
+    # errorsFittedLightCoeffsC= errorsLightCoeffsCList[robustIdx][setUnderOcclusionLevel]
+    # errorsFittedVColorsE = errorsVColorsEList[robustIdx][setUnderOcclusionLevel]
+    # errorsFittedVColorsC = errorsVColorsCList[robustIdx][setUnderOcclusionLevel]
+    # errorsFittedVColorsS = errorsVColorsSList[robustIdx][setUnderOcclusionLevel]
+    # # errorsFittedSegmentation = errorsSegmentationList[recognitionIdx][setUnderOcclusionLevel]
+    # errorsFittedSegmentation = None
+    #
+    #
+    # saveScatterPlots(resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS)
 
     # errorsPoseFitted =  [errorsPosePredList[5][0][setUnderOcclusionLevel], errorsPosePredList[5][1][setUnderOcclusionLevel]]
     # errorsFittedLightCoeffs = errorsLightCoeffsList[5][setUnderOcclusionLevel]
