@@ -49,8 +49,8 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 
 # gtPrefix = 'train4_occlusion_shapemodel'
 # gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
-gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
-# gtPrefix = 'train4_occlusion_shapemodel'
+# gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
+gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
@@ -254,7 +254,6 @@ groundTruthFilename = gtDir + 'groundTruth.h5'
 gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')
-
 
 rangeTests = np.arange(len(testSet))
 # rangeTests = np.arange(100,1100)
@@ -767,7 +766,7 @@ azsPredictions = np.array([])
 recomputeMeans = True
 includeMeanBaseline = True
 
-recomputePredictions = True
+recomputePredictions = False
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -1688,6 +1687,8 @@ for testSetting, model in enumerate(modelTests):
             resultDir = 'results/' + testPrefix + '/'
 
             testOcclusions = dataOcclusions
+
+            ipdb.set_trace()
 
             bestFittedAz = chAz.r
             bestFittedEl = chEl.r
