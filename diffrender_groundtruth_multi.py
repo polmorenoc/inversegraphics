@@ -31,13 +31,13 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_synthetic_newscenes'
+prefix = 'train4_occlusion_shapemodel_triplets'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
 
-renderFromPreviousGT = False
+renderFromPreviousGT = True
 useShapeModel = True
 useOpenDR = True
 useBlender = True
@@ -49,6 +49,7 @@ useCycles = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
+generateTriplets = True
 
 replaceNewGroundtruth = False
 renderOcclusions = True
@@ -122,87 +123,72 @@ removeObjectData(int(targetIndex), v, f_list, vc, vn, uv, haveTextures_list, tex
 targetModels = []
 mugModels = []
 blender_teapots = []
-selection = [ teapots[i] for i in renderTeapotsList]
-scene_io_utils.loadTargetsBlendData()
-for teapotIdx, teapotName in enumerate(selection):
-    teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
-    teapot.layers[1] = True
-    teapot.layers[2] = True
-    targetModels = targetModels + [teapot]
-    blender_teapots = blender_teapots + [teapot]
+blender_mugs = []
+if useBlender:
+    selection = [ teapots[i] for i in renderTeapotsList]
+    scene_io_utils.loadTargetsBlendData()
+    for teapotIdx, teapotName in enumerate(selection):
+        teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
+        teapot.layers[1] = True
+        teapot.layers[2] = True
+        targetModels = targetModels + [teapot]
+        blender_teapots = blender_teapots + [teapot]
+
+
+    if renderMugs:
+        selectionMugs = [ mugs[i] for i in renderMugsList]
+        scene_io_utils.loadMugsBlendData()
+        for mugIdx, mugName in enumerate(selectionMugs):
+            mug = bpy.data.scenes[mugName[0:63]].objects['mugInstance' + str(renderMugsList[mugIdx])]
+            mug.layers[1] = True
+            mug.layers[2] = True
+            mugModels = mugModels + [mug]
+            blender_mugs = blender_mugs + [mug]
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
-blender_mugs = []
-selectionMugs = [ mugs[i] for i in renderMugsList]
-scene_io_utils.loadMugsBlendData()
-for mugIdx, mugName in enumerate(selectionMugs):
-    mug = bpy.data.scenes[mugName[0:63]].objects['mugInstance' + str(renderMugsList[mugIdx])]
-    mug.layers[1] = True
-    mug.layers[2] = True
-    mugModels = mugModels + [mug]
-    blender_mugs = blender_mugs + [mug]
-v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat_mugs, varray_mugs, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, useBlender, unpackModelsFromBlender, mugModels)
+if renderMugs:
+    v_mugs, f_list_mugs, vc_mugs, vn_mugs, uv_mugs, haveTextures_list_mugs, textures_list_mugs, vflat_mugs, varray_mugs, center_mugs = scene_io_utils.loadMugsOpenDRData(renderMugsList, useBlender, unpackModelsFromBlender, mugModels)
 
-v_mug = v_mugs[0][0]
-f_list_mug = f_list_mugs[0][0]
-chVColorsMug = ch.Ch([1,0,0])
-vc_mug = [chVColorsMug * np.ones(v_mug[0].shape)]
-vn_mug = vn_mugs[0][0]
-uv_mug = uv_mugs[0][0]
-haveTextures_list_mug = haveTextures_list_mugs[0][0]
-textures_list_mug = textures_list_mugs[0][0]
+    v_mug = v_mugs[0][0]
+    f_list_mug = f_list_mugs[0][0]
+    chVColorsMug = ch.Ch([1,0,0])
+    vc_mug = [chVColorsMug * np.ones(v_mug[0].shape)]
+    vn_mug = vn_mugs[0][0]
+    uv_mug = uv_mugs[0][0]
+    haveTextures_list_mug = haveTextures_list_mugs[0][0]
+    textures_list_mug = textures_list_mugs[0][0]
 
-azimuth = np.pi
-chCosAz = ch.Ch([np.cos(azimuth)])
-chSinAz = ch.Ch([np.sin(azimuth)])
 
-chAz = 2*ch.arctan(chSinAz/(ch.sqrt(chCosAz**2 + chSinAz**2) + chCosAz))
-chAz = ch.Ch([0])
 chObjAz = ch.Ch([0])
-chAzRel = chAz - chObjAz
 
-elevation = 0
-chLogCosEl = ch.Ch(np.log(np.cos(elevation)))
-chLogSinEl = ch.Ch(np.log(np.sin(elevation)))
-chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(chLogSinEl)**2) + ch.exp(chLogCosEl)))
-chEl =  ch.Ch([0.0])
 chDist = ch.Ch([camDistance])
 
 chObjAzGT = ch.Ch([0])
 chAzGT = ch.Ch([0])
+chElGT = ch.Ch([0])
 chAzRelGT = chAzGT - chObjAzGT
-chElGT = ch.Ch(chEl.r[0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
-chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
 chObjDistGT = ch.Ch([0])
 chObjRotationGT = ch.Ch([0])
 chObjAzMug = ch.Ch([0])
 chObjDistMug = ch.Ch([0])
 chObjRotationMug = ch.Ch([0])
-chAzRelMug = chAz - chObjAzMug
 
-chPointLightIntensity = ch.Ch([1])
 chPointLightIntensityGT = ch.Ch([1])
-chLightAz = ch.Ch([0.0])
-chLightEl = ch.Ch([np.pi/2])
-chLightDist = ch.Ch([0.5])
+
 chLightDistGT = ch.Ch([0.5])
 chLightAzGT = ch.Ch([0.0])
 chLightElGT = ch.Ch([np.pi/4])
 
-ligthTransf = computeHemisphereTransformation(chLightAz, chLightEl, chLightDist, targetPosition)
 ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
 
-lightPos = ch.dot(ligthTransf, ch.Ch([0.,0.,0.,1.]))[0:3]
-lightPos = ch.Ch([targetPosition[0]+0.5,targetPosition[1],targetPosition[2] + 0.5])
 lightPosGT = ch.dot(ligthTransfGT, ch.Ch([0.,0.,0.,1.]))[0:3]
 
-light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-chVColors = ch.Ch([0.8,0.8,0.8])
+
 chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
@@ -236,28 +222,22 @@ chLightDistGT = ch.Ch([0.5])
 chLightIntensityGT = ch.Ch([0])
 chLightAzGT = ch.Ch([np.pi*3/2])
 chLightElGT = ch.Ch([np.pi/4])
-angle = ch.arcsin(chLightRadGT/chLightDistGT)
-zGT = chZonalHarmonics(angle)
-shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT + chObjAzGT - np.pi/2) * clampedCosCoeffs
-shDirLightGTRel = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2) * clampedCosCoeffs
-chComponentGT = chAmbientSHGT
-# chComponentGT = ch.Ch(chAmbientSHGT.r[:].copy())
- # + shDirLightGT*chLightIntensityGT
-chComponentGTRel = chAmbientSHGTRel
-# chComponentGTRel = ch.Ch(chAmbientSHGTRel.r[:].copy())
-# chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
 
-chDisplacement = ch.Ch([0.0, 0.0,0.0])
+chComponentGT = chAmbientSHGT
+
+chComponentGTRel = chAmbientSHGTRel
+
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
-chScale = ch.Ch([1.0,1.0,1.0])
 chScaleGT = ch.Ch([1, 1.,1.])
 
 currentTeapotModel = 0
 currentMugModel = 0
 
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
+if renderTeapots:
+    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
 
-addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_mugs[currentMugModel][0], f_list_mugs[currentMugModel][0], vc_mugs[currentMugModel][0], vn_mugs[currentMugModel][0], uv_mugs[currentMugModel][0], haveTextures_list_mugs[currentMugModel][0], textures_list_mugs[currentMugModel][0])
+if renderMugs:
+    addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_mugs[currentMugModel][0], f_list_mugs[currentMugModel][0], vc_mugs[currentMugModel][0], vn_mugs[currentMugModel][0], uv_mugs[currentMugModel][0], haveTextures_list_mugs[currentMugModel][0], textures_list_mugs[currentMugModel][0])
 
 center = center_teapots[currentTeapotModel]
 
@@ -272,13 +252,12 @@ if useOpenDR:
 
 numPixels = height * width
 
+## For blender parallell rendering.
 import multiprocessing
 numTileAxis = np.ceil(np.sqrt(multiprocessing.cpu_count())/2)
 numTileAxis = 3
 
-#########################################
-# Initialization ends here
-#########################################
+
 smCenterGT = ch.array([0,0,0.1])
 shapeVerticesScaling = 0.09
 teapotFilePath = 'data/teapotModel.pkl'
@@ -333,6 +312,127 @@ else:
     latentDim = 1
     chShapeParamsGT = ch.array([0])
 
+
+### Renderer (only teapot)
+
+teapotToRender = -1
+
+# renderTeapotsList = np.arange(len(teapots))
+renderTeapotsList = np.arange(len(teapots))[0:1]
+
+targetModels = []
+
+chAz = ch.Ch([0])
+chObjAz = ch.Ch([0])
+chAzRel = chAz - chObjAz
+
+chEl =  ch.Ch([0.95993109])
+chDist = ch.Ch([camDistance])
+
+chLightSHCoeffs = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
+
+# if multiObjects:
+chObjDist = ch.Ch([0])
+chObjRotation = ch.Ch([0])
+chObjAzMug = ch.Ch([0])
+chObjDistMug = ch.Ch([0])
+chObjRotationMug = ch.Ch([0])
+
+chVColorsMug = ch.Ch([1,0,0])
+
+chComponent = chLightSHCoeffs * clampedCosCoeffs
+
+light_color = ch.ones(3)
+
+chVColors = ch.Ch([0.4,0.4,0.4])
+
+chDisplacement = ch.Ch([0.0, 0.0,0.0])
+chScale = ch.Ch([1.0,1.0,1.0])
+
+
+# testRenderer = 2
+if useShapeModel:
+    import shape_model
+    #%% Load data
+
+    shapeParams = np.zeros(latentDim)
+    chShapeParams = ch.Ch(shapeParams.copy())
+
+
+    chVertices = shape_model.VerticesModel(chShapeParams=chShapeParams,meshLinearTransform=meshLinearTransform,W = W,b=b)
+    chVertices.init()
+
+    chVertices = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVertices.T).T
+
+    smFaces = [[faces]]
+    smVColors = [chVColors*np.ones(chVertices.shape)]
+    smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
+    smHaveTextures = [[False]]
+    smTexturesList = [[None]]
+
+    chVertices = chVertices - ch.mean(chVertices, axis=0)
+    minZ = ch.min(chVertices[:,2])
+
+    chMinZ = ch.min(chVertices[:,2])
+
+    zeroZVerts = chVertices[:,2]- chMinZ
+    chVertices = ch.hstack([chVertices[:,0:2] , zeroZVerts.reshape([-1,1])])
+
+    chVertices = chVertices*0.09
+    smCenter = ch.array([0,0,0.1])
+
+    smVertices = [chVertices]
+    chNormals = shape_model.chGetNormals(chVertices, faces)
+    smNormals = [chNormals]
+
+    if useShapeModel:
+        center = smCenter
+        UVs = smUVs
+        v = smVertices
+        vn = smNormals
+        Faces = smFaces
+        VColors = smVColors
+        UVs = smUVs
+        HaveTextures = smHaveTextures
+        TexturesList = smTexturesList
+    else:
+        v, vn = v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0]
+        Faces = f_list_teapots[currentTeapotModel][0]
+        VColors = vc_teapots[currentTeapotModel][0]
+        UVs = uv_teapots[currentTeapotModel][0]
+        HaveTextures = haveTextures_list_teapots[currentTeapotModel][0]
+        TexturesList = textures_list_teapots[currentTeapotModel][0]
+
+    v, vn, teapotPosOffset = transformObject(v, vn, chScale, chObjAz, chObjDist, chObjRotation, np.array([0,0,0]))
+
+    if renderMugs:
+        verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, np.array([0,0,0]))
+
+        VerticesB = [v] + [verticesMug]
+        NormalsB = [vn] + [normalsMug]
+        FacesB = [Faces] + [f_list_mug]
+        VColorsB = [VColors] + [vc_mug]
+        UVsB = [UVs] + [uv_mug]
+        HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
+        TexturesListB = [TexturesList] + [textures_list_mug]
+
+        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+    else:
+
+        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, None )
+    renderer.msaa = True
+    renderer.overdraw = True
+
+    # chShapeParams[:] = np.zeros([latentDim])
+    chVerticesMean = chVertices.r.copy()
+
+# else:
+#     renderer = renderer_teapots[teapotToRender]
+
+########################################################
+#######          Initialization ends here
+########################################################
+
 print("Creating Ground Truth")
 
 trainAzsGT = np.array([])
@@ -385,6 +485,13 @@ if not os.path.exists(gtDir + 'images_opendr/'):
 
 if not os.path.exists(gtDir + 'masks_occlusion/'):
     os.makedirs(gtDir + 'masks_occlusion/')
+
+if generateTriplets:
+    if not os.path.exists(gtDir + 'triplets1/'):
+        os.makedirs(gtDir + 'triplets1/')
+
+    if not os.path.exists(gtDir + 'triplets2/'):
+        os.makedirs(gtDir + 'triplets2/')
 
 print("Generating renders")
 
@@ -1488,6 +1595,15 @@ if renderFromPreviousGT:
                     glfw.destroy_window(rendererGT.win)
                 del rendererGT
 
+                if generateTriplets:
+                    renderer.makeCurrentContext()
+                    renderer.clear()
+                    contextdata.cleanupContext(contextdata.getContext())
+                    if glMode == 'glfw':
+                        glfw.destroy_window(renderer.win)
+
+                    del renderer
+
                 if renderTeapots:
                     currentTeapotModel = teapot_i
                     center = center_teapots[teapot_i]
@@ -1557,6 +1673,47 @@ if renderFromPreviousGT:
                                               light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height,
                                               UVsTeapot + UVsMug + uv, HaveTexturesTeapot + HaveTexturesMug + haveTextures_list,
                                               TexturesListTeapot + TexturesListMug + textures_list, frustum, None)
+
+                if generateTriplets:
+                    if useShapeModel:
+                        center = smCenter
+                        UVs = smUVs
+                        v = smVertices
+                        vn = smNormals
+                        Faces = smFaces
+                        VColors = smVColors
+                        UVs = smUVs
+                        HaveTextures = smHaveTextures
+                        TexturesList = smTexturesList
+                    else:
+                        v, vn = v_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0]
+                        Faces = f_list_teapots[currentTeapotModel][0]
+                        VColors = vc_teapots[currentTeapotModel][0]
+                        UVs = uv_teapots[currentTeapotModel][0]
+                        HaveTextures = haveTextures_list_teapots[currentTeapotModel][0]
+                        TexturesList = textures_list_teapots[currentTeapotModel][0]
+
+                    v, vn, teapotPosOffset = transformObject(v, vn, chScale, chObjAz, chObjDist, chObjRotation, np.array([0, 0, 0]))
+
+                    if renderMugs:
+                        verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug,
+                                                                                chObjRotationMug, np.array([0, 0, 0]))
+
+                        VerticesB = [v] + [verticesMug]
+                        NormalsB = [vn] + [normalsMug]
+                        FacesB = [Faces] + [f_list_mug]
+                        VColorsB = [VColors] + [vc_mug]
+                        UVsB = [UVs] + [uv_mug]
+                        HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
+                        TexturesListB = [TexturesList] + [textures_list_mug]
+
+                        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,
+                                                        chComponent, chVColors, np.array([0, 0, 0]), chDisplacement, width, height, UVsB,
+                                                        HaveTexturesB, TexturesListB, frustum, None)
+                    else:
+                        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color,
+                                                        chComponent, chVColors, 0, chDisplacement, width, height, [smUVs], [smHaveTextures],
+                                                        [smTexturesList], frustum, None)
 
             ## Blender: Unlink and link new teapot.
             if useBlender:
@@ -1746,6 +1903,25 @@ if renderFromPreviousGT:
             lin2srgb(image)
 
         if not ignore:
+
+            if generateTriplets:
+                lightCoeffsRel = envMapCoeffsRotatedRel.r[None, :].copy().squeeze()
+                lightCoeffsRel = 0.3 * lightCoeffsRel[:, 0] + 0.59 * lightCoeffsRel[:, 1] + 0.11 * lightCoeffsRel[:, 2]
+                chLightSHCoeffs[:] = lightCoeffsRel
+                chObjAz[:] = 0
+                chAz[:] = chAzRelGT.r + np.random.choice([-1,1]) * np.random.uniform(0,10) * np.pi / 180
+                chEl[:] = chElGT.r
+                chVColors[:] = chVColorsGT.r
+                chShapeParams[:] =  chShapeParamsGT.r
+
+                if useOpenDR:
+                    cv2.imwrite(gtDir + 'triplets1/im' + str(train_i) + '.jpeg' , 255*renderer.r[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+
+                chAz[:] = chAzRelGT.r + np.random.choice([-1,1]) * np.random.uniform(10,40) * np.pi / 180
+
+                if useOpenDR:
+                    cv2.imwrite(gtDir + 'triplets2/im' + str(train_i) + '.jpeg', 255 * renderer.r[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
             if useBlender and renderBlender:
                 cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
