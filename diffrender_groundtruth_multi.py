@@ -713,9 +713,10 @@ if not renderFromPreviousGT:
             v, f_list, vc, vn, uv, haveTextures_list, textures_list = copy.deepcopy(v2), copy.deepcopy(f_list2), copy.deepcopy(vc2), copy.deepcopy(vn2)\
                 , copy.deepcopy(uv2), copy.deepcopy(haveTextures_list2), copy.deepcopy(textures_list2)
 
+            ipdb.set_trace()
             removeObjectData(len(v) - 1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
-        # if sceneIdx != currentScene or targetIndex != currentTargetIndex:
+            # if sceneIdx != currentScene or targetIndex != currentTargetIndex:
             if useBlender:
                 if unlinkedObj != None:
                     scene.objects.link(unlinkedObj)
@@ -1457,9 +1458,13 @@ else:
 
 teapot_i = 0
 
-experimentPrefix = 'train4_occlusion_shapemodel_10k'
-experimentDir = 'experiments/' + experimentPrefix + '/'
-subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(0,100)]
+# experimentPrefix = 'train4_occlusion_shapemodel_10k'
+# experimentDir = 'experiments/' + experimentPrefix + '/'
+# subsetToRender = np.load(experimentDir + 'test.npy')[np.arange(0,100)]
+
+
+subsetToRender = np.arange(len(rangeGT))
+
 # subsetToRender = np.arange(len(rangeGT))
 
 if useShapeModel:
@@ -1552,7 +1557,8 @@ if renderFromPreviousGT:
         targetIndex = groundTruthToRender['trainTargetIndices'][gtIdx]
 
         if sceneIdx != currentScene and not renderMugs and sceneIdx == 44 and sceneNumber == 114:
-            removeObjectData(1, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
+            if len(v) > 1:
+                removeObjectData(1, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
         if sceneIdx != currentScene or targetIndex != currentTargetIndex:
             targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
@@ -1674,6 +1680,8 @@ if renderFromPreviousGT:
                                               UVsTeapot + UVsMug + uv, HaveTexturesTeapot + HaveTexturesMug + haveTextures_list,
                                               TexturesListTeapot + TexturesListMug + textures_list, frustum, None)
 
+                rendererGT.makeCurrentContext()
+
                 if generateTriplets:
                     if useShapeModel:
                         center = smCenter
@@ -1711,9 +1719,12 @@ if renderFromPreviousGT:
                                                         chComponent, chVColors, np.array([0, 0, 0]), chDisplacement, width, height, UVsB,
                                                         HaveTexturesB, TexturesListB, frustum, None)
                     else:
+
                         renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color,
                                                         chComponent, chVColors, 0, chDisplacement, width, height, [smUVs], [smHaveTextures],
                                                         [smTexturesList], frustum, None)
+                    rendererGT.makeCurrentContext()
+
 
             ## Blender: Unlink and link new teapot.
             if useBlender:
@@ -1907,22 +1918,24 @@ if renderFromPreviousGT:
             if generateTriplets:
                 lightCoeffsRel = envMapCoeffsRotatedRel.r[None, :].copy().squeeze()
                 lightCoeffsRel = 0.3 * lightCoeffsRel[:, 0] + 0.59 * lightCoeffsRel[:, 1] + 0.11 * lightCoeffsRel[:, 2]
-                chLightSHCoeffs[:] = lightCoeffsRel
+                chLightSHCoeffs[:] = lightCoeffsRel * chAmbientIntensityGT.r
                 chObjAz[:] = 0
                 chAz[:] = chAzRelGT.r + np.random.choice([-1,1]) * np.random.uniform(0,10) * np.pi / 180
                 chEl[:] = chElGT.r
                 chVColors[:] = chVColorsGT.r
                 chShapeParams[:] =  chShapeParamsGT.r
 
+                renderer.makeCurrentContext()
                 if useOpenDR:
-                    cv2.imwrite(gtDir + 'triplets1/im' + str(train_i) + '.jpeg' , 255*renderer.r[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                    cv2.imwrite(gtDir + 'triplets1/im' + str(train_i) + '.jpeg' , 255*lin2srgb(renderer.r.copy())[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
 
                 chAz[:] = chAzRelGT.r + np.random.choice([-1,1]) * np.random.uniform(10,40) * np.pi / 180
 
                 if useOpenDR:
-                    cv2.imwrite(gtDir + 'triplets2/im' + str(train_i) + '.jpeg', 255 * renderer.r[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                    cv2.imwrite(gtDir + 'triplets2/im' + str(train_i) + '.jpeg', 255 * lin2srgb(renderer.r.copy())[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
+            rendererGT.makeCurrentContext()
             if useBlender and renderBlender:
                 cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg' , 255*blenderRender[:,:,[2,1,0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
             if useOpenDR:

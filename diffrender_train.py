@@ -28,7 +28,7 @@ import theano
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion_shapemodel'
+gtPrefix = 'train4_occlusion_shapemodel_triplets'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
@@ -95,6 +95,7 @@ else:
 loadGray = False
 imagesAreH5 = False
 loadGrayFromHdf5 = False
+trainTriplets = True
 
 filter = np.ones(len(trainSet)).astype(np.bool)
 filter = np.array(tuple(dataOcclusions >= 0) and tuple(dataOcclusions < 0.9))
@@ -110,20 +111,20 @@ trainAmbientIntensityGT = dataAmbientIntensityGT[filter]
 
 grayImages = readImages(imagesDir, trainSet, True, loadGrayFromHdf5)
 
+if trainTriplets:
+    imagesDir_t1 = gtDir + 'triplets1/'
+    imagesDir_t2 = gtDir + 'triplets2/'
+
+    grayImages_t1 = readImages(imagesDir_t1, trainSet, True, loadGrayFromHdf5)
+    grayImages_t2 = readImages(imagesDir_t2, trainSet, True, loadGrayFromHdf5)
+
 # images = readImages(imagesDir, trainSet, False, False)
 
 # grayImages = 0.3*images[:,:,:,0] + 0.59*images[:,:,:,1] + 0.11*images[:,:,:,2]
 
+# backprojectionsDir = gtDir + 'backprojections/'
+# backprojections = readImages(backprojectionsDir, trainSet, True, False)
 
-
-
-backprojectionsDir = gtDir + 'backprojections/'
-backprojections = readImages(backprojectionsDir, trainSet, True, False)
-
-
-
-
-ipdb.set_trace()
 
 loadMask = False
 gtDirMask = 'groundtruth/train4_occlusion_mask/'
@@ -184,11 +185,55 @@ parameterTrainSet = set(['appearanceNN'])
 parameterTrainSet = set(['neuralNetModelLight'])
 parameterTrainSet = set(['neuralNetModelShape'])
 parameterTrainSet = set(['poseNN'])
+parameterTrainSet = set(['azimuthTripletNN'])
 
 # parameterTrainSet = set(['appearanceNN'])
 # parameterTrainSet = set(['poseNN'])
 
 print("Training recognition models.")
+if 'azimuthTripletNN' in parameterTrainSet:
+    modelType = 'cnn_pose_embedding'
+    network = lasagne_nn.load_network(modelType=modelType, param_values=[])
+
+    print("Training NN Pose Components")
+    validRatio = 0.9
+
+    trainValSet = np.arange(len(trainSet))[:np.uint(len(trainSet)*validRatio)]
+    validSet = np.arange(len(trainSet))[np.uint(len(trainSet)*validRatio)::]
+    # modelPath = experimentDir + 'neuralNetModelRelSHComponents.npz'
+
+    param_values = []
+
+    fineTune = False
+
+    pretrainedExperimentDir =  'experiments/train3_test/'
+    if fineTune:
+        pretrainedModelFile = pretrainedExperimentDir + 'neuralNetModelAzimuthTriplet.pickle'
+        with open(pretrainedModelFile, 'rb') as pfile:
+            neuralNetTripletAzimuth = pickle.load(pfile)
+
+        meanImage = neuralNetTripletAzimuth['mean']
+        # ipdb.set_trace()
+        modelType = neuralNetTripletAzimuth['type']
+        param_values = neuralNetTripletAzimuth['params']
+    else:
+        meanImage = np.mean(grayImages, axis=0)
+        meanImage = np.zeros(grayImages.shape)
+
+    modelPath=experimentDir + 'neuralNetModelAzimuthTriplet.pickle'
+
+    poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
+    grayImagesR = grayImages.reshape([grayImages.shape[0], 1, grayImages.shape[1], grayImages.shape[2]])
+    grayImages_t1_R = grayImages_t1.reshape([grayImages_t1.shape[0], 1, grayImages_t1.shape[1], grayImages_t1.shape[2]])
+    grayImages_t2_R = grayImages_t2.reshape([grayImages_t2.shape[0], 1, grayImages_t2.shape[1], grayImages_t2.shape[2]])
+
+    tripletsModel = lasagne_nn.train_triplets_h5(grayImagesR, grayImages_t1_R, grayImages_t2_R, len(trainValSet), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+
+    # np.savez(modelPath, *SHNNparams)
+    with open(modelPath, 'wb') as pfile:
+        pickle.dump(tripletsModel, pfile)
+
 
 if 'poseNN' in parameterTrainSet:
     modelType = 'cnn_pose'
