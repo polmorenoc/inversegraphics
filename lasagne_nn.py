@@ -172,26 +172,26 @@ def build_cnn_pose_embedding(input_var=None):
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network =  ConvLayer(
-            network, num_filters=256, filter_size=(5, 5),
+            network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network =  ConvLayer(
-            network, num_filters=256, filter_size=(5, 5),
+            network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network =  ConvLayer(
-            network, num_filters=256, filter_size=(5, 5),
+            network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # A fully-connected layer of 256 units with 50% dropout on its inputs:
     network = lasagne.layers.DenseLayer(
             lasagne.layers.dropout(network, p=.5),
-            num_units=128,
+            num_units=64,
             nonlinearity=lasagne.nonlinearities.rectify)
 
     # A fully-connected layer of 256 units with 50% dropout on its inputs:
@@ -1397,39 +1397,43 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
     if param_values:
         lasagne.layers.set_all_param_values(network, param_values)
 
-    input_var = T.tensor4('inputs')
-    input_var_t1 = T.tensor4('inputs_t1')
-    input_var_t2 = T.tensor4('inputs_t2')
+    input_var = lasagne.layers.get_all_layers(network)[0].input_var
 
     # target_var = T.fmatrix('targets')
 
-    prediction = lasagne.layers.get_output(network)
-    prediction_t1 = lasagne.layers.get_output(network)
-    prediction_t2 = lasagne.layers.get_output(network)
+    predictions = lasagne.layers.get_output(network)
 
     params = lasagne.layers.get_all_params(network, trainable=True)
 
-    test_prediction = lasagne.layers.get_output(network, deterministic=True)
-    test_prediction_t1 = lasagne.layers.get_output(network, deterministic=True)
-    test_prediction_t2 = lasagne.layers.get_output(network, deterministic=True)
-
+    batchSize = 72
+    batchStepSize = int(batchSize / 3)
+    test_predictions = lasagne.layers.get_output(network, deterministic=True)
+    test_predictions_t0 = test_predictions[0:batchStepSize]
+    test_predictions_t1 = test_predictions[batchStepSize:2*batchStepSize]
+    test_predictions_t2 = test_predictions[2*batchStepSize::]
     # loss = lasagne.objectives.binary_crossentropy(prediction, prediction_t1, prediction_t2)
 
     m = 0.001
-    loss = T.sum((prediction_t1 - prediction)**2) / (T.sum((prediction_t2  - prediction)) + m)
+
+    predictions_t0 = predictions[0:batchStepSize]
+    predictions_t1 = predictions[batchStepSize:2*batchStepSize]
+    predictions_t2 = predictions[2*batchStepSize::]
+
+    loss = T.sum((predictions_t1 - predictions_t0)**2) / (T.sum((predictions_t2  - predictions_t0)) + m)
 
     loss = loss.mean()
 
-    test_loss = T.sum((test_prediction_t1 - test_prediction)**2) / (T.sum((test_prediction_t2  - test_prediction)) + m)
+    test_loss = T.sum((test_predictions_t1 - test_predictions_t0)**2, axis=0) / (T.sum((test_predictions_t2  - test_predictions_t0), axis=0) + m)
+
     test_loss = test_loss.mean()
 
     updates = lasagne.updates.nesterov_momentum(
             loss, params, learning_rate=0.01, momentum=0.9)
 
-    train_fn = theano.function([input_var, input_var_t1, input_var_t2], loss, updates=updates)
+    train_fn = theano.function([input_var], loss, updates=updates)
 
     # Compile a second function computing the validation loss and accura# cy:
-    val_fn = theano.function([input_var, input_var_t1, input_var_t2], test_loss)
+    val_fn = theano.function([input_var], test_loss)
 
     # Finally, launch the training loop.
     print("Starting training...")
@@ -1439,7 +1443,7 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
     best_valid = np.inf
     best_valid_epoch = 0
     best_weights = None
-    batchSize = 64
+
     for epoch in range(num_epochs):
         # In each epoch, we do a full pass over the training data:
         train_err = 0
@@ -1450,27 +1454,26 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
         for start_idx in range(0, trainSetVal, slicesize):
             sliceidx += 1
             print("Working on slice " + str(sliceidx) + " of " +  str(int(trainSetVal/slicesize)))
-            X_train = X_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
-            X_t1_train = Xt1_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
-            X_t2_train = Xt2_h5[start_idx:min(start_idx + slicesize, trainSetVal)].astype(np.float32) - meanImage.reshape(
-                [1, meanImage.shape[2], meanImage.shape[0], meanImage.shape[1]]).astype(np.float32)
+            X_train = X_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32)
+            X_t1_train = Xt1_h5[start_idx:min(start_idx + slicesize,trainSetVal)].astype(np.float32)
+            X_t2_train = Xt2_h5[start_idx:min(start_idx + slicesize, trainSetVal)].astype(np.float32)
 
             # parameterVals = y_train[start_idx:min(start_idx + slicesize,trainSetVal)]
             # anchorIdx, closeIdx, farIdx = getTriplets(parameterVals, closeDist=5 * np.pi / 180, farDist=15 * np.pi / 180, normConst=2 * np.pi, chunkSize=10)
 
-
-            for batch in iterate_minibatches_triplets(X_train, X_t1_train, X_t2_train, batchSize, shuffle=True):
+            for batch in iterate_minibatches_triplets(X_train, X_t1_train, X_t2_train, batchStepSize, shuffle=True):
                 # print("Batch " + str(train_batches))
                 inputs, inputs_t1, inputs_t2 = batch
-                train_err += train_fn(inputs, inputs_t1, inputs_t2)
+
+                train_err += train_fn(np.concatenate([inputs, inputs_t1, inputs_t2],axis=0))
                 train_batches += 1
 
         # And a full pass over the validation data:
         val_err = 0
         val_batches = 0
-        for batch in iterate_minibatches_triplets(X_val, X_t1_val, X_t2_val, batchSize, shuffle=True):
+        for batch in iterate_minibatches_triplets(X_val, X_t1_val, X_t2_val, batchStepSize, shuffle=True):
             inputs, inputs_t1, inputs_t2 = batch
-            err = val_fn(inputs, inputs_t1, inputs_t2)
+            err = val_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
             val_err += err
             val_batches += 1
 
