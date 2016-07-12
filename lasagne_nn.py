@@ -1305,7 +1305,7 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
         test_loss = test_loss.mean()
 
     updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.01, momentum=0.9)
+            loss, params, learning_rate=0.001, momentum=0.9)
 
     train_fn = theano.function([input_var, target_var], loss, updates=updates)
 
@@ -1374,6 +1374,8 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
 
     return model
 
+from lasagne.regularization import regularize_layer_params_weighted, l2, l1
+
 def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, modelType = 'cnn', num_epochs=150, saveModelAtEpoch=True, modelPath='tmp/nnmodel.pickle', param_values=[]):
     # Load the dataset
 
@@ -1413,24 +1415,37 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
     test_predictions_t2 = test_predictions[2*batchStepSize::]
     # loss = lasagne.objectives.binary_crossentropy(prediction, prediction_t1, prediction_t2)
 
-    m = 0.001
+    m = 0.01
 
     predictions_t0 = predictions[0:batchStepSize]
     predictions_t1 = predictions[batchStepSize:2*batchStepSize]
     predictions_t2 = predictions[2*batchStepSize::]
 
-    loss = T.sum((predictions_t1 - predictions_t0)**2) / (T.sum((predictions_t2  - predictions_t0)) + m)
+    loss = T.sum((predictions_t1 - predictions_t0)**2, axis=1) / (T.sum((predictions_t2  - predictions_t0), axis=1) + m)
 
     loss = loss.mean()
+    # ipdb.set_trace()
+    layers = lasagne.layers.get_all_layers(network)
 
-    test_loss = T.sum((test_predictions_t1 - test_predictions_t0)**2, axis=0) / (T.sum((test_predictions_t2  - test_predictions_t0), axis=0) + m)
+    regLayers = {layer:0.1 for layer in layers}
+
+    l2_penalty = regularize_layer_params_weighted(regLayers,l2)
+
+    loss = loss + l2_penalty
+
+    test_loss = T.sum((test_predictions_t1 - test_predictions_t0)**2, axis=1) / (T.sum((test_predictions_t2  - test_predictions_t0), axis=1) + m)
 
     test_loss = test_loss.mean()
+    test_loss = test_loss + l2_penalty
 
     updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.01, momentum=0.9)
+            loss, params, learning_rate=0.001, momentum=0.9)
 
     train_fn = theano.function([input_var], loss, updates=updates)
+
+    pred_t0_fn = theano.function([input_var], test_predictions_t0)
+    pred_t1_fn = theano.function([input_var], test_predictions_t1)
+    pred_t2_fn = theano.function([input_var], test_predictions_t2)
 
     # Compile a second function computing the validation loss and accura# cy:
     val_fn = theano.function([input_var], test_loss)
@@ -1465,7 +1480,22 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
                 # print("Batch " + str(train_batches))
                 inputs, inputs_t1, inputs_t2 = batch
 
+                # p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                #
+                # nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0), axis=1) + m)
+
+                # ipdb.set_trace()
+
                 train_err += train_fn(np.concatenate([inputs, inputs_t1, inputs_t2],axis=0))
+
+                # p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                #
+                # nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0), axis=1) + m)
+
                 train_batches += 1
 
         # And a full pass over the validation data:
