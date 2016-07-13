@@ -152,56 +152,6 @@ def build_cnn(input_var=None):
     return network
 
 
-def build_cnn_pose_embedding(input_var=None):
-    # As a third model, we'll create a CNN of two convolution + pooling stages
-    # and a fully-connected hidden layer in front of the output layer.
-
-    # Input layer, as usual:
-    network = lasagne.layers.InputLayer(shape=(None, 1, 150, 150),
-                                        input_var=input_var)
-    # This time we do not apply input dropout, as it tends to work less well
-    # for convolutional
-
-    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
-    # convolutions are supported as well; see the docstring.
-    network = ConvLayer(
-            network, num_filters=128, filter_size=(5, 5),
-            nonlinearity=lasagne.nonlinearities.rectify)
-
-    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
-
-    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network =  ConvLayer(
-            network, num_filters=128, filter_size=(5, 5),
-            nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
-
-    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network =  ConvLayer(
-            network, num_filters=128, filter_size=(5, 5),
-            nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
-
-    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
-    network =  ConvLayer(
-            network, num_filters=128, filter_size=(5, 5),
-            nonlinearity=lasagne.nonlinearities.rectify)
-    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
-
-    # A fully-connected layer of 256 units with 50% dropout on its inputs:
-    network = lasagne.layers.DenseLayer(
-            lasagne.layers.dropout(network, p=.5),
-            num_units=64,
-            nonlinearity=lasagne.nonlinearities.rectify)
-
-    # A fully-connected layer of 256 units with 50% dropout on its inputs:
-    network = lasagne.layers.DenseLayer(
-        network,
-            num_units=32,
-            nonlinearity=lasagne.nonlinearities.linear)
-
-    return network
-
 def build_cnn_small(input_var=None):
     # As a third model, we'll create a CNN of two convolution + pooling stages
     # and a fully-connected hidden layer in front of the output layer.
@@ -241,6 +191,56 @@ def build_cnn_small(input_var=None):
     network = lasagne.layers.DenseLayer(
             lasagne.layers.dropout(network, p=.5),
             num_units=9,
+            nonlinearity=lasagne.nonlinearities.linear)
+
+    return network
+
+def build_cnn_pose_embedding(input_var=None, sizeIm=150):
+    # As a third model, we'll create a CNN of two convolution + pooling stages
+    # and a fully-connected hidden layer in front of the output layer.
+
+    # Input layer, as usual:
+    network = lasagne.layers.InputLayer(shape=(None, 1, sizeIm, sizeIm),
+                                        input_var=input_var)
+    # This time we do not apply input dropout, as it tends to work less well
+    # for convolutional
+
+    # Convolutional layer with 32 kernels of size 5x5. Strided and padded
+    # convolutions are supported as well; see the docstring.
+    network = ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=128, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
+    network =  ConvLayer(
+            network, num_filters=64, filter_size=(5, 5),
+            nonlinearity=lasagne.nonlinearities.rectify)
+    # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
+    # # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    # network = lasagne.layers.DenseLayer(
+    #         lasagne.layers.dropout(network, p=.5),
+    #         num_units=64,
+    #         nonlinearity=lasagne.nonlinearities.rectify)
+
+    # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    network = lasagne.layers.DenseLayer(
+        network,
+            num_units=32,
             nonlinearity=lasagne.nonlinearities.linear)
 
     return network
@@ -1201,7 +1201,7 @@ def load_network(modelType='cnn', param_values=[]):
     elif modelType == 'cnn_pose':
         network = build_cnn_pose(input_var)
     elif modelType == 'cnn_pose_embedding':
-        network = build_cnn_pose_embedding(input_var)
+        network = build_cnn_pose_embedding(input_var, 50)
     elif modelType == 'cnn_pose_large':
         network = build_cnn_pose_large(input_var)
     elif modelType == 'cnn_pose_color':
@@ -1305,7 +1305,7 @@ def train_nn_h5(X_h5, trainSetVal, y_train, y_val, meanImage, network, modelType
         test_loss = test_loss.mean()
 
     updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.001, momentum=0.9)
+            loss, params, learning_rate=0.01, momentum=0.9)
 
     train_fn = theano.function([input_var, target_var], loss, updates=updates)
 
@@ -1407,7 +1407,7 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
 
     params = lasagne.layers.get_all_params(network, trainable=True)
 
-    batchSize = 72
+    batchSize = 36
     batchStepSize = int(batchSize / 3)
     test_predictions = lasagne.layers.get_output(network, deterministic=True)
     test_predictions_t0 = test_predictions[0:batchStepSize]
@@ -1415,31 +1415,31 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
     test_predictions_t2 = test_predictions[2*batchStepSize::]
     # loss = lasagne.objectives.binary_crossentropy(prediction, prediction_t1, prediction_t2)
 
-    m = 0.01
+    m = 0.001
 
     predictions_t0 = predictions[0:batchStepSize]
     predictions_t1 = predictions[batchStepSize:2*batchStepSize]
     predictions_t2 = predictions[2*batchStepSize::]
 
-    loss = T.sum((predictions_t1 - predictions_t0)**2, axis=1) / (T.sum((predictions_t2  - predictions_t0), axis=1) + m)
+    loss = T.sum((predictions_t1 - predictions_t0)**2, axis=1) / (T.sum((predictions_t2  - predictions_t0)**2, axis=1) + m)
 
     loss = loss.mean()
     # ipdb.set_trace()
     layers = lasagne.layers.get_all_layers(network)
 
-    regLayers = {layer:0.1 for layer in layers}
+    regLayers = {layer:0.01 for layer in layers}
 
     l2_penalty = regularize_layer_params_weighted(regLayers,l2)
 
-    loss = loss + l2_penalty
+    # loss = loss
 
-    test_loss = T.sum((test_predictions_t1 - test_predictions_t0)**2, axis=1) / (T.sum((test_predictions_t2  - test_predictions_t0), axis=1) + m)
+    test_loss = T.sum((test_predictions_t1 - test_predictions_t0)**2, axis=1) / (T.sum((test_predictions_t2  - test_predictions_t0)**2, axis=1) + m)
 
     test_loss = test_loss.mean()
-    test_loss = test_loss + l2_penalty
+    # test_loss = test_loss
 
     updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.001, momentum=0.9)
+            loss, params, learning_rate=0.01, momentum=0.9)
 
     train_fn = theano.function([input_var], loss, updates=updates)
 
@@ -1480,21 +1480,22 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
                 # print("Batch " + str(train_batches))
                 inputs, inputs_t1, inputs_t2 = batch
 
-                # p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                # p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                # p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                #
-                # nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0), axis=1) + m)
+                p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
 
-                # ipdb.set_trace()
+                nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0)**2, axis=1) + m)
 
                 train_err += train_fn(np.concatenate([inputs, inputs_t1, inputs_t2],axis=0))
-
-                # p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                # p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                # p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
                 #
-                # nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0), axis=1) + m)
+                p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+
+                nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0)**2, axis=1) + m)
+
+                ipdb.set_trace()
+
 
                 train_batches += 1
 

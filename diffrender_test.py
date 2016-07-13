@@ -48,9 +48,9 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 #
 
 # gtPrefix = 'train4_occlusion_shapemodel'
-# gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
+gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 # gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
-gtPrefix = 'train4_occlusion_shapemodel'
+# gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
@@ -436,7 +436,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 0
+optimizationType = 1
 computePredErrorFuns = True
 
 method = 1
@@ -766,7 +766,7 @@ azsPredictions = np.array([])
 recomputeMeans = True
 includeMeanBaseline = True
 
-recomputePredictions = False
+recomputePredictions = True
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -982,35 +982,37 @@ import theano.tensor as T
 # chThError.r
 
 #
-# ## Theano NN error function finite differences.
-# with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
-#     neuralNetModelPose = pickle.load(pfile)
-#
-# meanImage = neuralNetModelPose['mean'].reshape([150,150])
-#
-# modelType = neuralNetModelPose['type']
-# param_values = neuralNetModelPose['params']
-# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-# layer = lasagne.layers.get_all_layers(network)[-2]
-# inputLayer = lasagne.layers.get_all_layers(network)[0]
-# layer_output = lasagne.layers.get_output(layer, deterministic=True)
-# dim_output= layer.output_shape[1]
-#
-# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-# layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
-# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
-# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
-#
-# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
-#
-# chThError = TheanoFunOnOpenDR(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray - meanImage, dim_output = dim_output,
-#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT - meanImage)
-#
-# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
-#
-# chThError.r
+## Theano NN error function finite differences.
+with open(trainModelsDirPose + 'neuralNetModelAzimuthTriplet50.pickle', 'rb') as pfile:
+    neuralNetModelPose = pickle.load(pfile)
 
+#meanImage = neuralNetModelPose['mean'].reshape([150,150])
+
+modelType = neuralNetModelPose['type']
+param_values = neuralNetModelPose['params']
+network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layer = lasagne.layers.get_all_layers(network)[-2]
+inputLayer = lasagne.layers.get_all_layers(network)[0]
+layer_output = lasagne.layers.get_output(network, deterministic=True)
+dim_output= network.output_shape[1]
+
+networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+# layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
+inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+layer_outputGT = lasagne.layers.get_output(networkGT, deterministic=True)
+
+rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+
+chThError = TheanoFunFiniteDiff(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray, dim_output = dim_output,
+                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT, imSize=50)
+
+chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+
+chThError.r
+
+ipdb.set_trace()
 
 if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLightCoefficientsPred.npy"):
     if 'neuralNetModelSHLight' in parameterRecognitionModels:
@@ -1392,7 +1394,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-MEANBASELINE-ORIGINALGT-' + testRangeStr
+testDescription = 'ECCV-NNEMBEDDING-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix

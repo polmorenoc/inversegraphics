@@ -135,19 +135,19 @@ class TheanoFunFiniteDiff(Ch):
 
         self.prediction_fn_gt = theano.function([theano_input_gt], theano_output_gt)
 
-        x = theano_input
-        gt_output = T.vector('gt_output')
+        # x = theano_input
+        # gt_output = T.vector('gt_output')
 
-        # self.error = T.sum(theano_output + gt_output)
-        self.error = T.sum(T.pow(theano_output.ravel() - theano_output_gt.ravel(),2))
-
-        self.errorGrad = T.grad(self.error, x)
-
-        from theano.compile.nanguardmode import NanGuardMode
-        self.errorGrad_fun = theano.function([theano_input, theano_input_gt], self.errorGrad)
-        # self.error_fun = theano.function([theano_input, theano_input_gt], self.error, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
-        self.error_fun = theano.function([theano_input, theano_input_gt], self.error)
-        # self.grad = theano.function([x], self.J, updates=updates, mode='FAST_RUN')
+        # # self.error = T.sum(theano_output + gt_output)
+        # self.error = T.sum(T.pow(theano_output.ravel() - theano_output_gt.ravel(),2))
+        #
+        # self.errorGrad = T.grad(self.error, x)
+        #
+        # from theano.compile.nanguardmode import NanGuardMode
+        # self.errorGrad_fun = theano.function([theano_input, theano_input_gt], self.errorGrad)
+        # # self.error_fun = theano.function([theano_input, theano_input_gt], self.error, mode=NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True))
+        # self.error_fun = theano.function([theano_input, theano_input_gt], self.error)
+        # # self.grad = theano.function([x], self.J, updates=updates, mode='FAST_RUN')
 
         self.initialized = True
 
@@ -155,13 +155,18 @@ class TheanoFunFiniteDiff(Ch):
         if not self.initialized:
             self.compileFunctions()
 
-        x = self.opendr_input.r[None,None,:,:].astype(np.float32)
-        x_gt = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
-        # out_gt = self.predict_input_gt().ravel().astype(np.float32)
+        x = self.opendr_input.r.copy()
+        x_gt = self.opendr_input_gt.r.copy()
 
-        output = np.array(self.error_fun(x, x_gt))
+        xs = skimage.transform.resize(x, [self.imSize, self.imSize])[None,None,:,:].astype(np.float32)
+        x_gts = skimage.transform.resize(x_gt, [self.imSize, self.imSize])[None,None,:,:].astype(np.float32)
 
-        return output.ravel()
+        emb = self.prediction_fn(xs)
+        emb_gt = self.prediction_fn_gt(x_gts)
+
+        diff = np.sum((emb - emb_gt)**2)
+
+        return diff
 
     def predict_input(self):
         x = self.opendr_input.r[None,None,:,:].astype(np.float32)
@@ -182,7 +187,7 @@ class TheanoFunFiniteDiff(Ch):
 
             x = self.opendr_input.r[None,None,:,:].astype(np.float32)
             x_gt = self.opendr_input_gt.r[None,None,:,:].astype(np.float32)
-            jac = np.array(self.errorGrad_fun(x,x_gt)).squeeze().reshape([1,self.opendr_input.r.size])
+            # jac = np.array(self.errorGrad_fun(x,x_gt)).squeeze().reshape([1,self.opendr_input.r.size])
 
             #Finite differences:
             approxjacs = []
@@ -197,10 +202,7 @@ class TheanoFunFiniteDiff(Ch):
                 approxjacs = approxjacs + [diff]
                 approxjacs = np.concatenate(approxjacs)
 
-
-            ipdb.set_trace()
-
-            return sp.csr.csr_matrix(jac)
+            return sp.csr.csr_matrix(approxjacs)
         return None
 
     def old_grads(self):
@@ -211,8 +213,6 @@ class TheanoFunFiniteDiff(Ch):
         jac = [sp.lil_matrix(np.array(grad_fun(x[None,None, :,:].astype(np.float32))).ravel()) for grad_fun in self.grad_fns]
 
         return sp.vstack(jac).tocsr()
-
-
 
 
 

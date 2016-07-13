@@ -110,6 +110,7 @@ trainVColorGT=trainVColorGT[filter]
 trainAmbientIntensityGT = dataAmbientIntensityGT[filter]
 
 grayImages = readImages(imagesDir, trainSet, True, loadGrayFromHdf5)
+numTrainSet = len(grayImages)
 
 if trainTriplets:
     imagesDir_t1 = gtDir + 'triplets1/'
@@ -117,6 +118,17 @@ if trainTriplets:
 
     grayImages_t1 = readImages(imagesDir_t1, trainSet, True, loadGrayFromHdf5)
     grayImages_t2 = readImages(imagesDir_t2, trainSet, True, loadGrayFromHdf5)
+
+    grayImages_50 = np.zeros([numTrainSet, 50,50])
+    grayImages_t1_50 = np.zeros([numTrainSet, 50,50])
+    grayImages_t2_50 = np.zeros([numTrainSet, 50, 50])
+
+    for imidx in range(numTrainSet):
+        grayImages_50[imidx] = skimage.transform.resize(grayImages[imidx], [50, 50])
+        grayImages_t1_50[imidx] = skimage.transform.resize(grayImages_t1[imidx], [50, 50])
+        grayImages_t2_50[imidx] = skimage.transform.resize(grayImages_t2[imidx], [50, 50])
+
+
 
 # images = readImages(imagesDir, trainSet, False, False)
 
@@ -220,14 +232,18 @@ if 'azimuthTripletNN' in parameterTrainSet:
         meanImage = np.mean(grayImages, axis=0)
         meanImage = np.zeros(grayImages.shape)
 
-    modelPath=experimentDir + 'neuralNetModelAzimuthTriplet.pickle'
+    modelPath=experimentDir + 'neuralNetModelAzimuthTriplet50.pickle'
 
     poseGT = np.hstack([np.cos(trainAzsRel)[:,None] , np.sin(trainAzsRel)[:,None], np.cos(trainElevsGT)[:,None], np.sin(trainElevsGT)[:,None]])
     grayImagesR = grayImages.reshape([grayImages.shape[0], 1, grayImages.shape[1], grayImages.shape[2]])
     grayImages_t1_R = grayImages_t1.reshape([grayImages_t1.shape[0], 1, grayImages_t1.shape[1], grayImages_t1.shape[2]])
     grayImages_t2_R = grayImages_t2.reshape([grayImages_t2.shape[0], 1, grayImages_t2.shape[1], grayImages_t2.shape[2]])
 
-    tripletsModel = lasagne_nn.train_triplets_h5(grayImagesR, grayImages_t1_R, grayImages_t2_R, len(trainValSet), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
+    grayImages_50_R = grayImages_50.reshape([grayImages_50.shape[0], 1, grayImages_50.shape[1], grayImages_50.shape[2]])
+    grayImages_t1_50_R = grayImages_t1_50.reshape([grayImages_t1_50.shape[0], 1, grayImages_t1_50.shape[1], grayImages_t1_50.shape[2]])
+    grayImages_t2_50_R = grayImages_t2_50.reshape([grayImages_t2_50.shape[0], 1, grayImages_t2_50.shape[1], grayImages_t2_50.shape[2]])
+
+    tripletsModel = lasagne_nn.train_triplets_h5(grayImages_50_R, grayImages_t1_50_R, grayImages_t2_50_R, len(trainValSet), meanImage=meanImage, network=network, modelType=modelType, num_epochs=150, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
     # poseNNmodel = lasagne_nn.train_nn(grayImages, trainSet, validSet, len(trainValSet), poseGT[trainValSet].astype(np.float32), poseGT[validSet].astype(np.float32), meanImage=meanImage, network=network, modelType=modelType, num_epochs=10, saveModelAtEpoch=True, modelPath=modelPath, param_values=param_values)
 
     # np.savez(modelPath, *SHNNparams)
