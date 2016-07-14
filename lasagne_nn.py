@@ -217,24 +217,26 @@ def build_cnn_pose_embedding(input_var=None, sizeIm=150):
     network =  ConvLayer(
             network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
+    #
     # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network =  ConvLayer(
-            network, num_filters=64, filter_size=(5, 5),
+            network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
     # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network =  ConvLayer(
-            network, num_filters=64, filter_size=(5, 5),
+            network, num_filters=128, filter_size=(5, 5),
             nonlinearity=lasagne.nonlinearities.rectify)
+
     # network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
-    # # A fully-connected layer of 256 units with 50% dropout on its inputs:
+    # # # A fully-connected layer of 256 units with 50% dropout on its inputs:
     # network = lasagne.layers.DenseLayer(
     #         lasagne.layers.dropout(network, p=.5),
-    #         num_units=64,
+    #         num_units=128,
     #         nonlinearity=lasagne.nonlinearities.rectify)
 
     # A fully-connected layer of 256 units with 50% dropout on its inputs:
@@ -1180,7 +1182,7 @@ def iterate_minibatches_h5(inputs_h5, trainSet, trainValSet, targets, batchsize,
         yield inputs_h5[boolSet,:,:], targets[excerpt]
     print("Ended loading minibatch set")
 
-def load_network(modelType='cnn', param_values=[]):
+def load_network(modelType='cnn', param_values=[], imgSize=150):
     # Load the dataset
 
     # Prepare Theano variables for inputs and targets
@@ -1201,7 +1203,7 @@ def load_network(modelType='cnn', param_values=[]):
     elif modelType == 'cnn_pose':
         network = build_cnn_pose(input_var)
     elif modelType == 'cnn_pose_embedding':
-        network = build_cnn_pose_embedding(input_var, 50)
+        network = build_cnn_pose_embedding(input_var, imgSize)
     elif modelType == 'cnn_pose_large':
         network = build_cnn_pose_large(input_var)
     elif modelType == 'cnn_pose_color':
@@ -1388,6 +1390,8 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
     X_t1_val = Xt1_h5[trainSetVal::].astype(np.float32)
     X_t2_val = Xt2_h5[trainSetVal::].astype(np.float32)
 
+    # height = X_h5[0].shape[2]
+    # width = X_h5[0].shape[3]
 
     print("Ended loading validation set")
 
@@ -1479,22 +1483,20 @@ def train_triplets_h5(X_h5, Xt1_h5, Xt2_h5, trainSetVal, meanImage, network, mod
             for batch in iterate_minibatches_triplets(X_train, X_t1_train, X_t2_train, batchStepSize, shuffle=True):
                 # print("Batch " + str(train_batches))
                 inputs, inputs_t1, inputs_t2 = batch
+                #
+                # p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
 
-                p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-
-                nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0)**2, axis=1) + m)
+                # nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0)**2, axis=1) + m)
 
                 train_err += train_fn(np.concatenate([inputs, inputs_t1, inputs_t2],axis=0))
+                # #
+                # p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
+                # p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
                 #
-                p0 = pred_t0_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                p1 = pred_t1_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-                p2 = pred_t2_fn(np.concatenate([inputs, inputs_t1, inputs_t2], axis=0))
-
-                nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0)**2, axis=1) + m)
-
-                ipdb.set_trace()
+                # nperr = np.sum((p1 - p0) ** 2, axis=1) / (np.sum((p2 - p0)**2, axis=1) + m)
 
 
                 train_batches += 1

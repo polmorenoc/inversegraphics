@@ -27,6 +27,11 @@ import light_probes
 from OpenGL import contextdata
 from light_probes import SHProjection
 
+import theano
+# theano.sandbox.cuda.use('cpu')
+import lasagne
+import lasagne_nn
+
 plt.ion()
 
 #########################################
@@ -48,9 +53,9 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 #
 
 # gtPrefix = 'train4_occlusion_shapemodel'
-gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
+# gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 # gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
-# gtPrefix = 'train4_occlusion_shapemodel'
+gtPrefix = 'train4_occlusion_shapemodel'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
@@ -74,6 +79,7 @@ width, height = (150, 150)
 win = -1
 
 multiObjects = False
+chThError = None
 
 if glMode == 'glfw':
     #Initialize base GLFW context for the Demo and to share context among all renderers.
@@ -766,7 +772,7 @@ azsPredictions = np.array([])
 recomputeMeans = True
 includeMeanBaseline = True
 
-recomputePredictions = True
+recomputePredictions = False
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -794,12 +800,10 @@ if includeMeanBaseline:
     # meanTrainEnvMapProjections = np.repeat(meanTrainEnvMapProjections[None,:], numTests, axis=0)
     meanTrainEnvMapProjections = None
 
+rangeTests = np.arange(len(testSet))
+
 if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.npy"):
     if 'neuralNetPose' in parameterRecognitionModels:
-        import theano
-        # theano.sandbox.cuda.use('cpu')
-        import lasagne
-        import lasagne_nn
 
         poseModel = ""
         with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
@@ -983,20 +987,23 @@ import theano.tensor as T
 
 #
 ## Theano NN error function finite differences.
-with open(trainModelsDirPose + 'neuralNetModelAzimuthTriplet50.pickle', 'rb') as pfile:
+with open(trainModelsDirPose + 'neuralNetModelAzimuthTriplet.pickle', 'rb') as pfile:
     neuralNetModelPose = pickle.load(pfile)
 
 #meanImage = neuralNetModelPose['mean'].reshape([150,150])
 
 modelType = neuralNetModelPose['type']
 param_values = neuralNetModelPose['params']
-network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+
+network = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
+
+
 # layer = lasagne.layers.get_all_layers(network)[-2]
 inputLayer = lasagne.layers.get_all_layers(network)[0]
 layer_output = lasagne.layers.get_output(network, deterministic=True)
 dim_output= network.output_shape[1]
 
-networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
 # layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
 inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
 # layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
@@ -1006,13 +1013,12 @@ rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,
 rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
 
 chThError = TheanoFunFiniteDiff(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray, dim_output = dim_output,
-                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT, imSize=50)
+                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT, imSize=75)
 
 chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
 
 chThError.r
 
-ipdb.set_trace()
 
 if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLightCoefficientsPred.npy"):
     if 'neuralNetModelSHLight' in parameterRecognitionModels:
@@ -1303,7 +1309,7 @@ def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH
     plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
     plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
 
-    chThError.opendr_input = renderer
+    # chThError.opendr_input = renderer
     lineStyles = ['-', '--', '-.', ':']
     for renderer_idx in range(len(trainingTeapots)):
         plt.plot(angles, chThErrors[renderer_idx]*y2/np.max(chThErrors[renderer_idx]), linestyle=lineStyles[np.mod(renderer_idx,4)], c='y')
@@ -1478,6 +1484,8 @@ def cb(_):
     iterat = iterat + 1
     print("Callback! " + str(iterat))
     print("Sq Error: " + str(errorFun.r))
+    if chThError is not None:
+        print("Theano Error: " + str(chThError.r))
 
     global negLikModelRobustSmallStd
     global bestShapeParamsSmallStd
@@ -1690,7 +1698,6 @@ for testSetting, model in enumerate(modelTests):
 
             testOcclusions = dataOcclusions
 
-            ipdb.set_trace()
 
             bestFittedAz = chAz.r
             bestFittedEl = chEl.r
@@ -1814,6 +1821,14 @@ for testSetting, model in enumerate(modelTests):
 
                 cv2.imwrite(resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_predicted' + '.png',  cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
+                if not os.path.exists(resultDir + 'az_samples/'):
+                    os.makedirs(resultDir + 'az_samples/')
+
+                analyzeAz(resultDir + 'az_samples/test' + str(test_i), rendererGT, renderer,
+                          chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
+
+                ipdb.set_trace()
+
                 # Dense CRF prediction of labels:
 
                 vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
@@ -1911,6 +1926,7 @@ for testSetting, model in enumerate(modelTests):
                         bestPredShapeParams = chShapeParams.r.copy()
                     bestModelLik = np.finfo('f').max
                     bestPredModelLik = np.finfo('f').max
+
                     # analyzeAz(resultDir + 'az_samples/test' + str(test_i) +'/pre'  , rendererGT, renderer, chEl.r, chVColors.r, chLightSHCoeffs.r, azsPredictions[test_i], sampleStds=stds.r)
 
                     # analyzeHue(resultDir + 'hue_samples/test' + str(test_i) +'/pre', rendererGT, renderer, chEl.r, chAz.r, chLightSHCoeffs.r, vColorsPredSamples[test_i], sampleStds=stds.r)
@@ -2226,7 +2242,10 @@ for testSetting, model in enumerate(modelTests):
                             # errorFunFast = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
                             #                                                     variances=variances) / numPixels
 
-                            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+
+                            ch.minimize({'raw': chThError}, bounds=None, method=methods[4], x0=[chAz], callback=cb, options=options)
+
+                            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                             maxShapeSize = 4
                             largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
