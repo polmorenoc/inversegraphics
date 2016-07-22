@@ -317,9 +317,14 @@ testSet = np.load(experimentDir + 'test.npy')[rangeTests][idsInRange]
 shapeGT = gtDataFile[gtPrefix].shape
 
 boolTestSet = np.array([np.any(num == testSet) for num in gtDataFile[gtPrefix]['trainIds']])
+dataIds = gtDataFile[gtPrefix][boolTestSet]['trainIds']
 
-groundTruth = gtDataFile[gtPrefix][boolTestSet]
+dataIdsTestIndices = np.array([np.where(dataIds==num)[0][0] for num in testSet])
+
+groundTruth = gtDataFile[gtPrefix][boolTestSet][dataIdsTestIndices]
+
 dataTeapotIdsTest = groundTruth['trainTeapotIds']
+
 test = np.arange(len(testSet))
 
 testSet = testSet[test]
@@ -392,26 +397,43 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 ##### Load Results data:
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTREALISTIC-MEANBASELINE-2530-17944_predict_1000samples__method1errorFun1_std0.05_shapePen0'
 resultDir = 'results/' + testPrefix + '/'
 
 with open(resultDir + 'experiment.pickle', 'rb') as pfile:
     experimentDic = pickle.load(pfile)
 testSet = experimentDic['testSet']
 methodsPred = experimentDic['methodsPred']
-testOcclusions = experimentDic[ 'testOcclusions']
+testOcclusions = experimentDic['testOcclusions']
+testOcclusions = testOcclusions[dataIdsTestIndices]
+
 testPrefixBase = experimentDic[ 'testPrefixBase']
 parameterRecognitionModels = experimentDic[ 'parameterRecognitionModels']
 azimuths = experimentDic[ 'azimuths']
+
+azimuths = [azimuths[method][dataIdsTestIndices] if  azimuths[method] is not None else None for method in range(len(azimuths))]
+
 elevations = experimentDic[ 'elevations']
+elevations = [elevations[method][dataIdsTestIndices] if  elevations[method] is not None else None for method in range(len(elevations))]
+
 vColors = experimentDic[ 'vColors']
+vColors = [vColors[method][dataIdsTestIndices] if  vColors[method] is not None else None for method in range(len(vColors))]
+
 lightCoeffs = experimentDic[ 'lightCoeffs']
+lightCoeffs = [lightCoeffs[method][dataIdsTestIndices] if  lightCoeffs[method] is not None else None for method in range(len(lightCoeffs))]
+
+
 likelihoods = experimentDic['likelihoods']
+likelihoods = [likelihoods[method][dataIdsTestIndices] if  likelihoods[method] is not None else None for method in range(len(likelihoods))]
+
 shapeParams = experimentDic['shapeParams']
+shapeParams = [shapeParams[method][dataIdsTestIndices] if  shapeParams[method] is not None else None for method in range(len(shapeParams))]
+
 if os.path.isfile(resultDir + 'segmentations.pickle'):
     with open(resultDir + 'segmentations.pickle', 'rb') as pfile:
         segmentationsDic = pickle.load(pfile)
     segmentations = segmentationsDic['segmentations']
+    segmentations = [segmentations[method][dataIdsTestIndices] if  segmentations[method] is not None else None for method in range(len(segmentations))]
 else:
     segmentations = [None]*len(methodsPred)
 
@@ -420,6 +442,7 @@ testOcclusionsFull = testOcclusions.copy()
 loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', dataIds)
+
 #
 # with open(resultDir + 'approxProjections.pickle', 'rb') as pfile:
 #     approxProjectionsDic = pickle.load(pfile)
@@ -760,8 +783,8 @@ from OpenGL import contextdata
 #
 # segmentations[4] = segmentations3[3]
 #
-# errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
-#         = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
+errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
+        = computeErrors(np.arange(len(rangeTests)), azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)
 
 
 # envMapTexture = np.zeros([180,360,3])
@@ -780,21 +803,21 @@ from OpenGL import contextdata
 #     approxProjectionsGTList = approxProjectionsGTList + [approxProjectionGT[None,:]]
 # approxProjectionsGT = np.vstack(approxProjectionsGTList)
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-MEANBASELINE2'
 resultDir = 'results/' + testPrefix + '/'
 
-# experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
-#
-# with open(resultDir + 'experiment.pickle', 'wb') as pfile:
-#     pickle.dump(experimentDic, pfile)
-#
-# experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsSList':errorsVColorsSList,'errorsSegmentationList':errorsSegmentationList}
-#
-# with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
-#     pickle.dump(experimentErrorsDic, pfile)
+experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
 
-with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
-    experimentErrorsDic = pickle.load(pfile)
+with open(resultDir + 'experiment.pickle', 'wb') as pfile:
+    pickle.dump(experimentDic, pfile)
+
+experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsSList':errorsVColorsSList,'errorsSegmentationList':errorsSegmentationList}
+
+with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
+    pickle.dump(experimentErrorsDic, pfile)
+
+# with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
+#     experimentErrorsDic = pickle.load(pfile)
 
 errorsPosePredList  = experimentErrorsDic['errorsPosePredList']
 errorsLightCoeffsList  = experimentErrorsDic['errorsLightCoeffsList']
@@ -848,9 +871,7 @@ plotStyles = plotStyles + ['solid']
 
 plotStyles = plotStyles + ['dashed']
 
-ipdb.set_trace()
-
-plotMethodsIndices = [2, 5, 3, 4, 6, 7]
+plotMethodsIndices = [0,2]
 
 recognitionIdx = 2
 robustIdx = 3
@@ -953,6 +974,7 @@ for occlusionLevel in range(100):
                 meanErrorsSegmentationArr[method_i] = None
 
 print("Printing occlusin-error plots - median!")
+
 saveOcclusionPlots(resultDir, 'mean',occlusions, methodsPred, plotColors, plotStyles, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsVColorsSArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr, meanErrorsSegmentationArr)
 
 medianAbsErrAzsArr = []
@@ -1029,9 +1051,13 @@ for occlusionLevel in range(100):
             else:
                 medianErrorsSegmentationArr[method_i] = None
 
-saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plotStyles, plotMethodsIndices, useShapeModel, medianAbsErrAzsArr, medianAbsErrElevsArr, medianErrorsVColorsCArr, medianErrorsVColorsEArr, medianErrorsVColorsSArr, medianErrorsLightCoeffsArr, medianErrorsShapeParamsArr, medianErrorsShapeVerticesArr, medianErrorsLightCoeffsCArr, medianErrorsEnvMapArr, medianErrorsSegmentationArr)
 
+
+saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plotStyles, plotMethodsIndices, useShapeModel, medianAbsErrAzsArr, medianAbsErrElevsArr, medianErrorsVColorsCArr, medianErrorsVColorsEArr, medianErrorsVColorsSArr, medianErrorsLightCoeffsArr, medianErrorsShapeParamsArr, medianErrorsShapeVerticesArr, medianErrorsLightCoeffsCArr, medianErrorsEnvMapArr, medianErrorsSegmentationArr)
 SHModel = ""
+
+
+ipdb.set_trace()
 
 for occlusionLevel in [25,75,100]:
 

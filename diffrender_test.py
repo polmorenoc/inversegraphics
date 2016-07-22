@@ -277,10 +277,14 @@ shapeGT = gtDataFile[gtPrefix].shape
 # boolTestSet[testSet] = True
 boolTestSet = np.array([np.any(num == testSet) for num in gtDataFile[gtPrefix]['trainIds']])
 
+dataIds = gtDataFile[gtPrefix][boolTestSet]['trainIds']
+
+dataIdsTestIndices = np.array([np.where(dataIds==num)[0][0] for num in testSet])
+
 # testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
 # groundTruthTest = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
 # groundTruthTest[boolTestSet] = testGroundTruth
-groundTruth = gtDataFile[gtPrefix][boolTestSet]
+groundTruth = gtDataFile[gtPrefix][boolTestSet][dataIdsTestIndices]
 dataTeapotIdsTest = groundTruth['trainTeapotIds']
 test = np.arange(len(testSet))
 
@@ -442,7 +446,7 @@ recognitionTypeDescr = ["near", "mean", "sampling"]
 recognitionType = 1
 
 optimizationTypeDescr = ["predict", "optimize", "joint"]
-optimizationType = 1
+optimizationType = 0
 computePredErrorFuns = True
 
 method = 1
@@ -772,7 +776,7 @@ azsPredictions = np.array([])
 recomputeMeans = True
 includeMeanBaseline = True
 
-recomputePredictions = False
+recomputePredictions = True
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -1400,7 +1404,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'ECCV-NNEMBEDDING-' + testRangeStr
+testDescription = 'ECCV-PHOTOREALISTIC-MEANBASELINE-FIXSH-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -2398,6 +2402,7 @@ for testSetting, model in enumerate(modelTests):
                     approxProjections= [meanTrainEnvMapProjections]
                     likelihoods = [meanBaselineErrorFuns]
                     segmentations = [None]
+                    ipdb.set_trace()
                 else:
                     azimuths =  [None]
                     elevations=  [None]
@@ -2543,8 +2548,7 @@ for testSetting, model in enumerate(modelTests):
                 totalTime = time.time() - startTime
                 print("Took " + str(totalTime/test_i) + " time per instance.")
 
-                experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
-
+                experimentDic = {'dataIds':dataIds,'gtPrefix':gtPrefix,'trainPrefixPose':trainPrefixPose,'trainPrefixVColor':trainPrefixVColor,'trainPrefixLightCoeffs':trainPrefixLightCoeffs,'trainPrefixShapeParams':trainPrefixShapeParams,'trainModelsDirAppLight':trainModelsDirAppLight, 'experimentDir': experimentDir, 'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
                 with open(resultDir + 'experiment.pickle', 'wb') as pfile:
                     pickle.dump(experimentDic, pfile)
 

@@ -985,7 +985,6 @@ def shapeVertexErrors(chShapeParams, chVertices, testShapeParamsGT, shapeParamsP
     return errorsShapeVertices
 
 def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, posteriors, masksGT):
-
     errorsPosePredList = []
     errorsLightCoeffsList = []
     errorsShapeParamsList = []
@@ -1044,6 +1043,7 @@ def computeErrors(setTest, azimuths, testAzsRel, elevations, testElevsGT, vColor
             errorsEnvMapList = errorsEnvMapList + [None]
 
         if relLightCoefficientsPred is not None:
+
             envMapScaling = scaleInvariantMSECoeff(relLightCoefficientsPred[setTest], testLightCoefficientsGTRel[setTest])
             errorsLightCoeffsC = (testLightCoefficientsGTRel[setTest] - envMapScaling[:,None]* relLightCoefficientsPred[setTest]) ** 2
 
