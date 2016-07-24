@@ -422,7 +422,7 @@ vColors = [vColors[method][dataIdsTestIndices] if  vColors[method] is not None e
 lightCoeffs = experimentDic[ 'lightCoeffs']
 lightCoeffs = [lightCoeffs[method][dataIdsTestIndices] if  lightCoeffs[method] is not None else None for method in range(len(lightCoeffs))]
 
-
+likelihoods = []
 # likelihoods = experimentDic['likelihoods']
 # likelihoods = [likelihoods[method][dataIdsTestIndices] if  likelihoods[method] is not None else None for method in range(len(likelihoods))]
 
@@ -804,19 +804,19 @@ from OpenGL import contextdata
 # approxProjectionsGT = np.vstack(approxProjectionsGTList)
 
 
-with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
-    experimentErrorsDic = pickle.load(pfile)
-
-errorsPosePredList  = experimentErrorsDic['errorsPosePredList']
-errorsLightCoeffsList  = experimentErrorsDic['errorsLightCoeffsList']
-errorsShapeParamsList  = experimentErrorsDic['errorsShapeParamsLis']
-errorsShapeVerticesList  = experimentErrorsDic['errorsShapeVerticesList']
-errorsEnvMapList  = experimentErrorsDic['errorsEnvMapList']
-errorsLightCoeffsCList  = experimentErrorsDic['errorsLightCoeffsCList']
-errorsVColorsEList  = experimentErrorsDic['errorsVColorsEList']
-errorsVColorsCList  = experimentErrorsDic['errorsVColorsCList']
-errorsVColorsSList  = experimentErrorsDic['errorsVColorsSList']
-errorsSegmentationList = experimentErrorsDic['errorsSegmentationList']
+# with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
+#     experimentErrorsDic = pickle.load(pfile)
+#
+# errorsPosePredList  = experimentErrorsDic['errorsPosePredList']
+# errorsLightCoeffsList  = experimentErrorsDic['errorsLightCoeffsList']
+# errorsShapeParamsList  = experimentErrorsDic['errorsShapeParamsLis']
+# errorsShapeVerticesList  = experimentErrorsDic['errorsShapeVerticesList']
+# errorsEnvMapList  = experimentErrorsDic['errorsEnvMapList']
+# errorsLightCoeffsCList  = experimentErrorsDic['errorsLightCoeffsCList']
+# errorsVColorsEList  = experimentErrorsDic['errorsVColorsEList']
+# errorsVColorsCList  = experimentErrorsDic['errorsVColorsCList']
+# errorsVColorsSList  = experimentErrorsDic['errorsVColorsSList']
+# errorsSegmentationList = experimentErrorsDic['errorsSegmentationList']
 
 
 testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT-BOWTIE'
@@ -832,6 +832,20 @@ resultDir = 'results/' + testPrefix + '/'
 #
 # with open(resultDir + 'experiment_errors.pickle', 'wb') as pfile:
 #     pickle.dump(experimentErrorsDic, pfile)
+
+with open(resultDir + 'experiment_errors.pickle', 'rb') as pfile:
+    experimentErrorsDic = pickle.load(pfile)
+
+errorsPosePredList  = experimentErrorsDic['errorsPosePredList']
+errorsLightCoeffsList  = experimentErrorsDic['errorsLightCoeffsList']
+errorsShapeParamsList  = experimentErrorsDic['errorsShapeParamsLis']
+errorsShapeVerticesList  = experimentErrorsDic['errorsShapeVerticesList']
+errorsEnvMapList  = experimentErrorsDic['errorsEnvMapList']
+errorsLightCoeffsCList  = experimentErrorsDic['errorsLightCoeffsCList']
+errorsVColorsEList  = experimentErrorsDic['errorsVColorsEList']
+errorsVColorsCList  = experimentErrorsDic['errorsVColorsCList']
+errorsVColorsSList  = experimentErrorsDic['errorsVColorsSList']
+errorsSegmentationList = experimentErrorsDic['errorsSegmentationList']
 
 
 

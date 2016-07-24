@@ -758,7 +758,7 @@ def saveConditionalHistograms(resultDir, occlusions, methodsPred, variablesDescr
 
         directory = resultDir + variableDescr
 
-        maxErr = np.max(np.array([np.max(errors[method_i]) for method_i in plotMethodsIndices]))
+        maxErr = np.max(np.array([np.max(errors[method_i]) if errors[method_i] is not None else 0 for method_i in plotMethodsIndices]))
 
 
         for method_i in plotMethodsIndices:
