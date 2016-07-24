@@ -745,6 +745,82 @@ def saveHistograms():
     # fig.savefig(directory + '-scatter.pdf', bbox_inches='tight')
     # plt.close(fig)
 
+def saveConditionalHistograms(resultDir, occlusions, methodsPred, variablesDescr, plotMethodsIndices, errorsList):
+    latexify(columns=2)
+
+    numBins = 20
+    numErrBins = 40
+
+
+    for variable_i in range(len(variablesDescr)):
+        variableDescr = variablesDescr[variable_i]
+        errors = errorsList[variable_i]
+
+        directory = resultDir + variableDescr
+
+        maxErr = np.max(np.array([np.max(errors[method_i]) for method_i in plotMethodsIndices]))
+
+
+        for method_i in plotMethodsIndices:
+            condHists = []
+            if errors[method_i] is not None and len(errors[method_i]) > 0:
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+
+                bins = np.linspace(0,0.9,numBins)
+
+                occlusionBinIndices = np.array([(occlusions < bins[i]) & (occlusions > bins[i-1]) for i in np.arange(1,len(bins))])
+
+                # ax.plot(occlusions, errorsPosePredList[method_i], c=plotColors[method_i], linestyle=plotStyles[method_i], label=methodsPred[method_i])
+                legend = ax.legend(loc='best')
+                ax.set_xlabel('Occlusion (\%)')
+                ax.set_ylabel('Error Cond. Histogram')
+                # x1, x2 = ax.get_xlim()
+                # y1, y2 = ax.get_ylim()
+
+
+
+                if variableDescr == 'Illumination':
+                    maxErr = 0.2
+
+                for i in range(len(bins)-1):
+
+                    hist, bin_edges = np.histogram(errors[method_i][occlusionBinIndices[i]], numErrBins, range=(0,maxErr), density=True)
+                    condHists = condHists + [hist]
+
+                # ipdb.set_trace()
+                histMat = np.flipud(np.vstack(condHists).T)
+
+                maxHistProb = np.max(histMat)
+
+                ax.matshow(histMat, cmap=matplotlib.cm.gray, interpolation='none', extent=[0,90,0,45], vmin=0, vmax=maxHistProb)
+
+                # locs, labels = ax.xticks()
+
+                # ax.set_xticks(bins)
+
+                ax.set_xlim((0, 90))
+                ax.set_ylim((0, 45))
+
+                yticks = np.linspace(0,45,10)
+
+                ytickslabels = ["{:1.2f}".format(num) for num in np.linspace(0, maxErr, 10)]
+                ax.set_yticks(yticks)
+                ax.set_yticklabels(ytickslabels)
+                # ax.set_xlim((0, 100))
+
+                # ax.set_ylim((-0.0, y2))
+
+                # ax.set_title('Cumulative segmentation accuracy per occlusion level')
+                ax.tick_params(axis='both', which='major', labelsize=8)
+                ax.tick_params(axis='both', which='minor', labelsize=8)
+
+                fig.savefig(directory + '-' + methodsPred[method_i] + '-conditional-histogram.pdf', bbox_inches='tight')
+                plt.close(fig)
+
+
+
+
 def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotStyles, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsVColorsSArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr,meanErrorsSegmentationArr):
 
     latexify(columns=2)
