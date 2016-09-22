@@ -55,8 +55,8 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 # gtPrefix = 'train4_occlusion_shapemodel'
 # gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 # gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
-gtPrefix = 'train4_occlusion_shapemodel'
-experimentPrefix = 'train4_occlusion_shapemodel_10k'
+gtPrefix = 'objectnet3d_teapots'
+experimentPrefix = 'objectnet3d_teapots'
 
 # gtPrefix = 'train4_occlusion_multi'
 # experimentPrefix = 'train4_occlusion_multi'
@@ -249,15 +249,14 @@ useShapeModel = True
 makeVideo = False
 reduceVariance = False
 getColorFromCRF = False
-syntheticGroundtruth = True
+syntheticGroundtruth = False
+evaluateWithGT = False
 
 ignoreGT = True
 ignore = []
 if os.path.isfile(gtDir + 'ignore.npy'):
     ignore = np.load(gtDir + 'ignore.npy')
 
-groundTruthFilename = gtDir + 'groundTruth.h5'
-gtDataFile = h5py.File(groundTruthFilename, 'r')
 
 testSet = np.load(experimentDir + 'test.npy')
 
@@ -271,61 +270,65 @@ testSet = testSet[rangeTests]
 
 numTests = len(testSet)
 
-shapeGT = gtDataFile[gtPrefix].shape
+if evaluateWithGT:
+    groundTruthFilename = gtDir + 'groundTruth.h5'
+    gtDataFile = h5py.File(groundTruthFilename, 'r')
 
-# boolTestSet = np.zeros(shapeGT).astype(np.bool)
-# boolTestSet[testSet] = True
-boolTestSet = np.array([np.any(num == testSet) for num in gtDataFile[gtPrefix]['trainIds']])
+    shapeGT = gtDataFile[gtPrefix].shape
 
-dataIds = gtDataFile[gtPrefix][boolTestSet]['trainIds']
+    # boolTestSet = np.zeros(shapeGT).astype(np.bool)
+    # boolTestSet[testSet] = True
+    boolTestSet = np.array([np.any(num == testSet) for num in gtDataFile[gtPrefix]['trainIds']])
 
-dataIdsTestIndices = np.array([np.where(dataIds==num)[0][0] for num in testSet])
+    dataIds = gtDataFile[gtPrefix][boolTestSet]['trainIds']
 
-# testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
-# groundTruthTest = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
-# groundTruthTest[boolTestSet] = testGroundTruth
-groundTruth = gtDataFile[gtPrefix][boolTestSet][dataIdsTestIndices]
-dataTeapotIdsTest = groundTruth['trainTeapotIds']
-test = np.arange(len(testSet))
+    dataIdsTestIndices = np.array([np.where(dataIds==num)[0][0] for num in testSet])
 
-testSet = testSet[test]
+    # testGroundTruth = gtDataFile[gtPrefix][boolTestSet]
+    # groundTruthTest = np.zeros(shapeGT, dtype=testGroundTruth.dtype)
+    # groundTruthTest[boolTestSet] = testGroundTruth
+    groundTruth = gtDataFile[gtPrefix][boolTestSet][dataIdsTestIndices]
+    dataTeapotIdsTest = groundTruth['trainTeapotIds']
+    test = np.arange(len(testSet))
+
+    testSet = testSet[test]
 
 
-print("Reading experiment.")
-dataAzsGT = groundTruth['trainAzsGT']
-dataObjAzsGT = groundTruth['trainObjAzsGT']
-dataElevsGT = groundTruth['trainElevsGT']
-dataLightAzsGT = groundTruth['trainLightAzsGT']
-dataLightElevsGT = groundTruth['trainLightElevsGT']
-dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
-dataVColorGT = groundTruth['trainVColorGT']
-dataScenes = groundTruth['trainScenes']
-dataTeapotIds = groundTruth['trainTeapotIds']
-dataEnvMaps = groundTruth['trainEnvMaps']
-dataOcclusions = groundTruth['trainOcclusions']
-dataTargetIndices = groundTruth['trainTargetIndices']
-dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
-dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
-dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
-dataIds = groundTruth['trainIds']
+    print("Reading experiment.")
+    dataAzsGT = groundTruth['trainAzsGT']
+    dataObjAzsGT = groundTruth['trainObjAzsGT']
+    dataElevsGT = groundTruth['trainElevsGT']
+    dataLightAzsGT = groundTruth['trainLightAzsGT']
+    dataLightElevsGT = groundTruth['trainLightElevsGT']
+    dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
+    dataVColorGT = groundTruth['trainVColorGT']
+    dataScenes = groundTruth['trainScenes']
+    dataTeapotIds = groundTruth['trainTeapotIds']
+    dataEnvMaps = groundTruth['trainEnvMaps']
+    dataOcclusions = groundTruth['trainOcclusions']
+    dataTargetIndices = groundTruth['trainTargetIndices']
+    dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+    dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+    dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
+    dataIds = groundTruth['trainIds']
 
-if multiObjects:
-    dataObjDistGT = groundTruth['trainObjDistGT']
-    dataObjRotationGT = groundTruth['trainObjRotationGT']
-    dataObjDistMug = groundTruth['trainObjDistMug']
-    dataObjRotationMug = groundTruth['trainObjRotationMug']
-    dataObjAzMug = groundTruth['trainObjAzMug']
-    dataVColorsMug = groundTruth['trainVColorsMug']
-    dataObjAzMugRel = groundTruth['trainObjAzMugRel']
-    dataObjAzGTRel = groundTruth['trainObjAzGTRel']
+    if multiObjects:
+        dataObjDistGT = groundTruth['trainObjDistGT']
+        dataObjRotationGT = groundTruth['trainObjRotationGT']
+        dataObjDistMug = groundTruth['trainObjDistMug']
+        dataObjRotationMug = groundTruth['trainObjRotationMug']
+        dataObjAzMug = groundTruth['trainObjAzMug']
+        dataVColorsMug = groundTruth['trainVColorsMug']
+        dataObjAzMugRel = groundTruth['trainObjAzMugRel']
+        dataObjAzGTRel = groundTruth['trainObjAzGTRel']
 
-    dataMugPosOffset = groundTruth['trainMugPosOffset']
-    dataTeapotPosOffset = groundTruth['trainTeapotPosOffset']
+        dataMugPosOffset = groundTruth['trainMugPosOffset']
+        dataTeapotPosOffset = groundTruth['trainTeapotPosOffset']
 
-if useShapeModel:
-    dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
+    if useShapeModel:
+        dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
-gtDtype = groundTruth.dtype
+    gtDtype = groundTruth.dtype
 
 testSetFixed = testSet
 whereBad = []
@@ -347,87 +350,131 @@ if syntheticGroundtruth:
     imagesDir = gtDir + 'images_opendr/'
 else:
     imagesDir = gtDir + 'images/'
-images = readImages(imagesDir, dataIds, loadFromHdf5)
 
+if evaluateWithGT:
+    images = readImages(imagesDir, dataIds, loadFromHdf5)
+else:
+    import glob
+
+    imageFiles = glob.glob1(imagesDir, "*.jpeg")
+    images = np.zeros([width, height, len(imageFiles)])
+    for imageFile_i, imageFile in enumerate(imageFiles):
+        image = skimage.io.imread(imageFile)
+        image = skimage.transform.resize(image , [height, width])
+
+        images[imageFile_i] = image
+
+    testSet = np.arange(len(images))
 
 print("Backprojecting and fitting estimates.")
 # testSet = np.arange(len(images))[0:10]
 
-testAzsGT = dataAzsGT
-testObjAzsGT = dataObjAzsGT
-testElevsGT = dataElevsGT
-testLightAzsGT = dataLightAzsGT
-testLightElevsGT = dataLightElevsGT
-testLightIntensitiesGT = dataLightIntensitiesGT
-testVColorGT = dataVColorGT
-if useShapeModel:
-    testShapeParamsGT = dataShapeModelCoeffsGT
+if evaluateWithGT:
+    testAzsGT = dataAzsGT
+    testObjAzsGT = dataObjAzsGT
+    testElevsGT = dataElevsGT
+    testLightAzsGT = dataLightAzsGT
+    testLightElevsGT = dataLightElevsGT
+    testLightIntensitiesGT = dataLightIntensitiesGT
+    testVColorGT = dataVColorGT
+    if useShapeModel:
+        testShapeParamsGT = dataShapeModelCoeffsGT
 
-testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
+    testLightCoefficientsGTRel = dataLightCoefficientsGTRel * dataAmbientIntensityGT[:,None]
 
-testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
+    testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
-if multiObjects:
-    testObjAzMugRel = dataObjAzMugRel
-    testObjAzGTRel = dataObjAzGTRel
+    if multiObjects:
+        testObjAzMugRel = dataObjAzMugRel
+        testObjAzGTRel = dataObjAzGTRel
 
-    testMugPosOffset = dataMugPosOffset
-    testTeapotPosOffset = dataTeapotPosOffset
-    testVColorMug = dataVColorsMug
+        testMugPosOffset = dataMugPosOffset
+        testTeapotPosOffset = dataTeapotPosOffset
+        testVColorMug = dataVColorsMug
 
-    testObjDistGT = dataObjDistGT
-    testObjRotationGT = dataObjRotationGT
-    testObjDistMug = dataObjDistMug
-    testObjRotationMug = dataObjRotationMug
-    testObjAzMug = dataObjAzMug
-    testVColorsMug = dataVColorsMug
+        testObjDistGT = dataObjDistGT
+        testObjRotationGT = dataObjRotationGT
+        testObjDistMug = dataObjDistMug
+        testObjRotationMug = dataObjRotationMug
+        testObjAzMug = dataObjAzMug
+        testVColorsMug = dataVColorsMug
+else:
+    #There is no GT.
+    testAzsGT = np.zeros(len(testSet))
+    testObjAzsGT = np.zeros(len(testSet))
+    testElevsGT = np.zeros(len(testSet))
+    testLightAzsGT = np.zeros(len(testSet))
+    testLightElevsGT = np.zeros(len(testSet))
+    testLightIntensitiesGT = np.zeros(len(testSet))
+    testVColorGT = np.zeros(len(testSet))
+    if useShapeModel:
+        testShapeParamsGT = np.zeros(len(testSet))
 
+    testLightCoefficientsGTRel = np.zeros(len(testSet))
+
+    testAzsRel = np.zeros(len(testSet))
+
+    if multiObjects:
+        testObjAzMugRel = np.zeros(len(testSet))
+        testObjAzGTRel = np.zeros(len(testSet))
+
+        testMugPosOffset = np.zeros(len(testSet))
+        testTeapotPosOffset = np.zeros(len(testSet))
+        testVColorMug = np.zeros(len(testSet))
+
+        testObjDistGT = np.zeros(len(testSet))
+        testObjRotationGT = np.zeros(len(testSet))
+        testObjDistMug = np.zeros(len(testSet))
+        testObjRotationMug = np.zeros(len(testSet))
+        testObjAzMug = np.zeros(len(testSet))
+        testVColorsMug = np.zeros(len(testSet))
 ##Read Training set labels
 
-trainGTPrefix = 'train4_occlusion_shapemodel'
+# trainGTPrefix = 'train4_occlusion_shapemodel'
+#
+# trainGTDir = 'groundtruth/' + trainGTPrefix + '/'
+# trainGroundTruthFilename = trainGTDir + 'groundTruth.h5'
+# trainGTDataFile = h5py.File(trainGroundTruthFilename, 'r')
+#
+# trainSet = np.load(experimentDir + 'train.npy')
+#
+# shapeGT = trainGTDataFile[trainGTPrefix].shape
+# boolTrainSet = np.zeros(shapeGT).astype(np.bool)
+# boolTrainSet[trainSet] = True
+# trainGroundTruth = trainGTDataFile[trainGTPrefix][boolTrainSet]
+# groundTruthTrain = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
+# groundTruthTrain[boolTrainSet] = trainGroundTruth
+# groundTruthTrain = groundTruthTrain[trainSet]
+# dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
+# train = np.arange(len(trainSet))
+#
+# testSet = testSet[test]
+#
+# print("Reading experiment.")
+# trainAzsGT = groundTruthTrain['trainAzsGT']
+# trainObjAzsGT = groundTruthTrain['trainObjAzsGT']
+# trainElevsGT = groundTruthTrain['trainElevsGT']
+# trainLightAzsGT = groundTruthTrain['trainLightAzsGT']
+# trainLightElevsGT = groundTruthTrain['trainLightElevsGT']
+# trainLightIntensitiesGT = groundTruthTrain['trainLightIntensitiesGT']
+# trainVColorGT = groundTruthTrain['trainVColorGT']
+# trainScenes = groundTruthTrain['trainScenes']
+# trainTeapotIds = groundTruthTrain['trainTeapotIds']
+# trainEnvMaps = groundTruthTrain['trainEnvMaps']
+# trainOcclusions = groundTruthTrain['trainOcclusions']
+# trainTargetIndices = groundTruthTrain['trainTargetIndices']
+# trainLightCoefficientsGT = groundTruthTrain['trainLightCoefficientsGT']
+# trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
+# trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
+# trainIds = groundTruthTrain['trainIds']
+#
+# if useShapeModel:
+#     trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
+#
+# trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None]
+#
+# trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
-trainGTDir = 'groundtruth/' + trainGTPrefix + '/'
-trainGroundTruthFilename = trainGTDir + 'groundTruth.h5'
-trainGTDataFile = h5py.File(trainGroundTruthFilename, 'r')
-
-trainSet = np.load(experimentDir + 'train.npy')
-
-shapeGT = trainGTDataFile[trainGTPrefix].shape
-boolTrainSet = np.zeros(shapeGT).astype(np.bool)
-boolTrainSet[trainSet] = True
-trainGroundTruth = trainGTDataFile[trainGTPrefix][boolTrainSet]
-groundTruthTrain = np.zeros(shapeGT, dtype=trainGroundTruth.dtype)
-groundTruthTrain[boolTrainSet] = trainGroundTruth
-groundTruthTrain = groundTruthTrain[trainSet]
-dataTeapotIdsTrain = groundTruthTrain['trainTeapotIds']
-train = np.arange(len(trainSet))
-
-testSet = testSet[test]
-
-print("Reading experiment.")
-trainAzsGT = groundTruthTrain['trainAzsGT']
-trainObjAzsGT = groundTruthTrain['trainObjAzsGT']
-trainElevsGT = groundTruthTrain['trainElevsGT']
-trainLightAzsGT = groundTruthTrain['trainLightAzsGT']
-trainLightElevsGT = groundTruthTrain['trainLightElevsGT']
-trainLightIntensitiesGT = groundTruthTrain['trainLightIntensitiesGT']
-trainVColorGT = groundTruthTrain['trainVColorGT']
-trainScenes = groundTruthTrain['trainScenes']
-trainTeapotIds = groundTruthTrain['trainTeapotIds']
-trainEnvMaps = groundTruthTrain['trainEnvMaps']
-trainOcclusions = groundTruthTrain['trainOcclusions']
-trainTargetIndices = groundTruthTrain['trainTargetIndices']
-trainLightCoefficientsGT = groundTruthTrain['trainLightCoefficientsGT']
-trainLightCoefficientsGTRel = groundTruthTrain['trainLightCoefficientsGTRel']
-trainAmbientIntensityGT = groundTruthTrain['trainAmbientIntensityGT']
-trainIds = groundTruthTrain['trainIds']
-
-if useShapeModel:
-    trainShapeModelCoeffsGT = groundTruthTrain['trainShapeModelCoeffsGT']
-
-trainLightCoefficientsGTRel = trainLightCoefficientsGTRel * trainAmbientIntensityGT[:,None]
-
-trainAzsRel = np.mod(trainAzsGT - trainObjAzsGT, 2*np.pi)
 
 # latexify(columns=2)
 #
@@ -560,7 +607,7 @@ if useShapeModel:
 else:
     renderer = renderer_teapots[testRenderer]
 
-loadMask = True
+loadMask = False
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
@@ -773,8 +820,8 @@ nnBatchSize = 100
 
 azsPredictions = np.array([])
 
-recomputeMeans = True
-includeMeanBaseline = True
+recomputeMeans = False
+includeMeanBaseline = False
 
 recomputePredictions = True
 

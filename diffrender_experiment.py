@@ -20,46 +20,45 @@ import pickle
 seed = 1
 np.random.seed(seed)
 
-gtPrefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
-experimentPrefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
-experimentDescr = 'Synth test set with new scenes, occlusions and shape model'
+gtPrefix = 'objectnet3d_teapots'
+experimentPrefix = 'objectnet3d_teapots'
+experimentDescr = 'The real teapots'
 gtDir = 'groundtruth/' + gtPrefix + '/'
 experimentDir = 'experiments/' + experimentPrefix + '/'
 
-groundTruthFilename = gtDir + 'groundTruth.h5'
-gtDataFile = h5py.File(groundTruthFilename, 'r')
+# groundTruthFilename = gtDir + 'groundTruth.h5'
+# gtDataFile = h5py.File(groundTruthFilename, 'r')
+#
+# onlySynthetic = False
+#
+#
+# print("Reading experiment data.")
+#
+# shapeGT = gtDataFile[gtPrefix].shape
+#
+# groundTruth = gtDataFile[gtPrefix]
+#
+# dataAzsGT = groundTruth['trainAzsGT']
+# dataObjAzsGT = groundTruth['trainObjAzsGT']
+# dataElevsGT = groundTruth['trainElevsGT']
+# dataLightAzsGT = groundTruth['trainLightAzsGT']
+# dataLightElevsGT = groundTruth['trainLightElevsGT']
+# dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
+# dataVColorGT = groundTruth['trainVColorGT']
+# dataScenes = groundTruth['trainScenes']
+# dataTeapotIds = groundTruth['trainTeapotIds']
+# dataEnvMaps = groundTruth['trainEnvMaps']
+# dataOcclusions = groundTruth['trainOcclusions']
+# dataTargetIndices = groundTruth['trainTargetIndices']
+# dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
+# dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
+# dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
+# dataIds = groundTruth['trainIds']
+#
+# gtDtype = groundTruth.dtype
+#
+# allDataIds = gtDataFile[gtPrefix]['trainIds']
 
-onlySynthetic = False
-
-
-print("Reading experiment data.")
-
-shapeGT = gtDataFile[gtPrefix].shape
-
-groundTruth = gtDataFile[gtPrefix]
-
-dataAzsGT = groundTruth['trainAzsGT']
-dataObjAzsGT = groundTruth['trainObjAzsGT']
-dataElevsGT = groundTruth['trainElevsGT']
-dataLightAzsGT = groundTruth['trainLightAzsGT']
-dataLightElevsGT = groundTruth['trainLightElevsGT']
-dataLightIntensitiesGT = groundTruth['trainLightIntensitiesGT']
-dataVColorGT = groundTruth['trainVColorGT']
-dataScenes = groundTruth['trainScenes']
-dataTeapotIds = groundTruth['trainTeapotIds']
-dataEnvMaps = groundTruth['trainEnvMaps']
-dataOcclusions = groundTruth['trainOcclusions']
-dataTargetIndices = groundTruth['trainTargetIndices']
-dataLightCoefficientsGT = groundTruth['trainLightCoefficientsGT']
-dataLightCoefficientsGTRel = groundTruth['trainLightCoefficientsGTRel']
-dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
-dataIds = groundTruth['trainIds']
-
-gtDtype = groundTruth.dtype
-
-allDataIds = gtDataFile[gtPrefix]['trainIds']
-
-ipdb.set_trace()
 
 ########## Check if there is anything wrong with the renders:
 
@@ -90,27 +89,22 @@ ipdb.set_trace()
 #     plt.imsave('tmp/check/badImage' + str(badImages[id]) + '.png', np.tile(badImage[:,:,None], [1,1,3]))
 #
 
-
-
-size = len(allDataIds)
+size = 376
 # if not os.path.isfile(experimentDir + 'train.npy'):
 np.random.seed(seed)
-
-
-
 
 
 data = np.arange(size)
 np.random.shuffle(data)
 
+generateExperiment(size, experimentDir, 1, 1)
 
-if not os.path.exists(experimentDir):
-    os.makedirs(experimentDir)
+# if not os.path.exists(experimentDir):
+#     os.makedirs(experimentDir)
+#
+# np.save(experimentDir + 'train.npy', train)
+# np.save(experimentDir + 'test.npy', test)
 
-np.save(experimentDir + 'train.npy', train)
-np.save(experimentDir + 'test.npy', test)
-
-ipdb.set_trace()
 
 ########## Out of sample selections.
 
