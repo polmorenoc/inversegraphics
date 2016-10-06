@@ -35,7 +35,7 @@ useShapeModel = True
 datasetGroundtruth = False
 syntheticGroundtruth = True
 useCycles = True
-demoMode = True
+demoMode = False
 showSubplots = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
@@ -72,7 +72,7 @@ angle = 60 * 180 / numpy.pi
 clip_start = 0.05
 clip_end = 10
 frustum = {'near': clip_start, 'far': clip_end, 'width': width, 'height': height}
-camDistance = 0.6
+camDistance = 0.4
 
 gtPrefix = 'train4_occlusion_shapemodel'
 gtDirPref = 'train4_occlusion_shapemodel'
@@ -99,7 +99,9 @@ dataAmbientIntensityGT = groundTruth['trainAmbientIntensityGT']
 dataEnvMapPhiOffsets = groundTruth['trainEnvMapPhiOffsets']
 dataShapeModelCoeffsGT = groundTruth['trainShapeModelCoeffsGT']
 
-readDataId = 0
+readDataId = 10045
+readDataId = 6102
+
 import shape_model
 
 if useShapeModel:
@@ -112,6 +114,7 @@ if useShapeModel:
     #%% Sample random shape Params
     latentDim = np.shape(teapotModel['ppcaW'])[1]
     shapeParams = np.random.randn(latentDim)
+    shapeParams = dataShapeModelCoeffsGT[readDataId]
     chShapeParams = ch.Ch(shapeParams)
 
     meshLinearTransform=teapotModel['meshLinearTransform']
@@ -303,8 +306,8 @@ chComponentGTOriginal = ch.array(np.array(chAmbientSHGT + shDirLightGT*chLightIn
 chComponentGT = chAmbientSHGT
 # chComponentGT = ch.Ch([0.2,0,0,0,0,0,0,0,0])
 
-chAz = ch.Ch(dataAzsGT[readDataId])
-chObjAz = ch.Ch(dataObjAzsGT[readDataId])
+chAz = ch.Ch(dataAzsGT[readDataId]) - ch.Ch(dataObjAzsGT[readDataId])
+chObjAz = 0
 chEl =  ch.Ch(dataElevsGT[readDataId])
 chAzRel = chAz - chObjAz
 
@@ -355,27 +358,27 @@ for teapotIdx, teapotName in enumerate(selection):
     blender_teapots = blender_teapots + [teapot]
     setObjectDiffuseColor(teapot, chVColorsGT.r.copy())
 
-for teapot_i in range(len(renderTeapotsList)):
-    if useBlender:
-        teapot = blender_teapots[teapot_i]
-        teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
-
-    vmod = v_teapots[teapot_i]
-    fmod_list = f_list_teapots[teapot_i]
-    vcmod = vc_teapots[teapot_i]
-    vnmod = vn_teapots[teapot_i]
-    uvmod = uv_teapots[teapot_i]
-    haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
-    texturesmod_list = textures_list_teapots[teapot_i]
-    centermod = center_teapots[teapot_i]
-
-    vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, np.pi/2, ch.Ch([0]), ch.Ch([0]), targetPosition)
-    renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
-
-    renderer.msaa = True
-    renderer.overdraw = True
-    renderer.r
-    renderer_teapots = renderer_teapots + [renderer]
+# for teapot_i in range(len(renderTeapotsList)):
+#     if useBlender:
+#         teapot = blender_teapots[teapot_i]
+#         teapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
+#
+#     vmod = v_teapots[teapot_i]
+#     fmod_list = f_list_teapots[teapot_i]
+#     vcmod = vc_teapots[teapot_i]
+#     vnmod = vn_teapots[teapot_i]
+#     uvmod = uv_teapots[teapot_i]
+#     haveTexturesmod_list = haveTextures_list_teapots[teapot_i]
+#     texturesmod_list = textures_list_teapots[teapot_i]
+#     centermod = center_teapots[teapot_i]
+#
+#     vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, np.pi/2, ch.Ch([0]), ch.Ch([0]), targetPosition)
+#     renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, targetPosition, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+#
+#     renderer.msaa = True
+#     renderer.overdraw = True
+#     renderer.r
+#     renderer_teapots = renderer_teapots + [renderer]
 
 if useShapeModel:
     shapeParams = np.random.randn(latentDim)
@@ -420,7 +423,7 @@ if useShapeModel:
     smHaveTexturesB = [smHaveTextures]
     smTexturesListB = [smTexturesList]
 
-    smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0.1]), ch.Ch([1]), targetPosition)
+    smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0.0]), ch.Ch([0]), np.array([0,0,0]))
 
     v_mug = v_mugs[0][0]
     f_list_mug = f_list_mugs[0]
@@ -431,19 +434,27 @@ if useShapeModel:
     haveTextures_list_mug = haveTextures_list_mugs[0]
     textures_list_mug = textures_list_mugs[0]
 
-    verticesMug, normalsMug, _ = transformObject(v_mug, vn_mug, chScale, chObjAz - np.pi/2, ch.Ch([0.2]), ch.Ch([0]), targetPosition)
+    verticesMug, normalsMug, _ = transformObject(v_mug, vn_mug, chScale, chObjAz - np.pi/2, ch.Ch([0.2]), ch.Ch([0]), np.array([0,0,0]))
 
-    VerticesB = [smVertices ] + [verticesMug]
-    NormalsB = [smNormals] + [normalsMug]
-    FacesB = smFacesB + f_list_mug
-    VColorsB = smVColorsB + vc_mug
-    UVsB = smUVsB + uv_mug
-    HaveTexturesB = smHaveTexturesB + haveTextures_list_mug
-    TexturesListB = smTexturesListB + textures_list_mug
+    if False:
+        VerticesB = [smVertices ] + [verticesMug]
+        NormalsB = [smNormals] + [normalsMug]
+        FacesB = smFacesB + f_list_mug
+        VColorsB = smVColorsB + vc_mug
+        UVsB = smUVsB + uv_mug
+        HaveTexturesB = smHaveTexturesB + haveTextures_list_mug
+        TexturesListB = smTexturesListB + textures_list_mug
+    else:
+        VerticesB = [smVertices ]
+        NormalsB = [smNormals]
+        FacesB = smFacesB
+        VColorsB = smVColorsB
+        UVsB = smUVsB
+        HaveTexturesB = smHaveTexturesB
+        TexturesListB = smTexturesListB
 
-    ipdb.set_trace()
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
+    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
     renderer.msaa = True
 
@@ -509,7 +520,7 @@ if useShapeModel:
     smVerticesGT, smNormalsGT, _ = transformObject(smVerticesGT, smNormalsGT, chScaleGT, chObjAzGT, ch.Ch([0]), ch.Ch([0]), targetPosition)
 
 if useShapeModel:
-    ipdb.set_trace()
+
     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  smVerticesGT, smFacesGT, smVColorsGT, smNormalsGT, smUVsGT, smHaveTexturesGT, smTexturesListGT)
 else:
     addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapots[currentTeapotModel][0], f_list_teapots[currentTeapotModel][0], vc_teapots[currentTeapotModel][0], vn_teapots[currentTeapotModel][0], uv_teapots[currentTeapotModel][0], haveTextures_list_teapots[currentTeapotModel][0], textures_list_teapots[currentTeapotModel][0])
@@ -524,6 +535,17 @@ rendererGT.msaa = True
 rendererGT.overdraw = True
 
 cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+render = renderer.r.copy()
+red = np.zeros(render.shape)
+red[:,:,0] = 1
+vis_occluded = np.array(rendererGT.indices_image == 0 + 1).copy().astype(np.bool)
+vis_im = np.array(rendererGT.image_mesh_bool([0])).copy().astype(np.bool)
+occlusion = (vis_im & (1 - vis_occluded)).astype(np.bool)
+render[occlusion] = render[occlusion]*0.1 + red[occlusion] *0.9
+cv2.imwrite('renderer' + str(readDataId) + '.jpeg' , 255*lin2srgb(render[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+ipdb.set_trace()
 
 if useGTasBackground:
     for teapot_i in range(len(renderTeapotsList)):

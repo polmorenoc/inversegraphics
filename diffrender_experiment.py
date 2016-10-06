@@ -89,7 +89,7 @@ experimentDir = 'experiments/' + experimentPrefix + '/'
 #     plt.imsave('tmp/check/badImage' + str(badImages[id]) + '.png', np.tile(badImage[:,:,None], [1,1,3]))
 #
 
-size = 376
+size = 375
 # if not os.path.isfile(experimentDir + 'train.npy'):
 np.random.seed(seed)
 
@@ -97,7 +97,7 @@ np.random.seed(seed)
 data = np.arange(size)
 np.random.shuffle(data)
 
-generateExperiment(size, experimentDir, 1, 1)
+generateExperiment(size, experimentDir, 0, 1)
 
 # if not os.path.exists(experimentDir):
 #     os.makedirs(experimentDir)

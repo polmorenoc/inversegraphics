@@ -31,17 +31,17 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_triplets'
+prefix = 'train4_occlusion_shapemodel_texture'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'train4_occlusion_shapemodel'
 
 #Main script options:
 
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
 useOpenDR = True
 useBlender = True
-renderBlender = False
+renderBlender = True
 captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
@@ -49,11 +49,11 @@ useCycles = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
-generateTriplets = True
+generateTriplets = False
 
 replaceNewGroundtruth = False
-renderOcclusions = True
-occlusionMin = 0.01
+renderOcclusions = False
+occlusionMin = 0.0
 occlusionMax = 0.9
 renderTeapots =  True
 renderMugs = False
@@ -144,6 +144,7 @@ if useBlender:
             mug.layers[2] = True
             mugModels = mugModels + [mug]
             blender_mugs = blender_mugs + [mug]
+
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
 
@@ -312,6 +313,33 @@ else:
     latentDim = 1
     chShapeParamsGT = ch.array([0])
 
+
+if useShapeModel:
+    teapotMesh = createMeshFromData('teapotShapeModelMesh', chVerticesGT.r.tolist(),
+                                    faces.astype(np.int32).tolist())
+    teapotMesh.layers[0] = True
+    teapotMesh.layers[1] = True
+    teapotMesh.pass_index = 1
+
+    targetGroup = bpy.data.groups.new('teapotShapeModelGroup')
+    targetGroup.objects.link(teapotMesh)
+    teapot = bpy.data.objects.new('teapotShapeModel', None)
+    teapot.dupli_type = 'GROUP'
+    teapot.dupli_group = targetGroup
+    teapot.pass_index = 1
+
+    mat = makeMaterial('teapotMat', (0, 0, 0), (0, 0, 0), 1)
+    setMaterial(teapotMesh, mat)
+
+
+
+# teapotScene = bpy.data.scenes.new('Teapot')
+# teapotScene.objects.link(teapotMesh)
+# placeNewTarget(teapotScene, teapot, np.array([0,0,0]))
+# teapotScene.update()
+# bpy.ops.file.pack_all()
+# bpy.ops.wm.save_as_mainfile(filepath='teapot.blend')
+# ipdb.set_trace()
 
 ### Renderer (only teapot)
 
@@ -499,7 +527,7 @@ sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 
 trainSize = 10000
-
+teapot
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
 ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
@@ -713,7 +741,6 @@ if not renderFromPreviousGT:
             v, f_list, vc, vn, uv, haveTextures_list, textures_list = copy.deepcopy(v2), copy.deepcopy(f_list2), copy.deepcopy(vc2), copy.deepcopy(vn2)\
                 , copy.deepcopy(uv2), copy.deepcopy(haveTextures_list2), copy.deepcopy(textures_list2)
 
-            ipdb.set_trace()
             removeObjectData(len(v) - 1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
             # if sceneIdx != currentScene or targetIndex != currentTargetIndex:
@@ -1148,6 +1175,8 @@ if not renderFromPreviousGT:
                                 mesh = teapot.dupli_group.objects[0]
                                 for vertex_i, vertex in enumerate(mesh.data.vertices):
                                     vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
+
+
 
                         if renderMugs:
                             setObjectDiffuseColor(mug, chVColorsMug.r.copy())
@@ -1876,6 +1905,7 @@ if renderFromPreviousGT:
                                    mathutils.Matrix.Translation(-original_matrix_world_mug.to_translation())) * original_matrix_world_mug
 
             scene.update()
+
 
             bpy.ops.render.render( write_still=True )
 
