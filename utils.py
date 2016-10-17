@@ -113,7 +113,8 @@ def latexify(fig_width=None, fig_height=None, columns=1):
               'ytick.labelsize': 14,
               'text.usetex': True,
               'figure.figsize': [fig_width,fig_height],
-              'font.family': 'serif'
+              'font.family': 'serif',
+              'lines.linewidth':2
     }
 
     matplotlib.rcParams.update(params)
@@ -836,7 +837,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Segmentation accuracy')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative segmentation accuracy per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -854,7 +855,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Angular error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((y1, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -871,7 +872,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Angular error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -888,7 +889,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Appearance error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -905,7 +906,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Appearance error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -923,7 +924,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Appearance error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -941,7 +942,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Illumination error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -960,7 +961,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
 
         x1, x2 = ax.get_xlim()
         y1, y2 = ax.get_ylim()
-        ax.set_xlim((0, 100))
+        ax.set_xlim((0, 90))
         ax.set_ylim((-0.0, y2))
         # ax.set_title('Cumulative prediction per occlusion level')
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -978,7 +979,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
 
         x1, x2 = ax.get_xlim()
         y1, y2 = ax.get_ylim()
-        ax.set_xlim((0, 100))
+        ax.set_xlim((0, 90))
         ax.set_ylim((y1, y2))
         # ax.set_title('Cumulative prediction per occlusion level')
         fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -995,7 +996,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Illumination error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
@@ -1013,7 +1014,7 @@ def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, p
     ax.set_ylabel('Illumination error')
     x1, x2 = ax.get_xlim()
     y1, y2 = ax.get_ylim()
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, 90))
     ax.set_ylim((-0.0, y2))
     # ax.set_title('Cumulative prediction per occlusion level')
     fig.savefig(directory + '-performance-plot.pdf', bbox_inches='tight')
