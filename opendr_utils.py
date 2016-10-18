@@ -718,8 +718,11 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
     renderer.msaa = True
     renderer.sharedWin = sharedWin
     # renderer.clear()
-    renderer.initGL()
-    renderer.initGLTexture()
+
+    # renderer.useShaderErrors = True
+
+    # renderer.initGL()
+    # renderer.initGLTexture()
 
 
 def addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list):

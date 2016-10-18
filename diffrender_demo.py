@@ -36,7 +36,7 @@ datasetGroundtruth = False
 syntheticGroundtruth = True
 useCycles = True
 demoMode = False
-showSubplots = True
+showSubplots = False
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -456,7 +456,14 @@ if useShapeModel:
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
     renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
-    renderer.msaa = True
+renderer.useShaderErrors = True
+renderer.overdraw = True
+renderer.nsamples = 8
+renderer.imageGT = np.ones([150,150,3])
+renderer.msaa = True
+renderer.initGL()
+renderer.initGLTexture()
+ipdb.set_trace()
 
 # # # Funky theano stuff
 # import lasagne_nn
@@ -527,14 +534,25 @@ else:
 
 center = center_teapots[currentTeapotModel]
 
+
+
+
 if not useShapeModel:
     smCenterGT = ch.array([0, 0, 0.1])
-rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition, chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
+rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, smCenterGT, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT,
+                              targetPosition, chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, win )
 
+rendererGT.useShaderErrors = False
 rendererGT.msaa = True
+rendererGT.nsamples = 8
 rendererGT.overdraw = True
+rendererGT.initGL()
+rendererGT.initGLTexture()
 
 cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+
+ipdb.set_trace()
 
 render = renderer.r.copy()
 red = np.zeros(render.shape)
