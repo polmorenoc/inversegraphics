@@ -10,6 +10,7 @@ import numpy as np
 from math import radians
 from opendr.camera import ProjectPoints
 from opendr.renderer import TexturedRenderer
+from opendr.renderer import SQErrorRenderer
 from opendr.lighting import SphericalHarmonics
 from opendr.lighting import LambertianPointLight
 import ipdb
@@ -410,7 +411,7 @@ def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation, t
 
     return vtransf, vntransf, newPos
 
-def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+def createRendererTarget(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
     renderer.set(glMode=glMode)
 
@@ -424,26 +425,6 @@ def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, v
 
     vc_list = computeSphericalHarmonics(vnflat, vcflat, light_color, chComponent)
 
-    if hasBackground:
-        dataCube, facesCube = create_cube(scale=(10,10,10), st=False, rgba=np.array([1.0, 1.0, 1.0, 1.0]), dtype='float32', type='triangles')
-        verticesCube = ch.Ch(dataCube[:,0:3])
-        UVsCube = ch.Ch(np.zeros([verticesCube.shape[0],2]))
-
-        facesCube = facesCube.reshape([-1,3])
-        import shape_model
-        normalsCube = -shape_model.chGetNormals(verticesCube, facesCube)
-        haveTexturesCube = [[False]]
-        texturesListCube = [[None]]
-        vColorsCube = ch.Ch(dataCube[:,3:6])
-
-        vflat = vflat + [verticesCube]
-        f_list = f_list + [[[facesCube]]]
-        vnflat = vnflat + [normalsCube]
-        vc_list = vc_list + [vColorsCube]
-        textures_list = textures_list + [texturesListCube]
-        haveTextures_list = haveTextures_list + [haveTexturesCube]
-        uv = uv + [UVsCube]
-
     if len(vflat)==1:
         vstack = vflat[0]
     else:
@@ -454,7 +435,49 @@ def createRendererTarget(glMode, hasBackground, chAz, chEl, chDist, center, v, v
     setupTexturedRenderer(renderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
 
+def createSQErrorRenderer(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+    sqeRenderer = SQErrorRenderer()
+    sqeRenderer.set(glMode=glMode)
 
+    vflat = [item for sublist in v for item in sublist]
+    rangeMeshes = range(len(vflat))
+
+    vnflat = [item for sublist in vn for item in sublist]
+
+    vcflat = [item for sublist in vc for item in sublist]
+    # vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+
+    vc_list = computeSphericalHarmonics(vnflat, vcflat, light_color, chComponent)
+
+    if len(vflat)==1:
+        vstack = vflat[0]
+    else:
+        vstack = ch.vstack(vflat)
+
+    camera, modelRotation, _ = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+
+    verticesCube, facesCube, normalsCube, vColorsCube, texturesListCube, haveTexturesCube = getCubeData()
+    ft = np.zeros([len(verticesCube),2])
+
+    sqeRenderer.set(v_bgCube=verticesCube, vc_bgCube=vColorsCube, f_bgCube=facesCube, ft_bgCube=ft)
+
+    setupTexturedRenderer(sqeRenderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    return sqeRenderer
+
+
+def getCubeData(scale=(2,2,2), st=False, rgb=np.array([0.0, 0.0, 0.0])):
+        dataCube, facesCube = create_cube(scale=(2,2,2), st=False, rgba=np.array([rgb[0], rgb[1], rgb[2], 1.0]), dtype='float32', type='triangles')
+        verticesCube = ch.Ch(dataCube[:,0:3])
+        UVsCube = ch.Ch(np.zeros([verticesCube.shape[0],2]))
+
+        facesCube = facesCube.reshape([-1,3])
+        import shape_model
+        normalsCube = -shape_model.chGetNormals(verticesCube, facesCube)
+        haveTexturesCube = [[False]]
+        texturesListCube = [[None]]
+        vColorsCube = ch.Ch(dataCube[:,3:6])
+
+        return verticesCube, facesCube, normalsCube, vColorsCube, texturesListCube, haveTexturesCube
 
 def createRendererGT(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
     renderer = TexturedRenderer()
@@ -714,7 +737,7 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
 
     haveTextures_listflat = [item for sublist in haveTextures_list for item in sublist]
 
-    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=True)
+    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.zeros(3), overdraw=True)
     renderer.msaa = True
     renderer.sharedWin = sharedWin
     # renderer.clear()

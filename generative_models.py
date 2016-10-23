@@ -118,6 +118,19 @@ def pixelLikelihoodRobust(image, template, testMask, backgroundModel, layerPrior
     foregroundProbs = np.prod(1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (image - template)**2 / (2 * variances)) * layerPrior, axis=2) + (1 - repPriors)
     return foregroundProbs * mask + (1-mask)
 
+def pixelLikelihoodRobustSQErrorCh(sqeRenderer, testMask, backgroundModel, layerPrior, variances):
+    sigma = ch.sqrt(variances)
+    mask = testMask
+    if backgroundModel == 'FULL':
+        mask = np.ones(sqeRenderer.r.shape[0:2])
+    # mask = np.repeat(mask[..., np.newaxis], 3, 2)
+    repPriors = ch.tile(layerPrior, sqeRenderer.r.shape[0:2])
+    # sum = np.sum(np.log(layerPrior * scipy.stats.norm.pdf(image, location = template, scale=np.sqrt(variances) ) + (1 - repPriors)))
+    # uniformProbs = np.ones(image.shape)
+
+    probs = ch.exp( - (sqeRenderer) / (2 * variances)) * (1./(sigma * np.sqrt(2 * np.pi)))
+    foregroundProbs = (probs[:,:,0] * probs[:,:,1] * probs[:,:,2]) * layerPrior + (1 - repPriors)
+    return foregroundProbs * mask + (1-mask)
 
 def pixelLikelihoodRobustCh(image, template, testMask, backgroundModel, layerPrior, variances):
     sigma = ch.sqrt(variances)
@@ -230,6 +243,39 @@ class NLLRobustModel(Ch):
     #
     #     return errorFun
 
+class NLLRobustSQErrorModel(Ch):
+    terms = ['Q', 'variances']
+    dterms = ['sqeRenderer']
+
+    def compute_r(self):
+        return -np.sum(np.log(self.prob))
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.sqeRenderer:
+            fgMask = np.array(self.sqeRenderer.image_mesh_bool([0])).astype(np.bool)
+
+            dr = (-1./(self.prob) * fgMask * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] * self.Q[:, :])[:, :, None] * ((self.sqeRenderer.imageGT.r - self.sqeRenderer.render_image)/self.variances.r)
+
+            return dr.ravel()
+
+    @depends_on(dterms)
+    def fgProb(self):
+        return np.exp(- (self.sqeRenderer.r) / (2 * self.variances.r)) * (1. / (np.sqrt(self.variances.r) * np.sqrt(2 * np.pi)))
+
+    @depends_on(dterms)
+    def prob(self):
+        h = self.sqeRenderer.r.shape[0]
+        w = self.sqeRenderer.r.shape[1]
+
+        occProb = np.ones([h, w])
+        bgProb = np.ones([h, w])
+
+        fgMask = np.array(self.sqeRenderer.image_mesh_bool([0])).astype(np.bool)
+
+        errorFun = fgMask[:, :]*(self.Q[:, :] * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] + (1-self.Q[:, :]))+ (1- fgMask[:, :])
+
+        return errorFun
+
 class NLLCRFModel(Ch):
     terms = ['Q', 'variances']
     dterms = ['renderer', 'groundtruth']
@@ -323,6 +369,26 @@ class LogRobustModel(Ch):
         visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
 
         return ch.log(pixelLikelihoodRobustCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
+
+
+class LogRobustSQErrorModel(Ch):
+    dterms = ['sqeRenderer', 'foregroundPrior', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.sqeRenderer:
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        visibility = self.sqeRenderer.visibility_image
+        # visible = visibility != 4294967295
+
+        visible = np.array(self.sqeRenderer.image_mesh_bool([0])).copy().astype(np.bool)
+
+        return ch.log(pixelLikelihoodRobustSQErrorCh(self.sqeRenderer, visible, 'MASK', self.foregroundPrior, self.variances))
+
 
 
 class LogRobustModelRegion(Ch):
@@ -435,6 +501,25 @@ def layerPosteriorsRobustCh(image, template, testMask, backgroundModel, layerPri
     # return np.prod(foregroundProbs*mask, axis=2)/prodlik, np.prod(outlierProbs*mask, axis=2)/prodlik
 
     return foregroundProbs*mask/lik, outlierProbs*mask/lik
+
+def layerPosteriorsRobustSQErrorCh(sqeRenderer, testMask, backgroundModel, layerPrior, variances):
+
+    sigma = ch.sqrt(variances)
+    mask = testMask
+    if backgroundModel == 'FULL':
+        mask = np.ones(sqeRenderer.r.shape[0:2])
+    # mask = np.repeat(mask[..., np.newaxis], 3, 2)
+    repPriors = ch.tile(layerPrior, sqeRenderer.r.shape[0:2])
+    probs = ch.exp( - (sqeRenderer) / (2 * variances))  * (1/(sigma * np.sqrt(2 * np.pi)))
+    foregroundProbs =  probs[:,:,0] * probs[:,:,1] * probs[:,:,2] * layerPrior
+    backgroundProbs = np.ones(sqeRenderer.r.shape)
+    outlierProbs = ch.Ch(1-repPriors)
+    lik = pixelLikelihoodRobustSQErrorCh(sqeRenderer, testMask, backgroundModel, layerPrior, variances)
+    # prodlik = np.prod(lik, axis=2)
+    # return np.prod(foregroundProbs*mask, axis=2)/prodlik, np.prod(outlierProbs*mask, axis=2)/prodlik
+
+    return foregroundProbs*mask/lik, outlierProbs*mask/lik
+
 
 
 def robustDistance(sqResiduals, scale):

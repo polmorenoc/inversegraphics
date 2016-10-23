@@ -53,10 +53,10 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 #
 
 gtPrefix = 'train4_occlusion_shapemodel'
-# gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
+gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
 # gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
-gtPrefix = 'objectnet3d_teapots'
-experimentPrefix = 'objectnet3d_teapots'
+# gtPrefix = 'objectnet3d_teapots'
+experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
 # gtPrefix = 'train4_occlusion_multi'
 # experimentPrefix = 'train4_occlusion_multi'
@@ -160,9 +160,11 @@ for teapot_i in range(len(renderTeapotsList)):
     centermod = center_teapots[teapot_i]
 
     vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer = createRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.msaa = True
-    renderer.r
+    renderer.initGL()
+    renderer.initGLTexture()
+
     renderer_teapots = renderer_teapots + [renderer]
 
 currentTeapotModel = 0
@@ -251,8 +253,8 @@ useShapeModel = True
 makeVideo = False
 reduceVariance = False
 getColorFromCRF = False
-syntheticGroundtruth = False
-evaluateWithGT = False
+syntheticGroundtruth = True
+evaluateWithGT = True
 
 ignoreGT = True
 ignore = []
@@ -264,7 +266,7 @@ testSet = np.load(experimentDir + 'test.npy')
 
 rangeTests = np.arange(len(testSet))
 
-# rangeTests = np.arange(100,1100)
+rangeTests = np.arange(100,1100)
 
 # rangeTests = np.arange(100,1100)
 
@@ -567,9 +569,9 @@ if useShapeModel:
     # smUVs = ch.Ch(np.zeros([chVertices.shape[0],2]))
     smUVs = uvmod[0]
     # smHaveTextures = [[False]]
-    smHaveTextures = [[True]]
-    # smTexturesList = [[None]]
-    smTexturesList = [[texturesmod_list[0][0][0]]]
+    smHaveTextures = [[False]]
+    smTexturesList = [[None]]
+    # smTexturesList = [[texturesmod_list[0][0][0]]]
 
     chVertices = chVertices - ch.mean(chVertices, axis=0)
     minZ = ch.min(chVertices[:,2])
@@ -616,10 +618,14 @@ if useShapeModel:
         HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
         TexturesListB = [TexturesList] + [textures_list_mug]
 
-        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+        renderer = createRendererTarget(glMode, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+        renderer.initGL()
+        renderer.initGLTexture()
     else:
+        renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+        renderer.initGL()
+        renderer.initGLTexture()
 
-        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -629,11 +635,18 @@ if useShapeModel:
 else:
     renderer = renderer_teapots[testRenderer]
 
-ipdb.set_trace()
-renderer.dr_wrt(renderer.texture_stack[0])
 
+sqeRenderer = createSQErrorRenderer(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
 
-loadMask = False
+sqeRenderer.nsamples = 16
+sqeRenderer.imageGT = ch.Ch(renderer.r.copy())
+sqeRenderer.initGL()
+sqeRenderer.initGLTexture()
+sqeRenderer.initGL_SQErrorRenderer()
+
+plt.imsave('testrender.png', sqeRenderer.render_image)
+
+loadMask = True
 if loadMask:
     masksGT = loadMasks(gtDir + '/masks_occlusion/', testSet)
 
@@ -849,7 +862,7 @@ azsPredictions = np.array([])
 recomputeMeans = False
 includeMeanBaseline = False
 
-recomputePredictions = True
+recomputePredictions = False
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -1075,7 +1088,6 @@ param_values = neuralNetModelPose['params']
 
 network = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
 
-
 # layer = lasagne.layers.get_all_layers(network)[-2]
 inputLayer = lasagne.layers.get_all_layers(network)[0]
 layer_output = lasagne.layers.get_output(network, deterministic=True)
@@ -1090,12 +1102,12 @@ layer_outputGT = lasagne.layers.get_output(networkGT, deterministic=True)
 rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
 rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
 
-chThError = TheanoFunFiniteDiff(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray, dim_output = dim_output,
-                              theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT, imSize=75)
-
-chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
-
-chThError.r
+# chThError = TheanoFunFiniteDiff(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray, dim_output = dim_output,
+#                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT, imSize=75)
+#
+# chThError.compileFunctions(layer_output, theano_input=inputLayer.input_var, dim_output=dim_output, theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT)
+#
+# chThError.r
 
 
 if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLightCoefficientsPred.npy"):
@@ -1464,21 +1476,25 @@ shapeIm = [height, width]
 #Update all error functions with the right renderers.
 print("Using " + modelsDescr[model])
 
-negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
-negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
+negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/ numPixels
+negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/ numPixels
 pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
 pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
+pixelLikelihoodRobustSQErrorCh = generative_models.LogRobustSQErrorModel(sqeRenderer, foregroundPrior=globalPrior, variances=variances)
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
+# postSqerror = generative_models.layerPosteriorsRobustSQErrorCh(sqeRenderer, np.array([]), 'MASK', globalPrior, variances)[0].r>0.5
 
-models = [negLikModel, negLikModelRobust]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
+negLikModelRobustSQError = generative_models.NLLRobustSQErrorModel(sqeRenderer=sqeRenderer, Q=globalPrior.r*np.ones([height, width]),variances=variances) / numPixels
+
+models = [negLikModel, negLikModelRobust, negLikModelRobustSQError]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustSQErrorCh]
 modelsDescr = ["Gaussian Model", "Outlier model" ]
 
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'OPTIMIZE-VIDEO-' + testRangeStr
+testDescription = 'SQERROSHADER-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1790,15 +1806,21 @@ for testSetting, model in enumerate(modelTests):
             imageSrgb = image.copy()
             rendererGT[:] = srgb2lin(image)
 
+            sqeRenderer.imageGT = ch.Ch(image)
 
             negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
             # negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
             negLikModelRobust = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
                                                                                 variances=variances) / numPixels
 
-            models = [negLikModel, negLikModelRobust]
+            negLikModelRobustSQError = generative_models.NLLRobustSQErrorModel(sqeRenderer=sqeRenderer, Q=globalPrior.r*np.ones([height, width]),
+                                                                                variances=variances) / numPixels
+
+            models = [negLikModel, negLikModelRobust, negLikModelRobustSQError]
 
             stds[:] = stdsTests[testSetting]
+
+
 
             if makeVideo:
                 writer_i = Writer(fps=1, metadata=dict(title='', artist=''), bitrate=1800)
@@ -1892,6 +1914,13 @@ for testSetting, model in enumerate(modelTests):
                 chLightSHCoeffs[:] = lightCoefficientsRel
                 if useShapeModel:
                     chShapeParams[:] = shapeParams
+
+                plt.imsave('errors.png', sqeRenderer.r)
+                plt.imsave('errorscolors.png', sqeRenderer.render_image)
+                # plt.imsave('renderer2.png', sqeRenderer.render_dedx)
+                plt.imsave('errorsdx.png', sqeRenderer.render_dedx,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+                plt.imsave('errorsdy.png', sqeRenderer.render_dedy,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+                plt.imsave('errorsgt.png', sqeRenderer.imageGT.r)
 
                 rendererRecognition = renderer.r.copy()
 
@@ -2313,12 +2342,10 @@ for testSetting, model in enumerate(modelTests):
                             minimizingShape = True
 
                             method = 1
-                            errorFun = models[model]
+                            errorFun = models[2]
 
                             # errorFunFast = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
                             #                                                     variances=variances) / numPixels
-
-
                             ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                             # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
@@ -2416,6 +2443,9 @@ for testSetting, model in enumerate(modelTests):
 
                 vis_im = np.array(renderer.indices_image==1).copy().astype(np.bool)
                 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, vis_im, 'MASK', globalPrior, variances)[0].r>0.5
+
+                # postSqerror = generative_models.layerPosteriorsRobustSQErrorCh(sqeRenderer, np.array([]), 'MASK', globalPrior, variances)[0].r>0.5
+
                 fittedPosteriorsList = fittedPosteriorsList + [post[None,:]]
 
                 stds[:] = stdsTests[testSetting]

@@ -419,7 +419,7 @@ if useShapeModel:
 
     smFacesB = [smFaces]
     smVColorsB = [smVColors]
-    smUVsB = [smUVs]
+    smUVsB = [[smUVs]]
     smHaveTexturesB = [smHaveTextures]
     smTexturesListB = [smTexturesList]
 
@@ -454,16 +454,34 @@ if useShapeModel:
         TexturesListB = smTexturesListB
 
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
+    renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
-renderer.useShaderErrors = True
-renderer.overdraw = True
-renderer.nsamples = 8
-renderer.imageGT = np.ones([150,150,3])
-renderer.msaa = True
-renderer.initGL()
-renderer.initGLTexture()
-ipdb.set_trace()
+    chAz2 = ch.Ch(chAz.r[:] - 0.3)
+    chEl2 = ch.Ch(chEl.r[:]- 0.3)
+    chVColors2 = ch.Ch(np.array([1,0,0.5]))
+    light_color2 = light_color + np.array([0.2,-0.4,-0.4])
+    renderer2 = createRendererTarget(glMode, chAz2, chEl2, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color2, chComponent, chVColors2, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
+    renderer2.overdraw = True
+    renderer2.nsamples = 16
+    renderer2.msaa = True
+    renderer2.initGL()
+    renderer2.initGLTexture()
+
+sqeRenderer = createSQErrorRenderer(glMode, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
+
+sqeRenderer.nsamples = 16
+sqeRenderer.imageGT = renderer2.r.copy()
+sqeRenderer.initGL()
+sqeRenderer.initGLTexture()
+sqeRenderer.initGL_SQErrorRenderer()
+
+plt.imsave('errors.png', sqeRenderer.r)
+plt.imsave('errorscolors.png', sqeRenderer.render_image)
+# plt.imsave('renderer2.png', sqeRenderer.render_dedx)
+plt.imsave('errorsdx.png', sqeRenderer.render_dedx,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+plt.imsave('errorsdy.png', sqeRenderer.render_dedy,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+
+sys.exit()
 
 # # # Funky theano stuff
 # import lasagne_nn
