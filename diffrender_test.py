@@ -638,11 +638,12 @@ else:
 
 sqeRenderer = createSQErrorRenderer(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
 
-sqeRenderer.nsamples = 16
+sqeRenderer.nsamples = 8
 sqeRenderer.imageGT = ch.Ch(renderer.r.copy())
 sqeRenderer.initGL()
 sqeRenderer.initGLTexture()
 sqeRenderer.initGL_SQErrorRenderer()
+
 
 plt.imsave('testrender.png', sqeRenderer.render_image)
 
@@ -1915,12 +1916,6 @@ for testSetting, model in enumerate(modelTests):
                 if useShapeModel:
                     chShapeParams[:] = shapeParams
 
-                plt.imsave('errors.png', sqeRenderer.r)
-                plt.imsave('errorscolors.png', sqeRenderer.render_image)
-                # plt.imsave('renderer2.png', sqeRenderer.render_dedx)
-                plt.imsave('errorsdx.png', sqeRenderer.render_dedx,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-                plt.imsave('errorsdy.png', sqeRenderer.render_dedy,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-                plt.imsave('errorsgt.png', sqeRenderer.imageGT.r)
 
                 rendererRecognition = renderer.r.copy()
 
@@ -2330,10 +2325,10 @@ for testSetting, model in enumerate(modelTests):
 
                             free_variables = [chShapeParams, chAz, chEl, chLightSHCoeffs, chVColors]
                             #
-                            # stds[:] = 0.03
                             # shapePenalty = 0.0001
 
                             stds[:] = stdsTests[testSetting]
+                            stds[:] = 0.1
                             shapePenalty = 0.0001
 
                             options = {'disp': False, 'maxiter': 50}
@@ -2345,10 +2340,61 @@ for testSetting, model in enumerate(modelTests):
                             errorFun = models[2]
 
                             # errorFunFast = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
-                            #                                                     variances=variances) / numPixels
-                            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            #                                                      variances=variances) / numPixels
+                            #
+                            # plt.imsave('errorscolors1.png', sqeRenderer.render_image)
+                            #
+                            # chVColors[:] = testVColorGT[test_i] + nearGTOffsetVColor
+                            # chAz[:]= testAzsRel[test_i] + nearGTOffsetRelAz
+                            # chEl[:] = testElevsGT[test_i] + nearGTOffsetEl
+                            # chLightSHCoeffs[:] = testLightCoefficientsGTRel[test_i]
+                            # chShapeParams[:] = testShapeParamsGT[test_i]
+                            # # chLightSHCoeffs[:] = 0
+                            # # chLightSHCoeffs[2] = 0.5
+                            # # chLightSHCoeffs[0] = 1
+                            # plt.imsave('render.png', renderer.r)
+                            #
+                            # imageGT = renderer.r.copy()
+                            #
+                            # chEl[:] = chEl[:].r + 0.2
+                            #
+                            # SQError = (rendererGT.r - renderer)**2
+                            #
+                            # sqeRenderer.imageGT = ch.Ch(imageGT)
+                            #
+                            # plt.imsave('errors.png', sqeRenderer.r)
+                            # plt.imsave('errorscolors.png', sqeRenderer.render_image)
+                            # # plt.imsave('renderer2.png', sqeRenderer.render_dedx)
+                            # # plt.imsave('errorsdx.png', sqeRenderer.render_dedx, cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+                            # drAz = np.sum(sqeRenderer.dr_wrt(chEl).toarray().reshape([height,width, 3]), axis=2)
+                            #
+                            # drAzErrorFun = -pixelLikelihoodRobustSQErrorCh.dr_wrt(chEl).toarray().reshape([height, width])
+                            #
+                            # plt.ioff()
+                            # fig = plt.figure()
+                            # ax = fig.add_subplot(111, aspect='equal')
+                            # ims = ax.imshow(drAz, cmap=matplotlib.cm.coolwarm, vmin=-4, vmax=4)
+                            # fig.colorbar(ims)
+                            # fig.savefig('drAzfig.png', bbox_inches='tight')
+                            # plt.close(fig)
+                            # plt.ioff()
+                            #
+                            # fig = plt.figure()
+                            # ax = fig.add_subplot(111, aspect='equal')
+                            # ims = ax.imshow(drAzErrorFun, cmap=matplotlib.cm.coolwarm, vmin=-300, vmax=300)
+                            # fig.colorbar(ims)
+                            # fig.savefig('drAzfigErrFun.png', bbox_inches='tight')
+                            # plt.close(fig)
+                            #
+                            #
+                            # plt.imsave('errorsdr_wrtaz.png', drAz, cmap=matplotlib.cm.coolwarm, vmin=drAz.min(), vmax=drAz.max())
+                            #
+                            # plt.imsave('SQerrorsdr_wrtaz.png', SQError.dr_wrt(chEl).toarray().reshape([height,width, 3]), cmap=matplotlib.cm.coolwarm, vmin=-4, vmax=4)
+                            # plt.imsave('errorsgt.png', sqeRenderer.imageGT.r)
+                            #
+                            # sys.exit()
 
-                            # ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
+                            ch.minimize({'raw': errorFun}, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
                             maxShapeSize = 4
                             largeShapeParams = np.abs(chShapeParams.r) > maxShapeSize
