@@ -1509,6 +1509,8 @@ modelTests = len(stdsTests)*[1]
 # modelTests = [1]
 methodTests = len(stdsTests)*[1]
 
+maxOptIters = len(stdsTests)*[50]
+
 if makeVideo:
     plt.ioff()
     import matplotlib.animation as animation
@@ -1820,8 +1822,6 @@ for testSetting, model in enumerate(modelTests):
             models = [negLikModel, negLikModelRobust, negLikModelRobustSQError]
 
             stds[:] = stdsTests[testSetting]
-
-
 
             if makeVideo:
                 writer_i = Writer(fps=1, metadata=dict(title='', artist=''), bitrate=1800)
@@ -2328,10 +2328,10 @@ for testSetting, model in enumerate(modelTests):
                             # shapePenalty = 0.0001
 
                             stds[:] = stdsTests[testSetting]
-                            stds[:] = 0.1
-                            shapePenalty = 0.0001
 
-                            options = {'disp': False, 'maxiter': 50}
+                            shapePenalty = shapePenaltyTests[testSetting]
+
+                            options = {'disp': False, 'maxiter': maxOptIters[testSetting]}
                             # options={'disp':False, 'maxiter':2}
 
                             minimizingShape = True
@@ -2499,12 +2499,14 @@ for testSetting, model in enumerate(modelTests):
                 plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
 
             #Every now and then (or after the final test case), produce plots to keep track of work accross different levels of occlusion.
-            experimentDic = {'dataIds': testIds, 'gtPrefix': gtPrefix, 'trainPrefixPose': trainPrefixPose, 'trainPrefixVColor': trainPrefixVColor,
+            experimentDic = {'model':model, 'method':method, 'shapePenalty':shapePenalty, 'stds':stds.r, 'dataIds': testIds, 'gtPrefix': gtPrefix, 'trainPrefixPose': trainPrefixPose, 'trainPrefixVColor': trainPrefixVColor,
                              'trainPrefixLightCoeffs': trainPrefixLightCoeffs, 'trainPrefixShapeParams': trainPrefixShapeParams,
                              'trainModelsDirAppLight': trainModelsDirAppLight, 'experimentDir': experimentDir, 'testSet': testSet,
                              'methodsPred': methodsPred, 'testOcclusions': testOcclusions, 'likelihoods': likelihoods,
                              'testPrefixBase': testPrefixBase, 'parameterRecognitionModels': parameterRecognitionModels, 'azimuths': azimuths,
                              'elevations': elevations, 'vColors': vColors, 'lightCoeffs': lightCoeffs, 'shapeParams': shapeParams, 'evaluateWithGT':evaluateWithGT}
+
+
             with open(resultDir + 'experiment.pickle', 'wb') as pfile:
                 pickle.dump(experimentDic, pfile)
 
