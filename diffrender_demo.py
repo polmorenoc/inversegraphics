@@ -34,7 +34,7 @@ groundTruthBlender = False
 useShapeModel = True
 datasetGroundtruth = False
 syntheticGroundtruth = True
-useCycles = True
+useCycles = False
 demoMode = False
 showSubplots = False
 unpackModelsFromBlender = False
@@ -455,6 +455,11 @@ if useShapeModel:
 
     # renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], smVColorsB, smFacesB, [smNormals], light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height,smUVsB, smHaveTexturesB, smTexturesListB, frustum, win )
     renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
+    renderer.overdraw = True
+    renderer.nsamples = 8
+    renderer.msaa = True
+    renderer.initGL()
+    renderer.initGLTexture()
 
     chAz2 = ch.Ch(chAz.r[:] - 0.3)
     chEl2 = ch.Ch(chEl.r[:]- 0.3)
@@ -462,25 +467,25 @@ if useShapeModel:
     light_color2 = light_color + np.array([0.2,-0.4,-0.4])
     renderer2 = createRendererTarget(glMode, chAz2, chEl2, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color2, chComponent, chVColors2, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
     renderer2.overdraw = True
-    renderer2.nsamples = 16
+    renderer2.nsamples = 8
     renderer2.msaa = True
     renderer2.initGL()
     renderer2.initGLTexture()
 
 sqeRenderer = createSQErrorRenderer(glMode, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
 
-sqeRenderer.nsamples = 16
+sqeRenderer.nsamples = 8
 sqeRenderer.imageGT = renderer2.r.copy()
 sqeRenderer.initGL()
 sqeRenderer.initGLTexture()
 sqeRenderer.initGL_SQErrorRenderer()
 
-plt.imsave('errors.png', sqeRenderer.r)
-plt.imsave('errorscolors.png', sqeRenderer.render_image)
-# plt.imsave('renderer2.png', sqeRenderer.render_dedx)
-plt.imsave('errorsdx.png', sqeRenderer.render_dedx,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-plt.imsave('errorsdy.png', sqeRenderer.render_dedy,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
-
+# plt.imsave('errors.png', sqeRenderer.r)
+# plt.imsave('errorscolors.png', sqeRenderer.render_image)
+# # plt.imsave('renderer2.png', sqeRenderer.render_dedx)
+# plt.imsave('errorsdx.png', sqeRenderer.render_dedx,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+# plt.imsave('errorsdy.png', sqeRenderer.render_dedy,cmap=matplotlib.cm.coolwarm, vmin=-1, vmax=1)
+#
 sys.exit()
 
 # # # Funky theano stuff

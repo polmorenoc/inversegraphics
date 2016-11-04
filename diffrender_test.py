@@ -1495,7 +1495,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'SQERROSHADER-' + testRangeStr
+testDescription = 'TMP-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1503,7 +1503,7 @@ testPrefixBase = testPrefix
 runExp = True
 shapePenaltyTests = [0,0,0,0]
 # shapePenaltyTests = [0,0,0,0]
-stdsTests = [0.03]
+stdsTests = [0.01]
 # stdsTests = [0.03]
 modelTests = len(stdsTests)*[1]
 # modelTests = [1]
@@ -2270,7 +2270,7 @@ for testSetting, model in enumerate(modelTests):
                             # stds[:] = 0.03
                             # shapePenalty = 0.0001
 
-                            stds[:] = 0.05
+                            stds[:] = stdsTests[testSetting]
                             shapePenalty = 0.0001
 
                             options={'disp':False, 'maxiter':50}
@@ -2632,13 +2632,6 @@ for testSetting, model in enumerate(modelTests):
                         segmentations = segmentations + [None]
                         shapeParams = shapeParams + [None]
 
-
-                    # segmentVColors = np.vstack(segmentVColorsList)
-                    # errorsVColorsCSegment = image_processing.cColourDifference(testVColorGT[numFitted], segmentVColors)
-                    # errorsVColorsScaleInvSegment = image_processing.scaleInvariantColourDifference(testVColorGT[numFitted], segmentVColors)
-                    # errorsVColorsScaleInvPred = image_processing.scaleInvariantColourDifference(testVColorGT[numFitted], vColors[2][numFitted])
-                    #
-                    # ipdb.set_trace()
 
                     errorsPosePredList, errorsLightCoeffsList, errorsShapeParamsList, errorsShapeVerticesList, errorsEnvMapList, errorsLightCoeffsCList, errorsVColorsEList, errorsVColorsCList, errorsVColorsSList, errorsSegmentationList \
                         = computeErrors(numFitted, azimuths, testAzsRel, elevations, testElevsGT, vColors, testVColorGT, lightCoeffs, testLightCoefficientsGTRel, approxProjections,  approxProjectionsGT, shapeParams, testShapeParamsGT, useShapeModel, chShapeParams, chVertices, segmentations, masksGT)

@@ -130,6 +130,7 @@ def pixelLikelihoodRobustSQErrorCh(sqeRenderer, testMask, backgroundModel, layer
 
     probs = ch.exp( - (sqeRenderer) / (2 * variances)) * (1./(sigma * np.sqrt(2 * np.pi)))
     foregroundProbs = (probs[:,:,0] * probs[:,:,1] * probs[:,:,2]) * layerPrior + (1 - repPriors)
+
     return foregroundProbs * mask + (1-mask)
 
 def pixelLikelihoodRobustCh(image, template, testMask, backgroundModel, layerPrior, variances):
@@ -209,6 +210,7 @@ class NLLRobustModel(Ch):
 
             dr = (-1./(self.prob) * fgMask * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] * self.Q[:, :])[:, :, None] * ((self.groundtruth.r - self.renderer.r)/self.variances.r)
 
+
             return dr.ravel()
 
     @depends_on(dterms)
@@ -251,10 +253,15 @@ class NLLRobustSQErrorModel(Ch):
         return -np.sum(np.log(self.prob))
 
     def compute_dr_wrt(self, wrt):
+
         if wrt is self.sqeRenderer:
             fgMask = np.array(self.sqeRenderer.image_mesh_bool([0])).astype(np.bool)
 
-            dr = (-1./(self.prob) * fgMask * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] * self.Q[:, :])[:, :, None] * ((self.sqeRenderer.imageGT.r - self.sqeRenderer.render_image)/self.variances.r)
+            # dr = (-1./(self.prob) * fgMask * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] * self.Q[:, :])[:, :, None] * ((self.sqeRenderer.imageGT.r - self.sqeRenderer.render_image)/self.variances.r)
+            dr = np.tile((-1./(self.prob) * fgMask * self.fgProb[:,:,0]*self.fgProb[:,:,1]*self.fgProb[:,:,2] * self.Q[:, :])[:, :, None], [1,1,3]) * (-0.5/self.variances.r)
+
+            # dr = (-1./(self.prob[:, :,None]) * fgMask[:, :,None] * self.fgProb * self.Q[:, :,None]) * (-0.5/self.variances.r)
+
 
             return dr.ravel()
 
@@ -379,7 +386,7 @@ class LogRobustSQErrorModel(Ch):
 
     def compute_dr_wrt(self, wrt):
         if wrt is self.sqeRenderer:
-            return self.logProb().dr_wrt(self.renderer)
+            return self.logProb().dr_wrt(self.sqeRenderer)
 
     def logProb(self):
         visibility = self.sqeRenderer.visibility_image
@@ -439,6 +446,7 @@ def pixelLikelihood(image, template, testMask, backgroundModel, variances):
     uniformProbs = np.ones(image.shape[0:2])
     normalProbs = np.prod((1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (image - template)**2 / (2 * variances))),axis=2)
     return normalProbs * mask + (1-mask)
+
 
 def logPixelLikelihoodCh(image, template, testMask, backgroundModel, variances):
     sigma = ch.sqrt(variances)
