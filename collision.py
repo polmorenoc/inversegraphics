@@ -19,21 +19,21 @@ def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, app
         bm.from_mesh(me)
         bpy.data.meshes.remove(me)
     else:
-        me = obj.data
         if obj.mode == 'EDIT':
             bm_orig = bmesh.from_edit_mesh(me)
             bm = bm_orig.copy()
         else:
             bm = bmesh.new()
             bm.from_mesh(me)
-
-    # Remove custom data layers to save memory
-    for elem in (bm.faces, bm.edges, bm.verts, bm.loops):
-        for layers_name in dir(elem.layers):
-            if not layers_name.startswith("_"):
-                layers = getattr(elem.layers, layers_name)
-                for layer_name, layer in layers.items():
+        # Remove custom data layers to save memory
+        for elem in (bm.faces, bm.edges, bm.verts, bm.loops):
+            for layers_name in dir(elem.layers):
+                if not layers_name.startswith("_"):
+                    layers = getattr(elem.layers, layers_name)
                     layers.remove(layer)
+                    for layer_name, layer in layers.items():
+                        pass
+        me = obj.data
 
     if transform:
         bm.transform(objTransf * obj.matrix_world)

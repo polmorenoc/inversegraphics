@@ -145,7 +145,6 @@ def modifySpecular(scene, delta):
                 mat.specular_intensity = mat.specular_intensity + delta
                 mat.specular_hardness = mat.specular_hardness / 4.0
 
-
 def makeMaterial(name, diffuse, specular, alpha):
     mat = bpy.data.materials.new(name)
     mat.diffuse_color = diffuse
