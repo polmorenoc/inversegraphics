@@ -1,7 +1,7 @@
 # Overcoming Occlusion with Inverse Graphics
-This is the code for our ECCV16 paper on the Geometry meets Deep Learning workshop. 
+This is the code for our [ECCV16 paper on the Geometry meets Deep Learning workshop](http://homepages.inf.ed.ac.uk/ckiw/postscript/eccv_gmdl16.pdf). 
 
-[](images/vaig.png)
+[img](images/vaig.png)
 
 Here you'll find the scene generator as well as the code for the models. The main libraries needed are:
 
