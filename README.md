@@ -5,3 +5,15 @@ This is the code for our ECCV16 paper on the Geometry meets Deep Learning worksh
 - My updated versions of OpenDR and Chumpy you can [find here](https://github.com/polmorenoc/opendr).
 
 Python 3.4+ is a requirement.
+
+The main script files to run are the following:
+
+* diffrender_demo.py: Code to interactively run and fit the generative models.
+* diffrender_groundtruth.py:	Main code to generate ground-truth for synthetic scenes (both for OpenGL and Photorealistic (cycles) types of rendering!
+* diffrender_groundtruth_multi.p: As above, but extended to multiple objects.
+* diffrender_experiment.py: Generate experiment train/test splits.
+* diffrender_train.py: Train Lasagne neural networks (used to train our recognition models).
+* diffrender_test.py: Main code to evaluate and fit different models.
+* diffrender_analyze.py: Extract statistics and plots of experimental evaluation.
+
+For the stocastic generation of synthetic images with ground-truth, you'll need additional CAD data and other files. Please get in touch with me (polmorenoc@gmail.com) for it.
