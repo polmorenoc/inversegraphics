@@ -1,7 +1,7 @@
 __author__ = 'pol'
 
 import matplotlib
-matplotlib.use('Qt4Agg')
+# matplotlib.use('Qt4Agg')
 import bpy
 import scene_io_utils
 import mathutils
@@ -28,21 +28,20 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_cycles'
-previousGTPrefix = 'train4_occlusion_shapemodel'
+prefix = 'cian_example'
+previousGTPrefix = 'cian_example'
 
 #Main script options:
-renderFromPreviousGT = True
+renderFromPreviousGT = False
 useShapeModel = True
-renderOcclusions = True
+renderOcclusions = False
 useOpenDR = True
-useBlender = True
+useBlender = False
 loadBlenderSceneFile = True
-groundTruthBlender = True
 useCycles = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
-loadSavedSH = False
+
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
@@ -91,61 +90,38 @@ targetModels = []
 blender_teapots = []
 teapots = [line.strip() for line in open('teapots.txt')]
 selection = [ teapots[i] for i in renderTeapotsList]
-scene_io_utils.loadTargetsBlendData()
-for teapotIdx, teapotName in enumerate(selection):
-    teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
-    teapot.layers[1] = True
-    teapot.layers[2] = True
-    targetModels = targetModels + [teapot]
-    blender_teapots = blender_teapots + [teapot]
+
+if useBlender:
+    scene_io_utils.loadTargetsBlendData()
+    for teapotIdx, teapotName in enumerate(selection):
+        teapot = bpy.data.scenes[teapotName[0:63]].objects['teapotInstance' + str(renderTeapotsList[teapotIdx])]
+        teapot.layers[1] = True
+        teapot.layers[2] = True
+        targetModels = targetModels + [teapot]
+        blender_teapots = blender_teapots + [teapot]
 
 v_teapots, f_list_teapots, vc_teapots, vn_teapots, uv_teapots, haveTextures_list_teapots, textures_list_teapots, vflat, varray, center_teapots = scene_io_utils.loadTeapotsOpenDRData(renderTeapotsList, useBlender, unpackModelsFromBlender, targetModels)
-
-azimuth = np.pi
-chCosAz = ch.Ch([np.cos(azimuth)])
-chSinAz = ch.Ch([np.sin(azimuth)])
-
-chAz = 2*ch.arctan(chSinAz/(ch.sqrt(chCosAz**2 + chSinAz**2) + chCosAz))
-chAz = ch.Ch([0])
-chObjAz = ch.Ch([0])
-chAzRel = chAz - chObjAz
-
-elevation = 0
-chLogCosEl = ch.Ch(np.log(np.cos(elevation)))
-chLogSinEl = ch.Ch(np.log(np.sin(elevation)))
-chEl = 2*ch.arctan(ch.exp(chLogSinEl)/(ch.sqrt(ch.exp(chLogCosEl)**2 + ch.exp(chLogSinEl)**2) + ch.exp(chLogCosEl)))
-chEl =  ch.Ch([0.0])
-chDist = ch.Ch([camDistance])
 
 chObjAzGT = ch.Ch([0])
 chAzGT = ch.Ch([0])
 chAzRelGT = chAzGT - chObjAzGT
-chElGT = ch.Ch(chEl.r[0])
+chElGT = ch.Ch([0])
 chDistGT = ch.Ch([camDistance])
 chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 chComponent = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
-chPointLightIntensity = ch.Ch([1])
 chPointLightIntensityGT = ch.Ch([1])
-chLightAz = ch.Ch([0.0])
-chLightEl = ch.Ch([np.pi/2])
-chLightDist = ch.Ch([0.5])
+
 chLightDistGT = ch.Ch([0.5])
 chLightAzGT = ch.Ch([0.0])
 chLightElGT = ch.Ch([np.pi/4])
 
-ligthTransf = computeHemisphereTransformation(chLightAz, chLightEl, chLightDist, targetPosition)
 ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
 
-lightPos = ch.dot(ligthTransf, ch.Ch([0.,0.,0.,1.]))[0:3]
-lightPos = ch.Ch([targetPosition[0]+0.5,targetPosition[1],targetPosition[2] + 0.5])
 lightPosGT = ch.dot(ligthTransfGT, ch.Ch([0.,0.,0.,1.]))[0:3]
 
-chGlobalConstant = ch.Ch([0.5])
 chGlobalConstantGT = ch.Ch([0.5])
-light_color = ch.ones(3)*chPointLightIntensity
 light_colorGT = ch.ones(3)*chPointLightIntensityGT
-chVColors = ch.Ch([0.8,0.8,0.8])
 chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
 shCoefficientsFile = 'data/sceneSH' + str(sceneIdx) + '.pickle'
@@ -190,9 +166,7 @@ chComponentGTRel = chAmbientSHGTRel
 # chComponentGTRel = ch.Ch(chAmbientSHGTRel.r[:].copy())
 # chComponentGT = chAmbientSHGT.r[:] + shDirLightGT.r[:]*chLightIntensityGT.r[:]
 
-chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chDisplacementGT = ch.Ch([0.0,0.0,0.0])
-chScale = ch.Ch([1.0,1.0,1.0])
 chScaleGT = ch.Ch([1, 1.,1.])
 
 currentTeapotModel = 0
@@ -202,7 +176,7 @@ addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list,  v_teapot
 center = center_teapots[currentTeapotModel]
 
 if useOpenDR:
-    rendererGT = createRendererGT(glMode, chAzGT, chObjAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, chScaleGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
+    rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, uv, haveTextures_list, textures_list, frustum, None)
 
     vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
     vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -210,16 +184,6 @@ if useOpenDR:
     shapeIm = vis_gt.shape
 
 numPixels = height * width
-
-def imageGT():
-    global groundTruthBlender
-    global rendererGT
-    global blenderRender
-
-    if groundTruthBlender:
-        return blenderRender
-    else:
-        return np.copy(np.array(rendererGT.r)).astype(np.float64)
 
 import multiprocessing
 numTileAxis = np.ceil(np.sqrt(multiprocessing.cpu_count())/2)
@@ -522,7 +486,7 @@ if not renderFromPreviousGT:
 
                         chLightIntensityGTVals = 0
 
-                        chVColorsGTVals =  np.random.uniform(0.2,0.8, [1, 3])
+                        chVColorsGTVals =  np.random.uniform(0.1,0.9, [1, 3])
 
                         envMapCoeffsRotatedVals = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
                         envMapCoeffsRotatedRelVals = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
@@ -566,7 +530,6 @@ if not renderFromPreviousGT:
                         if np.mod(train_i, 100) == 0:
                             print("Generated " + str(train_i) + " GT instances.")
                             print("Generating groundtruth. Iteration of " + str(range(int(trainSize/(lenScenes*len(hdrstorender)*len(renderTeapotsList))))) + " teapots")
-
 
 if renderFromPreviousGT:
 
@@ -804,7 +767,7 @@ for gtIdx in rangeGT[:]:
         #Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
         cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0,0,0,1]])])[0:3,3]
         vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
-        if np.min(np.linalg.norm(vDists,axis=1) <= clip_start):
+        if np.min(np.linalg.norm(vDists,axis=1)) <= clip_start:
             ignore = True
 
     if not ignore and useBlender:

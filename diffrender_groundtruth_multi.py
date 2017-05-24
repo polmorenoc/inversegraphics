@@ -1,7 +1,7 @@
 __author__ = 'pol'
 
 import matplotlib
-matplotlib.use('Qt4Agg')
+# matplotlib.use('Qt4Agg')
 import bpy
 import scene_io_utils
 import mathutils
@@ -12,6 +12,7 @@ import opendr
 import chumpy as ch
 import geometry
 import image_processing
+import pdb
 import numpy as np
 import cv2
 from blender_utils import *
@@ -31,17 +32,17 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'train4_occlusion_shapemodel_texture'
+prefix = 'cian_example'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
-previousGTPrefix = 'train4_occlusion_shapemodel'
+previousGTPrefix = 'cian_example'
 
 #Main script options:
 
 renderFromPreviousGT = False
 useShapeModel = True
 useOpenDR = True
-useBlender = True
-renderBlender = True
+useBlender = False
+renderBlender = False
 captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
@@ -106,7 +107,8 @@ mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(mugs))[0:1]
 
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+# replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -159,7 +161,6 @@ if renderMugs:
     uv_mug = uv_mugs[0][0]
     haveTextures_list_mug = haveTextures_list_mugs[0][0]
     textures_list_mug = textures_list_mugs[0][0]
-
 
 chObjAz = ch.Ch([0])
 
@@ -245,6 +246,11 @@ center = center_teapots[currentTeapotModel]
 if useOpenDR:
 
     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
+    rendererGT.overdraw = False
+    rendererGT.nsamples = 8
+    rendererGT.msaa = True
+    rendererGT.initGL()
+    rendererGT.initGLTexture()
 
     vis_gt = np.array(rendererGT.indices_image!=1).copy().astype(np.bool)
     vis_mask = np.array(rendererGT.indices_image==1).copy().astype(np.bool)
@@ -333,14 +339,6 @@ if useShapeModel:
 
 
 
-# teapotScene = bpy.data.scenes.new('Teapot')
-# teapotScene.objects.link(teapotMesh)
-# placeNewTarget(teapotScene, teapot, np.array([0,0,0]))
-# teapotScene.update()
-# bpy.ops.file.pack_all()
-# bpy.ops.wm.save_as_mainfile(filepath='teapot.blend')
-# ipdb.set_trace()
-
 ### Renderer (only teapot)
 
 teapotToRender = -1
@@ -354,9 +352,10 @@ chAz = ch.Ch([0])
 chObjAz = ch.Ch([0])
 chAzRel = chAz - chObjAz
 
-chEl =  ch.Ch([0.95993109])
+chEl =  ch.Ch([0.0])
 chDist = ch.Ch([camDistance])
 
+#Initialize to a random set of SH coefficients
 chLightSHCoeffs = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
 # if multiObjects:
@@ -378,7 +377,6 @@ chDisplacement = ch.Ch([0.0, 0.0,0.0])
 chScale = ch.Ch([1.0,1.0,1.0])
 
 
-# testRenderer = 2
 if useShapeModel:
     import shape_model
     #%% Load data
@@ -387,7 +385,7 @@ if useShapeModel:
     chShapeParams = ch.Ch(shapeParams.copy())
 
 
-    chVertices = shape_model.VerticesModel(chShapeParams=chShapeParams,meshLinearTransform=meshLinearTransform,W = W,b=b)
+    chVertices = shape_model.VerticesModel(chShapeParams=chShapeParams, meshLinearTransform=meshLinearTransform,W = W,b=b)
     chVertices.init()
 
     chVertices = ch.dot(geometry.RotateZ(-np.pi/2)[0:3,0:3],chVertices.T).T
@@ -444,10 +442,10 @@ if useShapeModel:
         HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
         TexturesListB = [TexturesList] + [textures_list_mug]
 
-        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
+        renderer = createRendererTarget(glMode, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,chComponent, chVColors, np.array([0,0,0]), chDisplacement, width, height, UVsB, HaveTexturesB, TexturesListB, frustum, None)
     else:
 
-        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, None )
+        renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, None )
     renderer.msaa = True
     renderer.overdraw = True
 
@@ -733,7 +731,7 @@ if not renderFromPreviousGT:
         envMapFilename = None
 
         for targetidx, targetIndex in enumerate(targetIndices):
-            targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
+            targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0][0]]
 
             # if sceneIdx != currentScene or targetIndex != currentTargetIndex:
         #     targetPosition = targetPositions[np.where(targetIndex == np.array(targetIndicesScene))[0]]
@@ -744,6 +742,8 @@ if not renderFromPreviousGT:
             removeObjectData(len(v) - 1 - targetIndex, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
             # if sceneIdx != currentScene or targetIndex != currentTargetIndex:
+            parentIdx = instances[targetIndex][1]
+
             if useBlender:
                 if unlinkedObj != None:
                     scene.objects.link(unlinkedObj)
@@ -753,8 +753,9 @@ if not renderFromPreviousGT:
                 scene.objects.unlink(unlinkedObj)
                 cubeScene.objects.unlink(unlinkedCubeObj)
 
-                parentIdx = instances[targetIndex][1]
+
                 parentSupportObj = scene.objects[str(parentIdx)]
+
                 supportWidthMax, supportWidthMin = modelWidth(parentSupportObj.dupli_group.objects,
                                                               parentSupportObj.matrix_world)
                 supportDepthMax, supportDepthMin = modelDepth(parentSupportObj.dupli_group.objects,
@@ -762,86 +763,88 @@ if not renderFromPreviousGT:
                 # supportRad = min(0.5 * np.sqrt((supportDepthMax - supportDepthMin) ** 2),0.5 * np.min((supportWidthMax - supportWidthMin) ** 2))
                 supportRad = np.sqrt(0.5 * (supportDepthMax - supportDepthMin) ** 2 + 0.5 * (supportWidthMax - supportWidthMin) ** 2)
 
-                sceneCollisions = {}
-                collisionsFile = 'data/collisions/discreteCollisions_scene' + str(sceneNumber) + '_targetIdx' + str(targetIndex) + '.pickle'
-
                 distRange = min(supportRad, 0.3)
-                distInterval = 0.05
-                rotationRange = 2 * np.pi
-                rotationInterval = 10 * np.pi / 180
 
-                if not parseSceneInstantiations and os.path.exists(collisionsFile):
+            sceneCollisions = {}
+            collisionsFile = 'data/collisions/discreteCollisions_scene' + str(sceneNumber) + '_targetIdx' + str(targetIndex) + '.pickle'
 
-                    with open(collisionsFile, 'rb') as pfile:
-                        sceneCollisions = pickle.load(pfile)
+            distInterval = 0.05
+            rotationRange = 2 * np.pi
+            rotationInterval = 10 * np.pi / 180
 
-                    supportRad = sceneCollisions['supportRad']
-                    instantiationBinsTeapot = sceneCollisions['instantiationBinsTeapot']
-                    distRange = sceneCollisions['distRange']
-                    rotationRange = sceneCollisions['rotationRange']
-                    rotationInterval = sceneCollisions['rotationInterval']
-                    distInterval = sceneCollisions['distInterval']
-                    instantiationBinsMug = sceneCollisions['instantiationBinsMug']
-                    totalBinsTeapot = sceneCollisions['totalBinsTeapot']
-                    totalBinsMug = sceneCollisions['totalBinsMug']
-                else:
+            if not parseSceneInstantiations and os.path.exists(collisionsFile):
 
-                    print("Parsing collisions for scene " + str(sceneNumber))
-                    placeCamera(cubeScene.camera, 0,
-                                45, chDistGT.r[0].copy(),
-                                center[:].copy() + targetPosition[:].copy())
+                with open(collisionsFile, 'rb') as pfile:
+                    sceneCollisions = pickle.load(pfile)
 
-                    scaleZ = 0.2
-                    scaleY = 0.2
-                    scaleX = 0.2
+                supportRad = sceneCollisions['supportRad']
+                instantiationBinsTeapot = sceneCollisions['instantiationBinsTeapot']
+                distRange = sceneCollisions['distRange']
+                rotationRange = sceneCollisions['rotationRange']
+                rotationInterval = sceneCollisions['rotationInterval']
+                distInterval = sceneCollisions['distInterval']
+                instantiationBinsMug = sceneCollisions['instantiationBinsMug']
+                totalBinsTeapot = sceneCollisions['totalBinsTeapot']
+                totalBinsMug = sceneCollisions['totalBinsMug']
+            else:
+                assert(useBlender)
 
-                    cubeTeapot = createCube(scaleX, scaleY, scaleZ, 'cubeTeapot')
-                    cubeTeapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
+                print("Parsing collisions for scene " + str(sceneNumber))
+                placeCamera(cubeScene.camera, 0,
+                            45, chDistGT.r[0].copy(),
+                            center[:].copy() + targetPosition[:].copy())
 
-                    # cubeTeapot = getCubeObj(teapot)
-                    # cubeMug = getCubeObj(mug)
+                scaleZ = 0.2
+                scaleY = 0.2
+                scaleX = 0.2
 
-                    scaleZ = 0.1
-                    scaleY = 0.1
-                    scaleX = 0.1
+                cubeTeapot = createCube(scaleX, scaleY, scaleZ, 'cubeTeapot')
+                cubeTeapot.matrix_world = mathutils.Matrix.Translation(targetPosition)
 
-                    cubeMug = createCube(scaleX, scaleY, scaleZ, 'cubeMug')
-                    cubeMug.matrix_world = mathutils.Matrix.Translation(targetPosition)
+                # cubeTeapot = getCubeObj(teapot)
+                # cubeMug = getCubeObj(mug)
 
-                    cubeScene.objects.link(cubeTeapot)
+                scaleZ = 0.1
+                scaleY = 0.1
+                scaleX = 0.1
 
-                    cubeParentSupportObj = cubeScene.objects['cube' + str(parentIdx)]
-                    cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
-                    cubeScene.update()
+                cubeMug = createCube(scaleX, scaleY, scaleZ, 'cubeMug')
+                cubeMug.matrix_world = mathutils.Matrix.Translation(targetPosition)
 
-                    objDisplacementMat = computeHemisphereTransformation(chObjRotationGT, 0, chObjDistGT, np.array([0, 0, 0]))
+                cubeScene.objects.link(cubeTeapot)
 
-                    objOffset = objDisplacementMat[0:3, 3]
+                cubeParentSupportObj = cubeScene.objects['cube' + str(parentIdx)]
+                cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
+                cubeScene.update()
 
-                    instantiationBinsTeapot, totalBinsTeapot = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeTeapot,
-                                                                                  cubeScene, objOffset, chObjDistGT,
-                                                                                  chObjRotationGT, cubeParentSupportObj,
-                                                                                  cubeRoomObj, distRange, rotationRange,
-                                                                                  distInterval, rotationInterval)
-                    cubeScene.objects.unlink(cubeTeapot)
-                    cubeScene.objects.link(cubeMug)
-                    instantiationBinsMug, totalBinsMug = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeMug,
-                                                                                        cubeScene, objOffset,
-                                                                                        chObjDistGT, chObjRotationGT,
-                                                                                        cubeParentSupportObj, cubeRoomObj,
-                                                                                        distRange,
-                                                                                        rotationRange, distInterval,
-                                                                                        rotationInterval)
-                    cubeScene.objects.unlink(cubeMug)
-                    deleteObject(cubeTeapot)
-                    deleteObject(cubeMug)
-                    sceneCollisions = {'totalBinsTeapot': totalBinsTeapot, 'totalBinsMug': totalBinsMug,
-                                       'supportRad': supportRad, 'instantiationBinsTeapot': instantiationBinsTeapot,
-                                       'distRange': distRange, 'rotationRange': rotationRange,
-                                       'distInterval': distInterval, 'rotationInterval': rotationInterval,
-                                       'instantiationBinsMug': instantiationBinsMug}
-                    with open(collisionsFile, 'wb') as pfile:
-                        pickle.dump(sceneCollisions, pfile)
+                objDisplacementMat = computeHemisphereTransformation(chObjRotationGT, 0, chObjDistGT, np.array([0, 0, 0]))
+
+                objOffset = objDisplacementMat[0:3, 3]
+
+                instantiationBinsTeapot, totalBinsTeapot = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeTeapot,
+                                                                              cubeScene, objOffset, chObjDistGT,
+                                                                              chObjRotationGT, cubeParentSupportObj,
+                                                                              cubeRoomObj, distRange, rotationRange,
+                                                                              distInterval, rotationInterval)
+                cubeScene.objects.unlink(cubeTeapot)
+                cubeScene.objects.link(cubeMug)
+                instantiationBinsMug, totalBinsMug = collision.parseSceneCollisions(gtDir, scene_i, targetIndex, cubeMug,
+                                                                                    cubeScene, objOffset,
+                                                                                    chObjDistGT, chObjRotationGT,
+                                                                                    cubeParentSupportObj, cubeRoomObj,
+                                                                                    distRange,
+                                                                                    rotationRange, distInterval,
+                                                                                    rotationInterval)
+                cubeScene.objects.unlink(cubeMug)
+                deleteObject(cubeTeapot)
+                deleteObject(cubeMug)
+                sceneCollisions = {'totalBinsTeapot': totalBinsTeapot, 'totalBinsMug': totalBinsMug,
+                                   'supportRad': supportRad, 'instantiationBinsTeapot': instantiationBinsTeapot,
+                                   'distRange': distRange, 'rotationRange': rotationRange,
+                                   'distInterval': distInterval, 'rotationInterval': rotationInterval,
+                                   'instantiationBinsMug': instantiationBinsMug}
+                with open(collisionsFile, 'wb') as pfile:
+                    pickle.dump(sceneCollisions, pfile)
 
                 #Go to next target Index or scene if there are no plausible place instantiations for teapot or mug.
                 if instantiationBinsTeapot.sum() < 1 or instantiationBinsMug.sum() < 1:
@@ -932,6 +935,12 @@ if not renderFromPreviousGT:
                     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, Faces, VColors, vnGT, UVs, HaveTextures, TexturesList)
 
                     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, VerticesTeapot + VerticesMug +  v, VColorsTeapot + VColorsMug +  vc, FacesTeapot + FacesMug +  f_list, NormalsTeapot + NormalsMug +  vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, UVsTeapot + UVsMug +  uv, HaveTexturesTeapot + HaveTexturesMug +  haveTextures_list, TexturesListTeapot + TexturesListMug +  textures_list, frustum, None)
+                    rendererGT.overdraw = False
+                    rendererGT.nsamples = 8
+                    rendererGT.msaa = True
+                    rendererGT.initGL()
+                    rendererGT.initGLTexture()
+
                 ## Blender: Unlink and link new teapot.
                 if useBlender:
 
@@ -991,7 +1000,9 @@ if not renderFromPreviousGT:
                 envMapCoeffs = hdrValues[1]
 
                 envMapFilename = hdrFile
-                envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+
+                if not useBlender:
+                    envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
                 numTeapotTrain = 0
                 numAttempts = 0
                 maxAttempts = max(int(trainSize/(lenScenes*len(renderTeapotsList))),1)
@@ -1055,7 +1066,7 @@ if not renderFromPreviousGT:
                     chObjRotationGTVals = 0
                     if renderTeapots:
                         chObjAzGTVals = np.random.uniform(0, np.pi * 2)
-                        chObjDistGTVals = np.random.uniform(0, np.min(supportRad, 0.3))
+                        chObjDistGTVals = np.random.uniform(0, np.minimum(supportRad, 0.3))
                         chObjAzGT[:] = chObjAzGTVals
 
                         chVColorsGT[:] = chVColorsGTVals
@@ -1101,7 +1112,7 @@ if not renderFromPreviousGT:
                     mugPosOffsetVals = 0
                     chVColorsMugVals = np.random.uniform(0.1, 0.9, [1, 3])
                     if renderMugs:
-                        chObjDistMugVals = np.random.uniform(0,np.min(supportRad, 0.4))
+                        chObjDistMugVals = np.random.uniform(0,np.minimum(supportRad, 0.4))
                         chObjRotationMugVals = np.random.uniform(0,np.pi*2)
 
                         instantiationBinsMugUpdated = instantiationBinsMug
@@ -1229,17 +1240,18 @@ if not renderFromPreviousGT:
                         maxDistToObjects = 0.6
 
                         #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
-                        if np.min(np.linalg.norm(vDists, axis=1) <= clip_start):
+                        
+                        if np.min(np.linalg.norm(vDists, axis=1)) <= clip_start:
                             ignore = True
 
                         if renderTeapots:
                             vDistsTeapot = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded].ravel()].ravel()] - cameraEye
-                            if  np.min(np.linalg.norm(vDistsTeapot, axis=1) <= minDistToObjects) or np.min(np.linalg.norm(vDistsTeapot, axis=1) > maxDistToObjects):
+                            if  np.min(np.linalg.norm(vDistsTeapot, axis=1)) <= minDistToObjects or np.min(np.linalg.norm(vDistsTeapot, axis=1)) > maxDistToObjects:
                                 ignore = True
 
                         if renderMugs:
                             vDistsMug = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded_mug].ravel()].ravel()] - cameraEye
-                            if  np.min(np.linalg.norm(vDistsMug, axis=1) <= minDistToObjects) or np.min(np.linalg.norm(vDistsMug, axis=1) > maxDistToObjects):
+                            if np.min(np.linalg.norm(vDistsMug, axis=1)) <= minDistToObjects or np.min(np.linalg.norm(vDistsMug, axis=1)) > maxDistToObjects:
                                 ignore = True
 
                         if useBlender:
@@ -1590,7 +1602,7 @@ if renderFromPreviousGT:
                 removeObjectData(1, v, f_list, vc, vn, uv, haveTextures_list, textures_list)
 
         if sceneIdx != currentScene or targetIndex != currentTargetIndex:
-            targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0]]
+            targetPosition = targetPositions[np.where(targetIndex==np.array(targetIndicesScene))[0][0]]
             import copy
             v, f_list, vc, vn, uv, haveTextures_list, textures_list = copy.deepcopy(v2), copy.deepcopy(f_list2), copy.deepcopy(vc2), copy.deepcopy(vn2), copy.deepcopy(uv2), copy.deepcopy(haveTextures_list2),  copy.deepcopy(textures_list2)
 
@@ -1708,6 +1720,11 @@ if renderFromPreviousGT:
                                               light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height,
                                               UVsTeapot + UVsMug + uv, HaveTexturesTeapot + HaveTexturesMug + haveTextures_list,
                                               TexturesListTeapot + TexturesListMug + textures_list, frustum, None)
+                rendererGT.overdraw = False
+                rendererGT.nsamples = 8
+                rendererGT.msaa = True
+                rendererGT.initGL()
+                rendererGT.initGLTexture()
 
                 rendererGT.makeCurrentContext()
 
@@ -1744,12 +1761,12 @@ if renderFromPreviousGT:
                         HaveTexturesB = [HaveTextures] + [haveTextures_list_mug]
                         TexturesListB = [TexturesList] + [textures_list_mug]
 
-                        renderer = createRendererTarget(glMode, False, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,
+                        renderer = createRendererTarget(glMode, chAz, chEl, chDist, center, VerticesB, VColorsB, FacesB, NormalsB, light_color,
                                                         chComponent, chVColors, np.array([0, 0, 0]), chDisplacement, width, height, UVsB,
                                                         HaveTexturesB, TexturesListB, frustum, None)
                     else:
 
-                        renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color,
+                        renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color,
                                                         chComponent, chVColors, 0, chDisplacement, width, height, [smUVs], [smHaveTextures],
                                                         [smTexturesList], frustum, None)
                     rendererGT.makeCurrentContext()
