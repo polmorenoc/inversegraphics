@@ -32,9 +32,9 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'cian_example'
+prefix = 'cian_data_dir_whitebg'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
-previousGTPrefix = 'cian_example'
+previousGTPrefix = 'cian_data_dir_whitebg'
 
 #Main script options:
 
@@ -52,7 +52,7 @@ unpackSceneFromBlender = False
 loadSavedSH = False
 generateTriplets = False
 
-replaceNewGroundtruth = False
+replaceNewGroundtruth = True
 renderOcclusions = False
 occlusionMin = 0.0
 occlusionMax = 0.9
@@ -62,6 +62,9 @@ showMug = False
 centeredObject = True
 fixedCamDistance = True
 
+useDirectionalLight = True
+renderBackground = False
+
 teapotSceneIndex = 0
 mugSceneIndex = 0
 if renderTeapots and renderMugs:
@@ -70,7 +73,7 @@ if renderTeapots and renderMugs:
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
-width, height = (150, 150)
+width, height = (64, 64)
 win = -1
 
 coords = np.meshgrid(np.arange(width) - width / 2, np.arange(height) - height / 2)
@@ -107,8 +110,8 @@ mugs = [line.strip() for line in open('mugs.txt')]
 renderMugsList = np.arange(len(mugs))[0:1]
 
 sceneIdx = 0
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
-# replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
+# replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
+replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -179,17 +182,7 @@ chObjAzMug = ch.Ch([0])
 chObjDistMug = ch.Ch([0])
 chObjRotationMug = ch.Ch([0])
 
-chPointLightIntensityGT = ch.Ch([1])
-
-chLightDistGT = ch.Ch([0.5])
-chLightAzGT = ch.Ch([0.0])
-chLightElGT = ch.Ch([np.pi/4])
-
-ligthTransfGT = computeHemisphereTransformation(chLightAzGT, chLightElGT, chLightDistGT, targetPosition)
-
-lightPosGT = ch.dot(ligthTransfGT, ch.Ch([0.,0.,0.,1.]))[0:3]
-
-light_colorGT = ch.ones(3)*chPointLightIntensityGT
+light_colorGT = ch.ones(3)
 
 chVColorsGT = ch.Ch([0.8,0.8,0.8])
 
@@ -208,6 +201,16 @@ with open(SHFilename, 'rb') as pfile:
 phiOffset = ch.Ch([0])
 totalOffset = phiOffset + chObjAzGT
 envMapCoeffs = ch.Ch(list(envMapDic.items())[0][1][1])
+chLightRadGT = ch.Ch([0.1])
+chLightDistGT = ch.Ch([0.5])
+chLightIntensityGT = ch.Ch([1])
+chLightAzGT = ch.Ch([0])
+chLightElGT = ch.Ch([0])
+chGlobalConstantGT = ch.Ch([0.5])
+angleGT = ch.arcsin(chLightRadGT/chLightDistGT)
+zGT = chZonalHarmonics(angleGT)
+
+shDirLightGT = chZonalToSphericalHarmonics(zGT, np.pi/2 - chLightElGT, chLightAzGT - np.pi/2)
 
 envMapCoeffsRotated = ch.Ch(np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
 envMapCoeffsRotatedRel = ch.Ch(np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]])
@@ -218,12 +221,6 @@ chShCoeffs = 0.3*shCoeffsRGB[:,0] + 0.59*shCoeffsRGB[:,1] + 0.11*shCoeffsRGB[:,2
 chShCoeffsRel = 0.3*shCoeffsRGBRel[:,0] + 0.59*shCoeffsRGBRel[:,1] + 0.11*shCoeffsRGBRel[:,2]
 chAmbientSHGT = chShCoeffs.ravel() * chAmbientIntensityGT * clampedCosCoeffs
 chAmbientSHGTRel = chShCoeffsRel.ravel() * chAmbientIntensityGT * clampedCosCoeffs
-
-chLightRadGT = ch.Ch([0.1])
-chLightDistGT = ch.Ch([0.5])
-chLightIntensityGT = ch.Ch([0])
-chLightAzGT = ch.Ch([np.pi*3/2])
-chLightElGT = ch.Ch([np.pi/4])
 
 chComponentGT = chAmbientSHGT
 
@@ -361,6 +358,7 @@ chLightSHCoeffs = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 # if multiObjects:
 chObjDist = ch.Ch([0])
 chObjRotation = ch.Ch([0])
+
 chObjAzMug = ch.Ch([0])
 chObjDistMug = ch.Ch([0])
 chObjRotationMug = ch.Ch([0])
@@ -523,9 +521,10 @@ print("Generating renders")
 
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
+scenesToRender = range(len(sceneLines))[0:1]
 
-trainSize = 10000
-teapot
+trainSize = 100000
+
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
 ignoreEnvMaps = np.loadtxt('data/bad_envmaps.txt')
@@ -655,7 +654,6 @@ with open(gtDir + 'gtInfo.pickle', 'wb') as pfile:
 
 #Generate GT labels before rendering them.
 if not renderFromPreviousGT:
-
     for scene_i, sceneIdx in enumerate(scenesToRender):
 
         sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndicesScene, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
@@ -934,12 +932,41 @@ if not renderFromPreviousGT:
                     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, verticesMug, f_list_mug, vc_mug,  normalsMug, uv_mug, haveTextures_list_mug, textures_list_mug)
                     # addObjectData(v, f_list, vc, vn, uv, haveTextures_list, textures_list, vGT, Faces, VColors, vnGT, UVs, HaveTextures, TexturesList)
 
-                    rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, VerticesTeapot + VerticesMug +  v, VColorsTeapot + VColorsMug +  vc, FacesTeapot + FacesMug +  f_list, NormalsTeapot + NormalsMug +  vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, UVsTeapot + UVsMug +  uv, HaveTexturesTeapot + HaveTexturesMug +  haveTextures_list, TexturesListTeapot + TexturesListMug +  textures_list, frustum, None)
+                    VColorsTeapot = [[np.ones_like(VColorsTeapot[0][0]) * chVColorsGT.reshape([1, 3])]]
+                    if renderBackground:
+                        vc_scene = VColorsTeapot + VColorsMug +  vc
+                        vn_scene = NormalsTeapot + NormalsMug +  vn
+                    else:
+                        vc_scene = VColorsTeapot + VColorsMug
+                        vn_scene = NormalsTeapot + NormalsMug
+
+
+                    vc_scene_illum = []
+                    for mesh in range(len(vc_scene)):
+                        if useDirectionalLight:
+                            vc_scene_illum += [computeGlobalAndDirectionalLighting(vn_scene[mesh], vc_scene[mesh], chLightAzGT, chLightElGT, chLightIntensityGT, chGlobalConstantGT)]
+                        else:
+                            vc_scene_illum += [computeSphericalHarmonics(vn_scene[mesh], vc_scene[mesh], light_colorGT, chComponentGT)]
+
+                    if renderBackground:
+                        v_scene = VerticesTeapot + VerticesMug +  v
+                        f_scene = FacesTeapot + FacesMug +  f_list
+                        UVsTeapot + UVsMug + uv
+                        HaveTexturesTeapot + HaveTexturesMug + haveTextures_list
+                        TexturesListTeapot + TexturesListMug + textures_list
+                    else:
+                        v_scene = VerticesTeapot + VerticesMug
+                        f_scene = FacesTeapot + FacesMug
+                        uvs_scene = UVsTeapot + UVsMug
+                        haveTextures_scene = HaveTexturesTeapot + HaveTexturesMug
+                        textures_list_scene = TexturesListTeapot + TexturesListMug
+                    rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v_scene, vc_scene_illum, f_scene, vn_scene, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, uvs_scene, haveTextures_scene, textures_list_scene, frustum, None)
                     rendererGT.overdraw = False
                     rendererGT.nsamples = 8
                     rendererGT.msaa = True
                     rendererGT.initGL()
                     rendererGT.initGLTexture()
+
 
                 ## Blender: Unlink and link new teapot.
                 if useBlender:
@@ -990,8 +1017,9 @@ if not renderFromPreviousGT:
                         mug.layers[0] = True
                         original_matrix_world_mug = mug.matrix_world.copy()
 
-                # for hdrFile, hdrValues in hdrstorender:
+                # LIGHT RANDOMIZATION
                 hdrchoice = np.random.choice(len(hdrstorender))
+                hdrchoice = 0
 
                 hdrValues = hdrstorender[hdrchoice][1]
                 hdrFile = hdrstorender[hdrchoice][0]
@@ -1017,8 +1045,14 @@ if not renderFromPreviousGT:
                     ignore = False
 
                     meanValIntensityOffset = np.random.uniform(-0.5,0.5)
+                    meanValIntensityOffset = 0
                     chAmbientIntensityGTVals = (0.8 + meanValIntensityOffset)/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
+                    chAmbientIntensityGTVals = chGlobalConstantGT.r
+
+
+                    #LIGHT RANDOMIZATION
                     phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
+                    phiOffsetVals = 0
 
                     # phiOffset[:] = 0
                     from numpy.random import choice
@@ -1027,25 +1061,30 @@ if not renderFromPreviousGT:
 
                     chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
 
-                    chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
-                    chLightElGTVals = np.random.uniform(0,np.pi/3, 1)
+                    # chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
+                    chLightAzGTVals = chLightAzGT.r
+                    # chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
+                    chLightElGTVals = chLightElGT.r
 
-                    chLightIntensityGTVals = 0
+                    chLightIntensityGTVals = chLightIntensityGT.r
 
-                    chVColorsGTVals =  np.random.uniform(0.2,0.8, [1, 3])
+                    chVColorsGTVals =  np.random.uniform(0.0,1.0, [1, 3])
 
                     envMapCoeffsRotatedVals = np.dot(light_probes.chSphericalHarmonicsZRotation(totalOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
                     envMapCoeffsRotatedRelVals = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
+                    # SHAPE RANDOMIZATION
                     shapeParams = np.random.randn(latentDim)
+                    shapeParams = np.zeros(latentDim)
                     chShapeParamsGTVals = shapeParams
 
                     ## Update renderer scene latent variables.
 
                     ignore = False
 
-                    chAmbientIntensityGT[:] = chAmbientIntensityGTVals
+                    chAmbientIntensityGT[:] = chGlobalConstantGT.r
                     phiOffset[:] = phiOffsetVals
+
                     chAzGT[:] = chAzGTVals
                     chElGT[:] = chElGTVals
 
@@ -1093,24 +1132,25 @@ if not renderFromPreviousGT:
 
                         chObjDistGT[:] = chObjDistGTVals
                         chObjRotationGT[:] = chObjRotationGTVals
-                        vecToTeapot = targetPosition + teapotPosOffset.r - cameraEye
-                        vecToTeapot = vecToTeapot / np.linalg.norm(vecToTeapot)
-                        teapotPosRight = np.sign(rightCamVec.dot(vecToTeapot))
-                        angleToTeapot = np.arccos(vecToTeapot.dot(vecToCenter))
+                        if not centeredObject:
+                            vecToTeapot = targetPosition + teapotPosOffset.r - cameraEye
+                            vecToTeapot = vecToTeapot / np.linalg.norm(vecToTeapot)
+                            teapotPosRight = np.sign(rightCamVec.dot(vecToTeapot))
+                            angleToTeapot = np.arccos(vecToTeapot.dot(vecToCenter))
 
-                        if np.isnan(angleToTeapot):
-                            angleToMug = 0
-                            ignore = True
-                        chObjAzGTRel = chAzGT.r - teapotPosRight * angleToTeapot
+                            if np.isnan(angleToTeapot):
+                                angleToMug = 0
+                                ignore = True
+                            chObjAzGTRel = chAzGT.r - teapotPosRight * angleToTeapot
 
-                        teapotPosOffsetVals = teapotPosOffset.r
+                            teapotPosOffsetVals = teapotPosOffset.r
 
                     chObjDistMugVals = 0
                     chObjRotationMugVals = 0
                     chObjAzMugVals = 0
                     mugCamElGT = 0
                     mugPosOffsetVals = 0
-                    chVColorsMugVals = np.random.uniform(0.1, 0.9, [1, 3])
+                    chVColorsMugVals = np.random.uniform(0.0, 1, [1, 3])
                     if renderMugs:
                         chObjDistMugVals = np.random.uniform(0,np.minimum(supportRad, 0.4))
                         chObjRotationMugVals = np.random.uniform(0,np.pi*2)
@@ -1202,7 +1242,10 @@ if not renderFromPreviousGT:
                         if renderTeapots:
                             occlusion = getOcclusionFraction(rendererGT, id=teapotSceneIndex)
                             vis_occluded = np.array(rendererGT.indices_image == teapotSceneIndex+1).copy().astype(np.bool)
+                            vis_occluded = np.ones_like(vis_occluded)
                             vis_im = np.array(rendererGT.image_mesh_bool([teapotSceneIndex])).copy().astype(np.bool)
+                            vis_im = np.ones_like(vis_im)
+
 
                         if renderMugs:
                             occlusionMug = getOcclusionFraction(rendererGT, id=mugSceneIndex)
@@ -1214,7 +1257,9 @@ if not renderFromPreviousGT:
                             if occlusion < occlusionMin or occlusion > occlusionMax:
                                 ignore = True
 
-                            if occlusion > 0.9 or vis_occluded.sum() < 10 or np.isnan(occlusion):
+                            # if occlusion > 0.9 or vis_occluded.sum() < 10 or np.isnan(occlusion):
+                            #Cian change:
+                            if occlusion > 0.01 or vis_occluded.sum() < 10 or np.isnan(occlusion):
                                 ignore = True
 
                             if np.sum(vis_im[:,0]) > 1 or np.sum(vis_im[0,:]) > 1 or np.sum(vis_im[:,-1]) > 1 or np.sum(vis_im[-1,:]) > 1:
@@ -1228,90 +1273,91 @@ if not renderFromPreviousGT:
                             if np.sum(vis_im_mug[:,0]) > 1 or np.sum(vis_im_mug[0,:]) > 1 or np.sum(vis_im_mug[:,-1]) > 1 or np.sum(vis_im_mug[-1,:]) > 1:
                                 if showMug:
                                     ignore = True
-
-                    if not ignore:
-                        # Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
-                        cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3,3]
-
-                        vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[
-                            rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
-
-                        minDistToObjects = 0.2
-                        maxDistToObjects = 0.6
-
-                        #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
-                        
-                        if np.min(np.linalg.norm(vDists, axis=1)) <= clip_start:
-                            ignore = True
-
-                        if renderTeapots:
-                            vDistsTeapot = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded].ravel()].ravel()] - cameraEye
-                            if  np.min(np.linalg.norm(vDistsTeapot, axis=1)) <= minDistToObjects or np.min(np.linalg.norm(vDistsTeapot, axis=1)) > maxDistToObjects:
-                                ignore = True
-
-                        if renderMugs:
-                            vDistsMug = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded_mug].ravel()].ravel()] - cameraEye
-                            if np.min(np.linalg.norm(vDistsMug, axis=1)) <= minDistToObjects or np.min(np.linalg.norm(vDistsMug, axis=1)) > maxDistToObjects:
-                                ignore = True
-
-                        if useBlender:
-                            if renderTeapots:
-                                cubeTeapot = getCubeObj(teapot)
-                                cubeScene.objects.link(cubeTeapot)
-
-                            if renderMugs:
-                                cubeMug = getCubeObj(mug)
-                                cubeScene.objects.link(cubeMug)
-
-                            cubeParentSupportObj = cubeScene.objects['cube'+str(parentIdx)]
-                            cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
-                            cubeScene.update()
-
-                            if renderTeapots:
-                                if collision.targetCubeSceneCollision(cubeTeapot, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
-                                    print("Teapot intersects with an object.")
-                                    ignore = True
-
-                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
-                                    print("Teapot interesects supporting object.")
-                                    ignore = True
-
-                                # ipdb.set_trace()
-                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeRoomObj]):
-                                    print("Teapot intersects room")
-                                    ignore = True
-
-                                if not ignore and not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.02))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
-                                    print("Teapot not on table.")
-                                    ignore = True
-
-                            if renderMugs:
-                                if not ignore and collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube' + str(roomInstanceNum), cubeParentSupportObj):
-                                    print("Mug intersects with an object.")
-                                    ignore = True
-
-                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
-                                    print("Mug intersects supporting object")
-                                    ignore = True
-
-                                if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeMug], mathutils.Matrix.Identity(4), [cubeRoomObj]):
-                                    print("Mug intersects room")
-                                    ignore = True
-
-                                if not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.02))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
-                                    print("Mug not on table.")
-                                    ignore = True
-
-                                if not ignore:
-                                    print("No collision issues")
-
-                            if renderTeapots:
-                                cubeScene.objects.unlink(cubeTeapot)
-                                deleteObject(cubeTeapot)
-
-                            if renderMugs:
-                                cubeScene.objects.unlink(cubeMug)
-                                deleteObject(cubeMug)
+                    #Don't take into account "ignore" variable for now...
+                    ignore = False
+                    # if not ignore:
+                    #     # Ignore if camera collides with occluding object as there are inconsistencies with OpenDR and Blender.
+                    #     cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3,3]
+                    #
+                    #     vDists = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[
+                    #         rendererGT.visibility_image != 4294967295].ravel()].ravel()] - cameraEye
+                    #
+                    #     minDistToObjects = 0.2
+                    #     maxDistToObjects = 0.6
+                    #
+                    #     #Ignore when teapot or mug is up to 10 cm to the camera eye, or too far (more than 1 meter).
+                    #
+                    #     if np.min(np.linalg.norm(vDists, axis=1)) <= clip_start:
+                    #         ignore = True
+                    #
+                    #     if renderTeapots:
+                    #         vDistsTeapot = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded].ravel()].ravel()] - cameraEye
+                    #         if  np.min(np.linalg.norm(vDistsTeapot, axis=1)) <= minDistToObjects or np.min(np.linalg.norm(vDistsTeapot, axis=1)) > maxDistToObjects:
+                    #             ignore = True
+                    #
+                    #     if renderMugs:
+                    #         vDistsMug = rendererGT.v.r[rendererGT.f[rendererGT.visibility_image[vis_occluded_mug].ravel()].ravel()] - cameraEye
+                    #         if np.min(np.linalg.norm(vDistsMug, axis=1)) <= minDistToObjects or np.min(np.linalg.norm(vDistsMug, axis=1)) > maxDistToObjects:
+                    #             ignore = True
+                    #
+                    #     if useBlender:
+                    #         if renderTeapots:
+                    #             cubeTeapot = getCubeObj(teapot)
+                    #             cubeScene.objects.link(cubeTeapot)
+                    #
+                    #         if renderMugs:
+                    #             cubeMug = getCubeObj(mug)
+                    #             cubeScene.objects.link(cubeMug)
+                    #
+                    #         cubeParentSupportObj = cubeScene.objects['cube'+str(parentIdx)]
+                    #         cubeRoomObj = cubeScene.objects['cube' + str(roomInstanceNum)]
+                    #         cubeScene.update()
+                    #
+                    #         if renderTeapots:
+                    #             if collision.targetCubeSceneCollision(cubeTeapot, cubeScene, 'cube'+str(roomInstanceNum), cubeParentSupportObj):
+                    #                 print("Teapot intersects with an object.")
+                    #                 ignore = True
+                    #
+                    #             if not ignore and collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                    #                 print("Teapot interesects supporting object.")
+                    #                 ignore = True
+                    #
+                    #             # ipdb.set_trace()
+                    #             if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeRoomObj]):
+                    #                 print("Teapot intersects room")
+                    #                 ignore = True
+                    #
+                    #             if not ignore and not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.02))), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                    #                 print("Teapot not on table.")
+                    #                 ignore = True
+                    #
+                    #         if renderMugs:
+                    #             if not ignore and collision.targetCubeSceneCollision(cubeMug, cubeScene, 'cube' + str(roomInstanceNum), cubeParentSupportObj):
+                    #                 print("Mug intersects with an object.")
+                    #                 ignore = True
+                    #
+                    #             if not ignore and collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, +0.02))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                    #                 print("Mug intersects supporting object")
+                    #                 ignore = True
+                    #
+                    #             if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeMug], mathutils.Matrix.Identity(4), [cubeRoomObj]):
+                    #                 print("Mug intersects room")
+                    #                 ignore = True
+                    #
+                    #             if not ignore and not collision.instancesIntersect(mathutils.Matrix.Translation(mathutils.Vector((0, 0, -0.02))), [cubeMug], mathutils.Matrix.Identity(4), [cubeParentSupportObj]):
+                    #                 print("Mug not on table.")
+                    #                 ignore = True
+                    #
+                    #             if not ignore:
+                    #                 print("No collision issues")
+                    #
+                    #         if renderTeapots:
+                    #             cubeScene.objects.unlink(cubeTeapot)
+                    #             deleteObject(cubeTeapot)
+                    #
+                    #         if renderMugs:
+                    #             cubeScene.objects.unlink(cubeMug)
+                    #             deleteObject(cubeMug)
 
                     ## Environment map update if using Cycles.
 

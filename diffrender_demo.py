@@ -472,13 +472,6 @@ if useShapeModel:
     renderer2.initGL()
     renderer2.initGLTexture()
 
-sqeRenderer = createSQErrorRenderer(glMode, chAz, chEl, chDist, smCenter, VerticesB, VColorsB, FacesB, NormalsB, light_color, chComponent, chVColors, np.array([0,0,0]), chDisplacement, width,height, UVsB, HaveTexturesB, TexturesListB, frustum, win )
-
-sqeRenderer.nsamples = 8
-sqeRenderer.imageGT = renderer2.r.copy()
-sqeRenderer.initGL()
-sqeRenderer.initGLTexture()
-sqeRenderer.initGL_SQErrorRenderer()
 
 # plt.imsave('errors.png', sqeRenderer.r)
 # plt.imsave('errorscolors.png', sqeRenderer.render_image)

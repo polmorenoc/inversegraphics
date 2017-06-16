@@ -10,7 +10,6 @@ import numpy as np
 from math import radians
 from opendr.camera import ProjectPoints
 from opendr.renderer import TexturedRenderer
-from opendr.renderer import SQErrorRenderer
 from opendr.lighting import SphericalHarmonics
 from opendr.lighting import LambertianPointLight
 import ipdb
@@ -405,10 +404,14 @@ def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation, t
 
     vtransf = []
     vntransf = []
+
     for mesh_i, mesh in enumerate(v):
         vtransf = vtransf + [ch.dot(v[mesh_i], transformation) + newPos + targetPosition]
-        vntransf = vntransf + [ch.dot(vn[mesh_i], invTranspModel)]
-
+        # ipdb.set_trace()
+        # vtransf = vtransf + [v[mesh_i] + chPosition]
+        vndot = ch.dot(vn[mesh_i], invTranspModel)
+        vndot = vndot/ch.sqrt(ch.sum(vndot**2,1))[:,None]
+        vntransf = vntransf + [vndot]
     return vtransf, vntransf, newPos
 
 def createRendererTarget(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
@@ -434,35 +437,6 @@ def createRendererTarget(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, 
 
     setupTexturedRenderer(renderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
-
-def createSQErrorRenderer(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
-    sqeRenderer = SQErrorRenderer()
-    sqeRenderer.set(glMode=glMode)
-
-    vflat = [item for sublist in v for item in sublist]
-    rangeMeshes = range(len(vflat))
-
-    vnflat = [item for sublist in vn for item in sublist]
-
-    vcflat = [item for sublist in vc for item in sublist]
-    # vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
-
-    vc_list = computeSphericalHarmonics(vnflat, vcflat, light_color, chComponent)
-
-    if len(vflat)==1:
-        vstack = vflat[0]
-    else:
-        vstack = ch.vstack(vflat)
-
-    camera, modelRotation, _ = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
-
-    verticesCube, facesCube, normalsCube, vColorsCube, texturesListCube, haveTexturesCube = getCubeData()
-    ft = np.zeros([len(verticesCube),2])
-
-    sqeRenderer.set(v_bgCube=verticesCube, vc_bgCube=vColorsCube, f_bgCube=facesCube, ft_bgCube=ft)
-
-    setupTexturedRenderer(sqeRenderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
-    return sqeRenderer
 
 
 def getCubeData(scale=(2,2,2), st=False, rgb=np.array([0.0, 0.0, 0.0])):
@@ -498,13 +472,10 @@ def createRendererGT(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, ligh
     # vnchnorm = [vnch[mesh]/ch.sqrt(vnch[mesh][:,0]**2 + vnch[mesh][:,1]**2 + vnch[mesh][:,2]**2).reshape([-1,1]) for mesh in rangeMeshes]
     vcflat = [item for sublist in vc for item in sublist]
     vcch = [vcflat[mesh] for mesh in rangeMeshes]
-    vcch[0] = np.ones_like(vcflat[0])*chVColors.reshape([1,3])
-    # vcch[0] = vcflat[0]
 
-    vc_list = computeSphericalHarmonics(vnflat, vcch, light_color, chComponent)
     # vc_list =  computeGlobalAndPointLighting(vch, vnch, vcch, lightPosGT, chGlobalConstantGT, light_colorGT)
 
-    setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    setupTexturedRenderer(renderer, vstack, vch, f_list, vcch, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
     return renderer
 
 
@@ -574,7 +545,8 @@ def getOcclusionFraction(renderer, id=0):
     vis_im = np.array(renderer.image_mesh_bool([id])).copy().astype(np.bool)
 
 
-    return 1. - np.sum(vis_occluded)/np.sum(vis_im)
+    # return 1. - np.sum(vis_occluded)/np.sum(vis_im)
+    return 0.
 
 #From http://www.ppsloan.org/publications/StupidSH36.pdf
 def chZonalHarmonics(a):
@@ -673,6 +645,20 @@ def computeSphericalHarmonics(vn, vc, light_color, components):
     vc_list = [A_list[mesh]*vc[mesh] for mesh in rangeMeshes]
     return vc_list
 
+def computeGlobalAndDirectionalLighting(vn, vc, chLightAzimuth, chLightElevation, chLightIntensity, chGlobalConstant):
+
+    # Construct point light source
+    rangeMeshes = range(len(vn))
+    vc_list = []
+    chRotAzMat = geometry.RotateZ(a=chLightAzimuth)[0:3,0:3]
+    chRotElMat = geometry.RotateX(a=chLightElevation)[0:3,0:3]
+    chLightVector = -ch.dot(chRotAzMat, ch.dot(chRotElMat, np.array([0,0,-1])))
+    for mesh in rangeMeshes:
+        l1 = ch.maximum(ch.dot(vn[mesh], chLightVector).reshape((-1,1)), 0.)
+        vcmesh = vc[mesh] * (chLightIntensity * l1 + chGlobalConstant)
+        vc_list = vc_list + [vcmesh]
+    return vc_list
+
 def computeGlobalAndPointLighting(v, vn, vc, light_pos, globalConstant, light_color):
     # Construct point light source
     rangeMeshes = range(len(vn))
@@ -691,8 +677,6 @@ def computeGlobalAndPointLighting(v, vn, vc, light_pos, globalConstant, light_co
     return vc_list
 
 def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, haveTextures_list, textures_list, camera, frustum, sharedWin=None):
-
-
     f = []
     f_listflat = [item for sublist in f_list for item in sublist]
     lenMeshes = 0
@@ -737,7 +721,7 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
 
     haveTextures_listflat = [item for sublist in haveTextures_list for item in sublist]
 
-    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.zeros(3), overdraw=True)
+    renderer.set(camera=camera, frustum=frustum, v=vstack, f=fstack, vn=vnstack, vc=vcstack, ft=ftstack, texture_stack=texture_stack, v_list=vch, f_list=f_listflat, vc_list=vc_list, ft_list=uvflat, textures_list=textures_listflat, haveUVs_list=haveTextures_listflat, bgcolor=ch.ones(3), overdraw=True)
     renderer.msaa = True
     renderer.sharedWin = sharedWin
     # renderer.clear()
