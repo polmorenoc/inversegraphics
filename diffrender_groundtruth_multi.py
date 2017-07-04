@@ -32,7 +32,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'cian_data_dir_whitebg'
+prefix = 'cian_data_dir_whitebg_all_params_noambient'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'cian_data_dir_whitebg'
 
@@ -523,7 +523,7 @@ sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 scenesToRender = range(len(sceneLines))[0:1]
 
-trainSize = 100000
+trainSize = 500000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -611,6 +611,9 @@ train_i = nextId
 
 if train_i == 0:
     np.random.seed(1)
+
+np.random.seed(2)
+
 unlinkedObj = None
 
 scenesToRenderOcclusions = []
@@ -1044,14 +1047,14 @@ if not renderFromPreviousGT:
 
                     ignore = False
 
-                    meanValIntensityOffset = np.random.uniform(-0.5,0.5)
-                    meanValIntensityOffset = 0
-                    chAmbientIntensityGTVals = (0.8 + meanValIntensityOffset)/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
-                    chAmbientIntensityGTVals = chGlobalConstantGT.r
+                    # meanValIntensityOffset = np.random.uniform(-0.5,0.5)
+                    # meanValIntensityOffset = 0
+                    # chAmbientIntensityGTVals = (0.8 + meanValIntensityOffset)/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
+                    # chAmbientIntensityGTVals = chGlobalConstantGT.r
 
 
                     #LIGHT RANDOMIZATION
-                    phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
+                    # phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
                     phiOffsetVals = 0
 
                     # phiOffset[:] = 0
@@ -1061,12 +1064,16 @@ if not renderFromPreviousGT:
 
                     chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
 
-                    # chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
-                    chLightAzGTVals = chLightAzGT.r
-                    # chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
-                    chLightElGTVals = chLightElGT.r
+                    chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
+                    # chLightAzGTVals = chLightAzGT.r
+                    chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
+                    # chLightElGTVals = chLightElGT.r
 
-                    chLightIntensityGTVals = chLightIntensityGT.r
+                    chLightIntensityGTVals = np.random.uniform(0,1)
+
+                    chLightIntensityGTVals = np.random.uniform(0,1)
+                    chGlobalConstantGTVals = np.random.uniform(0.1,0.9)
+                    chAmbientIntensityGTVals = chGlobalConstantGTVals
 
                     chVColorsGTVals =  np.random.uniform(0.0,1.0, [1, 3])
 
@@ -1074,15 +1081,15 @@ if not renderFromPreviousGT:
                     envMapCoeffsRotatedRelVals = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
                     # SHAPE RANDOMIZATION
-                    shapeParams = np.random.randn(latentDim)
                     shapeParams = np.zeros(latentDim)
+                    shapeParams[0:4] = np.random.randn(4)
                     chShapeParamsGTVals = shapeParams
 
                     ## Update renderer scene latent variables.
 
                     ignore = False
 
-                    chAmbientIntensityGT[:] = chGlobalConstantGT.r
+                    chAmbientIntensityGT[:] = chGlobalConstantGTVals
                     phiOffset[:] = phiOffsetVals
 
                     chAzGT[:] = chAzGTVals
