@@ -32,7 +32,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'cian_data_dir_whitebg_all_params_noambient'
+prefix = 'cian_data_dir_whitebg_1_repeat'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'cian_data_dir_whitebg'
 
@@ -40,7 +40,7 @@ previousGTPrefix = 'cian_data_dir_whitebg'
 
 renderFromPreviousGT = False
 useShapeModel = True
-useOpenDR = True
+useOpenDR = False
 useBlender = False
 renderBlender = False
 captureEnvMapFromBlender = False
@@ -71,7 +71,7 @@ if renderTeapots and renderMugs:
     mugSceneIndex = 1
 
 glModes = ['glfw','mesa']
-glMode = glModes[0]
+glMode = glModes[1]
 
 width, height = (64, 64)
 win = -1
@@ -178,6 +178,7 @@ chComponentGT = ch.Ch(np.array([2, 0.25, 0.25, 0.12,-0.17,0.36,0.1,0.,0.]))
 
 chObjDistGT = ch.Ch([0])
 chObjRotationGT = ch.Ch([0])
+
 chObjAzMug = ch.Ch([0])
 chObjDistMug = ch.Ch([0])
 chObjRotationMug = ch.Ch([0])
@@ -245,7 +246,7 @@ if useOpenDR:
     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
     rendererGT.overdraw = False
     rendererGT.nsamples = 8
-    rendererGT.msaa = True
+    rendererGT.msaa = False
     rendererGT.initGL()
     rendererGT.initGLTexture()
 
@@ -523,7 +524,7 @@ sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 scenesToRender = range(len(sceneLines))[0:1]
 
-trainSize = 500000
+trainSize = 100000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
@@ -612,7 +613,7 @@ train_i = nextId
 if train_i == 0:
     np.random.seed(1)
 
-np.random.seed(2)
+# np.random.seed(2)
 
 unlinkedObj = None
 
@@ -1047,15 +1048,15 @@ if not renderFromPreviousGT:
 
                     ignore = False
 
-                    # meanValIntensityOffset = np.random.uniform(-0.5,0.5)
-                    # meanValIntensityOffset = 0
-                    # chAmbientIntensityGTVals = (0.8 + meanValIntensityOffset)/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
-                    # chAmbientIntensityGTVals = chGlobalConstantGT.r
+                    meanValIntensityOffset = np.random.uniform(-0.5,0.5)
+                    meanValIntensityOffset = 0
+                    chAmbientIntensityGTVals = (0.8 + meanValIntensityOffset)/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
+                    chAmbientIntensityGTVals = chGlobalConstantGT.r
 
 
                     #LIGHT RANDOMIZATION
-                    # phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
-                    phiOffsetVals = 0
+                    phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
+                    # phiOffsetVals = 0
 
                     # phiOffset[:] = 0
                     from numpy.random import choice
@@ -1064,16 +1065,15 @@ if not renderFromPreviousGT:
 
                     chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
 
-                    chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
-                    # chLightAzGTVals = chLightAzGT.r
-                    chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
-                    # chLightElGTVals = chLightElGT.r
+                    # chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
+                    chLightAzGTVals = chLightAzGT.r
+                    # chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
+                    chLightElGTVals = chLightElGT.r
 
-                    chLightIntensityGTVals = np.random.uniform(0,1)
-
-                    chLightIntensityGTVals = np.random.uniform(0,1)
-                    chGlobalConstantGTVals = np.random.uniform(0.1,0.9)
-                    chAmbientIntensityGTVals = chGlobalConstantGTVals
+                    chLightIntensityGTVals = chLightIntensityGT.r
+                    # chLightIntensityGTVals = np.random.uniform(0,1)
+                    # chGlobalConstantGTVals = np.random.uniform(0.1,0.9)
+                    # chAmbientIntensityGTVals = chGlobalConstantGTVals
 
                     chVColorsGTVals =  np.random.uniform(0.0,1.0, [1, 3])
 
@@ -1081,15 +1081,18 @@ if not renderFromPreviousGT:
                     envMapCoeffsRotatedRelVals = np.dot(light_probes.chSphericalHarmonicsZRotation(phiOffset), envMapCoeffs[[0,3,2,1,4,5,6,7,8]])[[0,3,2,1,4,5,6,7,8]]
 
                     # SHAPE RANDOMIZATION
+                    shapeParams = np.random.randn(latentDim)
                     shapeParams = np.zeros(latentDim)
-                    shapeParams[0:4] = np.random.randn(4)
+                    # shapeParams[0:4] = np.random.randn(4)
                     chShapeParamsGTVals = shapeParams
 
                     ## Update renderer scene latent variables.
 
                     ignore = False
 
-                    chAmbientIntensityGT[:] = chGlobalConstantGTVals
+                    # chAmbientIntensityGT[:] = chGlobalConstantGTVals
+                    chAmbientIntensityGT[:] = chGlobalConstantGT.r
+
                     phiOffset[:] = phiOffsetVals
 
                     chAzGT[:] = chAzGTVals
@@ -1101,11 +1104,12 @@ if not renderFromPreviousGT:
                     teapotCamElGT = 0
                     teapotPosOffsetVals = 0
 
-                    cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3, 3]
+                    if useOpenDR:
+                        cameraEye = np.linalg.inv(np.r_[rendererGT.camera.view_mtx, np.array([[0, 0, 0, 1]])])[0:3, 3]
 
-                    vecToCenter = targetPosition - cameraEye
-                    vecToCenter = vecToCenter / np.linalg.norm(vecToCenter)
-                    rightCamVec = np.cross(vecToCenter, np.array([0, 0, 1]))
+                        vecToCenter = targetPosition - cameraEye
+                        vecToCenter = vecToCenter / np.linalg.norm(vecToCenter)
+                        rightCamVec = np.cross(vecToCenter, np.array([0, 0, 1]))
 
                     chObjAzGTVals = 0
                     chObjDistGTVals = 0
@@ -1533,11 +1537,15 @@ if not renderFromPreviousGT:
 
 
 if renderFromPreviousGT:
+
     groundTruthFilename = 'groundtruth/' + previousGTPrefix + '/groundTruth.h5'
     gtDataFileToRender = h5py.File(groundTruthFilename, 'r')
     groundTruthToRender = gtDataFileToRender[previousGTPrefix]
+
 else:
     exit()
+
+pdb.set_trace()
 
 currentScene = -1
 currentTeapot = -1
