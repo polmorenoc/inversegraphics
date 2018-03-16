@@ -32,7 +32,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'cian_data_dir_whitebg_1_repeat'
+prefix = 'cian_data_dir_whitebg_1_repeat_imgs'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'cian_data_dir_whitebg'
 
@@ -40,7 +40,7 @@ previousGTPrefix = 'cian_data_dir_whitebg'
 
 renderFromPreviousGT = False
 useShapeModel = True
-useOpenDR = False
+useOpenDR = True
 useBlender = False
 renderBlender = False
 captureEnvMapFromBlender = False
@@ -71,7 +71,7 @@ if renderTeapots and renderMugs:
     mugSceneIndex = 1
 
 glModes = ['glfw','mesa']
-glMode = glModes[1]
+glMode = glModes[0]
 
 width, height = (64, 64)
 win = -1

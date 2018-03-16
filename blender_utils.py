@@ -492,8 +492,6 @@ def createCube(scaleX, scaleY, scaleZ, name):
 
     return cubeObj
 
-
-
 def getCubeObj(instance):
     minX1, maxX1 = modelWidth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
     minY1, maxY1 = modelDepth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))

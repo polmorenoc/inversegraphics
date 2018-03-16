@@ -21,7 +21,6 @@ def chShapeParamsToVerts(landmarks, meshLinearTransform):
     vertices = ch.dot(meshLinearTransform,landmarks)
     return vertices
 
-
 class VerticesModel(Ch):
     terms = 'meshLinearTransform', 'W', 'b'
     dterms = 'chShapeParams'
@@ -40,10 +39,6 @@ class VerticesModel(Ch):
             # ipdb.set_trace()
             return self.jac
         return None
-
-
-
-
 
 def chShapeParamsToNormals(N, landmarks, linT):
     T = ch.dot(linT,landmarks)

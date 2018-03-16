@@ -108,9 +108,17 @@ for teapot_i in range(len(renderTeapotsList)):
     texturesmod_list = textures_list_teapots[teapot_i]
     centermod = center_teapots[teapot_i]
     vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
-    renderer.msaa = True
+    renderer = createRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement, width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer.overdraw = True
+    renderer.nsamples = 8
+    renderer.msaa = False
+    renderer.initGL()
+    renderer.initGLTexture()
+    # renderer.initGL_AnalyticRenderer()
+    renderer.imageGT = None
     renderer.r
+
+
     renderer_teapots = renderer_teapots + [renderer]
 
 currentTeapotModel = 0
@@ -162,10 +170,15 @@ if useShapeModel:
     chNormals = shape_model.chGetNormals(chVertices, faces)
     smNormals = [chNormals]
     smVertices, smNormals, _ = transformObject(smVertices, smNormals, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0, 0, 0]))
-    renderer = createRendererTarget(glMode, True, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
-    renderer.msaa = True
+    renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [smVertices], [smVColors], [smFaces], [smNormals], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
     renderer.overdraw = True
-
+    renderer.nsamples = 8
+    renderer.msaa = False
+    renderer.initGL()
+    renderer.initGLTexture()
+    # renderer.initGL_AnalyticRenderer()
+    renderer.imageGT = None
+    renderer.r
     chShapeParams[:] = np.zeros([latentDim])
     chVerticesMean = chVertices.r.copy()
 else:
@@ -363,7 +376,7 @@ for test_it, test_id in enumerate(testSet):
 
 loadFromHdf5 = False
 useShapeModel = True
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 
 synthPrefix = '_cycles'
 if syntheticGroundtruth:
@@ -397,7 +410,7 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 ##### Load Results data:
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCVNEW-JOINED-ALL2018'
 resultDir = 'results/' + testPrefix + '/'
 
 with open(resultDir + 'experiment.pickle', 'rb') as pfile:
@@ -819,7 +832,7 @@ from OpenGL import contextdata
 # errorsSegmentationList = experimentErrorsDic['errorsSegmentationList']
 
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT-BOWTIE'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT2018'
 resultDir = 'results/' + testPrefix + '/'
 
 # experimentDic = {'testSet':testSet, 'methodsPred':methodsPred, 'testOcclusions':testOcclusions, 'likelihoods':likelihoods, 'testPrefixBase':testPrefixBase, 'parameterRecognitionModels':parameterRecognitionModels, 'azimuths':azimuths, 'elevations':elevations, 'vColors':vColors, 'lightCoeffs':lightCoeffs, 'shapeParams':shapeParams}
@@ -846,7 +859,6 @@ errorsVColorsEList  = experimentErrorsDic['errorsVColorsEList']
 errorsVColorsCList  = experimentErrorsDic['errorsVColorsCList']
 errorsVColorsSList  = experimentErrorsDic['errorsVColorsSList']
 errorsSegmentationList = experimentErrorsDic['errorsSegmentationList']
-
 
 
 meanAbsErrAzsList, meanAbsErrElevsList, meanErrorsLightCoeffsList, meanErrorsShapeParamsList, meanErrorsShapeVerticesList, meanErrorsLightCoeffsCList, meanErrorsEnvMapList, meanErrorsVColorsEList, meanErrorsVColorsCList, meanErrorsVColorsCList, meanErrorsSegmentation \
@@ -891,8 +903,8 @@ plotStyles = plotStyles + ['solid']
 plotStyles = plotStyles + ['dashed']
 
 plotMethodsIndices = [2,5,3,4]
+plotMethodsIndices = [0,2,3,4]
 
-ipdb.set_trace()
 
 recognitionIdx = 2
 robustIdx = 3
@@ -900,7 +912,6 @@ robustIdx = 3
 errorsAzimuthList = [errorsPosePredList[i][0] if errorsPosePredList[i] is not None else None for i in range(len(methodsPred))]
 errorsElevationList = [errorsPosePredList[i][1] if errorsPosePredList[i] is not None else None for i in range(len(methodsPred))]
 
-ipdb.set_trace()
 variablesDescr = ['Azimuth', 'Elevation', 'VColor', 'Illumination', 'Shape', 'Segmentation']
 
 
@@ -1092,8 +1103,6 @@ saveOcclusionPlots(resultDir, 'median', occlusions,methodsPred, plotColors, plot
 SHModel = ""
 
 
-ipdb.set_trace()
-
 for occlusionLevel in [25,75,100]:
 
 
@@ -1155,7 +1164,7 @@ for occlusionLevel in [25,75,100]:
 
     saveScatterPlotsMethodFit(4, resultDirOcclusion, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS)
 
-    saveLikelihoodScatter(resultDirOcclusion, setUnderOcclusionLevel, testOcclusions,  likelihoods)
+    # saveLikelihoodScatter(resultDirOcclusion, setUnderOcclusionLevel, testOcclusions,  likelihoods)
 
 
     # if len(stdevsFull) > 0:

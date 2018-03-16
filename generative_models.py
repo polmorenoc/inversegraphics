@@ -359,7 +359,7 @@ class LogCRFModel(Ch):
         return errorFun
 
 
-class LogRobustModel(Ch):
+class LogRobustModelOld(Ch):
     dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
 
     def compute_r(self):
@@ -377,6 +377,34 @@ class LogRobustModel(Ch):
 
         return ch.log(pixelLikelihoodRobustCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
+
+class LogRobustModel(Ch):
+    terms = ['useMask']
+    dterms = ['renderer', 'groundtruth', 'foregroundPrior', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        # visibility = self.renderer.visibility_image
+        # visible = visibility != 4294967295
+        try:
+            self.useMask
+        except:
+            self.useMask = False
+
+        if self.useMask:
+            visible = self.renderer.indices_image != 0
+        else:
+            visible = np.ones_like(self.renderer.indices_image.astype(np.bool))
+
+        # visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
+
+        return ch.log(pixelLikelihoodRobustCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
 class LogRobustSQErrorModel(Ch):
     dterms = ['sqeRenderer', 'foregroundPrior', 'variances']
@@ -417,7 +445,7 @@ class LogRobustModelRegion(Ch):
         return ch.log(pixelLikelihoodRobustRegionCh(self.groundtruth, self.renderer, visible, 'MASK', self.foregroundPrior, self.variances))
 
 
-class LogGaussianModel(Ch):
+class LogGaussianModelOld(Ch):
     dterms = ['renderer', 'groundtruth', 'variances']
 
     def compute_r(self):
@@ -435,6 +463,33 @@ class LogGaussianModel(Ch):
 
         return logPixelLikelihoodCh(self.groundtruth, self.renderer, visible, 'MASK', self.variances)
 
+class LogGaussianModel(Ch):
+    terms = ['useMask']
+    dterms = ['renderer', 'groundtruth', 'variances']
+
+    def compute_r(self):
+        return self.logProb()
+
+    def compute_dr_wrt(self, wrt):
+        if wrt is self.renderer:
+            return self.logProb().dr_wrt(self.renderer)
+
+    def logProb(self):
+        # visibility = self.renderer.visibility_image
+        # visible = visibility != 4294967295
+        try:
+            self.useMask
+        except:
+            self.useMask = False
+
+        if self.useMask:
+            visible = self.renderer.indices_image != 0 # assumes the first mesh is the background cube.
+        else:
+            visible = np.ones_like(self.renderer.indices_image.astype(np.bool))
+
+        # visible = np.array(self.renderer.image_mesh_bool([0])).copy().astype(np.bool)
+
+        return logPixelLikelihoodCh(self.groundtruth, self.renderer, visible, 'MASK', self.variances)
 
 def pixelLikelihood(image, template, testMask, backgroundModel, variances):
     sigma = np.sqrt(variances)

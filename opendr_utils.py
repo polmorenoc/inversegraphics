@@ -12,6 +12,7 @@ from opendr.camera import ProjectPoints
 from opendr.renderer import TexturedRenderer
 from opendr.lighting import SphericalHarmonics
 from opendr.lighting import LambertianPointLight
+from opendr.renderer import ResidualRendererOpenDR
 import ipdb
 import light_probes
 import scene_io_utils
@@ -439,6 +440,30 @@ def createRendererTarget(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, 
     return renderer
 
 
+def createNewRendererTarget(glMode, chAz, chEl, chDist, center, v, vc, f_list, vn, light_color, chComponent, chVColors, targetPosition, chDisplacement, width,height, uv, haveTextures_list, textures_list, frustum, win ):
+    renderer = ResidualRendererOpenDR()
+    renderer.set(glMode=glMode)
+
+    vflat = [item for sublist in v for item in sublist]
+    rangeMeshes = range(len(vflat))
+
+    vnflat = [item for sublist in vn for item in sublist]
+
+    vcflat = [item for sublist in vc for item in sublist]
+    # vcch = [np.ones_like(vcflat[mesh])*chVColors.reshape([1,3]) for mesh in rangeMeshes]
+
+    vc_list = computeSphericalHarmonics(vnflat, vcflat, light_color, chComponent)
+
+    if len(vflat)==1:
+        vstack = vflat[0]
+    else:
+        vstack = ch.vstack(vflat)
+
+    camera, modelRotation, _ = setupCamera(vstack, chAz, chEl, chDist, center + targetPosition + chDisplacement, width, height)
+
+    setupTexturedRenderer(renderer, vstack, vflat, f_list, vc_list, vnflat,  uv, haveTextures_list, textures_list, camera, frustum, win)
+    return renderer
+
 def getCubeData(scale=(2,2,2), st=False, rgb=np.array([0.0, 0.0, 0.0])):
         dataCube, facesCube = create_cube(scale=(2,2,2), st=False, rgba=np.array([rgb[0], rgb[1], rgb[2], 1.0]), dtype='float32', type='triangles')
         verticesCube = ch.Ch(dataCube[:,0:3])
@@ -634,13 +659,19 @@ def computeHemisphereTransformation(chAz, chEl, chDist, objCenter):
 
     return chCamModelWorld
 
-def computeSphericalHarmonics(vn, vc, light_color, components):
+def computeSphericalHarmonics(vn, vc, light_color, components, ignoreFirstMesh = True):
     # vnflat = [item for sublist in vn for item in sublist]
     # vcflat = [item for sublist in vc for item in sublist]
+    A_list = []
     rangeMeshes = range(len(vn))
-    A_list = [SphericalHarmonics(vn=vn[mesh],
-                       components=components,
-                       light_color=light_color) for mesh in rangeMeshes]
+    for mesh in rangeMeshes:
+        if ignoreFirstMesh and len(vn) > 1:
+            if mesh > 0:
+                A_list += [SphericalHarmonics(vn=vn[mesh],components=components,light_color=light_color)]
+            else:
+                A_list += [1.]
+        else:
+            A_list += [SphericalHarmonics(vn=vn[mesh],components=components,light_color=light_color)]
 
     vc_list = [A_list[mesh]*vc[mesh] for mesh in rangeMeshes]
     return vc_list
@@ -760,3 +791,45 @@ def removeObjectData(objIdx, v, f_list, vc, vn, uv, haveTextures_list, textures_
     del haveTextures_list[objIdx]
     del textures_list[objIdx]
 
+
+def transformObject2(v, vn, chScale, chObjAz, chPosition):
+
+    if chScale.size == 1:
+        scaleMat = geometry.Scale(x=chScale[0], y=chScale[0],z=chScale[0])[0:3,0:3]
+    elif chScale.size == 2:
+        scaleMat = geometry.Scale(x=chScale[0], y=chScale[0], z=chScale[1])[0:3, 0:3]
+    else:
+        scaleMat = geometry.Scale(x=chScale[0], y=chScale[1], z=chScale[2])[0:3, 0:3]
+    chRotAzMat = geometry.RotateZ(a=chObjAz)[0:3,0:3]
+    chRotAzMatX = geometry.RotateX(a=0)[0:3,0:3]
+
+    # transformation = scaleMat
+    transformation = ch.dot(ch.dot(chRotAzMat,chRotAzMatX), scaleMat)
+    invTranspModel = ch.transpose(ch.inv(transformation))
+
+    vtransf = []
+    vntransf = []
+    for mesh_i, mesh in enumerate(v):
+        vtransf = vtransf + [ch.dot(v[mesh_i], transformation) + chPosition]
+        # ipdb.set_trace()
+        # vtransf = vtransf + [v[mesh_i] + chPosition]
+        vndot = ch.dot(vn[mesh_i], invTranspModel)
+        vndot = vndot/ch.sqrt(ch.sum(vndot**2,1))[:,None]
+
+        vntransf = vntransf + [vndot]
+
+    return vtransf, vntransf
+
+
+def getCubeData(scale=(2,2,2), st=False, rgb=np.array([1.0, 1.0, 1.0])):
+    dataCube, facesCube = create_cube(scale=(1,1,1), st=False, rgba=np.array([rgb[0], rgb[1], rgb[2], 1.0]), dtype='float32', type='triangles')
+    verticesCube = ch.Ch(dataCube[:,0:3])
+    UVsCube = ch.Ch(np.zeros([verticesCube.shape[0],2]))
+
+    facesCube = facesCube.reshape([-1,3])
+    normalsCube = geometry.chGetNormals(verticesCube, facesCube)
+    haveTexturesCube = [[False]]
+    texturesListCube = [[None]]
+    vColorsCube = ch.Ch(dataCube[:,3:6])
+
+    return verticesCube, facesCube, normalsCube, vColorsCube, texturesListCube, haveTexturesCube

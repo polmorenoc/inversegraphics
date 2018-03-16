@@ -28,6 +28,8 @@ from OpenGL import contextdata
 from light_probes import SHProjection
 
 import theano
+theano.config.optimizer='fast_compile'
+theano.config.cycle_detection = False
 # theano.sandbox.cuda.use('cpu')
 import lasagne
 import lasagne_nn
@@ -53,8 +55,8 @@ parameterRecognitionModels = set(['neuralNetPose', 'neuralNetModelSHLight', 'neu
 #
 
 gtPrefix = 'train4_occlusion_shapemodel'
-gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
-# gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
+# gtPrefix = 'train4_occlusion_shapemodel_synthetic_10K_test100-1100'
+gtPrefix = 'train4_occlusion_shapemodel_photorealistic_10K_test100-1100'
 # gtPrefix = 'objectnet3d_teapots'
 experimentPrefix = 'train4_occlusion_shapemodel_10k'
 
@@ -160,10 +162,15 @@ for teapot_i in range(len(renderTeapotsList)):
     centermod = center_teapots[teapot_i]
 
     vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
-    renderer = createRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer = createNewRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer.overdraw = True
+    renderer.nsamples = 8
     renderer.msaa = True
     renderer.initGL()
     renderer.initGLTexture()
+    renderer.initGL_AnalyticRenderer()
+    renderer.imageGT = None
+    renderer.r
 
     renderer_teapots = renderer_teapots + [renderer]
 
@@ -204,7 +211,7 @@ SE_raw = ch.sum(E_raw*E_raw, axis=2)
 
 SSqE_raw = ch.SumOfSquares(E_raw)/numPixels
 
-initialPixelStdev = 0.01
+initialPixelStdev = 0.1
 
 # finalPixelStdev = 0.05
 stds = ch.Ch([initialPixelStdev])
@@ -242,18 +249,18 @@ gtDir = 'groundtruth/' + gtPrefix + '/'
 featuresDir = gtDir
 
 experimentDir = 'experiments/' + experimentPrefix + '/'
-trainModelsDirPose = 'experiments/' + trainPrefixPose + '/'
-trainModelsDirVColor = 'experiments/' + trainPrefixVColor + '/'
-trainModelsDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/'
-trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/'
-trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/'
+trainModelsDirPose = 'experiments/' + trainPrefixPose + '/' + gtPrefix
+trainModelsDirVColor = 'experiments/' + trainPrefixVColor + '/' + gtPrefix
+trainModelsDirLightCoeffs = 'experiments/' + trainPrefixLightCoeffs + '/' + gtPrefix
+trainModelsDirShapeParams = 'experiments/' + trainPrefixShapeParams + '/' + gtPrefix
+trainModelsDirAppLight = 'experiments/' + trainModelsDirAppLight + '/' + gtPrefix
 
 useCRFOcclusionPred = False
 useShapeModel = True
 makeVideo = False
 reduceVariance = False
 getColorFromCRF = False
-syntheticGroundtruth = True
+syntheticGroundtruth = False
 evaluateWithGT = True
 
 ignoreGT = True
@@ -507,7 +514,7 @@ optimizationTypeDescr = ["predict", "optimize", "joint"]
 optimizationType = 1
 computePredErrorFuns = True
 
-method = 1
+method = 5
 model = 1
 maxiter = 100
 numSamples = 1
@@ -521,8 +528,9 @@ boundAz = (-3*np.pi, 3*np.pi)
 boundscomponents = (0,None)
 bounds = [boundAz,boundEl]
 bounds = [(None , None ) for sublist in free_variables for item in sublist]
-methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'SGDMom', 'probLineSearch']
-options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+methods = ['dogleg', 'minimize', 'BFGS', 'L-BFGS-B', 'Nelder-Mead', 'TNC', 'SGDMom', 'probLineSearch']
+# options = {'disp':False, 'maxiter':maxiter, 'lr':0.0001, 'momentum':0.1, 'decay':0.99}
+options = {'disp':False, 'maxiter':maxiter}
 azVar = 0.1
 elVar = 0.1
 vColorVar = 0.01
@@ -607,6 +615,26 @@ if useShapeModel:
 
     v, vn, teapotPosOffset = transformObject(v, vn, chScale, chObjAz, chObjDist, chObjRotation, np.array([0,0,0]))
 
+    verticesCube, facesCube, normalsCube, vColorsCube, texturesListCube, haveTexturesCube = getCubeData()
+
+    uvCube = np.zeros([verticesCube.shape[0],2])
+
+    chCubePosition = ch.Ch([0, 0, 0])
+    chCubeScale = ch.Ch([10.0])
+    chCubeAzimuth = ch.Ch([0])
+    chCubeVCColors = ch.Ch(np.ones_like(vColorsCube) * 1.0)
+    v_transf, vn_transf = transformObject2([verticesCube], [normalsCube], chCubeScale, chCubeAzimuth, chCubePosition)
+
+    v_scene = [v]
+    f_list_scene = [smFaces]
+    vc_scene = [smVColors]
+    vn_scene = [vn]
+    uv_scene = [smUVs]
+    haveTextures_list_scene = [smHaveTextures]
+    textures_list_scene = [smTexturesList]
+
+    addObjectData(v_scene, f_list_scene, vc_scene, vn_scene, uv_scene, haveTextures_list_scene, textures_list_scene, v_transf, [[facesCube]],[chCubeVCColors], vn_transf, [uvCube], haveTexturesCube, texturesListCube)
+
     if multiObjects:
         verticesMug, normalsMug, mugPosOffset = transformObject(v_mug, vn_mug, chScale, chObjAzMug + np.pi / 2, chObjDistMug, chObjRotationMug, np.array([0,0,0]))
 
@@ -622,12 +650,21 @@ if useShapeModel:
         renderer.initGL()
         renderer.initGLTexture()
     else:
-        renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+        # renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
+        renderer = createNewRendererTarget(glMode, chAz, chEl, chDist, smCenter, v_scene, vc_scene, f_list_scene, vn_scene, light_color, chComponent, chVColors, 0, chDisplacement, width,height, uv_scene, haveTextures_list_scene, textures_list_scene, frustum, win )
+
+        renderer.overdraw = True
+        renderer.nsamples = 8
+        renderer.msaa = True
         renderer.initGL()
         renderer.initGLTexture()
+        renderer.initGL_AnalyticRenderer()
+        renderer.imageGT = None
+        renderer.r
 
-    renderer.msaa = True
-    renderer.overdraw = True
+
+
+
 
     # chShapeParams[:] = np.zeros([latentDim])
     chVerticesMean = chVertices.r.copy()
@@ -636,16 +673,8 @@ else:
     renderer = renderer_teapots[testRenderer]
 
 
-sqeRenderer = createSQErrorRenderer(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
 
-sqeRenderer.nsamples = 8
-sqeRenderer.imageGT = ch.Ch(renderer.r.copy())
-sqeRenderer.initGL()
-sqeRenderer.initGLTexture()
-sqeRenderer.initGL_SQErrorRenderer()
-
-
-plt.imsave('testrender.png', sqeRenderer.render_image)
+# plt.imsave('testrender.png', sqeRenderer.render_image)
 
 loadMask = True
 if loadMask:
@@ -864,6 +893,7 @@ recomputeMeans = False
 includeMeanBaseline = False
 
 recomputePredictions = False
+recomputePredictionsPose = False
 
 if includeMeanBaseline:
     meanTrainLightCoefficientsGTRel = np.repeat(np.mean(trainLightCoefficientsGTRel, axis=0)[None,:], numTests, axis=0)
@@ -893,11 +923,13 @@ if includeMeanBaseline:
 
 rangeTests = np.arange(len(testSet))
 
-if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.npy"):
+
+
+if recomputePredictionsPose or not os.path.isfile(trainModelsDirPose + "elevsPred.npy"):
     if 'neuralNetPose' in parameterRecognitionModels:
 
         poseModel = ""
-        with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
+        with open(experimentDir + 'neuralNetModelPose.pickle', 'rb') as pfile:
             neuralNetModelPose = pickle.load(pfile)
 
         meanImage = neuralNetModelPose['mean']
@@ -933,43 +965,43 @@ if recomputePredictions or not os.path.isfile(trainModelsDirPose + "elevsPred.np
         # with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
         #     neuralNetModelPose = pickle.load(pfile)
         #
-        meanImage = neuralNetModelPose['mean']
-        modelType = neuralNetModelPose['type']
-        param_values = neuralNetModelPose['params']
-
-        # network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-        nonDetPosePredictionFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-        posePredictionsSamples = []
-        cosAzsPredSamples = []
-        sinAzsPredSamples = []
-        cosElevsPredSamples = []
-        sinElevsPredSamples = []
-        for i in range(100):
-            posePredictionsSample = np.zeros([len(grayTestImages), 4])
-            for start_idx in range(0, len(grayTestImages), nnBatchSize):
-                posePredictionsSample[start_idx:start_idx + nnBatchSize] = nonDetPosePredictionFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-
-            cosAzsPredSample = posePredictionsSample[:,0]
-            sinAzsPredSample = posePredictionsSample[:,1]
-            cosAzsPredSamples = cosAzsPredSamples + [cosAzsPredSample[:,None]]
-            sinAzsPredSamples = sinAzsPredSamples + [sinAzsPredSample[:,None]]
-
-            cosElevsPredSample = posePredictionsSample[:,2]
-            sinElevsPredSample = posePredictionsSample[:,3]
-            cosElevsPredSamples = cosElevsPredSamples + [cosElevsPredSample[:,None]]
-            sinElevsPredSamples = sinElevsPredSamples + [sinElevsPredSample[:,None]]
-
-        cosAzsPredSamples = np.hstack(cosAzsPredSamples)
-        sinAzsPredSamples = np.hstack(sinAzsPredSamples)
-
-        cosElevsPredSamples = np.hstack(cosElevsPredSamples)
-        sinElevsPredSamples = np.hstack(sinElevsPredSamples)
-
-        azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
-        elevsPredictions = np.arctan2(sinElevsPredSamples, cosElevsPredSamples)
-
-        np.save(trainModelsDirPose + 'azsPredictions.npy', azsPredictions)
-        np.save(trainModelsDirPose + 'elevsPredictions.npy', elevsPredictions)
+        # meanImage = neuralNetModelPose['mean']
+        # modelType = neuralNetModelPose['type']
+        # param_values = neuralNetModelPose['params']
+        #
+        # # network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+        # nonDetPosePredictionFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
+        # posePredictionsSamples = []
+        # cosAzsPredSamples = []
+        # sinAzsPredSamples = []
+        # cosElevsPredSamples = []
+        # sinElevsPredSamples = []
+        # for i in range(100):
+        #     posePredictionsSample = np.zeros([len(grayTestImages), 4])
+        #     for start_idx in range(0, len(grayTestImages), nnBatchSize):
+        #         posePredictionsSample[start_idx:start_idx + nnBatchSize] = nonDetPosePredictionFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+        #
+        #     cosAzsPredSample = posePredictionsSample[:,0]
+        #     sinAzsPredSample = posePredictionsSample[:,1]
+        #     cosAzsPredSamples = cosAzsPredSamples + [cosAzsPredSample[:,None]]
+        #     sinAzsPredSamples = sinAzsPredSamples + [sinAzsPredSample[:,None]]
+        #
+        #     cosElevsPredSample = posePredictionsSample[:,2]
+        #     sinElevsPredSample = posePredictionsSample[:,3]
+        #     cosElevsPredSamples = cosElevsPredSamples + [cosElevsPredSample[:,None]]
+        #     sinElevsPredSamples = sinElevsPredSamples + [sinElevsPredSample[:,None]]
+        #
+        # cosAzsPredSamples = np.hstack(cosAzsPredSamples)
+        # sinAzsPredSamples = np.hstack(sinAzsPredSamples)
+        #
+        # cosElevsPredSamples = np.hstack(cosElevsPredSamples)
+        # sinElevsPredSamples = np.hstack(sinElevsPredSamples)
+        #
+        # azsPredictions = np.arctan2(sinAzsPredSamples, cosAzsPredSamples)
+        # elevsPredictions = np.arctan2(sinElevsPredSamples, cosElevsPredSamples)
+        #
+        # np.save(trainModelsDirPose + 'azsPredictions.npy', azsPredictions)
+        # np.save(trainModelsDirPose + 'elevsPredictions.npy', elevsPredictions)
 
         # ##Get predictions with dropout on to get samples.
         # with open(trainModelsDirPose + 'neuralNetModelPose.pickle', 'rb') as pfile:
@@ -979,8 +1011,10 @@ else:
     elevsPred = np.load(trainModelsDirPose + 'elevsPred.npy')[rangeTests]
     azsPred = np.load(trainModelsDirPose + 'azsPred.npy')[rangeTests]
 
-    azsPredictions =  np.load(trainModelsDirPose + 'azsPredictions.npy')[rangeTests]
-    elevsPredictions = np.load(trainModelsDirPose + 'elevsPredictions.npy')[rangeTests]
+    # azsPredictions =  np.load(trainModelsDirPose + 'azsPredictions.npy')[rangeTests]
+    azsPredictions =  None
+    # elevsPredictions = np.load(trainModelsDirPose + 'elevsPredictions.npy')[rangeTests]
+    elevsPredictions = None
 
 if recomputePredictions or not os.path.isfile(trainModelsDirVColor + "vColorsPred.npy"):
 
@@ -992,7 +1026,7 @@ if recomputePredictions or not os.path.isfile(trainModelsDirVColor + "vColorsPre
         import lasagne_nn
 
         nnModel = ""
-        with open(trainModelsDirVColor + 'neuralNetModelAppearance.pickle', 'rb') as pfile:
+        with open(experimentDir + 'neuralNetModelAppearance.pickle', 'rb') as pfile:
             neuralNetModelAppearance = pickle.load(pfile)
 
         meanImage = neuralNetModelAppearance['mean']
@@ -1079,29 +1113,29 @@ import theano.tensor as T
 
 #
 ## Theano NN error function finite differences.
-with open(trainModelsDirPose + 'neuralNetModelAzimuthTriplet.pickle', 'rb') as pfile:
-    neuralNetModelPose = pickle.load(pfile)
+# with open(trainModelsDirPose + 'neuralNetModelAzimuthTriplet.pickle', 'rb') as pfile:
+#     neuralNetModelPose = pickle.load(pfile)
 
 #meanImage = neuralNetModelPose['mean'].reshape([150,150])
 
-modelType = neuralNetModelPose['type']
-param_values = neuralNetModelPose['params']
-
-network = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
-
-# layer = lasagne.layers.get_all_layers(network)[-2]
-inputLayer = lasagne.layers.get_all_layers(network)[0]
-layer_output = lasagne.layers.get_output(network, deterministic=True)
-dim_output= network.output_shape[1]
-
-networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
-# layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
-inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
-# layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
-layer_outputGT = lasagne.layers.get_output(networkGT, deterministic=True)
-
-rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
-rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
+# modelType = neuralNetModelPose['type']
+# param_values = neuralNetModelPose['params']
+#
+# network = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
+#
+# # layer = lasagne.layers.get_all_layers(network)[-2]
+# inputLayer = lasagne.layers.get_all_layers(network)[0]
+# layer_output = lasagne.layers.get_output(network, deterministic=True)
+# dim_output= network.output_shape[1]
+#
+# networkGT = lasagne_nn.load_network(modelType=modelType, param_values=param_values, imgSize=75)
+# # layerGT = lasagne.layers.get_all_layers(networkGT)[-2]
+# inputLayerGT = lasagne.layers.get_all_layers(networkGT)[0]
+# # layer_outputGT = lasagne.layers.get_output(layerGT, deterministic=True)
+# layer_outputGT = lasagne.layers.get_output(networkGT, deterministic=True)
+#
+# rendererGray =  0.3*renderer[:,:,0] +  0.59*renderer[:,:,1] + 0.11*renderer[:,:,2]
+# rendererGrayGT =  0.3*rendererGT[:,:,0] +  0.59*rendererGT[:,:,1] + 0.11*rendererGT[:,:,2]
 
 # chThError = TheanoFunFiniteDiff(theano_input=inputLayer.input_var, theano_output=layer_output, opendr_input=rendererGray, dim_output = dim_output,
 #                               theano_input_gt=inputLayerGT.input_var, theano_output_gt=layer_outputGT, opendr_input_gt=rendererGrayGT, imSize=75)
@@ -1121,7 +1155,7 @@ if recomputePredictions or not os.path.isfile(trainModelsDirLightCoeffs + "relLi
 
 
         nnModel = ""
-        with open(trainModelsDirLightCoeffs + 'neuralNetModelLight.pickle', 'rb') as pfile:
+        with open(experimentDir + 'neuralNetModelLight.pickle', 'rb') as pfile:
             neuralNetModelSHLight = pickle.load(pfile)
 
         meanImage = neuralNetModelSHLight['mean']
@@ -1153,7 +1187,7 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "shape
         import lasagne_nn
 
         nnModel = ""
-        with open(trainModelsDirShapeParams + 'neuralNetModelShape.pickle', 'rb') as pfile:
+        with open(experimentDir + 'neuralNetModelShape.pickle', 'rb') as pfile:
             neuralNetModelSHLight = pickle.load(pfile)
 
         meanImage = neuralNetModelSHLight['mean']
@@ -1177,76 +1211,76 @@ if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "shape
         np.save(trainModelsDirShapeParams + 'shapeParamsPred.npy', shapeParamsPred)
 
 
-        #Samples:
-        shapeParamsPredSamples = []
-        shapeParamsNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-
-        for i in range(100):
-            shapeParamsPredictionsSample = np.zeros([len(grayTestImages), 10])
-            for start_idx in range(0, len(grayTestImages), nnBatchSize):
-                shapeParamsPredictionsSample[start_idx:start_idx + nnBatchSize] = shapeParamsNonDetFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-
-            shapeParamsPredSamples = shapeParamsPredSamples + [shapeParamsPredictionsSample[:,:][:,:,None]]
-
-        shapeParamsPredSamples = np.concatenate(shapeParamsPredSamples, axis=2)
-
-        np.save(trainModelsDirShapeParams + 'shapeParamsPredSamples.npy', shapeParamsPredSamples)
+        # #Samples:
+        # shapeParamsPredSamples = []
+        # shapeParamsNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
+        #
+        # for i in range(100):
+        #     shapeParamsPredictionsSample = np.zeros([len(grayTestImages), 10])
+        #     for start_idx in range(0, len(grayTestImages), nnBatchSize):
+        #         shapeParamsPredictionsSample[start_idx:start_idx + nnBatchSize] = shapeParamsNonDetFun(grayTestImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+        #
+        #     shapeParamsPredSamples = shapeParamsPredSamples + [shapeParamsPredictionsSample[:,:][:,:,None]]
+        #
+        # shapeParamsPredSamples = np.concatenate(shapeParamsPredSamples, axis=2)
+        #
+        # np.save(trainModelsDirShapeParams + 'shapeParamsPredSamples.npy', shapeParamsPredSamples)
 
 else:
     shapeParamsPred = np.load(trainModelsDirShapeParams + 'shapeParamsPred.npy')[rangeTests]
-    shapeParamsPredSamples = np.load(trainModelsDirShapeParams + 'shapeParamsPredSamples.npy')[rangeTests]
+    # shapeParamsPredSamples = np.load(trainModelsDirShapeParams + 'shapeParamsPredSamples.npy')[rangeTests]
 
-if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "neuralNetModelMaskLarge.npy"):
-    if 'neuralNetModelMask' in parameterRecognitionModels:
-
-        import theano
-        # theano.sandbox.cuda.use('cpu')
-        import lasagne
-        import lasagne_nn
-
-
-        nnModel = ""
-        with open(trainModelsDirLightCoeffs + 'neuralNetModelMaskLarge.pickle', 'rb') as pfile:
-            neuralNetModelSHLight = pickle.load(pfile)
-
-        meanImage = neuralNetModelSHLight['mean']
-        modelType = neuralNetModelSHLight['type']
-        param_values = neuralNetModelSHLight['params']
-
-        testImages = images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
-
-        network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
-        maskPredictionFun = lasagne_nn.get_prediction_fun(network)
-
-        maskPredictions = np.zeros([len(testImages), 50*50])
-        for start_idx in range(0, len(testImages), nnBatchSize):
-            maskPredictions[start_idx:start_idx + nnBatchSize] = maskPredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-
-        maskPredictions = np.reshape(maskPredictions, [len(testImages), 50,50])
-
-        np.save(trainModelsDirShapeParams + 'maskPredictions.npy', maskPredictions)
-
-        # # #Samples:
-        # maskSamples = []
-        # maskPredNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
-        #
-        # for i in range(100):
-        #     maskPredictionsSamples = np.zeros([len(testImages), 50*50])
-        #     for start_idx in range(0, len(testImages),nnBatchSize):
-        #         maskPredictionsSamples[start_idx:start_idx + nnBatchSize] = maskPredNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
-        #
-        #     maskSamples = maskSamples + [maskPredictionsSamples[:,:][:,:,None]]
-        #
-        # maskSamples = np.concatenate(maskSamples, axis=2)
-        # loadMask = True
-        #
-        # gtDirMask = 'groundtruth/train4_occlusion_mask/'
-        #
-        # masksDir =  gtDirMask + 'masks_occlusion/'
-        # if loadMask:
-        #     masksGT = loadMasks(masksDir, testSet)
-else:
-    maskPredictions = np.load(trainModelsDirShapeParams + 'maskPredictions.npy')[rangeTests]
+# if recomputePredictions or not os.path.isfile(trainModelsDirShapeParams + "neuralNetModelMaskLarge.npy"):
+#     if 'neuralNetModelMask' in parameterRecognitionModels:
+#
+#         import theano
+#         # theano.sandbox.cuda.use('cpu')
+#         import lasagne
+#         import lasagne_nn
+#
+#
+#         nnModel = ""
+#         with open(trainModelsDirLightCoeffs + 'neuralNetModelMaskLarge.pickle', 'rb') as pfile:
+#             neuralNetModelSHLight = pickle.load(pfile)
+#
+#         meanImage = neuralNetModelSHLight['mean']
+#         modelType = neuralNetModelSHLight['type']
+#         param_values = neuralNetModelSHLight['params']
+#
+#         testImages = images.reshape([images.shape[0],3,images.shape[1],images.shape[2]]) - meanImage.reshape([1,meanImage.shape[2], meanImage.shape[0],meanImage.shape[1]]).astype(np.float32)
+#
+#         network = lasagne_nn.load_network(modelType=modelType, param_values=param_values)
+#         maskPredictionFun = lasagne_nn.get_prediction_fun(network)
+#
+#         maskPredictions = np.zeros([len(testImages), 50*50])
+#         for start_idx in range(0, len(testImages), nnBatchSize):
+#             maskPredictions[start_idx:start_idx + nnBatchSize] = maskPredictionFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+#
+#         maskPredictions = np.reshape(maskPredictions, [len(testImages), 50,50])
+#
+#         np.save(trainModelsDirShapeParams + 'maskPredictions.npy', maskPredictions)
+#
+#         # # #Samples:
+#         # maskSamples = []
+#         # maskPredNonDetFun = lasagne_nn.get_prediction_fun_nondeterministic(network)
+#         #
+#         # for i in range(100):
+#         #     maskPredictionsSamples = np.zeros([len(testImages), 50*50])
+#         #     for start_idx in range(0, len(testImages),nnBatchSize):
+#         #         maskPredictionsSamples[start_idx:start_idx + nnBatchSize] = maskPredNonDetFun(testImages.astype(np.float32)[start_idx:start_idx + nnBatchSize])
+#         #
+#         #     maskSamples = maskSamples + [maskPredictionsSamples[:,:][:,:,None]]
+#         #
+#         # maskSamples = np.concatenate(maskSamples, axis=2)
+#         # loadMask = True
+#         #
+#         # gtDirMask = 'groundtruth/train4_occlusion_mask/'
+#         #
+#         # masksDir =  gtDirMask + 'masks_occlusion/'
+#         # if loadMask:
+#         #     masksGT = loadMasks(masksDir, testSet)
+# else:
+#     maskPredictions = np.load(trainModelsDirShapeParams + 'maskPredictions.npy')[rangeTests]
 
 loadMask = False
 if loadMask:
@@ -1263,199 +1297,199 @@ hdritems = list(envMapDic.items())[:]
 
 analyzeSamples = False
 
-def analyzeHue(figurePath, rendererGT, renderer, sampleEl, sampleAz, sampleSH, sampleVColorsPredictions=None, sampleStds=0.1):
-    global stds
-    global chAz
-    global test_i
-    global samplingMode
-
-    plt.ioff()
-    fig = plt.figure()
-
-    stds[:] = sampleStds
-    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
-    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
-    stds = ch.Ch([initialPixelStdev])
-
-    models = [negLikModel, negLikModelRobust, negLikModelRobust]
-    errorFunRobust = models[1]
-    errorFunGaussian = models[0]
-
-    vColorsPredSamplesHSV = cv2.cvtColor(np.uint8(sampleVColorsPredictions.reshape([1, 100, 3])*255), cv2.COLOR_RGB2HSV)[0,:,0]
-
-    plt.hist(vColorsPredSamplesHSV, bins=30, alpha=0.2)
-
-    hueGT = cv2.cvtColor(np.uint8(testVColorGT[test_i][None,None,:]*255), cv2.COLOR_RGB2HSV)[0,0,0]
-    huePred = cv2.cvtColor(np.uint8(vColorsPred[test_i][None,None,:]*255), cv2.COLOR_RGB2HSV)[0,0,0]
-
-    chAz[:] = sampleAz
-    chEl[:] = sampleEl
-    currentVColors = chVColors.r
-    currentHSV = cv2.cvtColor(np.uint8(currentVColors[None,None,:]*255), cv2.COLOR_RGB2HSV)[0,0]
-
-    chLightSHCoeffs[:] = sampleSH
-
-    trainingTeapots = [0]
-    hueRange = np.arange(0,255,5)
-    # chThErrors = np.zeros([len(trainingTeapots), len(hueRange)])
-
-    robustErrors = np.array([])
-    gaussianErrors = np.array([])
-    hues = np.array([])
-    for hue_i, hue in enumerate(hueRange):
-        hues = np.append(hues, hue)
-
-        color = cv2.cvtColor(np.array([hue, currentHSV[1],currentHSV[2]])[None,None,:].astype(np.uint8), cv2.COLOR_HSV2RGB)/255
-        chVColors[:] = color
-
-        for idx, renderer_idx in enumerate(trainingTeapots):
-            renderer_i = renderer_teapots[renderer_idx]
-            rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
-            # chThError.opendr_input = rendererGray
-            # chThErrors[idx, az_i] = chThError.r
-
-        robustErrors = np.append(robustErrors, errorFunRobust.r)
-        gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
-
-    x1,x2,y1,y2 = plt.axis()
-
-    robustErrors = robustErrors - np.min(robustErrors)
-    gaussianErrors = gaussianErrors - np.min(gaussianErrors)
-    # chThErrors = chThErrors - np.min(chThErrors)
-    plt.plot(hues, robustErrors*y2/np.max(robustErrors),  c='brown')
-    plt.plot(hues, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
-
-    chThError.opendr_input = renderer
-    lineStyles = ['-', '--', '-.', ':']
-
-    # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
-    # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
-    # plt.axvline(bestHue, linewidth=2, c='y')
-    plt.axvline(hueGT, linewidth=2,c='g')
-    plt.axvline(huePred, linewidth=2,c='r')
-
-    # plt.axvline(np.mod(currentAz*180/np.pi, 360), linewidth=2, linestyle='--',c='b')
-
-    plt.xlabel('Sample')
-    plt.ylabel('Angular error')
-
-    plt.axis((0,255,y1,y2))
-    plt.title('Neuralnet multiple predictions')
-    fig.savefig(figurePath + 'sample' + '.png', bbox_inches='tight')
-    plt.close(fig)
-
-    chVColors[:] = currentVColors
-    cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
-
-def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH, sampleAzsPredictions=None, sampleStds=0.1):
-    global stds
-    global chAz
-    global test_i
-    global samplingMode
-
-    plt.ioff()
-    fig = plt.figure()
-
-    stds[:] = sampleStds
-    negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
-    negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
-    models = [negLikModel, negLikModelRobust, negLikModelRobust]
-    errorFunRobust = models[1]
-    errorFunGaussian = models[0]
-
-    plt.hist(np.mod(sampleAzsPredictions*180/np.pi,360), bins=30, alpha=0.2)
-
-    bestAz = testAzsRel[test_i]
-
-    currentAz = chAz.r.copy()
-    chEl[:] = sampleEl
-    chVColors[:] = sampleVColor
-    chLightSHCoeffs[:] = sampleSH
-
-    trainingTeapots = [0,14,20,25,26,1]
-    trainingTeapots = [0]
-    azRange = np.arange(0,2*np.pi,5*np.pi/180)
-    chThErrors = np.zeros([len(trainingTeapots), len(azRange)])
-
-    robustErrors = np.array([])
-    gaussianErrors = np.array([])
-    angles = np.array([])
-    for az_i, az in enumerate(azRange):
-        angles = np.append(angles, az*180/np.pi)
-        chAz[:] = az
-        # for idx, renderer_idx in enumerate(trainingTeapots):
-        #     renderer_i = renderer_teapots[renderer_idx]
-        #     rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
-        #     chThError.opendr_input = rendererGray
-        chThErrors[0, az_i] = chThError.r
-
-        robustErrors = np.append(robustErrors, errorFunRobust.r)
-        gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
-
-    x1,x2,y1,y2 = plt.axis()
-
-    robustErrors = robustErrors - np.min(robustErrors)
-    gaussianErrors = gaussianErrors - np.min(gaussianErrors)
-    chThErrors = chThErrors - np.min(chThErrors)
-    plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
-    plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
-
-    # chThError.opendr_input = renderer
-    lineStyles = ['-', '--', '-.', ':']
-    for renderer_idx in range(len(trainingTeapots)):
-        plt.plot(angles, chThErrors[renderer_idx]*y2/np.max(chThErrors[renderer_idx]), linestyle=lineStyles[np.mod(renderer_idx,4)], c='y')
-
-    if len(trainingTeapots) > 1:
-        prodErrors = np.prod(chThErrors, axis=0)
-        plt.plot(angles, prodErrors*y2/np.max(prodErrors), linestyle='-', c='black')
-        meanErrors = np.mean(chThErrors, axis=0)
-        plt.plot(angles, meanErrors*y2/np.max(meanErrors), linestyle='--', c='black')
-        # plt.plot(angles, gaussianErrors*robustErrors*y2/np.max(gaussianErrors*robustErrors), linestyle='--', c='black')
-
-    # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
-    # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
-    plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
-    plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
-    plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
-
-    plt.axvline(np.mod(currentAz*180/np.pi, 360), linewidth=2, linestyle='--',c='b')
-
-    plt.xlabel('Sample')
-    plt.ylabel('Angular error')
-
-    # if samplingMode == False:
-    #
-    #     scaleAzSamples = np.array(errorFunAzSamples)
-    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-    #     scaleAzSamples = scaleAzSamples*0.25*y2/np.max(scaleAzSamples)
-    #     for azSample_i, azSample in enumerate(scaleAzSamples):
-    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='r')
-    #
-    #     scaleAzSamples = np.array(errorFunGaussianAzSamples)
-    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-    #     scaleAzSamples = scaleAzSamples*0.4*y2/np.max(scaleAzSamples)
-    #     for azSample_i, azSample in enumerate(scaleAzSamples):
-    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='g')
-    #
-    #     scaleAzSamples = np.array(errorFunAzSamplesPred)
-    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-    #     scaleAzSamples = scaleAzSamples*0.65*y2/np.max(scaleAzSamples)
-    #     for azSample_i, azSample in enumerate(scaleAzSamples):
-    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='b')
-    #
-    #     scaleAzSamples = np.array(errorFunGaussianAzSamplesPred)
-    #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
-    #     scaleAzSamples = scaleAzSamples*0.75*y2/np.max(scaleAzSamples)
-    #     for azSample_i, azSample in enumerate(scaleAzSamples):
-    #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='y')
-
-    plt.axis((0,360,y1,y2))
-    plt.title('Neuralnet multiple predictions')
-    fig.savefig(figurePath + 'sample' + '.png', bbox_inches='tight')
-    plt.close(fig)
-
-    chAz[:] = currentAz
-    cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+# def analyzeHue(figurePath, rendererGT, renderer, sampleEl, sampleAz, sampleSH, sampleVColorsPredictions=None, sampleStds=0.1):
+#     global stds
+#     global chAz
+#     global test_i
+#     global samplingMode
+#
+#     plt.ioff()
+#     fig = plt.figure()
+#
+#     stds[:] = sampleStds
+#     negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
+#     negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
+#     stds = ch.Ch([initialPixelStdev])
+#
+#     models = [negLikModel, negLikModelRobust, negLikModelRobust]
+#     errorFunRobust = models[1]
+#     errorFunGaussian = models[0]
+#
+#     vColorsPredSamplesHSV = cv2.cvtColor(np.uint8(sampleVColorsPredictions.reshape([1, 100, 3])*255), cv2.COLOR_RGB2HSV)[0,:,0]
+#
+#     plt.hist(vColorsPredSamplesHSV, bins=30, alpha=0.2)
+#
+#     hueGT = cv2.cvtColor(np.uint8(testVColorGT[test_i][None,None,:]*255), cv2.COLOR_RGB2HSV)[0,0,0]
+#     huePred = cv2.cvtColor(np.uint8(vColorsPred[test_i][None,None,:]*255), cv2.COLOR_RGB2HSV)[0,0,0]
+#
+#     chAz[:] = sampleAz
+#     chEl[:] = sampleEl
+#     currentVColors = chVColors.r
+#     currentHSV = cv2.cvtColor(np.uint8(currentVColors[None,None,:]*255), cv2.COLOR_RGB2HSV)[0,0]
+#
+#     chLightSHCoeffs[:] = sampleSH
+#
+#     trainingTeapots = [0]
+#     hueRange = np.arange(0,255,5)
+#     # chThErrors = np.zeros([len(trainingTeapots), len(hueRange)])
+#
+#     robustErrors = np.array([])
+#     gaussianErrors = np.array([])
+#     hues = np.array([])
+#     for hue_i, hue in enumerate(hueRange):
+#         hues = np.append(hues, hue)
+#
+#         color = cv2.cvtColor(np.array([hue, currentHSV[1],currentHSV[2]])[None,None,:].astype(np.uint8), cv2.COLOR_HSV2RGB)/255
+#         chVColors[:] = color
+#
+#         for idx, renderer_idx in enumerate(trainingTeapots):
+#             renderer_i = renderer_teapots[renderer_idx]
+#             rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
+#             # chThError.opendr_input = rendererGray
+#             # chThErrors[idx, az_i] = chThError.r
+#
+#         robustErrors = np.append(robustErrors, errorFunRobust.r)
+#         gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
+#
+#     x1,x2,y1,y2 = plt.axis()
+#
+#     robustErrors = robustErrors - np.min(robustErrors)
+#     gaussianErrors = gaussianErrors - np.min(gaussianErrors)
+#     # chThErrors = chThErrors - np.min(chThErrors)
+#     plt.plot(hues, robustErrors*y2/np.max(robustErrors),  c='brown')
+#     plt.plot(hues, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
+#
+#     chThError.opendr_input = renderer
+#     lineStyles = ['-', '--', '-.', ':']
+#
+#     # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
+#     # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
+#     # plt.axvline(bestHue, linewidth=2, c='y')
+#     plt.axvline(hueGT, linewidth=2,c='g')
+#     plt.axvline(huePred, linewidth=2,c='r')
+#
+#     # plt.axvline(np.mod(currentAz*180/np.pi, 360), linewidth=2, linestyle='--',c='b')
+#
+#     plt.xlabel('Sample')
+#     plt.ylabel('Angular error')
+#
+#     plt.axis((0,255,y1,y2))
+#     plt.title('Neuralnet multiple predictions')
+#     fig.savefig(figurePath + 'sample' + '.png', bbox_inches='tight')
+#     plt.close(fig)
+#
+#     chVColors[:] = currentVColors
+#     cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
+#
+# def analyzeAz(figurePath, rendererGT, renderer, sampleEl, sampleVColor, sampleSH, sampleAzsPredictions=None, sampleStds=0.1):
+#     global stds
+#     global chAz
+#     global test_i
+#     global samplingMode
+#
+#     plt.ioff()
+#     fig = plt.figure()
+#
+#     stds[:] = sampleStds
+#     negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))
+#     negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))
+#     models = [negLikModel, negLikModelRobust, negLikModelRobust]
+#     errorFunRobust = models[1]
+#     errorFunGaussian = models[0]
+#
+#     plt.hist(np.mod(sampleAzsPredictions*180/np.pi,360), bins=30, alpha=0.2)
+#
+#     bestAz = testAzsRel[test_i]
+#
+#     currentAz = chAz.r.copy()
+#     chEl[:] = sampleEl
+#     chVColors[:] = sampleVColor
+#     chLightSHCoeffs[:] = sampleSH
+#
+#     trainingTeapots = [0,14,20,25,26,1]
+#     trainingTeapots = [0]
+#     azRange = np.arange(0,2*np.pi,5*np.pi/180)
+#     chThErrors = np.zeros([len(trainingTeapots), len(azRange)])
+#
+#     robustErrors = np.array([])
+#     gaussianErrors = np.array([])
+#     angles = np.array([])
+#     for az_i, az in enumerate(azRange):
+#         angles = np.append(angles, az*180/np.pi)
+#         chAz[:] = az
+#         # for idx, renderer_idx in enumerate(trainingTeapots):
+#         #     renderer_i = renderer_teapots[renderer_idx]
+#         #     rendererGray =  0.3*renderer_i[:,:,0] +  0.59*renderer_i[:,:,1] + 0.11*renderer_i[:,:,2]
+#         #     chThError.opendr_input = rendererGray
+#         chThErrors[0, az_i] = chThError.r
+#
+#         robustErrors = np.append(robustErrors, errorFunRobust.r)
+#         gaussianErrors = np.append(gaussianErrors, errorFunGaussian.r)
+#
+#     x1,x2,y1,y2 = plt.axis()
+#
+#     robustErrors = robustErrors - np.min(robustErrors)
+#     gaussianErrors = gaussianErrors - np.min(gaussianErrors)
+#     chThErrors = chThErrors - np.min(chThErrors)
+#     plt.plot(angles, robustErrors*y2/np.max(robustErrors),  c='brown')
+#     plt.plot(angles, gaussianErrors*y2/np.max(gaussianErrors),  c='purple')
+#
+#     # chThError.opendr_input = renderer
+#     lineStyles = ['-', '--', '-.', ':']
+#     for renderer_idx in range(len(trainingTeapots)):
+#         plt.plot(angles, chThErrors[renderer_idx]*y2/np.max(chThErrors[renderer_idx]), linestyle=lineStyles[np.mod(renderer_idx,4)], c='y')
+#
+#     if len(trainingTeapots) > 1:
+#         prodErrors = np.prod(chThErrors, axis=0)
+#         plt.plot(angles, prodErrors*y2/np.max(prodErrors), linestyle='-', c='black')
+#         meanErrors = np.mean(chThErrors, axis=0)
+#         plt.plot(angles, meanErrors*y2/np.max(meanErrors), linestyle='--', c='black')
+#         # plt.plot(angles, gaussianErrors*robustErrors*y2/np.max(gaussianErrors*robustErrors), linestyle='--', c='black')
+#
+#     # plt.axvline(np.mod(bestAzNormal*180/np.pi,360), linewidth=2, c='purple')
+#     # plt.axvline(np.mod(bestAzRobust*180/np.pi,360), linewidth=2, c='brown')
+#     plt.axvline(np.mod(bestAz*180/np.pi,360), linewidth=2, c='y')
+#     plt.axvline(testAzsRel[test_i]*180/np.pi, linewidth=2,c='g')
+#     plt.axvline(np.mod(azsPred[test_i]*180/np.pi, 360), linewidth=2,c='r')
+#
+#     plt.axvline(np.mod(currentAz*180/np.pi, 360), linewidth=2, linestyle='--',c='b')
+#
+#     plt.xlabel('Sample')
+#     plt.ylabel('Angular error')
+#
+#     # if samplingMode == False:
+#     #
+#     #     scaleAzSamples = np.array(errorFunAzSamples)
+#     #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+#     #     scaleAzSamples = scaleAzSamples*0.25*y2/np.max(scaleAzSamples)
+#     #     for azSample_i, azSample in enumerate(scaleAzSamples):
+#     #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='r')
+#     #
+#     #     scaleAzSamples = np.array(errorFunGaussianAzSamples)
+#     #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+#     #     scaleAzSamples = scaleAzSamples*0.4*y2/np.max(scaleAzSamples)
+#     #     for azSample_i, azSample in enumerate(scaleAzSamples):
+#     #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='g')
+#     #
+#     #     scaleAzSamples = np.array(errorFunAzSamplesPred)
+#     #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+#     #     scaleAzSamples = scaleAzSamples*0.65*y2/np.max(scaleAzSamples)
+#     #     for azSample_i, azSample in enumerate(scaleAzSamples):
+#     #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='b')
+#     #
+#     #     scaleAzSamples = np.array(errorFunGaussianAzSamplesPred)
+#     #     scaleAzSamples = scaleAzSamples - np.min(scaleAzSamples) + 1
+#     #     scaleAzSamples = scaleAzSamples*0.75*y2/np.max(scaleAzSamples)
+#     #     for azSample_i, azSample in enumerate(scaleAzSamples):
+#     #         plt.plot(np.mod(totalAzSamples[azSample_i]*180/np.pi, 360), azSample, marker='o', ms=20., c='y')
+#
+#     plt.axis((0,360,y1,y2))
+#     plt.title('Neuralnet multiple predictions')
+#     fig.savefig(figurePath + 'sample' + '.png', bbox_inches='tight')
+#     plt.close(fig)
+#
+#     chAz[:] = currentAz
+#     cv2.imwrite(figurePath + '_render.png', cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
 #Fit:
 print("Fitting predictions")
@@ -1481,21 +1515,21 @@ negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, grou
 negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/ numPixels
 pixelLikelihoodCh = generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances)
 pixelLikelihoodRobustCh = generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances)
-pixelLikelihoodRobustSQErrorCh = generative_models.LogRobustSQErrorModel(sqeRenderer, foregroundPrior=globalPrior, variances=variances)
+# pixelLikelihoodRobustSQErrorCh = generative_models.LogRobustSQErrorModel(sqeRenderer, foregroundPrior=globalPrior, variances=variances)
 
 post = generative_models.layerPosteriorsRobustCh(rendererGT, renderer, np.array([]), 'FULL', globalPrior, variances)[0]
 # postSqerror = generative_models.layerPosteriorsRobustSQErrorCh(sqeRenderer, np.array([]), 'MASK', globalPrior, variances)[0].r>0.5
 
-negLikModelRobustSQError = generative_models.NLLRobustSQErrorModel(sqeRenderer=sqeRenderer, Q=globalPrior.r*np.ones([height, width]),variances=variances) / numPixels
+# negLikModelRobustSQError = generative_models.NLLRobustSQErrorModel(sqeRenderer=sqeRenderer, Q=globalPrior.r*np.ones([height, width]),variances=variances) / numPixels
 
-models = [negLikModel, negLikModelRobust, negLikModelRobustSQError]
-pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh, pixelLikelihoodRobustSQErrorCh]
+models = [negLikModel, negLikModelRobust]
+pixelModels = [pixelLikelihoodCh, pixelLikelihoodRobustCh]
 modelsDescr = ["Gaussian Model", "Outlier model" ]
 
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'TMP-' + testRangeStr
+testDescription = 'photorealistic-newopendr-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1503,7 +1537,7 @@ testPrefixBase = testPrefix
 runExp = True
 shapePenaltyTests = [0,0,0,0]
 # shapePenaltyTests = [0,0,0,0]
-stdsTests = [0.01]
+stdsTests = [0.1]
 # stdsTests = [0.03]
 modelTests = len(stdsTests)*[1]
 # modelTests = [1]
@@ -1809,17 +1843,18 @@ for testSetting, model in enumerate(modelTests):
             imageSrgb = image.copy()
             rendererGT[:] = srgb2lin(image)
 
-            sqeRenderer.imageGT = ch.Ch(image)
+            # sqeRenderer.imageGT = ch.Ch(image)
 
             negLikModel = -ch.sum(generative_models.LogGaussianModel(renderer=renderer, groundtruth=rendererGT, variances=variances))/numPixels
             # negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/numPixels
-            negLikModelRobust = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
-                                                                                variances=variances) / numPixels
+            # negLikModelRobust = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),variances=variances) / numPixels
 
-            negLikModelRobustSQError = generative_models.NLLRobustSQErrorModel(sqeRenderer=sqeRenderer, Q=globalPrior.r*np.ones([height, width]),
-                                                                                variances=variances) / numPixels
+            negLikModelRobust = -ch.sum(generative_models.LogRobustModel(renderer=renderer, groundtruth=rendererGT, foregroundPrior=globalPrior, variances=variances))/ numPixels
 
-            models = [negLikModel, negLikModelRobust, negLikModelRobustSQError]
+            # negLikModelRobustSQError = generative_models.NLLRobustSQErrorModel(sqeRenderer=sqeRenderer, Q=globalPrior.r*np.ones([height, width]),
+            #                                                                     variances=variances) / numPixels
+
+            models = [negLikModel, negLikModelRobust]
 
             stds[:] = stdsTests[testSetting]
 
@@ -1961,7 +1996,11 @@ for testSetting, model in enumerate(modelTests):
                             envMapCoeffsGT = hdrValues[1]
                             envMapFilename = hdrFile
 
-                            envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+                            try:
+                                envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+                            except:
+                                envMapTexture = np.zeros([360,180,3])
+
                             envMapTexture = cv2.resize(src=envMapTexture, dsize=(360,180))
                             envMapFound = True
                             break
@@ -2040,7 +2079,7 @@ for testSetting, model in enumerate(modelTests):
                         print("Minimizing first step")
                         model = 1
                         errorFun = models[model]
-                        # method = 1
+                        # method = 5
 
                         chLightSHCoeffs[:] = lightCoefficientsRel
                         chVColors[:] = color
@@ -2278,7 +2317,7 @@ for testSetting, model in enumerate(modelTests):
 
                             minimizingShape = True
 
-                            method = 1
+                            method = 5
 
                             ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -2336,8 +2375,8 @@ for testSetting, model in enumerate(modelTests):
 
                             minimizingShape = True
 
-                            method = 1
-                            errorFun = models[2]
+                            method = 5
+                            errorFun = models[1]
 
                             # errorFunFast = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
                             #                                                      variances=variances) / numPixels

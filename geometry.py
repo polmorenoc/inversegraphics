@@ -74,3 +74,21 @@ class Translate(Ch):
             return np.array([[0, 0, 0, 0],[0, 0, 0, 1], [0, 0, 0,0],[0,0,0,0]]).reshape(16,1)
         if wrt is self.z:
             return np.array([[0, 0, 0, 0],[0, 0, 0, 0], [0, 0, 0, 1],[0,0,0,0]]).reshape(16,1)
+
+
+def getNormals(vertices, faces):
+    norm = np.zeros( vertices.shape, dtype=vertices.dtype )
+    tris = vertices[faces]
+    n = np.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
+    normalize_v3(n)
+    norm[ faces[:,0] ] += n
+    norm[ faces[:,1] ] += n
+    norm[ faces[:,2] ] += n
+    normalize_v3(norm)
+    return norm
+
+def chGetNormals(vertices, faces):
+    import opendr.geometry
+    return opendr.geometry.VertNormals(vertices, faces).reshape((-1,3))
+
+
