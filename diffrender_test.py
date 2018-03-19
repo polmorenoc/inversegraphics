@@ -924,7 +924,6 @@ if includeMeanBaseline:
 rangeTests = np.arange(len(testSet))
 
 
-
 if recomputePredictionsPose or not os.path.isfile(trainModelsDirPose + "elevsPred.npy"):
     if 'neuralNetPose' in parameterRecognitionModels:
 
