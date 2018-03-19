@@ -3,7 +3,7 @@ test__author__ = 'pol'
 # from damascene import damascene
 
 import matplotlib
-matplotlib.use('QT4Agg')
+# matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
 import scene_io_utils
@@ -29,7 +29,7 @@ from light_probes import SHProjection
 
 import theano
 theano.config.optimizer='fast_compile'
-theano.config.cycle_detection = False
+theano.config.cycle_detection = 'fast'
 # theano.sandbox.cuda.use('cpu')
 import lasagne
 import lasagne_nn
@@ -82,6 +82,7 @@ win = -1
 
 multiObjects = False
 chThError = None
+global renderer
 
 if glMode == 'glfw':
     #Initialize base GLFW context for the Demo and to share context among all renderers.
@@ -203,6 +204,8 @@ if multiObjects:
 # Generative model set up
 #########################################
 
+global rendererGT
+
 rendererGT = ch.Ch(renderer.r.copy())
 numPixels = width*height
 
@@ -233,6 +236,7 @@ model = 1
 pixelErrorFun = pixelModels[model]
 errorFun = models[model]
 
+global iterat
 iterat = 0
 
 t = time.time()
@@ -267,7 +271,6 @@ ignoreGT = True
 ignore = []
 if os.path.isfile(gtDir + 'ignore.npy'):
     ignore = np.load(gtDir + 'ignore.npy')
-
 
 testSet = np.load(experimentDir + 'test.npy')
 
@@ -662,17 +665,11 @@ if useShapeModel:
         renderer.imageGT = None
         renderer.r
 
-
-
-
-
     # chShapeParams[:] = np.zeros([latentDim])
     chVerticesMean = chVertices.r.copy()
 
 else:
     renderer = renderer_teapots[testRenderer]
-
-
 
 # plt.imsave('testrender.png', sqeRenderer.render_image)
 
@@ -1528,7 +1525,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'photorealistic-newopendr-' + testRangeStr
+testDescription = 'photorealistic-newopendr_server-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1542,7 +1539,7 @@ modelTests = len(stdsTests)*[1]
 # modelTests = [1]
 methodTests = len(stdsTests)*[1]
 
-maxOptIters = len(stdsTests)*[50]
+maxOptIters = len(stdsTests)*[100]
 
 if makeVideo:
     plt.ioff()
@@ -1598,7 +1595,9 @@ segmentVColorError = np.array([])
 useSegmentation = True
 
 segmentVColorsList = []
+global annot_t
 annot_t = None
+
 def cb(_):
     global t
     global samplingMode
@@ -1650,16 +1649,12 @@ def cb(_):
         chVColors[:] = vColor
 
     if makeVideo:
-
         global im1
         global im2
-        global rendererGT
         global vidImgs
         global writer
         global writer_i
-        global renderer
         global rendererRecognition
-        global annot_t
 
         plt.figure(figvid.number)
         im1 = vax1.imshow(lin2srgb(rendererGT.r.copy()))
@@ -1735,6 +1730,8 @@ def cb(_):
 
     t = time.time()
 
+replaceExisting = True
+
 for testSetting, model in enumerate(modelTests):
     model = modelTests[testSetting]
     method = methodTests[testSetting]
@@ -1744,6 +1741,9 @@ for testSetting, model in enumerate(modelTests):
     testPrefix = testPrefixBase + '_method' + str(method)  + 'errorFun' + str(model) + '_std' + str(stds.r[0])  + '_shapePen'+ str(shapePenalty)
 
     resultDir = 'results/' + testPrefix + '/'
+
+    if not os.path.exists(resultDir + 'imgs/'):
+        os.makedirs(resultDir + 'results/')
 
     if not os.path.exists(resultDir + 'imgs/'):
         os.makedirs(resultDir + 'imgs/')
@@ -1824,8 +1824,14 @@ for testSetting, model in enumerate(modelTests):
     if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         for test_i in range(len(testAzsRel)):
 
-            resultDir = 'results/' + testPrefix + '/'
+            resultDir = 'results/' + testPrefix + '/results/'
+            testDir = resultDir + str(test_i) + '/'
 
+            if not os.path.exists(testDir):
+                os.makedirs(testDir)
+
+            if not replaceExisting and os.path.isfile(testDir + 'fitted_' + 'shapeParams'+ 'npy'):
+                continue
 
             bestFittedAz = chAz.r
             bestFittedEl = chEl.r
@@ -1955,6 +1961,12 @@ for testSetting, model in enumerate(modelTests):
 
                 cv2.imwrite(resultDir + 'imgs/test' + str(test_i) + '/sample' + str(sample) + '_predicted' + '.png',  cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy()) * 255), cv2.COLOR_RGB2BGR))
 
+                np.save(testDir + 'pred_' + 'az' + 'npy', az)
+                np.save(testDir + 'pred_' + 'el'+ 'npy', el)
+                np.save(testDir + 'pred_' + 'color'+ 'npy', color)
+                np.save(testDir + 'pred_' + 'lightCoefficientsRel'+ 'npy', lightCoefficientsRel)
+                np.save(testDir + 'pred_' + 'shapeParams'+ 'npy', shapeParams)
+
                 if not os.path.exists(resultDir + 'az_samples/'):
                     os.makedirs(resultDir + 'az_samples/')
                 #
@@ -2069,7 +2081,6 @@ for testSetting, model in enumerate(modelTests):
                     # analyzeHue(resultDir + 'hue_samples/test' + str(test_i) +'/pre', rendererGT, renderer, chEl.r, chAz.r, chLightSHCoeffs.r, vColorsPredSamples[test_i], sampleStds=stds.r)
 
                     for sampleAz in totalAzSamples:
-                        global iterat
                         iterat = 0
                         sampleAzNum += 1
 
@@ -2136,7 +2147,6 @@ for testSetting, model in enumerate(modelTests):
                 # analyzeAz(resultDir + 'az_samples/test' + str(test_i) + '_samples', rendererGT, renderer, chEl.r, color, lightCoefficientsRel,
                 #           azsPredictions[test_i], sampleStds=stds.r)
 
-                global iterat
                 iterat = 0
 
                 sampleAzNum = 0
@@ -2311,7 +2321,7 @@ for testSetting, model in enumerate(modelTests):
                             stds[:] = stdsTests[testSetting]
                             shapePenalty = 0.0001
 
-                            options={'disp':False, 'maxiter':50}
+                            options={'disp':False, 'maxiter':100}
                             # options={'disp':False, 'maxiter':2}
 
                             minimizingShape = True
@@ -2507,6 +2517,12 @@ for testSetting, model in enumerate(modelTests):
 
                 cv2.imwrite(resultDir + 'imgs/test'+ str(test_i) + '/fitted'+ '.png',cv2.cvtColor(np.uint8(lin2srgb(renderer.r.copy())*255), cv2.COLOR_RGB2BGR))
 
+                np.save(testDir + 'fitted_' + 'az' + 'npy', chAz.r)
+                np.save(testDir + 'fitted_' + 'el'+ 'npy', chEl.r)
+                np.save(testDir + 'fitted_' + 'color'+ 'npy', chVColors.r)
+                np.save(testDir + 'fitted_' + 'lightCoefficientsRel'+ 'npy', chLightSHCoeffs.r)
+                np.save(testDir + 'fitted_' + 'shapeParams'+ 'npy', chShapeParams.r)
+
             if optimizationTypeDescr[optimizationType] != 'predict':
                 if evaluateWithGT:
                     fittedErrorFuns = np.append(fittedErrorFuns, bestModelLik)
@@ -2534,7 +2550,8 @@ for testSetting, model in enumerate(modelTests):
 
                 stds[:] = stdsTests[testSetting]
 
-                plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]))
+                plt.imsave(resultDir + 'imgs/test'+ str(test_i) + '/' + str(hdridx) + '_Outlier.jpeg', np.tile(post.reshape(shapeIm[0],shapeIm[1],1), [1,1,3]).astype(np.float32))
+
 
             #Every now and then (or after the final test case), produce plots to keep track of work accross different levels of occlusion.
             experimentDic = {'model':model, 'method':method, 'shapePenalty':shapePenalty, 'stds':stds.r, 'dataIds': testIds, 'gtPrefix': gtPrefix, 'trainPrefixPose': trainPrefixPose, 'trainPrefixVColor': trainPrefixVColor,
@@ -2739,8 +2756,6 @@ for testSetting, model in enumerate(modelTests):
                     # ipdb.set_trace()
                     totalTime = time.time() - startTime
                     print("Took " + str(totalTime/test_i) + " time per instance.")
-
-
 
                     experimentErrorsDic = {'errorsPosePredList':errorsPosePredList, 'errorsLightCoeffsList':errorsLightCoeffsList, 'errorsShapeParamsLis':errorsShapeParamsList, 'errorsShapeVerticesList':errorsShapeVerticesList, 'errorsEnvMapList':errorsEnvMapList, 'errorsLightCoeffsCList':errorsLightCoeffsCList, 'errorsVColorsEList':errorsVColorsEList, 'errorsVColorsCList':errorsVColorsCList, 'errorsVColorsCList':errorsVColorsCList, 'errorsSegmentationList':errorsSegmentationList}
                     #
