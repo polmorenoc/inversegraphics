@@ -567,7 +567,6 @@ rendererGT.initGLTexture()
 
 cv2.imwrite('renderergt' + str(readDataId) + '.jpeg' , 255*lin2srgb(rendererGT.r[:,:,[2,1,0]]), [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-
 ipdb.set_trace()
 
 render = renderer.r.copy()

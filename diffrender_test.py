@@ -1730,7 +1730,7 @@ def cb(_):
 
     t = time.time()
 
-replaceExisting = True
+replaceExisting = False
 
 for testSetting, model in enumerate(modelTests):
     model = modelTests[testSetting]
@@ -1823,6 +1823,7 @@ for testSetting, model in enumerate(modelTests):
 
     if (computePredErrorFuns and optimizationType == 0) or optimizationType != 0:
         for test_i in range(len(testAzsRel)):
+            print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
 
             resultDir = 'results/' + testPrefix + '/results/'
             testDir = resultDir + str(test_i) + '/'
@@ -1830,7 +1831,7 @@ for testSetting, model in enumerate(modelTests):
             if not os.path.exists(testDir):
                 os.makedirs(testDir)
 
-            if not replaceExisting and os.path.isfile(testDir + 'fitted_' + 'shapeParams'+ 'npy'):
+            if not replaceExisting and os.path.isfile(testDir + 'fitted_' + 'shapeParams'+ 'npy.npy'):
                 continue
 
             bestFittedAz = chAz.r
@@ -1842,7 +1843,7 @@ for testSetting, model in enumerate(modelTests):
                 bestShapeParams = chShapeParams.r
 
             testId = testIds[test_i]
-            print("************** Minimizing loss of prediction " + str(test_i) + "of " + str(len(testAzsRel)))
+
 
             image = skimage.transform.resize(images[test_i], [height,width])
             imageSrgb = image.copy()
