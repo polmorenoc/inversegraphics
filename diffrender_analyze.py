@@ -410,7 +410,8 @@ testAzsRel = np.mod(testAzsGT - testObjAzsGT, 2*np.pi)
 
 ##### Load Results data:
 
-testPrefix = 'train4_occlusion_shapemodel_10k_ECCVNEW-JOINED-ALL2018'
+# testPrefix = 'train4_occlusion_shapemodel_10k_ECCVNEW-JOINED-ALL2018'
+testPrefix = 'train4_occlusion_shapemodel_10k_ECCV-PHOTOREALISTIC-JOINT2018'
 resultDir = 'results/' + testPrefix + '/'
 
 with open(resultDir + 'experiment.pickle', 'rb') as pfile:
@@ -418,7 +419,9 @@ with open(resultDir + 'experiment.pickle', 'rb') as pfile:
 testSet = experimentDic['testSet']
 methodsPred = experimentDic['methodsPred']
 testOcclusions = experimentDic['testOcclusions']
-testOcclusions = testOcclusions[dataIdsTestIndices]
+# testOcclusions = testOcclusions[dataIdsTestIndices] #Change depending on the source of GT.
+
+# import ipdb; ipdb.set_trace()
 
 testPrefixBase = experimentDic[ 'testPrefixBase']
 parameterRecognitionModels = experimentDic[ 'parameterRecognitionModels']
@@ -903,7 +906,7 @@ plotStyles = plotStyles + ['solid']
 plotStyles = plotStyles + ['dashed']
 
 plotMethodsIndices = [2,5,3,4]
-plotMethodsIndices = [0,2,3,4]
+plotMethodsIndices = [0,2,6,3]
 
 
 recognitionIdx = 2

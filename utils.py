@@ -121,7 +121,7 @@ def latexify(fig_width=None, fig_height=None, columns=1):
 
 def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS):
 
-    # latexify(columns=2)
+    latexify(columns=2)
 
     directory = resultDir + 'pred-azimuth-errors_fitted-azimuth-error'
     fig = plt.figure()
@@ -357,7 +357,7 @@ def saveScatterPlots(resultDir, testOcclusions, useShapeModel, errorsPosePred, e
 
 def saveScatterPlotsMethodFit(methodFitNum, resultDir, testOcclusions, useShapeModel, errorsPosePred, errorsPoseFitted,errorsLightCoeffsC,errorsFittedLightCoeffsC,errorsEnvMap,errorsFittedEnvMap,errorsLightCoeffs,errorsFittedLightCoeffs,errorsShapeParams,errorsFittedShapeParams,errorsShapeVertices,errorsFittedShapeVertices,errorsVColorsE,errorsFittedVColorsE,errorsVColorsC,errorsFittedVColorsC, errorsVColorsS,errorsFittedVColorsS):
 
-    # latexify(columns=2)
+    latexify(columns=2)
 
     directory = resultDir + 'pred-azimuth-errors_fitted-azimuth-error-' + str(methodFitNum) + '-'
     fig = plt.figure()
@@ -593,7 +593,7 @@ def saveScatterPlotsMethodFit(methodFitNum, resultDir, testOcclusions, useShapeM
 
 def saveLikelihoodPlots(resultDir, occlusions, methodsPred, plotColors, plotMethodsIndices, meanLikelihoodArr):
 
-    # latexify(columns=2)
+    latexify(columns=2)
     directory = resultDir + 'predictionLikelihood-FitLikelihood'
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -747,7 +747,7 @@ def saveHistograms():
     # plt.close(fig)
 
 def saveConditionalHistograms(resultDir, occlusions, methodsPred, variablesDescr, plotMethodsIndices, errorsList):
-    # latexify(columns=2)
+    latexify(columns=2)
 
     numBins = 20
     numErrBins = 40
@@ -824,7 +824,7 @@ def saveConditionalHistograms(resultDir, occlusions, methodsPred, variablesDescr
 
 def saveOcclusionPlots(resultDir, prefix, occlusions, methodsPred, plotColors, plotStyles, plotMethodsIndices, useShapeModel, meanAbsErrAzsArr, meanAbsErrElevsArr, meanErrorsVColorsCArr, meanErrorsVColorsEArr, meanErrorsVColorsSArr, meanErrorsLightCoeffsArr, meanErrorsShapeParamsArr, meanErrorsShapeVerticesArr, meanErrorsLightCoeffsCArr, meanErrorsEnvMapArr,meanErrorsSegmentationArr):
 
-    # latexify(columns=2)
+    latexify(columns=2)
 
     directory = resultDir + prefix + 'predictionMeanError-Segmentation'
     fig = plt.figure()

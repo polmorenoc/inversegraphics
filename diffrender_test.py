@@ -163,13 +163,13 @@ for teapot_i in range(len(renderTeapotsList)):
     centermod = center_teapots[teapot_i]
 
     vmod, vnmod, _ = transformObject(vmod, vnmod, chScale, chObjAz, ch.Ch([0]), ch.Ch([0]), np.array([0,0,0]))
-    renderer = createNewRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
+    renderer = createRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.overdraw = True
     renderer.nsamples = 8
-    renderer.msaa = True
+    renderer.msaa = False
     renderer.initGL()
     renderer.initGLTexture()
-    renderer.initGL_AnalyticRenderer()
+    # renderer.initGL_AnalyticRenderer()
     renderer.imageGT = None
     renderer.r
 
@@ -1525,7 +1525,7 @@ modelsDescr = ["Gaussian Model", "Outlier model" ]
 errorFun = models[model]
 
 testRangeStr = str(testSet[0]) + '-' + str(testSet[-1])
-testDescription = 'photorealistic-newopendr_server-' + testRangeStr
+testDescription = 'photorealistic-replicateopendr_server-' + testRangeStr
 testPrefix = experimentPrefix + '_' + testDescription + '_' + optimizationTypeDescr[optimizationType] + '_' + str(len(testSet)) + 'samples_'
 
 testPrefixBase = testPrefix
@@ -1533,13 +1533,13 @@ testPrefixBase = testPrefix
 runExp = True
 shapePenaltyTests = [0,0,0,0]
 # shapePenaltyTests = [0,0,0,0]
-stdsTests = [0.1]
+stdsTests = [0.03]
 # stdsTests = [0.03]
 modelTests = len(stdsTests)*[1]
 # modelTests = [1]
 methodTests = len(stdsTests)*[1]
 
-maxOptIters = len(stdsTests)*[100]
+maxOptIters = len(stdsTests)*[40]
 
 if makeVideo:
     plt.ioff()
@@ -2327,7 +2327,7 @@ for testSetting, model in enumerate(modelTests):
 
                             minimizingShape = True
 
-                            method = 5
+                            # method = 5
 
                             ch.minimize({'raw': errorFun }, bounds=None, method=methods[method], x0=free_variables, callback=cb, options=options)
 
@@ -2385,7 +2385,7 @@ for testSetting, model in enumerate(modelTests):
 
                             minimizingShape = True
 
-                            method = 5
+
                             errorFun = models[1]
 
                             # errorFunFast = generative_models.NLLRobustModel(renderer=renderer, groundtruth=rendererGT, Q=globalPrior.r*np.ones([height, width]),
