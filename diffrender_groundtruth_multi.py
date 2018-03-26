@@ -32,7 +32,7 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'cian_data_dir_whitebg_1_repeat_imgs'
+prefix = 'show_scenes'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
 previousGTPrefix = 'cian_data_dir_whitebg'
 
@@ -40,9 +40,9 @@ previousGTPrefix = 'cian_data_dir_whitebg'
 
 renderFromPreviousGT = False
 useShapeModel = True
-useOpenDR = True
-useBlender = False
-renderBlender = False
+useOpenDR = False
+useBlender = True
+renderBlender = True
 captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
@@ -56,7 +56,7 @@ replaceNewGroundtruth = True
 renderOcclusions = False
 occlusionMin = 0.0
 occlusionMax = 0.9
-renderTeapots =  True
+renderTeapots =  False
 renderMugs = False
 showMug = False
 centeredObject = True

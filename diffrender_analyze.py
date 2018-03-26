@@ -905,9 +905,10 @@ plotStyles = plotStyles + ['solid']
 
 plotStyles = plotStyles + ['dashed']
 
-plotMethodsIndices = [2,5,3,4]
-plotMethodsIndices = [0,2,6,3]
+plotMethodsIndices = [2,5,6, 7, 3,4]
+# plotMethodsIndices = [0,2,6,3]
 
+import ipdb; ipdb.set_trace()
 
 recognitionIdx = 2
 robustIdx = 3
