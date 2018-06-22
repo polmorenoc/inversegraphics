@@ -654,14 +654,14 @@ if useShapeModel:
         renderer.initGLTexture()
     else:
         # renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, win )
-        renderer = createNewRendererTarget(glMode, chAz, chEl, chDist, smCenter, v_scene, vc_scene, f_list_scene, vn_scene, light_color, chComponent, chVColors, 0, chDisplacement, width,height, uv_scene, haveTextures_list_scene, textures_list_scene, frustum, win )
+        renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, v_scene, vc_scene, f_list_scene, vn_scene, light_color, chComponent, chVColors, 0, chDisplacement, width,height, uv_scene, haveTextures_list_scene, textures_list_scene, frustum, win )
 
         renderer.overdraw = True
         renderer.nsamples = 8
-        renderer.msaa = True
+        renderer.msaa = False
         renderer.initGL()
         renderer.initGLTexture()
-        renderer.initGL_AnalyticRenderer()
+        # renderer.initGL_AnalyticRenderer()
         renderer.imageGT = None
         renderer.r
 
