@@ -74,6 +74,7 @@ trainModelsDirAppLight = 'train4_occlusion_shapemodel_10k'
 
 #Main script options:
 
+
 glModes = ['glfw','mesa']
 glMode = glModes[0]
 
@@ -166,7 +167,7 @@ for teapot_i in range(len(renderTeapotsList)):
     renderer = createRendererTarget(glMode, chAz, chEl, chDist, centermod, vmod, vcmod, fmod_list, vnmod, light_color, chComponent, chVColors, 0, chDisplacement,  width,height, uvmod, haveTexturesmod_list, texturesmod_list, frustum, win )
     renderer.overdraw = True
     renderer.nsamples = 8
-    renderer.msaa = False
+    renderer.msaa = True
     renderer.initGL()
     renderer.initGLTexture()
     # renderer.initGL_AnalyticRenderer()
@@ -543,15 +544,15 @@ options = {'disp':False, 'maxiter':maxiter, 'df_vars':df_vars}
 
 testRenderer = 0
 
-#Read texture UV mapping
-sceneFilename = 'teapot.blend'
-with bpy.data.libraries.load(filepath=sceneFilename) as (data_from, data_to):
-    for attr in dir(data_to):
-        setattr(data_to, attr, getattr(data_from, attr))
-teapot = bpy.data.scenes['Teapot'].objects[1]
-vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = scene_io_utils.unpackBlenderObject(teapot, '', False)
-color = np.array([0,0,0])
-texturesmod_list[0][0][0] = ch.Ch(np.ones(texturesmod_list[0][0][0].shape)*color[None,None,:])
+# #Read texture UV mapping
+# sceneFilename = 'teapot.blend'
+# with bpy.data.libraries.load(filepath=sceneFilename) as (data_from, data_to):
+#     for attr in dir(data_to):
+#         setattr(data_to, attr, getattr(data_from, attr))
+# teapot = bpy.data.scenes['Teapot'].objects[1]
+# vmod, fmod_list, vcmod, vnmod, uvmod, haveTexturesmod_list, texturesmod_list = scene_io_utils.unpackBlenderObject(teapot, '', False)
+# color = np.array([0,0,0])
+# texturesmod_list[0][0][0] = ch.Ch(np.ones(texturesmod_list[0][0][0].shape)*color[None,None,:])
 
 # testRenderer = 2
 if useShapeModel:
@@ -658,7 +659,7 @@ if useShapeModel:
 
         renderer.overdraw = True
         renderer.nsamples = 8
-        renderer.msaa = False
+        renderer.msaa = True
         renderer.initGL()
         renderer.initGLTexture()
         # renderer.initGL_AnalyticRenderer()
