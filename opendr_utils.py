@@ -738,9 +738,9 @@ def setupTexturedRenderer(renderer, vstack, vch, f_list, vc_list, vnch, uv, have
     texturesch = []
     textures_listflat = [item for sublist in textures_list for item in sublist]
     for texture_list in textures_listflat:
-        if texture_list != None:
+        if texture_list is not None:
             for texture in texture_list:
-                if texture != None:
+                if texture is not None:
                     texturesch = texturesch + [ch.array(texture)]
 
     if len(texturesch) == 0:

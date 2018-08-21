@@ -34,19 +34,19 @@ plt.ion()
 #########################################
 prefix = 'show_scenes'
 # prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
-previousGTPrefix = 'cian_data_dir_whitebg'
+prefix = 'train4_occlusion_shapemodel_boris'
+# previousGTPrefix = 'cian_data_dir_whitebg'
 
 #Main script options:
-
 renderFromPreviousGT = False
 useShapeModel = True
-useOpenDR = False
+useOpenDR = True
 useBlender = True
 renderBlender = True
 captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
-useCycles = True
+useCycles = False
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -56,14 +56,14 @@ replaceNewGroundtruth = True
 renderOcclusions = False
 occlusionMin = 0.0
 occlusionMax = 0.9
-renderTeapots =  False
+renderTeapots =  True
 renderMugs = False
 showMug = False
 centeredObject = True
 fixedCamDistance = True
 
-useDirectionalLight = True
-renderBackground = False
+useDirectionalLight = False
+renderBackground = True
 
 teapotSceneIndex = 0
 mugSceneIndex = 0
@@ -106,8 +106,12 @@ camDistance = 0.4
 teapotsFile = 'teapots.txt'
 teapots = [line.strip() for line in open(teapotsFile)]
 renderTeapotsList = np.arange(len(teapots))[0:1]
-mugs = [line.strip() for line in open('mugs.txt')]
-renderMugsList = np.arange(len(mugs))[0:1]
+
+mugs = []
+renderMugsList = np.array([])
+if renderMugs:
+    mugs = [line.strip() for line in open('mugs.txt')]
+    renderMugsList = np.arange(len(mugs))[0:1]
 
 sceneIdx = 0
 # replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
@@ -242,7 +246,6 @@ if renderMugs:
 center = center_teapots[currentTeapotModel]
 
 if useOpenDR:
-
     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
     rendererGT.overdraw = False
     rendererGT.nsamples = 8
@@ -334,7 +337,6 @@ if useShapeModel:
 
     mat = makeMaterial('teapotMat', (0, 0, 0), (0, 0, 0), 1)
     setMaterial(teapotMesh, mat)
-
 
 
 ### Renderer (only teapot)
@@ -524,7 +526,7 @@ sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
 scenesToRender = range(len(sceneLines))[0:1]
 
-trainSize = 100000
+trainSize = 10000
 
 renderTeapotsList = np.arange(len(teapots))[0:1]
 
