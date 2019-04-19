@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.4m
- 
 import bpy
 import bpy_extras
 import numpy
@@ -12,6 +10,8 @@ import cv2
 import sys
 import io
 import os
+import light_probes
+import imageio
 try:
    import cPickle as pickle
 except:
@@ -337,39 +337,34 @@ def addEnvironmentMapWorld(scene):
     scene.world.use_nodes = True
     treeNodes=scene.world.node_tree
     envTextureNode = treeNodes.nodes.new('ShaderNodeTexEnvironment')
-
     mappingNode = treeNodes.nodes.new('ShaderNodeMapping')
     links = treeNodes.links
     links.new(mappingNode.outputs[0],envTextureNode.inputs[0])
-
     texCoordNode = treeNodes.nodes.new('ShaderNodeTexCoord')
     links.new(texCoordNode.outputs[0],mappingNode.inputs[0])
-    # mathNode = treeNodes.nodes.new('ShaderNodeMath')
-    # links.new(envTextureNode.outputs[0],mathNode.inputs[0])
 
     rgbToBWNode = treeNodes.nodes.new('ShaderNodeRGBToBW')
-
-    # links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
-    # links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
-    # links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
-
-    links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
-
+    links.new(envTextureNode.outputs[0],rgbToBWNode.inputs[0])
     colorBackgroundNode = treeNodes.nodes.new('ShaderNodeBackground')
+    colorBackgroundNode.name = "WorldBackground"
+    colorBackgroundNode.inputs[0].default_value[0:3] = (1.0,1.0,1.0)    
+    links.new(rgbToBWNode.outputs[0],colorBackgroundNode.inputs[0])
+    # links.new(envTextureNode.outputs[0],colorBackgroundNode.inputs[0])
+    
 
-    colorBackgroundNode.inputs[0].default_value[0:3] = (1.0,1.0,1.0)
+    output_node = treeNodes.nodes['World Output']
+    links.new(colorBackgroundNode.outputs["Background"],output_node.inputs["Surface"])
+    # # links.new(rgbToBWNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
+    # links.new(envTextureNode.outputs[0],treeNodes.nodes['Background'].inputs[0])
 
-    mixShaderNode = treeNodes.nodes.new('ShaderNodeMixShader')
-    mixShaderNode.name = 'mixShaderNode'
-    light_pathNode = treeNodes.nodes.new('ShaderNodeLightPath')
-    light_pathNode.name = 'lightPathNode'
-
-    links.new(treeNodes.nodes['Background'].outputs[0],mixShaderNode.inputs[1])
-    links.new(colorBackgroundNode.outputs[0],mixShaderNode.inputs[2])
-    links.new(light_pathNode.outputs[0],mixShaderNode.inputs[0])
-
-    mixShaderNode.inputs[0].default_value = 0
-
+    # mixShaderNode = treeNodes.nodes.new('ShaderNodeMixShader')
+    # mixShaderNode.name = 'mixShaderNode'
+    # light_pathNode = treeNodes.nodes.new('ShaderNodeLightPath')
+    # light_pathNode.name = 'lightPathNode'
+    # links.new(treeNodes.nodes['Background'].outputs[0],mixShaderNode.inputs[1])
+    # links.new(colorBackgroundNode.outputs[0],mixShaderNode.inputs[2])
+    # links.new(light_pathNode.outputs[0],mixShaderNode.inputs[0])
+    # mixShaderNode.inputs[0].default_value = 0
     envTextureNode.color_space="NONE"
 
 def setEnviornmentMapStrength(strength, scene):
@@ -396,7 +391,6 @@ def cameraLookingInsideRoom(cameraAzimuth):
     return False
 
 def deleteInstance(instance):
-
     for mesh in instance.dupli_group.objects:
         mesh.user_clear()
         bpy.data.objects.remove(mesh)
@@ -449,11 +443,7 @@ def lin2srgb(im):
     return im
 
 
-import light_probes
-import imageio
 def sortface(f):
-
-
     if len(f) != 4:
         return f
     v=[mathutils.Vector(list(p)) for p in f]
@@ -477,30 +467,20 @@ def sortface(f):
         f.v=[f[0],f[2],f[3],f[1]]
 
 def createCube(scaleX, scaleY, scaleZ, name):
-
     bpy.ops.mesh.primitive_cube_add()
-
     cubeObj = bpy.context.object
     cubeObj.name = name
-
     cubeScale = mathutils.Matrix([[scaleX / 2, 0, 0, 0], [0, scaleY / 2, 0, 0], [0, 0, scaleZ / 2, 0], [0, 0, 0, 1]])
-
     cubeObj.data.transform(cubeScale * mathutils.Matrix.Translation(mathutils.Vector((0, 0, 1))))
-
     bpy.context.scene.objects.unlink(cubeObj)
-
-
     return cubeObj
 
 def getCubeObj(instance):
     minX1, maxX1 = modelWidth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
     minY1, maxY1 = modelDepth(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
     minZ1, maxZ1 = modelHeight(instance.dupli_group.objects, mathutils.Matrix.Identity(4))
-
     ob = instance.dupli_group.objects[0]
     bbox = [ob.matrix_world * mathutils.Vector(corner) for corner in ob.bound_box]
-
-    #
     # bpy.ops.mesh.primitive_cube_add()
     # cubeObj2 = bpy.context.object
     # cubeObj2.name = 'cube' + instance.name
@@ -516,7 +496,6 @@ def getCubeObj(instance):
     mesh = bpy.data.meshes.new('meshCube' + instance.name)
     cubeObj = bpy.data.objects.new('cube' + instance.name, mesh)
     # cubeObj.name = 'cube' + instance.name
-
     import bmesh
     bm = bmesh.new()
 
@@ -567,7 +546,6 @@ def getCubeObj(instance):
 
     return cubeObj
 
-
 def createCubeScene(scene):
     bpy.ops.scene.new(type='EMPTY')
     bpy.context.scene.name = "CubeScene"
@@ -577,22 +555,15 @@ def createCubeScene(scene):
 
     for sceneInstanceIdx, sceneInstance in enumerate(scene.objects):
         if sceneInstance.type == 'EMPTY':
-            # ipdb.set_trace()
-
             cubeObj = getCubeObj(sceneInstance)
-
             cubeScene.objects.link(cubeObj)
-
             cubeScene.update()
-
     return cubeScene
 
 def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, links, treeNodes, teapot, center, targetPosition, width, height, cyclesSamples=3000, gtDir='', train_i=0):
     bpy.context.screen.scene = scene
-
     envMapTexture = cv2.resize(src=envMapTexture, dsize=(360, 180))
     # envMapTexture = skimage.transform.resize(images[test_i], [height,width])
-
     envMapGray = 0.3 * envMapTexture[:, :, 0] + 0.59 * envMapTexture[:, :, 1] + 0.11 * envMapTexture[:, :, 2]
     envMapGrayMean = np.mean(envMapGray, axis=(0, 1))
 
@@ -682,7 +653,7 @@ def captureSceneEnvMap(scene, envMapTexture, roomInstanceNum, rotationOffset, li
 
     return envMapCoeffs
 
-def setupSceneGroundtruth(scene, width, height, clip_start, cyclesSamples, device_type, compute_device):
+def setupSceneGroundtruth(scene, width, height, clip_start, cyclesSamples, device_type=None, compute_device=None):
     scene.render.resolution_x = width  # perhaps set resolution in code
     scene.render.resolution_y = height
     scene.render.tile_x = height
@@ -690,39 +661,46 @@ def setupSceneGroundtruth(scene, width, height, clip_start, cyclesSamples, devic
     scene.cycles.samples = cyclesSamples
     bpy.context.screen.scene = scene
     addEnvironmentMapWorld(scene)
-    scene.render.image_settings.file_format = 'OPEN_EXR'
-    scene.render.filepath = 'opendr_blender.exr'
-    scene.sequencer_colorspace_settings.name = 'Linear'
-    scene.display_settings.display_device = 'None'
-    bpy.context.user_preferences.filepaths.render_cache_directory = '/disk/scratch1/pol/.cache/'
+    bpy.context.scene.render.image_settings.quality = 100
+    scene.render.image_settings.file_format = 'JPEG'
+    # scene.render.filepath = 'image.jpeg'
+    scene.sequencer_colorspace_settings.name = 'sRGB'
+    # scene.display_settings.display_device = 'None' #or sRGB
+    # bpy.context.user_preferences.filepaths.render_cache_directory = '/disk/scratch1/pol/.cache/'
 
-    scene.cycles.device = 'GPU'
-    bpy.context.user_preferences.system.compute_device_type = device_type
-
-    # bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
-    bpy.context.user_preferences.system.compute_device = compute_device
+    #Uncomment if you can use any of these:
+    if device_type is not None:
+        bpy.context.user_preferences.system.compute_device_type = device_type
+    if compute_device is not None:
+        bpy.context.user_preferences.system.compute_device = compute_Device
+    # bpy.context.user_preferences.system.compute_device = compute_device
     bpy.ops.wm.save_userpref()
 
     scene.world.horizon_color = mathutils.Color((1.0, 1.0, 1.0))
     scene.camera.data.clip_start = clip_start
 
+    scene.render.layers['RenderLayer'].use_pass_combined = True
+    scene.layers[0] = True
+    scene.camera.layers[0] = True
+    scene.render.layers.active = scene.render.layers['RenderLayer']
+    nt = bpy.context.scene.node_tree
+    nt.nodes['Render Layers'].layer = 'RenderLayer'
 
-def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples, useCycles, useGPU):
+
+
+def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples, useCycles, useGPU, device_type=None, compute_device=None):
 
     if useCycles:
         #Switch Engine to Cycles
         scene.render.engine = 'CYCLES'
         if useGPU:
             bpy.context.scene.cycles.device = 'GPU'
-            bpy.context.user_preferences.system.compute_device_type = 'CUDA'
-            bpy.context.user_preferences.system.compute_device = 'CUDA_MULTI_2'
-
+            bpy.context.user_preferences.system.compute_device_type = device_type
+            bpy.context.user_preferences.system.compute_device = compute_device
 
         scene.use_nodes = True
 
         AutoNode()
-        # bpy.context.scene.render.engine = 'BLENDER_RENDER'
-
         cycles = bpy.context.scene.cycles
 
         cycles.samples = 2000
@@ -803,7 +781,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
     bpy.ops.scene.render_layer_add()
 
     camera.layers[1] = True
-    scene.render.layers[0].use_pass_object_index = True
+    scene.render.layers[0].use_pass_combined = True
     scene.render.layers[1].use_pass_object_index = True
     scene.render.layers[1].use_pass_combined = True
     camera.layers[2] = True
@@ -814,6 +792,7 @@ def setupScene(scene, roomInstanceNum, world, camera, width, height, numSamples,
     scene.render.layers[1].use = False
     scene.render.layers[2].use = False
     scene.render.use_sequencer = False
+
 
 
 def addAmbientLightingScene(scene, useCycles):
@@ -1007,7 +986,6 @@ def closestCameraIntersection(scene, point):
 
 def sceneIntersection(scene, point):
     result, object, matrix, location, normal = scene.ray_cast(scene.camera.location, point)
-
     return result
 
 # def flattenMesh(mesh, transform):

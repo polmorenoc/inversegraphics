@@ -7,11 +7,7 @@ from blender_utils import *
 import blender_utils
 
 def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, apply_modifiers=False):
-    """
-    Returns a transformed, triangulated copy of the mesh
-    """
-
-    assert(obj.type == 'MESH')
+    assert (obj.type == 'MESH')
 
     if apply_modifiers and obj.modifiers:
         me = obj.to_mesh(bpy.context.scene, True, 'PREVIEW', calc_tessface=False)
@@ -19,21 +15,21 @@ def bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True, app
         bm.from_mesh(me)
         bpy.data.meshes.remove(me)
     else:
+        me = obj.data
         if obj.mode == 'EDIT':
             bm_orig = bmesh.from_edit_mesh(me)
             bm = bm_orig.copy()
         else:
             bm = bmesh.new()
             bm.from_mesh(me)
-        # Remove custom data layers to save memory
-        for elem in (bm.faces, bm.edges, bm.verts, bm.loops):
-            for layers_name in dir(elem.layers):
-                if not layers_name.startswith("_"):
-                    layers = getattr(elem.layers, layers_name)
+
+    # Remove custom data layers to save memory
+    for elem in (bm.faces, bm.edges, bm.verts, bm.loops):
+        for layers_name in dir(elem.layers):
+            if not layers_name.startswith("_"):
+                layers = getattr(elem.layers, layers_name)
+                for layer_name, layer in layers.items():
                     layers.remove(layer)
-                    for layer_name, layer in layers.items():
-                        pass
-        me = obj.data
 
     if transform:
         bm.transform(objTransf * obj.matrix_world)
@@ -56,60 +52,46 @@ def aabb_intersect(matrix_world1, instanceObjs1, matrix_world2, instanceObjs2):
     return ((maxX1 > minX2) and (minX1 < maxX2) and (maxY1 > minY2) and (minY1 < maxY2) and (maxZ1 > minZ2) and (minZ1 < maxZ2))
 
 
-def bmesh_check_intersect_objects(obj, objTransf,  obj2, obj2Transf):
+def bmesh_check_intersect_objects(obj, objTransf,  obj2, obj2Transf, selectface=False):
     """
     Check if any faces intersect with the other object
 
     returns a boolean
     """
+    from mathutils.bvhtree import BVHTree
     assert(obj != obj2)
 
     # Triangulate
     bm = bmesh_copy_from_object(obj, objTransf, transform=True, triangulate=True)
     bm2 = bmesh_copy_from_object(obj2, obj2Transf, transform=True, triangulate=True)
 
-    # If bm has more edges, use bm2 instead for looping over its edges
-    # (so we cast less rays from the simpler object to the more complex object)
-    if len(bm.edges) > len(bm2.edges):
-        bm2, bm = bm, bm2
-
-    # Create a real mesh (lame!)
-    scene = bpy.context.scene
-    me_tmp = bpy.data.meshes.new(name="~temp~")
-    bm2.to_mesh(me_tmp)
-    bm2.free()
-    obj_tmp = bpy.data.objects.new(name=me_tmp.name, object_data=me_tmp)
-    scene.objects.link(obj_tmp)
-    scene.update()
-    ray_cast = obj_tmp.ray_cast
-
     intersect = False
+    BMT1 = BVHTree.FromBMesh(bm)
+    BMT2 = BVHTree.FromBMesh(bm2)
+    overlap_pairs = BMT1.overlap(BMT2)
 
-    EPS_NORMAL = 0.000001
-    EPS_CENTER = 0.01  # should always be bigger
+    if len(overlap_pairs) > 0:
+        intersect = True
 
-    #for ed in me_tmp.edges:
-    for ed in bm.edges:
-        v1, v2 = ed.verts
+    if selectface:
+        # deselect everything for both objects
+        bpy.context.scene.objects.active = obj
+        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+        bpy.context.scene.objects.active = obj2
+        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
 
-        # setup the edge with an offset
-        co_1 = v1.co.copy()
-        co_2 = v2.co.copy()
-        co_mid = (co_1 + co_2) * 0.5
-        no_mid = (v1.normal + v2.normal).normalized() * EPS_NORMAL
-        co_1 = co_1.lerp(co_mid, EPS_CENTER) + no_mid
-        co_2 = co_2.lerp(co_mid, EPS_CENTER) + no_mid
+        for each in overlap_pairs:
+            obj.data.polygons[each[0]].select = True
+            obj.update_from_editmode()
+            obj2.data.polygons[each[1]].select = True
+            obj2.update_from_editmode()
 
-        co, no, index = ray_cast(co_1, co_2)
-        if index != -1:
-            intersect = True
-            break
-
-    scene.objects.unlink(obj_tmp)
-    bpy.data.objects.remove(obj_tmp)
-    bpy.data.meshes.remove(me_tmp)
-
-    scene.update()
+    bm.free()
+    bm2.free()
 
     return intersect
 

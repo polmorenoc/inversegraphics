@@ -32,21 +32,19 @@ plt.ion()
 #########################################
 # Initialization starts here
 #########################################
-prefix = 'show_scenes'
-# prefix = 'train4_occlusion_shapemodel_newscenes_eccvworkshop'
-prefix = 'train4_occlusion_shapemodel_boris'
-# previousGTPrefix = 'cian_data_dir_whitebg'
+prefix = 'new_scenes'
+previousGTPrefix = ''
 
 #Main script options:
 renderFromPreviousGT = False
 useShapeModel = True
-useOpenDR = True
+useOpenDR = False
 useBlender = True
 renderBlender = True
 captureEnvMapFromBlender = False
 parseSceneInstantiations = False
 loadBlenderSceneFile = True
-useCycles = False
+useCycles = True
 unpackModelsFromBlender = False
 unpackSceneFromBlender = False
 loadSavedSH = False
@@ -90,7 +88,7 @@ if useOpenDR:
         glfw.init()
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-        # glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
+        glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL.GL_TRUE)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.DEPTH_BITS,32)
         glfw.window_hint(glfw.VISIBLE, GL.GL_FALSE)
@@ -114,8 +112,7 @@ if renderMugs:
     renderMugsList = np.arange(len(mugs))[0:1]
 
 sceneIdx = 0
-# replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup.txt'
-replaceableScenesFile = '../databaseFull/fields/scene_replaceables_backup_new.txt'
+replaceableScenesFile = 'data/scene_replaceables_backup_new.txt'
 sceneNumber, sceneFileName, instances, roomName, roomInstanceNum, targetIndices, targetPositions = scene_io_utils.getSceneInformation(sceneIdx, replaceableScenesFile)
 sceneDicFile = 'data/scene' + str(sceneNumber) + '.pickle'
 targetParentIdx = 0
@@ -248,7 +245,7 @@ center = center_teapots[currentTeapotModel]
 if useOpenDR:
     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v, vc, f_list, vn, light_colorGT, chComponentGT, chVColorsGT, targetPosition[:].copy(), chDisplacementGT, width,height, uv, haveTextures_list, textures_list, frustum, None )
     rendererGT.overdraw = False
-    rendererGT.nsamples = 8
+    rendererGT.nsamples = 1
     rendererGT.msaa = False
     rendererGT.initGL()
     rendererGT.initGLTexture()
@@ -447,7 +444,7 @@ if useShapeModel:
     else:
 
         renderer = createRendererTarget(glMode, chAz, chEl, chDist, smCenter, [v], [smVColors], [smFaces], [vn], light_color, chComponent, chVColors, 0, chDisplacement, width,height, [smUVs], [smHaveTextures], [smTexturesList], frustum, None )
-    renderer.msaa = True
+    renderer.msaa = False
     renderer.overdraw = True
 
     # chShapeParams[:] = np.zeros([latentDim])
@@ -524,7 +521,9 @@ print("Generating renders")
 
 sceneLines = [line.strip() for line in open(replaceableScenesFile)]
 scenesToRender = range(len(sceneLines))[:]
-scenesToRender = range(len(sceneLines))[0:1]
+scenesToRender = range(len(sceneLines))[2:3]
+
+# scenesToRender = np.random.shuffle(scenesToRender)
 
 trainSize = 10000
 
@@ -685,6 +684,7 @@ if not renderFromPreviousGT:
         if useBlender and not loadBlenderSceneFile:
             bpy.ops.wm.read_factory_settings()
             scene = scene_io_utils.loadBlenderScene(sceneIdx, replaceableScenesFile)
+
             scene_io_utils.setupScene(scene, roomInstanceNum, scene.world, scene.camera, width, height, 16, useCycles, True)
             scene.update()
             # Save barebones scene.
@@ -692,10 +692,12 @@ if not renderFromPreviousGT:
             bpy.ops.wm.read_factory_settings()
             scene_io_utils.loadSceneBlendData(sceneIdx, replaceableScenesFile)
             scene = bpy.data.scenes['Main Scene']
+            
+            #bpy.ops.wm.save_as_mainfile(filepath="/home/pol/sceneload.blend")
+
 
         # Configure scene
         if useBlender:
-
             if renderTeapots:
                 targetModels = []
                 blender_teapots = []
@@ -720,15 +722,15 @@ if not renderFromPreviousGT:
                     mugModels = mugModels + [mug]
                     blender_mugs = blender_mugs + [mug]
 
-            setupSceneGroundtruth(scene, width, height, clip_start, 2000, 'CUDA', 'CUDA_MULTI_2')
-
+            # setupSceneGroundtruth(scene, width, height, clip_start, 2000, 'CUDA', 'CUDA_MULTI_2')
+            # bpy.ops.wm.save_as_mainfile(filepath="/home/pol/sceneload1.blend")
+            setupSceneGroundtruth(scene, width, height, clip_start, 2000)
+            # bpy.ops.wm.save_as_mainfile(filepath="/home/pol/sceneload2.blend")
             treeNodes = scene.world.node_tree
-
             links = treeNodes.links
-
             cubeScene = createCubeScene(scene)
             setEnviornmentMapStrength(20, cubeScene)
-            # cubeScene.render.engine = 'BLENDER_RENDER'
+            
 
         unlinkedObj = None
         unlinkedCubeObj = None
@@ -946,7 +948,6 @@ if not renderFromPreviousGT:
                         vc_scene = VColorsTeapot + VColorsMug
                         vn_scene = NormalsTeapot + NormalsMug
 
-
                     vc_scene_illum = []
                     for mesh in range(len(vc_scene)):
                         if useDirectionalLight:
@@ -967,16 +968,15 @@ if not renderFromPreviousGT:
                         haveTextures_scene = HaveTexturesTeapot + HaveTexturesMug
                         textures_list_scene = TexturesListTeapot + TexturesListMug
                     rendererGT = createRendererGT(glMode, chAzGT, chElGT, chDistGT, center, v_scene, vc_scene_illum, f_scene, vn_scene, light_colorGT, chComponentGT, chVColorsGT, targetPosition.copy(), chDisplacementGT, width, height, uvs_scene, haveTextures_scene, textures_list_scene, frustum, None)
-                    rendererGT.overdraw = False
-                    rendererGT.nsamples = 8
-                    rendererGT.msaa = True
+                    rendererGT.overdraw = True
+                    rendererGT.nsamples = 1
+                    rendererGT.msaa = False
                     rendererGT.initGL()
                     rendererGT.initGLTexture()
 
 
                 ## Blender: Unlink and link new teapot.
                 if useBlender:
-
                     if renderTeapots:
                         # if currentScene != -1 and currentTargetIndex != -1 and currentTeapot != -1 and teapot != None:
                         if teapot.name in scene.objects:
@@ -1006,8 +1006,8 @@ if not renderFromPreviousGT:
 
                         # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
                         placeNewTarget(scene, teapot, targetPosition[:].copy())
-                        teapot.layers[1] = True
                         teapot.layers[0] = True
+                        teapot.layers[1] = True
                         original_matrix_world = teapot.matrix_world.copy()
 
 
@@ -1035,10 +1035,10 @@ if not renderFromPreviousGT:
 
                 envMapFilename = hdrFile
 
-                if not useBlender:
-                    envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
+                # if not useBlender:
+                envMapTexture = np.array(imageio.imread(envMapFilename))[:,:,0:3]
                 numTeapotTrain = 0
-                numAttempts = 0
+                numAttempts = 0 #Rejection sampling
                 maxAttempts = max(int(trainSize/(lenScenes*len(renderTeapotsList))),1)
                 exitInstantiationLoop = False
 
@@ -1053,10 +1053,9 @@ if not renderFromPreviousGT:
                     meanValIntensityOffset = np.random.uniform(-0.5,0.5)
                     meanValIntensityOffset = 0
                     chAmbientIntensityGTVals = (0.8 + meanValIntensityOffset)/(0.3*envMapCoeffs[0,0] + 0.59*envMapCoeffs[0,1]+ 0.11*envMapCoeffs[0,2])
-                    chAmbientIntensityGTVals = chGlobalConstantGT.r
+                    # chAmbientIntensityGTVals = chGlobalConstantGT.r
 
-
-                    #LIGHT RANDOMIZATION
+                    #Light randomization
                     phiOffsetVals = np.random.uniform(0,2*np.pi, 1)
                     # phiOffsetVals = 0
 
@@ -1067,14 +1066,14 @@ if not renderFromPreviousGT:
 
                     chElGTVals = np.random.uniform(0.05,np.pi/2, 1)
 
-                    # chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
-                    chLightAzGTVals = chLightAzGT.r
-                    # chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
-                    chLightElGTVals = chLightElGT.r
+                    chLightAzGTVals = np.random.uniform(0,2*np.pi, 1)
+                    # chLightAzGTVals = chLightAzGT.r
+                    chLightElGTVals = np.random.uniform(0,np.pi/2, 1)
+                    # chLightElGTVals = chLightElGT.r
 
-                    chLightIntensityGTVals = chLightIntensityGT.r
-                    # chLightIntensityGTVals = np.random.uniform(0,1)
-                    # chGlobalConstantGTVals = np.random.uniform(0.1,0.9)
+                    # chLightIntensityGTVals = chLightIntensityGT.r
+                    chLightIntensityGTVals = np.random.uniform(0,1)
+                    chGlobalConstantGTVals = np.random.uniform(0.1,0.9)
                     # chAmbientIntensityGTVals = chGlobalConstantGTVals
 
                     chVColorsGTVals =  np.random.uniform(0.0,1.0, [1, 3])
@@ -1084,22 +1083,16 @@ if not renderFromPreviousGT:
 
                     # SHAPE RANDOMIZATION
                     shapeParams = np.random.randn(latentDim)
-                    shapeParams = np.zeros(latentDim)
+                    # shapeParams = np.zeros(latentDim)
                     # shapeParams[0:4] = np.random.randn(4)
                     chShapeParamsGTVals = shapeParams
 
                     ## Update renderer scene latent variables.
-
-                    ignore = False
-
                     # chAmbientIntensityGT[:] = chGlobalConstantGTVals
                     chAmbientIntensityGT[:] = chGlobalConstantGT.r
-
                     phiOffset[:] = phiOffsetVals
-
                     chAzGT[:] = chAzGTVals
                     chElGT[:] = chElGTVals
-
                     chLightAzGT[:] = chLightAzGTVals
                     chLightElGT[:] = chLightElGTVals
 
@@ -1225,6 +1218,8 @@ if not renderFromPreviousGT:
                         mugPosOffsetVals = mugPosOffset.r
 
                     if useBlender and not ignore:
+                        updateEnviornmentMap(envMapFilename, scene)
+                        rotateEnviornmentMap(totalOffset.r.copy(), scene)
 
                         placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi,
                                     chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(),
@@ -1239,8 +1234,6 @@ if not renderFromPreviousGT:
                                 mesh = teapot.dupli_group.objects[0]
                                 for vertex_i, vertex in enumerate(mesh.data.vertices):
                                     vertex.co = mathutils.Vector(chVerticesGT.r[vertex_i])
-
-
 
                         if renderMugs:
                             setObjectDiffuseColor(mug, chVColorsMug.r.copy())
@@ -1266,22 +1259,17 @@ if not renderFromPreviousGT:
                             vis_im_mug = np.array(rendererGT.image_mesh_bool([mugSceneIndex])).copy().astype(np.bool)
 
                         if renderTeapots:
-
                             if occlusion < occlusionMin or occlusion > occlusionMax:
                                 ignore = True
-
                             # if occlusion > 0.9 or vis_occluded.sum() < 10 or np.isnan(occlusion):
                             #Cian change:
                             if occlusion > 0.01 or vis_occluded.sum() < 10 or np.isnan(occlusion):
                                 ignore = True
-
                             if np.sum(vis_im[:,0]) > 1 or np.sum(vis_im[0,:]) > 1 or np.sum(vis_im[:,-1]) > 1 or np.sum(vis_im[-1,:]) > 1:
                                 ignore = True
-
                         if renderMugs and not showMug:
                             if  occlusionMug > 0.9 or vis_occluded_mug.sum() < 10 or np.isnan(occlusionMug):
                                 ignore = True
-
                             #Check that objects are not only partly in the viewing plane of the camera:
                             if np.sum(vis_im_mug[:,0]) > 1 or np.sum(vis_im_mug[0,:]) > 1 or np.sum(vis_im_mug[:,-1]) > 1 or np.sum(vis_im_mug[-1,:]) > 1:
                                 if showMug:
@@ -1335,7 +1323,7 @@ if not renderFromPreviousGT:
                     #                 print("Teapot interesects supporting object.")
                     #                 ignore = True
                     #
-                    #             # ipdb.set_trace()
+                    #
                     #             if not ignore and collision.instancesIntersect(mathutils.Matrix.Identity(4), [cubeTeapot], mathutils.Matrix.Identity(4), [cubeRoomObj]):
                     #                 print("Teapot intersects room")
                     #                 ignore = True
@@ -1379,6 +1367,9 @@ if not renderFromPreviousGT:
                             envMapCoeffs = captureSceneEnvMap(scene, envMapTexture, roomInstanceNum,
                                                               totalOffset.r.copy(), links, treeNodes, teapot, center,
                                                               targetPosition, width, height, 2000, gtDir, train_i)
+                            placeCamera(scene.camera, -chAzGT.r[:].copy() * 180 / np.pi,
+                                    chElGT.r[:].copy() * 180 / np.pi, chDistGT.r[0].copy(),
+                                    center[:].copy() + targetPosition[:].copy()) 
 
                     if useBlender:
                         envMapCoeffsRotated[:] = np.dot(light_probes.chSphericalHarmonicsZRotation(0),
@@ -1396,17 +1387,33 @@ if not renderFromPreviousGT:
 
                     if renderBlender and not ignore:
                         bpy.context.screen.scene = scene
+                        scene.render.filepath = gtDir + 'images/im' + str(train_i) + '.jpeg'
+                        
+                        # image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
+                        # image[image > 1] = 1
+                        # blenderRender = image
+                        # lin2srgb(blenderRender)
+                        # cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg', 255 * blenderRender[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                        
+                        scene.render.image_settings.file_format = 'JPEG'
+                        scene.render.filepath = gtDir + 'images/im' + str(train_i) + '.jpeg'
+                        
+                        scene.render.layers[0].use = True
+                        nt = bpy.context.scene.node_tree
+                        nt.nodes['Render Layers'].layer = 'RenderLayer'
+                        scene.render.layers['RenderLayer'].use_pass_combined = True
+                        scene.render.layers['RenderLayer'].use_pass_environment = True
+
+                        backgroundNode = scene.world.node_tree.nodes['WorldBackground']
+                        backgroundNode.inputs[1].default_value = 2
 
                         bpy.ops.render.render(write_still=True)
 
                         image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
-                        image[image > 1] = 1
-                        blenderRender = image
 
-                        lin2srgb(blenderRender)
+                        blenderRender = srgb2lin(image)
 
-                        cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg', 255 * blenderRender[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-                        if captureEnvMapFromBlender:
+                        if captureEnvMapFromBlender and useOpenDR:
                             blenderRenderGray = 0.3 * blenderRender[:, :, 0] + 0.59 * blenderRender[:, :,
                                                                                       1] + 0.11 * blenderRender[:, :, 2]
                             # For some reason I need to correct average intensity in OpenDR a few times before it gets it right:
@@ -1547,7 +1554,6 @@ if renderFromPreviousGT:
 else:
     exit()
 
-pdb.set_trace()
 
 currentScene = -1
 currentTeapot = -1
@@ -1648,7 +1654,8 @@ if renderFromPreviousGT:
                         mugModels = mugModels + [mug]
                         blender_mugs = blender_mugs + [mug]
 
-                setupSceneGroundtruth(scene, width, height, clip_start, 5000, 'CUDA', 'CUDA_MULTI_2')
+                # setupSceneGroundtruth(scene, width, height, clip_start, 5000, 'CUDA', 'CUDA_MULTI_2')
+                setupSceneGroundtruth(scene, width, height, clip_start, 5000)
 
                 treeNodes = scene.world.node_tree
 
@@ -1784,8 +1791,8 @@ if renderFromPreviousGT:
                                               UVsTeapot + UVsMug + uv, HaveTexturesTeapot + HaveTexturesMug + haveTextures_list,
                                               TexturesListTeapot + TexturesListMug + textures_list, frustum, None)
                 rendererGT.overdraw = False
-                rendererGT.nsamples = 8
-                rendererGT.msaa = True
+                rendererGT.nsamples = 1
+                rendererGT.msaa = False
                 rendererGT.initGL()
                 rendererGT.initGLTexture()
 
@@ -1866,8 +1873,8 @@ if renderFromPreviousGT:
 
                     # center = centerOfGeometry(teapot.dupli_group.objects, teapot.matrix_world)
                     placeNewTarget(scene, teapot, targetPosition[:].copy())
-                    teapot.layers[1] = True
                     teapot.layers[0] = True
+                    teapot.layers[1] = True
                     original_matrix_world = teapot.matrix_world.copy()
 
                 if renderMugs:
@@ -1878,9 +1885,8 @@ if renderFromPreviousGT:
                     mug = blender_mugs[currentTeapotModel]
 
                     placeNewTarget(scene, mug, targetPosition[:].copy())
-
-                    mug.layers[1] = True
                     mug.layers[0] = True
+                    mug.layers[1] = True
                     original_matrix_world_mug = mug.matrix_world.copy()
 
 
@@ -1898,8 +1904,7 @@ if renderFromPreviousGT:
                 break
 
         assert(envMapFilename != "")
-        # if envMapFilename == "":
-        #     ipdb.set_trace()
+
 
         print("Render " + str(gtIdx) + "of " + str(len(groundTruthToRender)))
         ignore = False
@@ -1985,39 +1990,43 @@ if renderFromPreviousGT:
                                    mathutils.Matrix.Translation(-original_matrix_world_mug.to_translation())) * original_matrix_world_mug
 
             scene.update()
+            scene.render.filepath = gtDir + 'images/im' + str(train_i) + '.jpeg'
+            bpy.ops.render.render(write_still=True)
 
-
-            bpy.ops.render.render( write_still=True )
-
-            image = np.array(imageio.imread(scene.render.filepath))[:,:,0:3]
-            image[image>1]=1
+            # image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
+            # image[image > 1] = 1
+            # blenderRender = image
+            # lin2srgb(blenderRender)
+            # cv2.imwrite(gtDir + 'images/im' + str(train_i) + '.jpeg', 255 * blenderRender[:, :, [2, 1, 0]], [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+            
+            image = np.array(imageio.imread(scene.render.filepath))[:, :, 0:3]
             blenderRender = image
+
 
             blenderRenderGray = 0.3*blenderRender[:,:,0] + 0.59*blenderRender[:,:,1] + 0.11*blenderRender[:,:,2]
 
             #For some reason I need to correct average intensity in OpenDR a few times before it gets it right:
+            # rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+            # meanIntensityScale = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+            # chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale
 
-            rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
-            meanIntensityScale = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
-            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale
+            # rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+            # meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+            # chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale2
 
-            rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
-            meanIntensityScale2 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
-            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale2
+            # rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+            # meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+            # chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale3
 
-            rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
-            meanIntensityScale3 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
-            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale3
+            # rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+            # meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+            # chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale4
 
-            rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
-            meanIntensityScale4 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
-            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale4
+            # rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
+            # meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
+            # chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale5
 
-            rendererGTGray = 0.3*rendererGT[:,:,0].r[:] + 0.59*rendererGT[:,:,1].r[:] + 0.11*rendererGT[:,:,2].r[:]
-            meanIntensityScale5 = np.mean(blenderRenderGray[vis_occluded])/np.mean(rendererGTGray[vis_occluded]).copy()
-            chAmbientIntensityGT[:] = chAmbientIntensityGT.r[:].copy()*meanIntensityScale5
-
-            lin2srgb(blenderRender)
+            # lin2srgb(blenderRender)
 
         if useOpenDR:
             image = rendererGT.r[:].copy()

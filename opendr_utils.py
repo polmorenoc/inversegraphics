@@ -397,7 +397,7 @@ def transformObject(v, vn, chScale, chObjAz, chObjDisplacement, chObjRotation, t
     scaleMat = geometry.Scale(x=chScale[0], y=chScale[1],z=chScale[2])[0:3,0:3]
     chRotAzMat = geometry.RotateZ(a=-chObjAz)[0:3,0:3]
     transformation = ch.dot(chRotAzMat, scaleMat)
-    invTranspModel = ch.transpose(ch.inv(transformation))
+    invTranspModel = ch.transpose(ch.linalg.inv(transformation))
 
     objDisplacementMat = computeHemisphereTransformation(chObjRotation, 0, chObjDisplacement, np.array([0,0,0]))
 
@@ -635,7 +635,7 @@ def setupCamera(v, chAz, chEl, chDist, objCenter, width, height):
 
     chMVMat = ch.dot(chCamModelWorld, np.array(mathutils.Matrix.Rotation(radians(270), 4, 'X')))
 
-    chInvCam = ch.inv(chMVMat)
+    chInvCam = ch.linalg.inv(chMVMat)
 
     modelRotation = chInvCam[0:3,0:3]
 
@@ -805,7 +805,7 @@ def transformObject2(v, vn, chScale, chObjAz, chPosition):
 
     # transformation = scaleMat
     transformation = ch.dot(ch.dot(chRotAzMat,chRotAzMatX), scaleMat)
-    invTranspModel = ch.transpose(ch.inv(transformation))
+    invTranspModel = ch.transpose(ch.linalg.inv(transformation))
 
     vtransf = []
     vntransf = []

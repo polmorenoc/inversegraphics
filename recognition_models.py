@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import datasets, linear_model
-from sklearn.cross_validation import ShuffleSplit
 from sklearn.metrics import r2_score
 from collections import defaultdict
 from sklearn.ensemble import RandomForestRegressor

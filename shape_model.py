@@ -46,7 +46,7 @@ def chShapeParamsToNormals(N, landmarks, linT):
     nLandmarks = landmarks.r.shape[0]
     for i in range(nLandmarks):
         R = T[4*i:4*i+3,:3].T
-        invR = ch.inv(R.T)
+        invR = ch.linalg.inv(R.T)
         invT = invT + [invR]
 
     invT = ch.vstack(invT)
